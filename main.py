@@ -80,12 +80,11 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024
     ALLOWED_IMAGE_TYPES: str = Field(default="image/jpeg,image/png,image/webp")
 
-    def get_cors_origins(self) -> List[str]:
-        """Parse CORS_ORIGINS string into list"""
-        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-        # Ensure no trailing slashes for consistency
-        return [origin.rstrip('/') for origins in origins]
-
+   def get_cors_origins(self) -> List[str]:
+    """Parse CORS_ORIGINS string into list"""
+    origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+    # Ensure no trailing slashes for consistency
+    return [o.rstrip('/') for o in origins]
 settings = Settings()
 
 # ==========================================

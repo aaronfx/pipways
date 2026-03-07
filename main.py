@@ -164,11 +164,11 @@ class ChatMessage(BaseModel):
     context: Optional[List[Dict[str, str]]] = None
 
 # ==========================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION WITH MIGRATIONS
 # ==========================================
 
 async def init_db():
-    """Initialize database with proper schema"""
+    """Initialize database with comprehensive migrations"""
     global pool, redis_client
     
     logger.info("Initializing database...")
@@ -196,107 +196,174 @@ async def init_db():
                 redis_client = None
         
         async with pool.acquire() as conn:
-            # Create tables with proper constraints
-            # Using transactions to handle migrations gracefully
+            # ============================================================================
+            # STEP 1: Create base tables (if not exist)
+            # ============================================================================
             await conn.execute("""
-                -- Users table with enhanced fields
+                -- Users table
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     email VARCHAR(255) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
                     full_name VARCHAR(255),
-                    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin', 'mentor')),
+                    role VARCHAR(20) DEFAULT 'user',
                     is_active BOOLEAN DEFAULT TRUE,
                     is_verified BOOLEAN DEFAULT FALSE,
-                    email_verification_token VARCHAR(255),
-                    password_reset_token VARCHAR(255),
-                    password_reset_expires TIMESTAMP,
-                    last_login TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
-                -- Add missing columns if table already exists (migration)
-                DO $$
-                BEGIN
-                    -- Add password_reset_token if it doesn't exist
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='password_reset_token') THEN
-                        ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255);
-                    END IF;
-                    
-                    -- Add password_reset_expires if it doesn't exist
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='password_reset_expires') THEN
-                        ALTER TABLE users ADD COLUMN password_reset_expires TIMESTAMP;
-                    END IF;
-                    
-                    -- Add email_verification_token if it doesn't exist
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='email_verification_token') THEN
-                        ALTER TABLE users ADD COLUMN email_verification_token VARCHAR(255);
-                    END IF;
-                    
-                    -- Add last_login if it doesn't exist
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='last_login') THEN
-                        ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
-                    END IF;
-                END $$;
-                
-                -- Create index on email for faster lookups
-                CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-                
-                -- Only create index if column exists (safe approach)
-                DO $$
-                BEGIN
-                    IF EXISTS (SELECT 1 FROM information_schema.columns 
-                               WHERE table_name='users' AND column_name='password_reset_token') THEN
-                        CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(password_reset_token) 
-                            WHERE password_reset_token IS NOT NULL;
-                    END IF;
-                END $$;
-                
-                -- Trades table with enhanced fields
+                -- Trades table
                 CREATE TABLE IF NOT EXISTS trades (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     pair VARCHAR(20) NOT NULL,
-                    direction VARCHAR(10) NOT NULL CHECK (direction IN ('LONG', 'SHORT')),
+                    direction VARCHAR(10) NOT NULL,
                     pips DECIMAL(10,2) NOT NULL,
-                    grade VARCHAR(5) DEFAULT 'C' CHECK (grade IN ('A', 'B', 'C', 'D', 'F')),
-                    notes TEXT,
-                    entry_price DECIMAL(15,5),
-                    exit_price DECIMAL(15,5),
-                    screenshot_url TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
-                CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);
-                CREATE INDEX IF NOT EXISTS idx_trades_created_at ON trades(created_at);
                 
                 -- Courses table
                 CREATE TABLE IF NOT EXISTS courses (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(255) NOT NULL,
-                    slug VARCHAR(255) UNIQUE NOT NULL,
                     description TEXT,
                     content TEXT,
-                    level VARCHAR(20) DEFAULT 'beginner' CHECK (level IN ('beginner', 'intermediate', 'advanced', 'expert')),
                     price DECIMAL(10,2) DEFAULT 0,
-                    is_published BOOLEAN DEFAULT FALSE,
-                    thumbnail_url TEXT,
-                    video_url TEXT,
-                    duration_minutes INTEGER,
-                    instructor_id INTEGER REFERENCES users(id),
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+            """)
+            
+            # ============================================================================
+            # STEP 2: Migrate Users table - add missing columns
+            # ============================================================================
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='password_reset_token') THEN
+                        ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='password_reset_expires') THEN
+                        ALTER TABLE users ADD COLUMN password_reset_expires TIMESTAMP;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='email_verification_token') THEN
+                        ALTER TABLE users ADD COLUMN email_verification_token VARCHAR(255);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='last_login') THEN
+                        ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='updated_at') THEN
+                        ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    END IF;
+                END $$;
                 
-                CREATE INDEX IF NOT EXISTS idx_courses_slug ON courses(slug);
+                CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+            """)
+            
+            # ============================================================================
+            # STEP 3: Migrate Trades table - add missing columns
+            # ============================================================================
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='trades' AND column_name='grade') THEN
+                        ALTER TABLE trades ADD COLUMN grade VARCHAR(5) DEFAULT 'C';
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='trades' AND column_name='notes') THEN
+                        ALTER TABLE trades ADD COLUMN notes TEXT;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='trades' AND column_name='entry_price') THEN
+                        ALTER TABLE trades ADD COLUMN entry_price DECIMAL(15,5);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='trades' AND column_name='exit_price') THEN
+                        ALTER TABLE trades ADD COLUMN exit_price DECIMAL(15,5);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='trades' AND column_name='screenshot_url') THEN
+                        ALTER TABLE trades ADD COLUMN screenshot_url TEXT;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='trades' AND column_name='updated_at') THEN
+                        ALTER TABLE trades ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    END IF;
+                END $$;
+                
+                CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);
+                CREATE INDEX IF NOT EXISTS idx_trades_created_at ON trades(created_at);
+            """)
+            
+            # ============================================================================
+            # STEP 4: Migrate Courses table - add missing columns
+            # ============================================================================
+            await conn.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='slug') THEN
+                        ALTER TABLE courses ADD COLUMN slug VARCHAR(255) UNIQUE;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='level') THEN
+                        ALTER TABLE courses ADD COLUMN level VARCHAR(20) DEFAULT 'beginner';
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='is_published') THEN
+                        ALTER TABLE courses ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='thumbnail_url') THEN
+                        ALTER TABLE courses ADD COLUMN thumbnail_url TEXT;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='video_url') THEN
+                        ALTER TABLE courses ADD COLUMN video_url TEXT;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='duration_minutes') THEN
+                        ALTER TABLE courses ADD COLUMN duration_minutes INTEGER;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='instructor_id') THEN
+                        ALTER TABLE courses ADD COLUMN instructor_id INTEGER REFERENCES users(id);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='updated_at') THEN
+                        ALTER TABLE courses ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    END IF;
+                END $$;
+                
+                CREATE INDEX IF NOT EXISTS idx_courses_slug ON courses(slug) WHERE slug IS NOT NULL;
                 CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(is_published) WHERE is_published = TRUE;
-                
+            """)
+            
+            # ============================================================================
+            # STEP 5: Create other tables (new tables won't conflict)
+            # ============================================================================
+            await conn.execute("""
                 -- Course enrollments
                 CREATE TABLE IF NOT EXISTS course_enrollments (
                     id SERIAL PRIMARY KEY,
@@ -359,7 +426,7 @@ async def init_db():
                 CREATE INDEX IF NOT EXISTS idx_blog_posts_published ON blog_posts(is_published, published_at) 
                     WHERE is_published = TRUE;
                 
-                -- Chart analyses with AI integration
+                -- Chart analyses
                 CREATE TABLE IF NOT EXISTS chart_analyses (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -407,8 +474,12 @@ async def init_db():
                 );
                 
                 CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);
-                
-                -- Insert default admin user if none exists
+            """)
+            
+            # ============================================================================
+            # STEP 6: Insert default admin user
+            # ============================================================================
+            await conn.execute("""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin' LIMIT 1) THEN
@@ -418,7 +489,7 @@ async def init_db():
                 END $$;
             """)
             
-            logger.info("Database schema initialized")
+            logger.info("Database schema initialized successfully")
             
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")

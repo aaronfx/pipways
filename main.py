@@ -23,57 +23,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Third-party imports with error handling
-try:
-    from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, BackgroundTasks, status
-    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-    from fastapi.responses import JSONResponse, StreamingResponse
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.middleware.trustedhost import TrustedHostMiddleware
-    from fastapi_limiter import FastAPILimiter
-    from fastapi_limiter.depends import RateLimiter
-except ImportError as e:
-    logger.error(f"Failed to import FastAPI: {e}")
-    raise
+# Third-party imports
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, BackgroundTasks, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from jose import JWTError, jwt
+from jose.exceptions import ExpiredSignatureError
+from passlib.context import CryptContext
+import httpx
+import asyncpg
+from asyncpg import Pool
+from pydantic import BaseModel, EmailStr, validator, Field
 
-try:
-    import asyncpg
-    from asyncpg import Pool
-except ImportError as e:
-    logger.error(f"Failed to import asyncpg: {e}")
-    raise
-
-try:
-    from jose import JWTError, jwt
-    from jose.exceptions import ExpiredSignatureError
-except ImportError as e:
-    logger.error(f"Failed to import python-jose: {e}")
-    raise
-
-try:
-    from passlib.context import CryptContext
-except ImportError as e:
-    logger.error(f"Failed to import passlib: {e}")
-    raise
-
-try:
-    import httpx
-except ImportError as e:
-    logger.error(f"Failed to import httpx: {e}")
-    raise
-
+# Optional imports with fallbacks
 try:
     import redis.asyncio as redis
-except ImportError as e:
-    logger.warning(f"Redis not available: {e}")
+except ImportError:
     redis = None
-
-try:
-    from pydantic import BaseModel, EmailStr, validator, Field
-    from pydantic_settings import BaseSettings
-except ImportError as e:
-    logger.error(f"Failed to import pydantic: {e}")
-    raise
 
 # ==========================================
 # CONFIGURATION
@@ -105,11 +72,6 @@ class Settings(BaseSettings):
     # File upload
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_IMAGE_TYPES: List[str] = Field(default=["image/jpeg", "image/png", "image/webp"])
-    
-    # Rate limiting
-    RATE_LIMIT_LOGIN: str = "5/minute"
-    RATE_LIMIT_REGISTER: str = "3/minute"
-    RATE_LIMIT_API: str = "100/minute"
     
     class Config:
         env_file = ".env"
@@ -368,7 +330,7 @@ async def init_db():
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     image_url TEXT NOT NULL,
-                    image_hash VARCHAR(64) UNIQUE,  -- For deduplication
+                    image_hash VARCHAR(64) UNIQUE,
                     analysis_text TEXT NOT NULL,
                     pattern_detected VARCHAR(100),
                     confidence_score DECIMAL(3,2),
@@ -392,7 +354,7 @@ async def init_db():
                     session_id VARCHAR(100) NOT NULL,
                     message TEXT NOT NULL,
                     response TEXT NOT NULL,
-                    context JSONB,  -- Store conversation context
+                    context JSONB,
                     tokens_used INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
@@ -720,7 +682,7 @@ async def chat_with_mentor(message: str, context: Optional[List[Dict]] = None, u
                     "X-Title": "Pipways AI Mentor"
                 },
                 json={
-                    "model": "anthropic/claude-3-sonnet-20240229",  # Faster model for chat
+                    "model": "anthropic/claude-3-sonnet-20240229",
                     "messages": messages,
                     "max_tokens": 1000,
                     "temperature": 0.7
@@ -754,14 +716,6 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("🚀 Starting Pipways API...")
     await init_db()
-    
-    # Initialize rate limiter if Redis available
-    if redis_client:
-        try:
-            await FastAPILimiter.init(redis_client)
-            logger.info("Rate limiter initialized")
-        except Exception as e:
-            logger.warning(f"Rate limiter not available: {e}")
     
     yield
     
@@ -887,7 +841,6 @@ async def register(
             "full_name": full_name,
             "role": UserRole.USER,
             "is_active": True,
-            "is_verified": False,
             "created_at": datetime.utcnow()
         }
     }
@@ -939,8 +892,7 @@ async def login(
             "full_name": user["full_name"],
             "role": user["role"],
             "is_active": user["is_active"],
-            "is_verified": user["is_verified"],
-            "created_at": datetime.utcnow()  # Approximation
+            "created_at": datetime.utcnow()
         }
     }
 
@@ -986,7 +938,6 @@ async def refresh_token(
                 "full_name": user.get("full_name"),
                 "role": user["role"],
                 "is_active": user["is_active"],
-                "is_verified": True,
                 "created_at": datetime.utcnow()
             }
         }
@@ -1312,7 +1263,7 @@ async def analyze_chart(
             stop_loss, take_profit_1, take_profit_2, risk_reward_ratio, indicators)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id""",
         current_user["id"],
-        image.filename,  # In production, upload to S3 first
+        image.filename,
         image_hash,
         json.dumps(analysis),
         analysis.get("pattern"),
@@ -1504,7 +1455,7 @@ async def admin_create_blog_post(
     content: str = Form(...),
     excerpt: Optional[str] = Form(None),
     category: str = Form("general"),
-    tags: Optional[str] = Form(None),  # Comma-separated
+    tags: Optional[str] = Form(None),
     is_published: bool = Form(False),
     current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)

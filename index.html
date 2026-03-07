@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipways - Trading Education Platform</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .success {
+            color: #10b981;
+            background: #d1fae5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: #dbeafe;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="success">
+        <h2>✅ Pipways API is Running!</h2>
+        <p>The backend is successfully deployed and operational.</p>
+    </div>
+
+    <div class="info">
+        <h3>🚀 Next Steps</h3>
+        <p><strong>Replace this file</strong> with your actual frontend <code>index.html</code>.</p>
+        <p>Your frontend should connect to:</p>
+        <ul>
+            <li>API Base URL: <code id="api-url">Loading...</code></li>
+            <li>Health Check: <code>/health</code></li>
+            <li>API Docs: <code>/docs</code></li>
+        </ul>
+    </div>
+
+    <h3>📋 Available Features</h3>
+    <div class="features">
+        <div class="feature">
+            <strong>📊 AI Chart Analysis</strong><br>
+            Upload charts for AI grading
+        </div>
+        <div class="feature">
+            <strong>📈 Performance Analysis</strong><br>
+            Statement analysis & trader profile
+        </div>
+        <div class="feature">
+            <strong>🎓 AI Mentor</strong><br>
+            Personalized trading coach
+        </div>
+        <div class="feature">
+            <strong>🎥 Webinars</strong><br>
+            Live trading sessions
+        </div>
+        <div class="feature">
+            <strong>📚 LMS</strong><br>
+            Trading courses
+        </div>
+        <div class="feature">
+            <strong>📝 Blog</strong><br>
+            SEO-optimized articles
+        </div>
+    </div>
+
+    <h3>🔑 Default Login</h3>
+    <p>
+        <strong>Email:</strong> <code>admin@pipways.com</code><br>
+        <strong>Password:</strong> <code>admin123</code>
+    </p>
+
+    <script>
+        // Display current API URL
+        document.getElementById('api-url').textContent = window.location.origin;
+
+        // Check API health
+        fetch('/health')
+            .then(r => r.json())
+            .then(data => {
+                console.log('API Status:', data);
+            })
+            .catch(err => {
+                console.error('API Error:', err);
+            });
+    </script>
+</body>
+</html>

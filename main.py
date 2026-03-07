@@ -1,6 +1,6 @@
 """
 Pipways API Service
-Separate backend for pipways-api-nhem
+Fixed CORS configuration
 """
 
 import os
@@ -181,22 +181,39 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS - MUST BE FIRST, before any routes
+# ==========================================
+# CORS - CRITICAL FIX: MUST BE BEFORE ROUTES
+# ==========================================
+
+# Option 1: Allow specific origins (PRODUCTION)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["https://pipways-web-nhem.onrender.com"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# Option 2: Allow all origins (TESTING - USE THIS NOW)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporarily allow all for testing
+    allow_origins=["*"],  # Allow all origins temporarily
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Health check
+# ==========================================
+# HEALTH CHECK
+# ==========================================
+
 @app.get("/health")
 async def health_check():
     return {
         "status": "healthy",
         "version": "2.0.0",
-        "database": "connected" if pool else "disconnected"
+        "database": "connected" if pool else "disconnected",
+        "cors": "enabled"
     }
 
 @app.get("/")
@@ -208,9 +225,9 @@ async def root():
         "health": "/health"
     }
 
-# ============================================================================
+# ==========================================
 # AUTH ENDPOINTS
-# ============================================================================
+# ==========================================
 
 @app.post("/auth/register")
 async def register(
@@ -281,9 +298,9 @@ async def get_me(current_user: str = Depends(get_current_user), conn=Depends(get
         raise HTTPException(status_code=404, detail="User not found")
     return dict(user)
 
-# ============================================================================
+# ==========================================
 # TRADE ENDPOINTS
-# ============================================================================
+# ==========================================
 
 @app.post("/trades")
 async def create_trade(
@@ -328,9 +345,9 @@ async def get_trades(
         "per_page": per_page
     }
 
-# ============================================================================
+# ==========================================
 # COURSE ENDPOINTS
-# ============================================================================
+# ==========================================
 
 @app.get("/courses")
 async def get_courses(
@@ -370,9 +387,9 @@ async def enroll_course(
     except asyncpg.UniqueViolationError:
         return {"success": True, "message": "Already enrolled"}
 
-# ============================================================================
+# ==========================================
 # WEBINAR ENDPOINTS
-# ============================================================================
+# ==========================================
 
 @app.get("/webinars")
 async def get_webinars(conn=Depends(get_db)):
@@ -398,9 +415,9 @@ async def register_webinar(
     except asyncpg.UniqueViolationError:
         return {"success": True, "message": "Already registered"}
 
-# ============================================================================
+# ==========================================
 # BLOG ENDPOINTS
-# ============================================================================
+# ==========================================
 
 @app.get("/blog/posts")
 async def get_blog_posts(
@@ -423,9 +440,9 @@ async def get_blog_posts(
         "per_page": per_page
     }
 
-# ============================================================================
+# ==========================================
 # AI ANALYSIS ENDPOINTS
-# ============================================================================
+# ==========================================
 
 @app.post("/analyze/chart")
 async def analyze_chart(

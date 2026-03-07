@@ -370,7 +370,7 @@ async def init_db():
             """)
             
             # ============================================================================
-            # STEP 5: Migrate Blog Posts table - SAFE MIGRATION (Recommended Fix)
+            # STEP 5: Migrate Blog Posts table - SAFE MIGRATION
             # ============================================================================
             await conn.execute("""
                 DO $$
@@ -443,7 +443,6 @@ async def init_db():
                 END $$;
                 
                 CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug);
-                -- Safe index creation - only on is_published, not including published_at
                 CREATE INDEX IF NOT EXISTS idx_blog_posts_published ON blog_posts(is_published);
             """)
             
@@ -511,8 +510,13 @@ async def init_db():
                 );
                 
                 CREATE INDEX IF NOT EXISTS idx_analyses_user_id ON chart_analyses(user_id);
-                
-                -- Mentor chat history
+            """)
+            
+            # ============================================================================
+            # STEP 7: Create mentor_chats table with all columns (safe migration)
+            # ============================================================================
+            await conn.execute("""
+                -- Mentor chat history - create if not exists
                 CREATE TABLE IF NOT EXISTS mentor_chats (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -524,10 +528,34 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                -- Migrate mentor_chats - add session_id if missing
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='mentor_chats' AND column_name='session_id') THEN
+                        ALTER TABLE mentor_chats ADD COLUMN session_id VARCHAR(100) NOT NULL DEFAULT 'legacy_session';
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='mentor_chats' AND column_name='context') THEN
+                        ALTER TABLE mentor_chats ADD COLUMN context JSONB;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='mentor_chats' AND column_name='tokens_used') THEN
+                        ALTER TABLE mentor_chats ADD COLUMN tokens_used INTEGER;
+                    END IF;
+                END $$;
+                
                 CREATE INDEX IF NOT EXISTS idx_mentor_chats_session ON mentor_chats(session_id);
                 CREATE INDEX IF NOT EXISTS idx_mentor_chats_user ON mentor_chats(user_id, created_at);
-                
-                -- Password reset tokens
+            """)
+            
+            # ============================================================================
+            # STEP 8: Create password_reset_tokens table with safe migration
+            # ============================================================================
+            await conn.execute("""
+                -- Password reset tokens - create if not exists
                 CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -537,11 +565,20 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                -- Migrate password_reset_tokens - add missing columns
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='password_reset_tokens' AND column_name='used_at') THEN
+                        ALTER TABLE password_reset_tokens ADD COLUMN used_at TIMESTAMP;
+                    END IF;
+                END $$;
+                
                 CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);
             """)
             
             # ============================================================================
-            # STEP 7: Insert default admin user
+            # STEP 9: Insert default admin user
             # ============================================================================
             await conn.execute("""
                 DO $$

@@ -725,6 +725,13 @@ async def mentor_chat(
     # Get available courses for recommendations
     courses = await conn.fetch("SELECT id, title, category FROM courses WHERE is_published = TRUE LIMIT 10")
 
+    # Build history text separately to avoid f-string backslash issue
+    history_lines = []
+    for h in reversed(history):
+        history_lines.append(f"User: {h['message']}")
+        history_lines.append(f"Mentor: {h['ai_response']}")
+    history_text = "\n".join(history_lines)
+
     # Build context
     context = f"""You are a professional trading mentor. Be direct, supportive but honest.
 
@@ -735,7 +742,7 @@ async def mentor_chat(
     Available Courses: {json.dumps([dict(c) for c in courses])}
 
     Recent conversation:
-    {chr(10).join([f"User: {h['message']}\nMentor: {h['ai_response']}" for h in reversed(history)])}
+    {history_text}
 
     Instructions:
     - Reference their specific weaknesses/strengths if relevant

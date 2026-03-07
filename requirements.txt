@@ -9,7 +9,7 @@ asyncpg==0.29.0
 # Authentication & Security
 python-jose[cryptography]==3.3.0
 bcrypt==4.1.2
-passlib==1.7.4          # <-- ADD THIS LINE
+passlib==1.7.4
 
 # Data Validation
 pydantic==2.5.0

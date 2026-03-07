@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from contextlib import asynccontextmanager
 import os
+import asyncpg
 
 from config import settings
 from database import init_db
@@ -12,7 +13,12 @@ from routers import trades, analysis, mentorship, blog, admin
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup"""
-    await init_db()
+    try:
+        await init_db()
+        print("✅ Database initialized")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        raise
     yield
 
 app = FastAPI(
@@ -22,14 +28,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware - Fix #6: More restrictive in production
+# Allow all for now, but restrict to specific origin when deploying
+cors_origins = ["*"]
+if os.getenv("ENVIRONMENT") == "production":
+    cors_origins = ["https://pipways-web-nhem.onrender.com"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global exception handler for debugging
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"Global error: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__}
+    )
 
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
@@ -58,38 +78,30 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
+    """Health check endpoint - Fix #5: Show env var status"""
     return {
         "status": "ok",
         "version": "2.1.0",
-        "database": "connected" if settings.DATABASE_URL else "not configured",
-        "openrouter": "configured" if settings.OPENROUTER_API_KEY else "not configured",
+        "environment": {
+            "database_configured": bool(settings.DATABASE_URL),
+            "secret_key_configured": bool(settings.SECRET_KEY) and settings.SECRET_KEY != "your-secret-key-change-in-production",
+            "openrouter_configured": bool(settings.OPENROUTER_API_KEY)
+        },
         "features": ["auth", "trades", "analysis", "mentorship", "blog", "admin"]
     }
 
-@app.get("/sitemap.xml")
-async def sitemap():
-    """Generate XML sitemap"""
-    base_url = "https://pipways.com"
-    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>{base_url}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>{base_url}/blog</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
-</urlset>"""
-    return HTMLResponse(content=xml, media_type="application/xml")
-
-@app.get("/robots.txt")
-async def robots():
-    """Serve robots.txt"""
-    content = """User-agent: *
-Allow: /
-Allow: /blog/
-Disallow: /admin/
-Disallow: /api/
-
-Sitemap: https://pipways.com/sitemap.xml
-"""
-    return HTMLResponse(content=content)
+# Debug endpoint to check database
+@app.get("/debug/db")
+async def debug_db():
+    """Debug database connection"""
+    try:
+        from database import get_db
+        conn = await asyncpg.connect(settings.DATABASE_URL, ssl="require")
+        user_count = await conn.fetchval("SELECT COUNT(*) FROM users")
+        await conn.close()
+        return {"status": "ok", "user_count": user_count}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

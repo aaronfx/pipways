@@ -1,5 +1,5 @@
 # Render Blueprint for Pipways Trading Platform
-# Version: 2.0.6 - Separate API and Frontend Services
+# Version: 2.0.8 - Option A: index.html in root
 
 services:
   # ==========================================
@@ -11,47 +11,42 @@ services:
     region: oregon
     plan: standard
     branch: main
-
-    # Force Python 3.11 to avoid 3.14 build errors
+    
     runtimeConfig:
       python:
         version: "3.11.0"
-
+    
     buildCommand: |
       echo "Python version:"
       python --version
-      echo "Upgrading pip..."
       pip install --upgrade pip setuptools wheel
-      echo "Installing dependencies..."
       pip install -r requirements.txt
-      echo "Build completed!"
-
+    
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
-
+    
     healthCheckPath: /health
-
+    
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: pipways-db-nhem
           property: connectionString
-
+      
       - key: SECRET_KEY
         generateValue: true
-
+      
       - key: OPENROUTER_API_KEY
         sync: false
-
+      
       - key: ENVIRONMENT
         value: production
-
-      # CORS - Allow frontend to access API
+      
       - key: FRONTEND_URL
         value: https://pipways-web-nhem.onrender.com
-
+      
       - key: CORS_ORIGINS
         value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000"
-
+    
     autoDeploy: true
 
   # ==========================================
@@ -61,23 +56,24 @@ services:
     name: pipways-web-nhem
     runtime: static
     region: oregon
-    plan: standard
+    plan: pro
     branch: main
-
-    buildCommand: echo "Static site - no build needed"
-
-    publishPath: ./static
-
-    # SPA routing support
+    
+    rootDir: .
+    
+    buildCommand: echo "No build needed"
+    
+    publishPath: ./        # ← index.html is in repo root
+    
     routes:
       - type: rewrite
         source: /(.*)
         destination: /index.html
-
+    
     envVars:
       - key: API_URL
         value: https://pipways-api-nhem.onrender.com
-
+    
     autoDeploy: true
 
 databases:

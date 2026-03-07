@@ -36,7 +36,6 @@ import httpx
 import asyncpg
 from asyncpg import Pool
 from pydantic import BaseModel, EmailStr, Field
-# FIX 1: Import field_validator for Pydantic v2 instead of deprecated validator
 from pydantic import field_validator
 
 # Import BaseSettings from pydantic_settings for Pydantic v2
@@ -80,11 +79,12 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024
     ALLOWED_IMAGE_TYPES: str = Field(default="image/jpeg,image/png,image/webp")
 
-   def get_cors_origins(self) -> List[str]:
-    """Parse CORS_ORIGINS string into list"""
-    origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-    # Ensure no trailing slashes for consistency
-    return [o.rstrip('/') for o in origins]
+    def get_cors_origins(self) -> List[str]:
+        """Parse CORS_ORIGINS string into list"""
+        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        # Ensure no trailing slashes for consistency
+        return [o.rstrip('/') for o in origins]
+
 settings = Settings()
 
 # ==========================================
@@ -121,7 +121,6 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = Field(None, max_length=100)
     
-    # FIX 2: Use field_validator instead of deprecated validator for Pydantic v2
     @field_validator('password')
     @classmethod
     def password_strength(cls, v: str) -> str:
@@ -1009,11 +1008,10 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# FIX 3: CORS middleware - temporarily use ["*"] for debugging to verify network error disappears
-# In production, replace with specific origins: cors_origins
+# CORS middleware - temporarily use ["*"] for debugging
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporarily allow all origins for debugging
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

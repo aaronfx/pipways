@@ -131,8 +131,8 @@ async def create_blog_post(
     """Create new blog post (admin only)"""
     try:
         # Create slug from title
-        slug = re.sub(r[^\w\s-], '', title.lower()).strip()
-        slug = re.sub(r[-\s]+, '-', slug)
+        slug = re.sub(r"[^\w\s-]", "", title.lower()).strip()
+        slug = re.sub(r"[-\s]+", "-", slug)
 
         # Ensure unique slug
         existing = await conn.fetchrow("SELECT id FROM blog_posts WHERE slug = $1", slug)
@@ -191,8 +191,8 @@ async def update_blog_post(
         if title:
             updates.append(f"title = ${len(params)+1}")
             params.append(title)
-            new_slug = re.sub(r[^\w\s-], '', title.lower()).strip()
-            new_slug = re.sub(r[-\s]+, '-', new_slug)
+            new_slug = re.sub(r"[^\w\s-]", "", title.lower()).strip()
+            new_slug = re.sub(r"[-\s]+", "-", new_slug)
             updates.append(f"slug = ${len(params)+1}")
             params.append(f"{new_slug}-{uuid.uuid4().hex[:8]}")
         if content:

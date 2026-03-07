@@ -1,7 +1,6 @@
 """
 Pipways API Service
 Separate backend for pipways-api-nhem
-Handles API requests from pipways-web-nhem (static site)
 """
 
 import os
@@ -46,11 +45,11 @@ async def init_db():
     if not settings.DATABASE_URL:
         logger.error("DATABASE_URL not set!")
         return
-
+    
     try:
         pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=5, max_size=20)
         logger.info("Database connected")
-
+        
         async with pool.acquire() as conn:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -63,7 +62,7 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_login TIMESTAMP
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS trades (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -74,7 +73,7 @@ async def init_db():
                     notes TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS courses (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(255) NOT NULL,
@@ -83,7 +82,7 @@ async def init_db():
                     is_published BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS course_enrollments (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -91,7 +90,7 @@ async def init_db():
                     enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, course_id)
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS webinars (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(255) NOT NULL,
@@ -102,7 +101,7 @@ async def init_db():
                     max_attendees INTEGER DEFAULT 100,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS webinar_registrations (
                     id SERIAL PRIMARY KEY,
                     webinar_id INTEGER REFERENCES webinars(id) ON DELETE CASCADE,
@@ -110,7 +109,7 @@ async def init_db():
                     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(webinar_id, user_id)
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS blog_posts (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(255) NOT NULL,
@@ -123,7 +122,7 @@ async def init_db():
                     author_id INTEGER REFERENCES users(id),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS chart_analyses (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -131,7 +130,7 @@ async def init_db():
                     analysis_text TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
+                
                 CREATE TABLE IF NOT EXISTS mentor_chats (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -182,12 +181,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# ==========================================
 # CORS - CRITICAL for separate services
-# ==========================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,  # Allows frontend to call API
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -224,19 +221,19 @@ async def register(
 ):
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-
+    
     existing = await conn.fetchrow("SELECT id FROM users WHERE email = $1", email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-
+    
     hashed = get_password_hash(password)
     user_id = await conn.fetchval(
         "INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id",
         email, hashed, full_name
     )
-
+    
     access_token = create_access_token({"sub": email})
-
+    
     return {
         "success": True,
         "user_id": user_id,
@@ -254,14 +251,14 @@ async def login(
         "SELECT id, email, password_hash, full_name, is_admin FROM users WHERE email = $1 AND is_active = TRUE",
         email
     )
-
+    
     if not user or not verify_password(password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
+    
     await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
-
+    
     access_token = create_access_token({"sub": email})
-
+    
     return {
         "success": True,
         "access_token": access_token,
@@ -299,12 +296,12 @@ async def create_trade(
     conn=Depends(get_db)
 ):
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-
+    
     trade_id = await conn.fetchval(
         "INSERT INTO trades (user_id, pair, direction, pips, grade, notes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
         user["id"], pair.upper(), direction.upper(), pips, grade.upper(), notes
     )
-
+    
     return {"success": True, "trade_id": trade_id}
 
 @app.get("/trades")
@@ -315,15 +312,15 @@ async def get_trades(
     conn=Depends(get_db)
 ):
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-
+    
     total = await conn.fetchval("SELECT COUNT(*) FROM trades WHERE user_id = $1", user["id"])
     offset = (page - 1) * per_page
-
+    
     trades = await conn.fetch(
         "SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
         user["id"], per_page, offset
     )
-
+    
     return {
         "trades": [dict(t) for t in trades],
         "total": total,
@@ -343,12 +340,12 @@ async def get_courses(
 ):
     total = await conn.fetchval("SELECT COUNT(*) FROM courses WHERE is_published = TRUE")
     offset = (page - 1) * per_page
-
+    
     courses = await conn.fetch(
         "SELECT * FROM courses WHERE is_published = TRUE ORDER BY created_at DESC LIMIT $1 OFFSET $2",
         per_page, offset
     )
-
+    
     return {
         "courses": [dict(c) for c in courses],
         "total": total,
@@ -363,7 +360,7 @@ async def enroll_course(
     conn=Depends(get_db)
 ):
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-
+    
     try:
         await conn.execute(
             "INSERT INTO course_enrollments (user_id, course_id) VALUES ($1, $2)",
@@ -391,7 +388,7 @@ async def register_webinar(
     conn=Depends(get_db)
 ):
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-
+    
     try:
         await conn.execute(
             "INSERT INTO webinar_registrations (webinar_id, user_id) VALUES ($1, $2)",
@@ -413,12 +410,12 @@ async def get_blog_posts(
 ):
     total = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE is_published = TRUE")
     offset = (page - 1) * per_page
-
+    
     posts = await conn.fetch(
         "SELECT id, title, slug, excerpt, featured_image, category, published_at FROM blog_posts WHERE is_published = TRUE ORDER BY published_at DESC LIMIT $1 OFFSET $2",
         per_page, offset
     )
-
+    
     return {
         "posts": [dict(p) for p in posts],
         "total": total,
@@ -437,19 +434,19 @@ async def analyze_chart(
     conn=Depends(get_db)
 ):
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-
+    
     contents = await image.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large")
-
+    
     filename = f"chart_{int(datetime.now().timestamp())}.png"
     analysis = "Chart analysis placeholder."
-
+    
     await conn.execute(
         "INSERT INTO chart_analyses (user_id, image_url, analysis_text) VALUES ($1, $2, $3)",
         user["id"], filename, analysis
     )
-
+    
     return {"success": True, "analysis": analysis}
 
 @app.post("/mentor/chat")
@@ -459,14 +456,14 @@ async def mentor_chat(
     conn=Depends(get_db)
 ):
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-
+    
     response = f"You said: {message}. This is a placeholder."
-
+    
     await conn.execute(
         "INSERT INTO mentor_chats (user_id, message, response) VALUES ($1, $2, $3)",
         user["id"], message, response
     )
-
+    
     return {"success": True, "response": response}
 
 if __name__ == "__main__":

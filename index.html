@@ -93,10 +93,11 @@
             font-size: 14px;
         }
 
-        /* CRITICAL FIX: Auth inputs need dark text */
         .auth-box input,
         #login-form input,
-        #register-form input {
+        #register-form input,
+        #forgot-form input,
+        #reset-form input {
             width: 100%;
             padding: 12px 16px;
             border: 2px solid #e5e7eb;
@@ -108,15 +109,11 @@
             -webkit-text-fill-color: #1e293b !important;
         }
 
-        .auth-box input::placeholder,
-        #login-form input::placeholder,
-        #register-form input::placeholder {
+        .auth-box input::placeholder {
             color: #6b7280 !important;
         }
 
-        .auth-box input:focus,
-        #login-form input:focus,
-        #register-form input:focus {
+        .auth-box input:focus {
             outline: none;
             border-color: var(--primary);
             background: white;
@@ -161,8 +158,8 @@
             background: var(--secondary);
         }
 
-        .btn-success:hover {
-            background: #059669;
+        .btn-danger {
+            background: var(--danger);
         }
 
         .auth-footer {
@@ -199,6 +196,20 @@
             color: #065f46;
             border: 1px solid #a7f3d0;
             display: block;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #6b7280;
+            text-decoration: none;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .back-link:hover {
+            color: var(--primary);
         }
 
         /* Dashboard Layout */
@@ -656,11 +667,84 @@
             display: flex;
             gap: 15px;
             margin-top: 25px;
+            flex-wrap: wrap;
         }
 
         .analysis-actions .btn {
             width: auto;
             padding: 12px 24px;
+        }
+
+        /* Chat Interface */
+        .chat-container {
+            background: var(--bg-card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .chat-message {
+            margin-bottom: 16px;
+            max-width: 80%;
+        }
+
+        .chat-message.user {
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .chat-message.assistant {
+            margin-right: auto;
+        }
+
+        .chat-bubble {
+            display: inline-block;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .chat-message.user .chat-bubble {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.assistant .chat-bubble {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         /* Analysis History */
@@ -1222,6 +1306,33 @@
             display: flex;
             gap: 10px;
         }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: var(--bg-hover);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            width: fit-content;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
     </style>
 </head>
 <body>
@@ -1245,7 +1356,8 @@
 
     <!-- Auth Container -->
     <div class="auth-container" id="auth-container">
-        <div class="auth-box">
+        <div class="auth-box" id="auth-box">
+            <!-- Logo -->
             <div class="auth-logo">
                 <i class="fas fa-chart-line"></i>
                 <h1>Pipways</h1>
@@ -1268,6 +1380,9 @@
                     <i class="fas fa-sign-in-alt"></i>
                     Sign In
                 </button>
+                <div class="auth-footer" style="margin-top: 20px;">
+                    <a onclick="showForgotPassword()">Forgot password?</a>
+                </div>
             </form>
 
             <!-- Register Form (Hidden) -->
@@ -1282,7 +1397,7 @@
                 </div>
                 <div class="form-group">
                     <label for="register-password">Password</label>
-                    <input type="password" id="register-password" placeholder="Min 8 characters" minlength="8" required>
+                    <input type="password" id="register-password" placeholder="Min 8 characters, 1 uppercase, 1 number" minlength="8" required>
                 </div>
                 <button type="submit" class="btn">
                     <i class="fas fa-user-plus"></i>
@@ -1290,7 +1405,46 @@
                 </button>
             </form>
 
-            <div class="auth-footer">
+            <!-- Forgot Password Form (Hidden) -->
+            <form id="forgot-form" onsubmit="handleForgotPassword(event)" style="display: none;">
+                <a class="back-link" onclick="showLogin()">
+                    <i class="fas fa-arrow-left"></i> Back to login
+                </a>
+                <h3 style="margin-bottom: 20px; color: #1e293b;">Reset Password</h3>
+                <p style="color: #64748b; margin-bottom: 20px; font-size: 14px;">
+                    Enter your email address and we'll send you a link to reset your password.
+                </p>
+                <div class="form-group">
+                    <label for="forgot-email">Email Address</label>
+                    <input type="email" id="forgot-email" placeholder="Enter your email" required>
+                </div>
+                <button type="submit" class="btn">
+                    <i class="fas fa-paper-plane"></i>
+                    Send Reset Link
+                </button>
+            </form>
+
+            <!-- Reset Password Form (Hidden) -->
+            <form id="reset-form" onsubmit="handleResetPassword(event)" style="display: none;">
+                <a class="back-link" onclick="showLogin()">
+                    <i class="fas fa-arrow-left"></i> Back to login
+                </a>
+                <h3 style="margin-bottom: 20px; color: #1e293b;">Create New Password</h3>
+                <div class="form-group">
+                    <label for="reset-token">Reset Token</label>
+                    <input type="text" id="reset-token" placeholder="Paste your reset token" required>
+                </div>
+                <div class="form-group">
+                    <label for="reset-password">New Password</label>
+                    <input type="password" id="reset-password" placeholder="Min 8 characters" minlength="8" required>
+                </div>
+                <button type="submit" class="btn">
+                    <i class="fas fa-lock"></i>
+                    Reset Password
+                </button>
+            </form>
+
+            <div class="auth-footer" id="auth-footer">
                 <span id="auth-toggle-text">Don't have an account?</span>
                 <a onclick="toggleAuthMode()" id="auth-toggle-link">Register</a>
             </div>
@@ -1325,6 +1479,12 @@
                     <a class="nav-link" onclick="showSection('analysis')">
                         <i class="fas fa-robot"></i>
                         <span>AI Analysis</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="showSection('mentor')">
+                        <i class="fas fa-comments"></i>
+                        <span>AI Mentor</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1399,11 +1559,11 @@
                     <div class="stat-card">
                         <div class="stat-header">
                             <div>
-                                <div class="stat-value" id="stat-analyses">0</div>
-                                <div class="stat-label">AI Analyses</div>
+                                <div class="stat-value" id="stat-winrate">0%</div>
+                                <div class="stat-label">Win Rate</div>
                             </div>
                             <div class="stat-icon orange">
-                                <i class="fas fa-robot"></i>
+                                <i class="fas fa-percentage"></i>
                             </div>
                         </div>
                     </div>
@@ -1411,11 +1571,11 @@
                     <div class="stat-card">
                         <div class="stat-header">
                             <div>
-                                <div class="stat-value" id="stat-courses">0</div>
-                                <div class="stat-label">Courses</div>
+                                <div class="stat-value" id="stat-analyses">0</div>
+                                <div class="stat-label">AI Analyses</div>
                             </div>
                             <div class="stat-icon red">
-                                <i class="fas fa-graduation-cap"></i>
+                                <i class="fas fa-robot"></i>
                             </div>
                         </div>
                     </div>
@@ -1441,13 +1601,13 @@
 
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Recent Analysis</h3>
+                            <h3 class="card-title">Trading Stats</h3>
                         </div>
                         <div class="card-body">
-                            <div id="recent-analysis-list">
+                            <div id="trading-stats">
                                 <div class="empty-state">
-                                    <i class="fas fa-robot"></i>
-                                    <p>No analyses yet</p>
+                                    <i class="fas fa-chart-pie"></i>
+                                    <p>No data available</p>
                                 </div>
                             </div>
                         </div>
@@ -1498,6 +1658,16 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Entry Price (optional)</label>
+                                        <input type="number" id="trade-entry" step="0.00001" placeholder="1.08500">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Exit Price (optional)</label>
+                                        <input type="number" id="trade-exit" step="0.00001" placeholder="1.09000">
+                                    </div>
+                                </div>
                                 <div class="form-group">
                                     <label>Notes</label>
                                     <textarea id="trade-notes" rows="3" placeholder="Trade notes, strategy used, emotions, lessons learned..."></textarea>
@@ -1538,7 +1708,7 @@
                         <div class="upload-area" onclick="document.getElementById('chart-upload').click()">
                             <i class="fas fa-cloud-upload-alt"></i>
                             <h3>Upload Chart for Analysis</h3>
-                            <p>Supported formats: PNG, JPG, JPEG (Max 10MB)</p>
+                            <p>Supported formats: PNG, JPG, WebP (Max 10MB)</p>
                             <button class="btn btn-secondary" style="width: auto; margin-top: 10px;">
                                 <i class="fas fa-image"></i> Select Chart Image
                             </button>
@@ -1578,6 +1748,30 @@
                             <i class="fas fa-history"></i>
                             <p>No previous analyses</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Mentor Section -->
+            <div class="section" id="mentor-section">
+                <div class="page-header">
+                    <h2>AI Trading Mentor</h2>
+                    <p>Get personalized trading advice and education</p>
+                </div>
+
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message assistant">
+                            <div class="chat-bubble">
+                                Hello! I'm your AI trading mentor. Ask me anything about trading strategies, risk management, or market analysis!
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="Ask your question..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                        <button class="btn btn-small" onclick="sendChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1628,76 +1822,135 @@
 
     <script>
         // ==========================================
-        // Configuration & State
+        // CONFIGURATION
         // ==========================================
         const API_URL = 'https://pipways-api-nhem.onrender.com';
         let currentUser = null;
         let authMode = 'login';
         let selectedFile = null;
-        let analysisHistory = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
+        let chatSessionId = null;
+        let currentSection = 'overview';
 
         // ==========================================
-        // Initialize App - CRITICAL FIX FOR BOUNCING
+        // INITIALIZATION
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
-            const authToken = localStorage.getItem('pipways_token');
-            const userData = localStorage.getItem('pipways_user');
+            checkAuthStatus();
             
-            // Parse user data safely
-            let parsedUser = null;
-            try {
-                parsedUser = userData ? JSON.parse(userData) : null;
-            } catch (e) {
-                parsedUser = null;
-            }
-            
-            // Check for valid session (API returns user_id, not id)
-            const hasValidUser = parsedUser && (parsedUser.id || parsedUser.user_id || parsedUser.email);
-            
-            if (authToken && hasValidUser) {
-                currentUser = parsedUser;
-                showDashboard();
-            } else {
-                // Clear invalid data to prevent loops
-                localStorage.removeItem('pipways_token');
-                localStorage.removeItem('pipways_user');
-                showAuth();
+            // Check for password reset token in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const resetToken = urlParams.get('token');
+            if (resetToken) {
+                document.getElementById('reset-token').value = resetToken;
+                showResetPassword();
             }
         });
 
-        // ==========================================
-        // Auth Functions
-        // ==========================================
-        
-        function toggleAuthMode() {
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const toggleText = document.getElementById('auth-toggle-text');
-            const toggleLink = document.getElementById('auth-toggle-link');
-            const alertBox = document.getElementById('alert-box');
+        function checkAuthStatus() {
+            const token = localStorage.getItem('pipways_token');
+            const userData = localStorage.getItem('pipways_user');
             
-            alertBox.className = 'alert';
-            alertBox.textContent = '';
-            
-            if (authMode === 'login') {
-                loginForm.style.display = 'none';
-                registerForm.style.display = 'block';
-                toggleText.textContent = 'Already have an account?';
-                toggleLink.textContent = 'Sign In';
-                authMode = 'register';
+            if (token && userData) {
+                try {
+                    currentUser = JSON.parse(userData);
+                    // Verify token is still valid
+                    fetch(`${API_URL}/auth/me`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    .then(res => {
+                        if (res.ok) {
+                            showDashboard();
+                        } else {
+                            throw new Error('Invalid token');
+                        }
+                    })
+                    .catch(() => {
+                        clearAuthData();
+                        showLogin();
+                    });
+                } catch (e) {
+                    clearAuthData();
+                    showLogin();
+                }
             } else {
-                loginForm.style.display = 'block';
-                registerForm.style.display = 'none';
-                toggleText.textContent = "Don't have an account?";
-                toggleLink.textContent = 'Register';
-                authMode = 'login';
+                showLogin();
             }
         }
+
+        function clearAuthData() {
+            localStorage.removeItem('pipways_token');
+            localStorage.removeItem('pipways_user');
+            localStorage.removeItem('pipways_refresh_token');
+            currentUser = null;
+        }
+
+        // ==========================================
+        // AUTHENTICATION UI FUNCTIONS
+        // ==========================================
+        
+        function showLogin() {
+            hideAllAuthForms();
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('auth-footer').style.display = 'block';
+            document.getElementById('auth-toggle-text').textContent = "Don't have an account?";
+            document.getElementById('auth-toggle-link').textContent = 'Register';
+            authMode = 'login';
+            clearAlert();
+        }
+
+        function showRegister() {
+            hideAllAuthForms();
+            document.getElementById('register-form').style.display = 'block';
+            document.getElementById('auth-footer').style.display = 'block';
+            document.getElementById('auth-toggle-text').textContent = 'Already have an account?';
+            document.getElementById('auth-toggle-link').textContent = 'Sign In';
+            authMode = 'register';
+            clearAlert();
+        }
+
+        function showForgotPassword() {
+            hideAllAuthForms();
+            document.getElementById('forgot-form').style.display = 'block';
+            document.getElementById('auth-footer').style.display = 'none';
+            clearAlert();
+        }
+
+        function showResetPassword() {
+            hideAllAuthForms();
+            document.getElementById('reset-form').style.display = 'block';
+            document.getElementById('auth-footer').style.display = 'none';
+            clearAlert();
+        }
+
+        function hideAllAuthForms() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('forgot-form').style.display = 'none';
+            document.getElementById('reset-form').style.display = 'none';
+        }
+
+        function toggleAuthMode() {
+            if (authMode === 'login') {
+                showRegister();
+            } else {
+                showLogin();
+            }
+        }
+
+        // ==========================================
+        // ALERTS & NOTIFICATIONS
+        // ==========================================
 
         function showAlert(message, type = 'error') {
             const alertBox = document.getElementById('alert-box');
             alertBox.className = `alert ${type}`;
             alertBox.textContent = message;
+        }
+
+        function clearAlert() {
+            const alertBox = document.getElementById('alert-box');
+            alertBox.className = 'alert';
+            alertBox.textContent = '';
         }
 
         function showToast(message, type = 'error') {
@@ -1708,14 +1961,19 @@
             setTimeout(() => toast.classList.remove('show'), 5000);
         }
 
+        // ==========================================
+        // AUTHENTICATION API CALLS
+        // ==========================================
+
         async function handleLogin(e) {
             e.preventDefault();
+            clearAlert();
+            
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             
             try {
                 const formData = new URLSearchParams();
-                // CRITICAL FIX: Use 'email' not 'username'
                 formData.append('email', email);
                 formData.append('password', password);
 
@@ -1729,6 +1987,7 @@
 
                 if (response.ok && data.success) {
                     localStorage.setItem('pipways_token', data.access_token);
+                    localStorage.setItem('pipways_refresh_token', data.refresh_token);
                     localStorage.setItem('pipways_user', JSON.stringify(data.user));
                     currentUser = data.user;
                     showDashboard();
@@ -1736,18 +1995,29 @@
                     showAlert(data.detail || 'Login failed');
                 }
             } catch (error) {
-                showAlert('Network error. Please try again.');
+                showAlert('Network error. Please check your connection.');
             }
         }
 
         async function handleRegister(e) {
             e.preventDefault();
+            clearAlert();
+            
             const fullName = document.getElementById('register-name').value;
             const email = document.getElementById('register-email').value;
             const password = document.getElementById('register-password').value;
 
+            // Client-side validation
             if (password.length < 8) {
                 showAlert('Password must be at least 8 characters');
+                return;
+            }
+            if (!/[A-Z]/.test(password)) {
+                showAlert('Password must contain at least one uppercase letter');
+                return;
+            }
+            if (!/[0-9]/.test(password)) {
+                showAlert('Password must contain at least one number');
                 return;
             }
             
@@ -1767,45 +2037,101 @@
 
                 if (response.ok && data.success) {
                     localStorage.setItem('pipways_token', data.access_token);
-                    showAlert('Account created successfully!', 'success');
-                    setTimeout(() => showDashboard(), 1000);
+                    localStorage.setItem('pipways_refresh_token', data.refresh_token);
+                    localStorage.setItem('pipways_user', JSON.stringify(data.user));
+                    currentUser = data.user;
+                    showToast('Account created successfully!', 'success');
+                    showDashboard();
                 } else {
                     showAlert(data.detail || 'Registration failed');
                 }
             } catch (error) {
-                showAlert('Network error. Please try again.');
+                showAlert('Network error. Please check your connection.');
+            }
+        }
+
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            clearAlert();
+            
+            const email = document.getElementById('forgot-email').value;
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('email', email);
+
+                const response = await fetch(`${API_URL}/auth/password-reset-request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Password reset link sent! Check your email.', 'success');
+                    setTimeout(showLogin, 3000);
+                } else {
+                    showAlert(data.detail || 'Request failed');
+                }
+            } catch (error) {
+                showAlert('Network error. Please check your connection.');
+            }
+        }
+
+        async function handleResetPassword(e) {
+            e.preventDefault();
+            clearAlert();
+            
+            const token = document.getElementById('reset-token').value;
+            const newPassword = document.getElementById('reset-password').value;
+            
+            if (newPassword.length < 8) {
+                showAlert('Password must be at least 8 characters');
+                return;
+            }
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('token', token);
+                formData.append('new_password', newPassword);
+
+                const response = await fetch(`${API_URL}/auth/password-reset-confirm`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Password reset successful! Please login.', 'success');
+                    setTimeout(showLogin, 2000);
+                } else {
+                    showAlert(data.detail || 'Reset failed');
+                }
+            } catch (error) {
+                showAlert('Network error. Please check your connection.');
             }
         }
 
         function logout() {
-            localStorage.removeItem('pipways_token');
-            localStorage.removeItem('pipways_user');
-            currentUser = null;
-            showAuth();
+            clearAuthData();
+            showLogin();
+            showToast('Logged out successfully', 'success');
         }
 
         // ==========================================
-        // Dashboard Functions
+        // DASHBOARD FUNCTIONS
         // ==========================================
-
-        function showAuth() {
-            document.getElementById('auth-container').style.display = 'flex';
-            document.getElementById('dashboard').style.display = 'none';
-        }
 
         function showDashboard() {
-            // Validate we have proper data
-            if (!currentUser) {
-                showAuth();
-                return;
-            }
-            
             document.getElementById('auth-container').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
             
-            // Update user info safely
-            const displayName = currentUser.full_name || currentUser.name || currentUser.email || 'Trader';
-            const displayEmail = currentUser.email || '';
+            // Update user info
+            const displayName = currentUser?.full_name || currentUser?.email?.split('@')[0] || 'Trader';
+            const displayEmail = currentUser?.email || '';
             const avatar = (displayName[0] || 'U').toUpperCase();
             
             document.getElementById('user-name').textContent = displayName;
@@ -1815,27 +2141,52 @@
             loadDashboardData();
         }
 
+        function showAuth() {
+            document.getElementById('auth-container').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
         function showSection(sectionName) {
+            currentSection = sectionName;
+            
             // Update nav active state
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            event.target.closest('.nav-link').classList.add('active');
+            event.target.closest('.nav-link')?.classList.add('active');
             
             // Show section
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            document.getElementById(`${sectionName}-section`).classList.add('active');
+            document.getElementById(`${sectionName}-section`)?.classList.add('active');
             
-            if (sectionName === 'courses') loadCourses();
-            if (sectionName === 'webinars') loadWebinars();
-            if (sectionName === 'blog') loadBlog();
-            if (sectionName === 'journal') loadTrades();
-            if (sectionName === 'analysis') loadAnalysisHistory();
+            // Load section data
+            switch(sectionName) {
+                case 'overview':
+                    loadDashboardData();
+                    break;
+                case 'journal':
+                    loadTrades();
+                    break;
+                case 'analysis':
+                    loadAnalysisHistory();
+                    break;
+                case 'mentor':
+                    // Chat loads automatically
+                    break;
+                case 'courses':
+                    loadCourses();
+                    break;
+                case 'webinars':
+                    loadWebinars();
+                    break;
+                case 'blog':
+                    loadBlog();
+                    break;
+            }
         }
 
         async function loadDashboardData() {
             await Promise.all([
                 loadStats(),
-                loadRecentTrades(),
-                loadRecentAnalysis()
+                loadRecentTrades()
             ]);
         }
 
@@ -1843,24 +2194,31 @@
             try {
                 const token = localStorage.getItem('pipways_token');
                 
-                // Load trades count
-                const tradesRes = await fetch(`${API_URL}/trades`, {
+                const response = await fetch(`${API_URL}/trades/stats?period=all`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const tradesData = await tradesRes.json();
-                document.getElementById('stat-trades').textContent = tradesData.total || 0;
                 
-                // Calculate total pips
-                const totalPips = tradesData.trades?.reduce((sum, t) => sum + parseFloat(t.pips || 0), 0) || 0;
-                document.getElementById('stat-pips').textContent = (totalPips > 0 ? '+' : '') + totalPips.toFixed(1);
+                if (!response.ok) throw new Error('Failed to load stats');
                 
-                // Update analysis count
-                document.getElementById('stat-analyses').textContent = analysisHistory.length;
+                const data = await response.json();
                 
-                // Load courses count
-                const coursesRes = await fetch(`${API_URL}/courses`);
-                const coursesData = await coursesRes.json();
-                document.getElementById('stat-courses').textContent = coursesData.total || 0;
+                if (data.success) {
+                    const stats = data.summary || {};
+                    document.getElementById('stat-trades').textContent = stats.total_trades || 0;
+                    document.getElementById('stat-pips').textContent = (stats.net_pips > 0 ? '+' : '') + (stats.net_pips || 0).toFixed(1);
+                    
+                    const winRate = stats.total_trades > 0 
+                        ? ((stats.winners / stats.total_trades) * 100).toFixed(1)
+                        : 0;
+                    document.getElementById('stat-winrate').textContent = winRate + '%';
+                }
+                
+                // Load analysis count from history
+                const analysisResponse = await fetch(`${API_URL}/analyze/history?per_page=1`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const analysisData = await analysisResponse.json();
+                document.getElementById('stat-analyses').textContent = analysisData.pagination?.total || 0;
                 
             } catch (error) {
                 console.error('Error loading stats:', error);
@@ -1868,7 +2226,7 @@
         }
 
         // ==========================================
-        // Trade Functions
+        // TRADE FUNCTIONS
         // ==========================================
 
         async function loadRecentTrades() {
@@ -1877,11 +2235,11 @@
                 const response = await fetch(`${API_URL}/trades?per_page=5`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await response.json();
                 
+                const data = await response.json();
                 const container = document.getElementById('recent-trades-list');
                 
-                if (!data.trades || data.trades.length === 0) {
+                if (!data.trades?.length) {
                     container.innerHTML = `
                         <div class="empty-state">
                             <i class="fas fa-book"></i>
@@ -1918,11 +2276,11 @@
                 const response = await fetch(`${API_URL}/trades?per_page=50`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await response.json();
                 
+                const data = await response.json();
                 const container = document.getElementById('trade-history-list');
                 
-                if (!data.trades || data.trades.length === 0) {
+                if (!data.trades?.length) {
                     container.innerHTML = `
                         <div class="empty-state">
                             <i class="fas fa-history"></i>
@@ -1956,21 +2314,24 @@
             e.preventDefault();
             const token = localStorage.getItem('pipways_token');
             
-            const formData = new URLSearchParams();
-            formData.append('pair', document.getElementById('trade-pair').value);
-            formData.append('direction', document.getElementById('trade-direction').value);
-            formData.append('pips', document.getElementById('trade-pips').value);
-            formData.append('grade', document.getElementById('trade-grade').value);
-            formData.append('notes', document.getElementById('trade-notes').value);
+            const tradeData = {
+                pair: document.getElementById('trade-pair').value,
+                direction: document.getElementById('trade-direction').value,
+                pips: parseFloat(document.getElementById('trade-pips').value),
+                grade: document.getElementById('trade-grade').value,
+                notes: document.getElementById('trade-notes').value,
+                entry_price: document.getElementById('trade-entry').value || null,
+                exit_price: document.getElementById('trade-exit').value || null
+            };
 
             try {
                 const response = await fetch(`${API_URL}/trades`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/json'
                     },
-                    body: formData
+                    body: JSON.stringify(tradeData)
                 });
 
                 const data = await response.json();
@@ -1989,12 +2350,18 @@
         }
 
         // ==========================================
-        // AI Analysis Functions
+        // AI ANALYSIS FUNCTIONS
         // ==========================================
 
         function handleFileSelect(input) {
             if (input.files && input.files[0]) {
                 selectedFile = input.files[0];
+                
+                // Validate file size
+                if (selectedFile.size > 10 * 1024 * 1024) {
+                    showToast('File too large. Max size is 10MB');
+                    return;
+                }
                 
                 // Show preview
                 const reader = new FileReader();
@@ -2024,6 +2391,7 @@
             const token = localStorage.getItem('pipways_token');
             const formData = new FormData();
             formData.append('image', selectedFile);
+            formData.append('save_to_journal', 'true');
 
             // Show loading
             const resultsDiv = document.getElementById('analysis-results');
@@ -2031,7 +2399,7 @@
             resultsDiv.innerHTML = `
                 <div class="analysis-result-card">
                     <div class="loading" style="padding: 40px;">
-                        <i class="fas fa-spinner"></i> AI is analyzing your chart...
+                        <i class="fas fa-spinner"></i> AI is analyzing your chart... This may take 10-20 seconds.
                     </div>
                 </div>
             `;
@@ -2046,15 +2414,9 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Generate detailed analysis
-                    const analysisResult = generateDetailedAnalysis(data.analysis);
-                    displayAnalysisResult(analysisResult, selectedFile.name);
-                    
-                    // Save to history
-                    saveAnalysisToHistory(analysisResult, selectedFile.name);
-                    
-                    // Clear file
+                    displayAnalysisResult(data.analysis, selectedFile.name, data.cached);
                     clearFile();
+                    loadAnalysisHistory();
                 } else {
                     resultsDiv.innerHTML = `
                         <div class="analysis-result-card" style="border-left-color: var(--danger);">
@@ -2073,44 +2435,7 @@
             }
         }
 
-        function generateDetailedAnalysis(basicAnalysis) {
-            const patterns = ['Head and Shoulders', 'Double Top', 'Ascending Triangle', 'Bull Flag', 'Support Bounce'];
-            const pattern = patterns[Math.floor(Math.random() * patterns.length)];
-            
-            return {
-                pattern: pattern,
-                summary: basicAnalysis || `Chart shows ${pattern} formation with strong volume confirmation.`,
-                supportResistance: {
-                    support: ['1.0850', '1.0820', '1.0800'],
-                    resistance: ['1.0920', '1.0950', '1.0980']
-                },
-                trendAnalysis: {
-                    shortTerm: 'Bullish',
-                    mediumTerm: 'Neutral',
-                    longTerm: 'Bullish'
-                },
-                entryExit: {
-                    entry: '1.0870 - 1.0880',
-                    stopLoss: '1.0830',
-                    takeProfit1: '1.0920',
-                    takeProfit2: '1.0950'
-                },
-                riskManagement: {
-                    riskReward: '1:2.5',
-                    positionSize: '2% of account',
-                    confidence: '75%'
-                },
-                indicators: {
-                    rsi: '62 (Neutral)',
-                    macd: 'Bullish crossover',
-                    ema: 'Price above 50 EMA',
-                    volume: 'Above average'
-                },
-                timestamp: new Date().toISOString()
-            };
-        }
-
-        function displayAnalysisResult(analysis, filename) {
+        function displayAnalysisResult(analysis, filename, cached = false) {
             const resultsDiv = document.getElementById('analysis-results');
             
             resultsDiv.innerHTML = `
@@ -2120,7 +2445,7 @@
                             <i class="fas fa-robot"></i>
                         </div>
                         <div class="analysis-title">
-                            <h3>Chart Analysis Complete</h3>
+                            <h3>Chart Analysis Complete ${cached ? '<span style="font-size: 12px; color: var(--secondary);">(Cached)</span>' : ''}</h3>
                             <span>${filename} • ${new Date().toLocaleString()}</span>
                         </div>
                     </div>
@@ -2133,56 +2458,55 @@
                     <div class="analysis-section">
                         <h4><i class="fas fa-layer-group"></i> Support & Resistance Levels</h4>
                         <p>
-                            <strong>Support:</strong> ${analysis.supportResistance.support.join(', ')}<br>
-                            <strong>Resistance:</strong> ${analysis.supportResistance.resistance.join(', ')}
+                            <strong>Support:</strong> ${analysis.support_levels?.join(', ') || 'N/A'}<br>
+                            <strong>Resistance:</strong> ${analysis.resistance_levels?.join(', ') || 'N/A'}
                         </p>
                     </div>
 
                     <div class="analysis-section">
                         <h4><i class="fas fa-chart-line"></i> Trend Analysis</h4>
                         <p>
-                            <strong>Short-term:</strong> ${analysis.trendAnalysis.shortTerm}<br>
-                            <strong>Medium-term:</strong> ${analysis.trendAnalysis.mediumTerm}<br>
-                            <strong>Long-term:</strong> ${analysis.trendAnalysis.longTerm}
+                            <strong>Short-term:</strong> ${analysis.short_term_trend}<br>
+                            <strong>Medium-term:</strong> ${analysis.medium_term_trend}<br>
+                            <strong>Long-term:</strong> ${analysis.long_term_trend}
                         </p>
                     </div>
 
                     <div class="analysis-section">
                         <h4><i class="fas fa-crosshairs"></i> Entry & Exit Points</h4>
                         <p>
-                            <strong style="color: var(--secondary);">Entry Zone:</strong> ${analysis.entryExit.entry}<br>
-                            <strong style="color: var(--danger);">Stop Loss:</strong> ${analysis.entryExit.stopLoss}<br>
-                            <strong style="color: var(--primary);">Take Profit 1:</strong> ${analysis.entryExit.takeProfit1}<br>
-                            <strong style="color: var(--primary);">Take Profit 2:</strong> ${analysis.entryExit.takeProfit2}
+                            <strong style="color: var(--secondary);">Entry Zone:</strong> ${analysis.entry_zone}<br>
+                            <strong style="color: var(--danger);">Stop Loss:</strong> ${analysis.stop_loss}<br>
+                            <strong style="color: var(--primary);">Take Profit 1:</strong> ${analysis.take_profit_1}<br>
+                            <strong style="color: var(--primary);">Take Profit 2:</strong> ${analysis.take_profit_2}
                         </p>
                     </div>
 
                     <div class="analysis-section">
                         <h4><i class="fas fa-shield-alt"></i> Risk Management</h4>
                         <p>
-                            Risk/Reward Ratio: <strong>${analysis.riskManagement.riskReward}</strong><br>
-                            Recommended Position: <strong>${analysis.riskManagement.positionSize}</strong><br>
-                            Confidence Level: <strong>${analysis.riskManagement.confidence}</strong>
+                            Risk/Reward Ratio: <strong>${analysis.risk_reward}</strong><br>
+                            Confidence Level: <strong>${analysis.confidence}</strong>
                         </p>
                     </div>
 
                     <div class="analysis-section">
                         <h4><i class="fas fa-wave-square"></i> Technical Indicators</h4>
                         <p>
-                            RSI: ${analysis.indicators.rsi}<br>
-                            MACD: ${analysis.indicators.macd}<br>
-                            EMA: ${analysis.indicators.ema}<br>
-                            Volume: ${analysis.indicators.volume}
+                            RSI: ${analysis.indicators?.rsi || 'N/A'}<br>
+                            MACD: ${analysis.indicators?.macd || 'N/A'}<br>
+                            EMA: ${analysis.indicators?.ema || 'N/A'}<br>
+                            Volume: ${analysis.indicators?.volume || 'N/A'}
                         </p>
                     </div>
 
                     <div class="analysis-metrics">
                         <div class="metric">
-                            <div class="metric-value" style="color: var(--secondary);">${analysis.riskManagement.confidence}</div>
+                            <div class="metric-value" style="color: var(--secondary);">${analysis.confidence}</div>
                             <div class="metric-label">Confidence</div>
                         </div>
                         <div class="metric">
-                            <div class="metric-value" style="color: var(--primary);">${analysis.riskManagement.riskReward}</div>
+                            <div class="metric-value" style="color: var(--primary);">${analysis.risk_reward}</div>
                             <div class="metric-label">Risk/Reward</div>
                         </div>
                         <div class="metric">
@@ -2206,83 +2530,51 @@
             `;
         }
 
-        function saveAnalysisToHistory(analysis, filename) {
-            const historyItem = {
-                id: Date.now(),
-                filename: filename,
-                analysis: analysis,
-                timestamp: new Date().toISOString()
-            };
-            
-            analysisHistory.unshift(historyItem);
-            if (analysisHistory.length > 10) analysisHistory.pop(); // Keep last 10
-            
-            localStorage.setItem('analysisHistory', JSON.stringify(analysisHistory));
-            loadAnalysisHistory();
-            loadRecentAnalysis();
-        }
-
-        function loadAnalysisHistory() {
-            const container = document.getElementById('analysis-history-list');
-            
-            if (analysisHistory.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-history"></i>
-                        <p>No previous analyses</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            container.innerHTML = analysisHistory.map(item => `
-                <div class="history-item" onclick="viewHistoryAnalysis(${item.id})">
-                    <div class="history-thumb">
-                        <i class="fas fa-chart-area"></i>
-                    </div>
-                    <div class="history-info">
-                        <h4>${item.analysis.pattern} Analysis</h4>
-                        <p>${item.filename}</p>
-                        <div class="history-meta">
-                            <span><i class="fas fa-calendar"></i> ${new Date(item.timestamp).toLocaleDateString()}</span>
-                            <span><i class="fas fa-check-circle"></i> ${item.analysis.riskManagement.confidence} confidence</span>
+        async function loadAnalysisHistory() {
+            try {
+                const token = localStorage.getItem('pipways_token');
+                const response = await fetch(`${API_URL}/analyze/history?per_page=10`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                const container = document.getElementById('analysis-history-list');
+                
+                if (!data.analyses?.length) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-history"></i>
+                            <p>No previous analyses</p>
                         </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = data.analyses.map(item => `
+                    <div class="history-item" onclick="viewHistoryAnalysis(${item.id})">
+                        <div class="history-thumb">
+                            <i class="fas fa-chart-area"></i>
+                        </div>
+                        <div class="history-info">
+                            <h4>${item.pattern_detected || 'Chart Analysis'}</h4>
+                            <p>${item.image_url}</p>
+                            <div class="history-meta">
+                                <span><i class="fas fa-calendar"></i> ${new Date(item.created_at).toLocaleDateString()}</span>
+                                <span><i class="fas fa-check-circle"></i> ${(item.confidence_score * 100).toFixed(0)}% confidence</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: var(--text-secondary);"></i>
                     </div>
-                    <i class="fas fa-chevron-right" style="color: var(--text-secondary);"></i>
-                </div>
-            `).join('');
-        }
-
-        function loadRecentAnalysis() {
-            const container = document.getElementById('recent-analysis-list');
-            
-            if (analysisHistory.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-robot"></i>
-                        <p>No analyses yet</p>
-                    </div>
-                `;
-                return;
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading analysis history:', error);
             }
-            
-            const recent = analysisHistory.slice(0, 3);
-            container.innerHTML = recent.map(item => `
-                <div style="padding: 15px; background: var(--bg-dark); border-radius: 10px; margin-bottom: 10px;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">${item.analysis.pattern}</div>
-                    <div style="font-size: 13px; color: var(--text-secondary);">
-                        <i class="fas fa-chart-line"></i> ${item.filename} • ${new Date(item.timestamp).toLocaleDateString()}
-                    </div>
-                </div>
-            `).join('');
         }
 
         function viewHistoryAnalysis(id) {
-            const item = analysisHistory.find(h => h.id === id);
-            if (item) {
-                displayAnalysisResult(item.analysis, item.filename);
-                document.getElementById('analysis-results').scrollIntoView({ behavior: 'smooth' });
-            }
+            // TODO: Implement viewing historical analysis
+            showToast('Loading historical analysis...', 'success');
         }
 
         function saveAnalysisToJournal() {
@@ -2294,14 +2586,294 @@
         }
 
         // ==========================================
-        // Courses Functions
+        // AI MENTOR CHAT
+        // ==========================================
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            // Add user message to chat
+            addChatMessage(message, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            try {
+                const token = localStorage.getItem('pipways_token');
+                const formData = new URLSearchParams();
+                formData.append('message', message);
+                if (chatSessionId) formData.append('session_id', chatSessionId);
+                
+                const response = await fetch(`${API_URL}/mentor/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData
+                });
+                
+                removeTypingIndicator();
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    chatSessionId = data.session_id;
+                    addChatMessage(data.response, 'assistant');
+                } else {
+                    addChatMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+                }
+                
+            } catch (error) {
+                removeTypingIndicator();
+                addChatMessage('Sorry, I encountered a network error. Please check your connection.', 'assistant');
+            }
+        }
+
+        function addChatMessage(text, sender) {
+            const container = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            messageDiv.innerHTML = `<div class="chat-bubble">${escapeHtml(text)}</div>`;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const container = document.getElementById('chat-messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-message assistant typing';
+            typingDiv.innerHTML = `
+                <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            `;
+            container.appendChild(typingDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typing = document.querySelector('.chat-message.typing');
+            if (typing) typing.remove();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==========================================
+        // COURSES, WEBINARS, BLOG
         // ==========================================
 
         async function loadCourses() {
             const container = document.getElementById('courses-grid');
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading courses...</div>';
             
             try {
                 const response = await fetch(`${API_URL}/courses`);
                 const data = await response.json();
 
-                if (!data.courses || data.courses.length === 
+                if (!data.courses?.length) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-graduation-cap"></i><p>No courses available</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.courses.map(course => `
+                    <div class="course-card">
+                        <div class="course-image">
+                            <div class="course-badge">${course.level}</div>
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div class="course-content">
+                            <span class="course-level">${course.level}</span>
+                            <h3 class="course-title">${course.title}</h3>
+                            <p class="course-desc">${course.description || 'Learn professional trading strategies.'}</p>
+                            <div class="course-stats">
+                                <span><i class="fas fa-clock"></i> ${course.duration_minutes || 60} min</span>
+                                <span><i class="fas fa-user"></i> ${course.instructor_name || 'Expert'}</span>
+                            </div>
+                            <div class="course-footer">
+                                <span class="course-price">${course.price > 0 ? '$' + course.price : 'Free'}</span>
+                                <button class="btn btn-small" onclick="enrollCourse(${course.id})">
+                                    ${course.price > 0 ? 'Buy Now' : 'Enroll'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading courses</p></div>';
+            }
+        }
+
+        async function enrollCourse(courseId) {
+            const token = localStorage.getItem('pipways_token');
+            if (!token) {
+                showToast('Please login first');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/courses/${courseId}/enroll`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                showToast(data.message, 'success');
+                
+            } catch (error) {
+                showToast('Error enrolling in course');
+            }
+        }
+
+        async function loadWebinars() {
+            const container = document.getElementById('webinars-list');
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading webinars...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/webinars?upcoming=true`);
+                const data = await response.json();
+
+                if (!data.webinars?.length) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-video"></i><p>No upcoming webinars</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.webinars.map(webinar => {
+                    const date = new Date(webinar.scheduled_at);
+                    return `
+                        <div class="webinar-item">
+                            <div class="webinar-date">
+                                <div class="day">${date.getDate()}</div>
+                                <div class="month">${date.toLocaleString('default', { month: 'short' })}</div>
+                            </div>
+                            <div class="webinar-info">
+                                <h4>${webinar.title}</h4>
+                                <p>${webinar.description || 'Live trading session'}</p>
+                                <div class="webinar-meta">
+                                    <span><i class="fas fa-user"></i> ${webinar.presenter_name || 'Expert'}</span>
+                                    <span><i class="fas fa-clock"></i> ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                    <span><i class="fas fa-users"></i> ${webinar.registered_count || 0}/${webinar.max_attendees}</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-small" onclick="registerWebinar(${webinar.id})">
+                                Register
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading webinars</p></div>';
+            }
+        }
+
+        async function registerWebinar(webinarId) {
+            const token = localStorage.getItem('pipways_token');
+            if (!token) {
+                showToast('Please login first');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/webinars/${webinarId}/register`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                showToast(data.message, 'success');
+                
+            } catch (error) {
+                showToast('Error registering for webinar');
+            }
+        }
+
+        async function loadBlog() {
+            const container = document.getElementById('blog-grid');
+            container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading articles...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/blog/posts`);
+                const data = await response.json();
+
+                if (!data.posts?.length) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-newspaper"></i><p>No articles available</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.posts.map(post => `
+                    <div class="blog-card" onclick="openBlogPost('${post.slug}')">
+                        <div class="blog-image">
+                            <i class="fas fa-newspaper"></i>
+                        </div>
+                        <div class="blog-content">
+                            <span class="blog-category">${post.category}</span>
+                            <h3 class="blog-title">${post.title}</h3>
+                            <p class="blog-excerpt">${post.excerpt || ''}</p>
+                            <div class="blog-footer">
+                                <div class="blog-author">
+                                    <div class="blog-author-avatar">P</div>
+                                    <div class="blog-author-info">
+                                        <div class="blog-author-name">Pipways Team</div>
+                                        <div class="blog-date">${new Date(post.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                </div>
+                                <span class="read-more">Read <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading articles</p></div>';
+            }
+        }
+
+        async function openBlogPost(slug) {
+            try {
+                const response = await fetch(`${API_URL}/blog/posts/${slug}`);
+                const data = await response.json();
+                
+                if (!data.success) throw new Error('Failed to load post');
+                
+                const modal = document.getElementById('blog-modal');
+                const content = document.getElementById('modal-content-area');
+                
+                content.innerHTML = `
+                    <div class="modal-header">
+                        <span class="blog-category">${data.post.category}</span>
+                        <h2 style="margin-top: 10px;">${data.post.title}</h2>
+                        <p style="color: var(--text-secondary); margin-top: 10px;">
+                            ${new Date(data.post.created_at).toLocaleDateString()}
+                        </p>
+                    </div>
+                    <div class="modal-body">
+                        ${data.post.content}
+                    </div>
+                `;
+                
+                modal.classList.add('show');
+                
+            } catch (error) {
+                showToast('Error loading article');
+            }
+        }
+
+        function closeBlogModal(e) {
+            if (!e || e.target.id === 'blog-modal') {
+                document.getElementById('blog-modal').classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>

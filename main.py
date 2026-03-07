@@ -31,7 +31,7 @@ class Settings:
     OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
     ENVIRONMENT = os.environ.get("ENVIRONMENT", "production")
     FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://pipways-web-nhem.onrender.com")
-    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
+    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "https://pipways-web-nhem.onrender.com").split(",")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 settings = Settings()
@@ -181,10 +181,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS - CRITICAL for separate services
+# CORS - MUST BE FIRST, before any routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],  # Temporarily allow all for testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -412,7 +412,7 @@ async def get_blog_posts(
     offset = (page - 1) * per_page
     
     posts = await conn.fetch(
-        "SELECT id, title, slug, excerpt, featured_image, category, published_at FROM blog_posts WHERE is_published = TRUE ORDER BY published_at DESC LIMIT $1 OFFSET $2",
+        "SELECT id, title, slug, excerpt, featured_image, category, created_at FROM blog_posts WHERE is_published = TRUE ORDER BY created_at DESC LIMIT $1 OFFSET $2",
         per_page, offset
     )
     

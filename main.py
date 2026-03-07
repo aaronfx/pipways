@@ -528,12 +528,22 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
-                -- Migrate mentor_chats - add session_id if missing
+                -- Migrate mentor_chats - add missing columns
                 DO $$
                 BEGIN
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                                    WHERE table_name='mentor_chats' AND column_name='session_id') THEN
                         ALTER TABLE mentor_chats ADD COLUMN session_id VARCHAR(100) NOT NULL DEFAULT 'legacy_session';
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='mentor_chats' AND column_name='message') THEN
+                        ALTER TABLE mentor_chats ADD COLUMN message TEXT NOT NULL DEFAULT '';
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='mentor_chats' AND column_name='response') THEN
+                        ALTER TABLE mentor_chats ADD COLUMN response TEXT NOT NULL DEFAULT '';
                     END IF;
                     
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
@@ -555,23 +565,45 @@ async def init_db():
             # STEP 8: Create password_reset_tokens table with safe migration
             # ============================================================================
             await conn.execute("""
-                -- Password reset tokens - create if not exists
+                -- Password reset tokens - create if not exists with minimal schema
                 CREATE TABLE IF NOT EXISTS password_reset_tokens (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                    token_hash VARCHAR(64) UNIQUE NOT NULL,
-                    expires_at TIMESTAMP NOT NULL,
-                    used_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
-                -- Migrate password_reset_tokens - add missing columns
+                -- Migrate password_reset_tokens - add all missing columns
                 DO $$
                 BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='password_reset_tokens' AND column_name='token_hash') THEN
+                        ALTER TABLE password_reset_tokens ADD COLUMN token_hash VARCHAR(64);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='password_reset_tokens' AND column_name='expires_at') THEN
+                        ALTER TABLE password_reset_tokens ADD COLUMN expires_at TIMESTAMP;
+                    END IF;
+                    
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                                    WHERE table_name='password_reset_tokens' AND column_name='used_at') THEN
                         ALTER TABLE password_reset_tokens ADD COLUMN used_at TIMESTAMP;
                     END IF;
+                END $$;
+                
+                -- Add unique constraint if not exists
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'password_reset_tokens_token_hash_key'
+                    ) THEN
+                        ALTER TABLE password_reset_tokens 
+                        ADD CONSTRAINT password_reset_tokens_token_hash_key UNIQUE (token_hash);
+                    END IF;
+                EXCEPTION 
+                    WHEN duplicate_table THEN NULL;
+                    WHEN unique_violation THEN NULL;
                 END $$;
                 
                 CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);

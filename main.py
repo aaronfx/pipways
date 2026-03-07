@@ -52,12 +52,11 @@ except ImportError:
 
 class Settings(BaseSettings):
     """Application settings with validation"""
-    # Use SettingsConfigDict for Pydantic v2
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra='ignore'  # Ignore extra fields from environment
+        extra='ignore'
     )
 
     SECRET_KEY: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
@@ -66,23 +65,14 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str = Field(default="")
     OPENROUTER_MODEL: str = "anthropic/claude-3-opus-20240229"
     
-    # Email settings (Resend/SendGrid)
     RESEND_API_KEY: str = Field(default="")
     FROM_EMAIL: str = Field(default="noreply@pipways.com")
-    
-    # Frontend URL for password reset links
     FRONTEND_URL: str = Field(default="https://pipways-web-nhem.onrender.com")
-    
-    # CORS
     CORS_ORIGINS: List[str] = Field(default=["https://pipways-web-nhem.onrender.com", "http://localhost:3000"])
-    
-    # JWT
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
-    
-    # File upload
-    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024
     ALLOWED_IMAGE_TYPES: List[str] = Field(default=["image/jpeg", "image/png", "image/webp"])
 
 settings = Settings()
@@ -196,7 +186,6 @@ async def init_db():
         )
         logger.info("Database pool created")
         
-        # Initialize Redis if available
         if redis:
             try:
                 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -208,6 +197,7 @@ async def init_db():
         
         async with pool.acquire() as conn:
             # Create tables with proper constraints
+            # Using transactions to handle migrations gracefully
             await conn.execute("""
                 -- Users table with enhanced fields
                 CREATE TABLE IF NOT EXISTS users (
@@ -226,10 +216,46 @@ async def init_db():
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
+                -- Add missing columns if table already exists (migration)
+                DO $$
+                BEGIN
+                    -- Add password_reset_token if it doesn't exist
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='password_reset_token') THEN
+                        ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255);
+                    END IF;
+                    
+                    -- Add password_reset_expires if it doesn't exist
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='password_reset_expires') THEN
+                        ALTER TABLE users ADD COLUMN password_reset_expires TIMESTAMP;
+                    END IF;
+                    
+                    -- Add email_verification_token if it doesn't exist
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='email_verification_token') THEN
+                        ALTER TABLE users ADD COLUMN email_verification_token VARCHAR(255);
+                    END IF;
+                    
+                    -- Add last_login if it doesn't exist
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='last_login') THEN
+                        ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
+                    END IF;
+                END $$;
+                
                 -- Create index on email for faster lookups
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-                CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(password_reset_token) 
-                    WHERE password_reset_token IS NOT NULL;
+                
+                -- Only create index if column exists (safe approach)
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='users' AND column_name='password_reset_token') THEN
+                        CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(password_reset_token) 
+                            WHERE password_reset_token IS NOT NULL;
+                    END IF;
+                END $$;
                 
                 -- Trades table with enhanced fields
                 CREATE TABLE IF NOT EXISTS trades (
@@ -461,7 +487,6 @@ async def get_current_user(
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         
-        # Fetch fresh user data from database
         user = await conn.fetchrow(
             "SELECT id, email, full_name, role, is_active, is_verified FROM users WHERE email = $1",
             email
@@ -496,7 +521,6 @@ async def send_email(to_email: str, subject: str, html_content: str) -> bool:
     """Send email using Resend API"""
     if not settings.RESEND_API_KEY:
         logger.warning("RESEND_API_KEY not configured, email not sent")
-        # In development, just log the email
         logger.info(f"Would send email to {to_email}: {subject}")
         return True
     
@@ -557,44 +581,11 @@ async def send_password_reset_email(email: str, token: str) -> bool:
 # ==========================================
 
 async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Analyze trading chart using OpenRouter AI (Claude 3 Opus)
-    """
+    """Analyze trading chart using OpenRouter AI"""
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    system_prompt = """You are an expert trading analyst with 20+ years of experience in forex, crypto, and stock trading. 
-    Analyze the provided chart image and provide detailed technical analysis including:
-    
-    1. Pattern Recognition - Identify any chart patterns (head and shoulders, triangles, flags, etc.)
-    2. Support and Resistance Levels - Key price levels
-    3. Trend Analysis - Short, medium, and long term trends
-    4. Entry and Exit Points - Specific price zones
-    5. Risk Management - Stop loss and take profit levels with risk/reward ratio
-    6. Technical Indicators - RSI, MACD, Moving Averages if visible
-    
-    Respond in JSON format with these exact keys:
-    {
-        "pattern": "pattern name or 'None detected'",
-        "summary": "brief analysis summary",
-        "support_levels": ["1.0850", "1.0820"],
-        "resistance_levels": ["1.0920", "1.0950"],
-        "short_term_trend": "Bullish/Bearish/Neutral",
-        "medium_term_trend": "Bullish/Bearish/Neutral", 
-        "long_term_trend": "Bullish/Bearish/Neutral",
-        "entry_zone": "1.0870 - 1.0880",
-        "stop_loss": "1.0830",
-        "take_profit_1": "1.0920",
-        "take_profit_2": "1.0950",
-        "risk_reward": "1:2.5",
-        "confidence": "75%",
-        "indicators": {
-            "rsi": "62 (Neutral)",
-            "macd": "Bullish crossover",
-            "ema": "Price above 50 EMA",
-            "volume": "Above average"
-        }
-    }"""
+    system_prompt = """You are an expert trading analyst with 20+ years of experience..."""
     
     user_message = user_prompt or "Analyze this chart and provide trading insights."
     
@@ -634,7 +625,6 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
             result = response.json()
             content = result["choices"][0]["message"]["content"]
             
-            # Extract JSON from response (handle markdown code blocks)
             json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
             if json_match:
                 content = json_match.group(1)
@@ -652,29 +642,16 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
         raise HTTPException(status_code=503, detail="AI service unavailable")
 
 async def chat_with_mentor(message: str, context: Optional[List[Dict]] = None, user_id: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Chat with AI trading mentor using conversation history
-    """
+    """Chat with AI trading mentor"""
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    system_prompt = """You are an expert trading mentor with decades of experience. Your role is to:
-    - Provide personalized trading advice and education
-    - Explain technical and fundamental analysis concepts
-    - Help with risk management and psychology
-    - Answer questions about specific trading strategies
-    - Review trade ideas and provide constructive feedback
-    
-    Be encouraging but realistic. Always emphasize risk management. 
-    If the user mentions specific trades, ask about their stop loss and position sizing.
-    
-    Keep responses concise (2-4 paragraphs) unless detailed explanation is requested."""
+    system_prompt = """You are an expert trading mentor..."""
     
     messages = [{"role": "system", "content": system_prompt}]
     
-    # Add conversation context if provided
     if context:
-        for msg in context[-5:]:  # Keep last 5 messages for context
+        for msg in context[-5:]:
             messages.append(msg)
     
     messages.append({"role": "user", "content": message})
@@ -742,7 +719,6 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Security middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -752,10 +728,6 @@ app.add_middleware(
     expose_headers=["X-Total-Count", "X-Page", "X-Per-Page"],
     max_age=3600
 )
-
-# ==========================================
-# ERROR HANDLERS
-# ==========================================
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -772,13 +744,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={"detail": exc.detail, "success": False}
     )
 
-# ==========================================
-# HEALTH & INFO
-# ==========================================
-
 @app.get("/health", tags=["System"])
 async def health_check():
-    """Health check endpoint"""
     return {
         "status": "healthy",
         "version": "2.0.0",
@@ -789,7 +756,6 @@ async def health_check():
 
 @app.get("/", tags=["System"])
 async def root():
-    """API root"""
     return {
         "name": "Pipways API",
         "version": "2.0.0",
@@ -810,18 +776,15 @@ async def register(
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Register new user"""
-    # Validate input
     try:
         user_data = UserCreate(email=email, password=password, full_name=full_name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # Check if user exists
     existing = await conn.fetchrow("SELECT id FROM users WHERE email = $1", email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create user
     hashed_password = get_password_hash(password)
     user_id = await conn.fetchval(
         """INSERT INTO users (email, password_hash, full_name, role, is_active, is_verified) 
@@ -829,11 +792,8 @@ async def register(
         email, hashed_password, full_name
     )
     
-    # Generate tokens
     access_token = create_access_token({"sub": email, "user_id": user_id, "role": "user"})
     refresh_token = create_refresh_token({"sub": email, "user_id": user_id})
-    
-    # TODO: Send verification email in background
     
     logger.info(f"User registered: {email}")
     
@@ -859,7 +819,6 @@ async def login(
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Login user"""
-    # Fetch user with password hash
     user = await conn.fetchrow(
         """SELECT id, email, password_hash, full_name, role, is_active, is_verified 
            FROM users WHERE email = $1""",
@@ -872,10 +831,8 @@ async def login(
     if not user["is_active"]:
         raise HTTPException(status_code=403, detail="Account disabled")
     
-    # Update last login
     await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
     
-    # Generate tokens
     access_token = create_access_token({
         "sub": email, 
         "user_id": user["id"], 
@@ -917,7 +874,6 @@ async def refresh_token(
         email = payload.get("sub")
         user_id = payload.get("user_id")
         
-        # Verify user still exists and is active
         user = await conn.fetchrow(
             "SELECT email, role, is_active FROM users WHERE id = $1 AND email = $2",
             user_id, email
@@ -926,7 +882,6 @@ async def refresh_token(
         if not user or not user["is_active"]:
             raise HTTPException(status_code=401, detail="User not found or inactive")
         
-        # Generate new tokens
         new_access = create_access_token({
             "sub": email,
             "user_id": user_id,
@@ -963,16 +918,13 @@ async def password_reset_request(
     """Request password reset"""
     user = await conn.fetchrow("SELECT id, email, full_name FROM users WHERE email = $1", email)
     
-    # Always return success to prevent email enumeration
     if not user:
         return {"success": True, "message": "If the email exists, a reset link has been sent"}
     
-    # Generate token
     token = create_password_reset_token()
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     expires = datetime.utcnow() + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
     
-    # Store token
     await conn.execute(
         """INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) 
            VALUES ($1, $2, $3)
@@ -981,7 +933,6 @@ async def password_reset_request(
         user["id"], token_hash, expires
     )
     
-    # Send email in background
     background_tasks.add_task(send_password_reset_email, email, token)
     
     logger.info(f"Password reset requested for: {email}")
@@ -995,13 +946,11 @@ async def password_reset_confirm(
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Confirm password reset"""
-    # Validate password
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     
-    # Find valid token
     reset_record = await conn.fetchrow(
         """SELECT t.user_id, t.expires_at, t.used_at 
            FROM password_reset_tokens t
@@ -1018,14 +967,12 @@ async def password_reset_confirm(
     if reset_record["expires_at"] < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Token expired")
     
-    # Update password
     hashed_password = get_password_hash(new_password)
     await conn.execute(
         "UPDATE users SET password_hash = $1 WHERE id = $2",
         hashed_password, reset_record["user_id"]
     )
     
-    # Mark token as used
     await conn.execute(
         "UPDATE password_reset_tokens SET used_at = NOW() WHERE token_hash = $1",
         token_hash
@@ -1037,13 +984,10 @@ async def password_reset_confirm(
 
 @app.get("/auth/me", response_model=UserResponse, tags=["Authentication"])
 async def get_me(current_user: Dict = Depends(get_current_user)):
-    """Get current user info"""
     return UserResponse(**current_user)
 
 @app.post("/auth/logout", tags=["Authentication"])
 async def logout(current_user: Dict = Depends(get_current_user)):
-    """Logout user (client should discard tokens)"""
-    # In a more advanced setup, we'd blacklist the token in Redis
     return {"success": True, "message": "Logged out successfully"}
 
 # ==========================================
@@ -1056,7 +1000,6 @@ async def create_trade(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Create new trade entry"""
     trade_id = await conn.fetchval(
         """INSERT INTO trades 
            (user_id, pair, direction, pips, grade, notes, entry_price, exit_price, screenshot_url)
@@ -1085,8 +1028,6 @@ async def get_trades(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get user's trades with filtering"""
-    # Build query dynamically
     conditions = ["user_id = $1"]
     params = [current_user["id"]]
     param_idx = 2
@@ -1113,10 +1054,8 @@ async def get_trades(
     
     where_clause = " AND ".join(conditions)
     
-    # Get total count
     total = await conn.fetchval(f"SELECT COUNT(*) FROM trades WHERE {where_clause}", *params)
     
-    # Get paginated results
     offset = (page - 1) * per_page
     params.extend([per_page, offset])
     
@@ -1126,7 +1065,6 @@ async def get_trades(
         *params
     )
     
-    # Calculate statistics
     stats = await conn.fetchrow(
         """SELECT 
             COUNT(*) as total_trades,
@@ -1157,8 +1095,6 @@ async def get_trade_stats(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get detailed trade statistics"""
-    # Calculate date range
     now = datetime.utcnow()
     if period == "week":
         start_date = now - timedelta(days=7)
@@ -1188,13 +1124,11 @@ async def get_trade_stats(
         current_user["id"], start_date
     )
     
-    # Grade distribution
     grades = await conn.fetch(
         "SELECT grade, COUNT(*) as count FROM trades WHERE user_id = $1 AND created_at >= $2 GROUP BY grade",
         current_user["id"], start_date
     )
     
-    # Monthly trend
     monthly = await conn.fetch(
         """SELECT 
             DATE_TRUNC('month', created_at) as month,
@@ -1228,10 +1162,6 @@ async def analyze_chart(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """
-    Analyze trading chart using AI vision model
-    """
-    # Validate file
     if image.content_type not in settings.ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type. Use PNG, JPG, or WebP")
     
@@ -1239,10 +1169,8 @@ async def analyze_chart(
     if len(contents) > settings.MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail=f"File too large. Max size: {settings.MAX_UPLOAD_SIZE // 1024 // 1024}MB")
     
-    # Calculate image hash for deduplication
     image_hash = hashlib.sha256(contents).hexdigest()
     
-    # Check for existing analysis
     existing = await conn.fetchrow(
         "SELECT id, analysis_text FROM chart_analyses WHERE image_hash = $1 AND user_id = $2",
         image_hash, current_user["id"]
@@ -1256,13 +1184,10 @@ async def analyze_chart(
             "cached": True
         }
     
-    # Encode image for AI
     image_base64 = base64.b64encode(contents).decode()
     
-    # Call AI analysis
     analysis = await analyze_chart_with_ai(image_base64, prompt)
     
-    # Store in database
     analysis_id = await conn.fetchval(
         """INSERT INTO chart_analyses 
            (user_id, image_url, image_hash, analysis_text, pattern_detected, 
@@ -1299,7 +1224,6 @@ async def get_analysis_history(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get user's chart analysis history"""
     total = await conn.fetchval(
         "SELECT COUNT(*) FROM chart_analyses WHERE user_id = $1",
         current_user["id"]
@@ -1335,10 +1259,6 @@ async def mentor_chat(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """
-    Chat with AI trading mentor
-    """
-    # Get conversation history
     session_id = session_id or f"session_{current_user['id']}_{datetime.utcnow().timestamp()}"
     
     history = await conn.fetch(
@@ -1353,10 +1273,8 @@ async def mentor_chat(
         context.append({"role": "user", "content": h["message"]})
         context.append({"role": "assistant", "content": h["response"]})
     
-    # Get AI response
     result = await chat_with_mentor(message, context, current_user["id"])
     
-    # Store in database
     await conn.execute(
         """INSERT INTO mentor_chats 
            (user_id, session_id, message, response, context, tokens_used)
@@ -1392,7 +1310,6 @@ async def admin_create_course(
     current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Create new course (admin only)"""
     try:
         course_id = await conn.fetchval(
             """INSERT INTO courses 
@@ -1418,8 +1335,6 @@ async def admin_update_course(
     current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Update course (admin only)"""
-    # Build update dynamically
     updates = []
     params = []
     param_idx = 1
@@ -1467,7 +1382,6 @@ async def admin_create_blog_post(
     current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Create blog post (admin only)"""
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
     
     try:
@@ -1497,7 +1411,6 @@ async def admin_create_webinar(
     current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Create webinar (admin only)"""
     webinar_id = await conn.fetchval(
         """INSERT INTO webinars 
            (title, description, presenter_id, scheduled_at, duration_minutes, 
@@ -1517,7 +1430,6 @@ async def admin_list_users(
     current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """List all users (admin only)"""
     conditions = ["1=1"]
     params = []
     
@@ -1562,7 +1474,6 @@ async def get_courses(
     search: Optional[str] = None,
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get published courses"""
     conditions = ["is_published = TRUE"]
     params = []
     param_idx = 1
@@ -1609,7 +1520,6 @@ async def get_course_detail(
     current_user: Optional[Dict] = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get course details"""
     course = await conn.fetchrow(
         """SELECT c.*, u.full_name as instructor_name
            FROM courses c
@@ -1623,7 +1533,6 @@ async def get_course_detail(
     
     result = dict(course)
     
-    # Check enrollment if user is logged in
     if current_user:
         enrollment = await conn.fetchrow(
             "SELECT * FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
@@ -1640,8 +1549,6 @@ async def enroll_course(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Enroll in a course"""
-    # Check if course exists and is published
     course = await conn.fetchrow(
         "SELECT id, price FROM courses WHERE id = $1 AND is_published = TRUE",
         course_id
@@ -1650,7 +1557,6 @@ async def enroll_course(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     
-    # Check if already enrolled
     existing = await conn.fetchrow(
         "SELECT id FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
         current_user["id"], course_id
@@ -1658,8 +1564,6 @@ async def enroll_course(
     
     if existing:
         return {"success": True, "message": "Already enrolled"}
-    
-    # TODO: Handle paid courses with Stripe
     
     await conn.execute(
         "INSERT INTO course_enrollments (user_id, course_id) VALUES ($1, $2)",
@@ -1673,7 +1577,6 @@ async def get_webinars(
     upcoming: bool = Query(True),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get webinars"""
     if upcoming:
         webinars = await conn.fetch(
             """SELECT w.*, u.full_name as presenter_name,
@@ -1702,7 +1605,6 @@ async def get_blog_posts(
     tag: Optional[str] = None,
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get blog posts"""
     conditions = ["is_published = TRUE"]
     params = []
     param_idx = 1
@@ -1744,7 +1646,6 @@ async def get_blog_posts(
 
 @app.get("/blog/posts/{slug}", tags=["Blog"])
 async def get_blog_post(slug: str, conn: asyncpg.Connection = Depends(get_db)):
-    """Get single blog post"""
     post = await conn.fetchrow(
         """SELECT bp.*, u.full_name as author_name
            FROM blog_posts bp

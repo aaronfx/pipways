@@ -1,16 +1,25 @@
+# Render Blueprint for Pipways Trading Platform
+# Version: 2.0.4 - Production Ready
+
 services:
+  # Main Web Service - Serves both Frontend and API
   - type: web
     name: pipways-web
     runtime: python
     region: oregon
-    plan: starter
+    plan: pro
     branch: main
 
     buildCommand: |
-      pip install --upgrade pip
+      echo "Python version:"
+      python --version
+      echo "Upgrading pip..."
+      pip install --upgrade pip setuptools wheel
+      echo "Installing dependencies..."
       pip install -r requirements.txt
+      echo "Build completed successfully"
 
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2  # ← REQUIRED!
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
 
     healthCheckPath: /health
 
@@ -23,8 +32,33 @@ services:
           name: pipways-db
           property: connectionString
 
+      - key: SECRET_KEY
+        generateValue: true
+
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+      - key: ENVIRONMENT
+        value: production
+
+      - key: STATIC_DIR
+        value: static
+
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+
+      - key: MAX_FILE_SIZE
+        value: "10485760"
+
+      - key: LOG_LEVEL
+        value: INFO
+
+    autoDeploy: true
+
+    previews:
+      generation: automatic
+
 databases:
   - name: pipways-db
     region: oregon
-    plan: starter
-    postgresMajorVersion: "15"
+    plan: standard

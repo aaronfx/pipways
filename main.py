@@ -35,7 +35,9 @@ from passlib.context import CryptContext
 import httpx
 import asyncpg
 from asyncpg import Pool
-from pydantic import BaseModel, EmailStr, validator, Field
+from pydantic import BaseModel, EmailStr, Field
+# FIX 1: Import field_validator for Pydantic v2 instead of deprecated validator
+from pydantic import field_validator
 
 # Import BaseSettings from pydantic_settings for Pydantic v2
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -82,7 +84,7 @@ class Settings(BaseSettings):
         """Parse CORS_ORIGINS string into list"""
         origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
         # Ensure no trailing slashes for consistency
-        return [origin.rstrip('/') for origin in origins]
+        return [origin.rstrip('/') for origins in origins]
 
 settings = Settings()
 
@@ -120,8 +122,10 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = Field(None, max_length=100)
     
-    @validator('password')
-    def password_strength(cls, v):
+    # FIX 2: Use field_validator instead of deprecated validator for Pydantic v2
+    @field_validator('password')
+    @classmethod
+    def password_strength(cls, v: str) -> str:
         if not any(c.isupper() for c in v):
             raise ValueError('Password must contain at least one uppercase letter')
         if not any(c.islower() for c in v):
@@ -1006,12 +1010,13 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# CORS middleware - MUST be added before other middleware
+# FIX 3: CORS middleware - temporarily use ["*"] for debugging to verify network error disappears
+# In production, replace with specific origins: cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=["*"],  # Temporarily allow all origins for debugging
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Total-Count", "X-Page", "X-Per-Page", "Authorization"],
     max_age=3600

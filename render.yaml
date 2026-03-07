@@ -1,10 +1,8 @@
 # Render Blueprint for Pipways Trading Platform
-# Version: 2.0.8 - Option A: index.html in root
+# Version: 2.0.8 - Fixed for separate services
 
 services:
-  # ==========================================
   # API SERVICE - Python Backend
-  # ==========================================
   - type: web
     name: pipways-api-nhem
     runtime: python
@@ -49,21 +47,17 @@ services:
     
     autoDeploy: true
 
-  # ==========================================
   # FRONTEND SERVICE - Static Site
-  # ==========================================
   - type: web
     name: pipways-web-nhem
     runtime: static
     region: oregon
-    plan: pro
+    plan: standard
     branch: main
     
     rootDir: .
-    
     buildCommand: echo "No build needed"
-    
-    publishPath: ./        # ← index.html is in repo root
+    publishPath: ./
     
     routes:
       - type: rewrite

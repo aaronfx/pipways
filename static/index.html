@@ -140,6 +140,7 @@
             overflow: hidden;
         }
     </style>
+<base target="_blank">
 </head>
 <body class="bg-slate-950 text-slate-200 antialiased">
     
@@ -270,7 +271,19 @@
     </div>
 
 <script>
-const API_URL = 'https://pipways-api-nhem.onrender.com';
+const API_URL = window.location.origin;
+
+// Safe JSON parsing helper
+async function safeJsonParse(response) {
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("Invalid JSON response:", text);
+        throw new Error("Server returned invalid response");
+    }
+}
+
 let authToken = localStorage.getItem('pipways_token');
 let currentUser = JSON.parse(localStorage.getItem('pipways_user') || '{}');
 
@@ -350,7 +363,7 @@ async function handleLogin(e) {
             body: formData.toString()
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         if (!response.ok) {
             throw new Error(getErrorMessage(data));
@@ -385,7 +398,7 @@ async function handleRegister(e) {
             body: formData.toString()
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         if (!response.ok) {
             throw new Error(getErrorMessage(data));
@@ -763,7 +776,7 @@ async function analyzeChart(input) {
             body: formData
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         loadingDiv.classList.add('hidden');
         resultDiv.classList.remove('hidden');
@@ -933,7 +946,7 @@ async function addTrade(e) {
             body: formData.toString()
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         if (!response.ok) {
             throw new Error(getErrorMessage(data));
@@ -1028,7 +1041,7 @@ async function analyzeTradeFile(input) {
             body: formData
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         loadingDiv.classList.add('hidden');
         resultDiv.classList.remove('hidden');
@@ -1195,7 +1208,7 @@ async function analyzeTradeFile(input) {
 async function loadTradeAnalysisHistory() {
     try {
         const response = await apiCall('/trade-analyses');
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         const container = document.getElementById('tradeAnalysisHistory');
         
         if (!data || data.length === 0) {
@@ -1364,7 +1377,7 @@ async function askMentor() {
             body: 'message=' + encodeURIComponent(message) + '&context_type=general'
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         // Remove typing indicator
         const typingEl = document.getElementById(typingId);
@@ -1469,7 +1482,7 @@ async function loadBlogPosts(category, search) {
         if (search) url += '&search=' + encodeURIComponent(search);
         
         const response = await fetch(API_URL + url);
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         const container = document.getElementById('blogPosts');
         
@@ -1668,7 +1681,7 @@ function renderAdmin(content) {
 async function loadAdminStats() {
     try {
         const response = await apiCall('/admin/dashboard');
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         const statsDiv = document.getElementById('adminStats');
         let html = '';
@@ -1820,7 +1833,7 @@ async function saveBlogPost(e) {
             body: formData.toString()
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         if (!response.ok) {
             throw new Error(getErrorMessage(data));
@@ -1842,7 +1855,7 @@ async function renderBlogPostsList(container) {
     
     try {
         const response = await fetch(API_URL + '/blog/posts?status=published&per_page=50');
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         let html = '<div class="flex items-center justify-between mb-6">';
         html += '<h3 class="text-lg font-semibold text-white">Manage Posts</h3>';
@@ -1905,7 +1918,7 @@ async function renderUsersList(container) {
     
     try {
         const response = await apiCall('/admin/users');
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         let html = '<div class="flex items-center justify-between mb-6">';
         html += '<h3 class="text-lg font-semibold text-white">All Users</h3>';
@@ -1977,7 +1990,7 @@ function renderMediaLibrary(container) {
 async function loadMediaFiles() {
     try {
         const response = await apiCall('/admin/media');
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         const container = document.getElementById('mediaGrid');
         
         if (!data.media || data.media.length === 0) {
@@ -2026,7 +2039,7 @@ async function uploadMedia(input) {
             body: formData
         });
         
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         
         if (data.success) {
             alert('Media uploaded: ' + data.url);

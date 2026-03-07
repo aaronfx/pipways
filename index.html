@@ -18,7 +18,6 @@
             --secondary: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
-            --info: #3b82f6;
             --bg-dark: #0f172a;
             --bg-card: #1e293b;
             --bg-hover: #334155;
@@ -94,9 +93,10 @@
             font-size: 14px;
         }
 
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
+        /* CRITICAL FIX: Auth inputs need dark text */
+        .auth-box input,
+        #login-form input,
+        #register-form input {
             width: 100%;
             padding: 12px 16px;
             border: 2px solid #e5e7eb;
@@ -104,11 +104,19 @@
             font-size: 15px;
             transition: all 0.3s;
             background: #f9fafb;
+            color: #1e293b !important;
+            -webkit-text-fill-color: #1e293b !important;
         }
 
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
+        .auth-box input::placeholder,
+        #login-form input::placeholder,
+        #register-form input::placeholder {
+            color: #6b7280 !important;
+        }
+
+        .auth-box input:focus,
+        #login-form input:focus,
+        #register-form input:focus {
             outline: none;
             border-color: var(--primary);
             background: white;
@@ -444,16 +452,10 @@
             gap: 20px;
         }
 
-        .form-group label {
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            display: block;
-            font-size: 14px;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
+        /* Dashboard form inputs (dark theme) */
+        .section .form-group input,
+        .section .form-group select,
+        .section .form-group textarea {
             background: var(--bg-dark);
             border: 1px solid var(--border);
             color: var(--text-primary);
@@ -463,9 +465,9 @@
             font-size: 15px;
         }
 
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
+        .section .form-group input:focus,
+        .section .form-group select:focus,
+        .section .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
         }
@@ -676,6 +678,7 @@
             margin-bottom: 15px;
             border: 1px solid var(--border);
             transition: all 0.3s;
+            cursor: pointer;
         }
 
         .history-item:hover {
@@ -898,6 +901,7 @@
             overflow: hidden;
             border: 1px solid var(--border);
             transition: transform 0.3s;
+            cursor: pointer;
         }
 
         .blog-card:hover {
@@ -1633,6 +1637,35 @@
         let analysisHistory = JSON.parse(localStorage.getItem('analysisHistory') || '[]');
 
         // ==========================================
+        // Initialize App - CRITICAL FIX FOR BOUNCING
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const authToken = localStorage.getItem('pipways_token');
+            const userData = localStorage.getItem('pipways_user');
+            
+            // Parse user data safely
+            let parsedUser = null;
+            try {
+                parsedUser = userData ? JSON.parse(userData) : null;
+            } catch (e) {
+                parsedUser = null;
+            }
+            
+            // Check for valid session (API returns user_id, not id)
+            const hasValidUser = parsedUser && (parsedUser.id || parsedUser.user_id || parsedUser.email);
+            
+            if (authToken && hasValidUser) {
+                currentUser = parsedUser;
+                showDashboard();
+            } else {
+                // Clear invalid data to prevent loops
+                localStorage.removeItem('pipways_token');
+                localStorage.removeItem('pipways_user');
+                showAuth();
+            }
+        });
+
+        // ==========================================
         // Auth Functions
         // ==========================================
         
@@ -1682,6 +1715,7 @@
             
             try {
                 const formData = new URLSearchParams();
+                // CRITICAL FIX: Use 'email' not 'username'
                 formData.append('email', email);
                 formData.append('password', password);
 
@@ -1694,8 +1728,8 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    localStorage.setItem('token', data.access_token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
+                    localStorage.setItem('pipways_token', data.access_token);
+                    localStorage.setItem('pipways_user', JSON.stringify(data.user));
                     currentUser = data.user;
                     showDashboard();
                 } else {
@@ -1732,7 +1766,7 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('pipways_token', data.access_token);
                     showAlert('Account created successfully!', 'success');
                     setTimeout(() => showDashboard(), 1000);
                 } else {
@@ -1744,33 +1778,49 @@
         }
 
         function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            localStorage.removeItem('pipways_token');
+            localStorage.removeItem('pipways_user');
             currentUser = null;
-            document.getElementById('auth-container').style.display = 'flex';
-            document.getElementById('dashboard').style.display = 'none';
+            showAuth();
         }
 
         // ==========================================
         // Dashboard Functions
         // ==========================================
 
+        function showAuth() {
+            document.getElementById('auth-container').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
         function showDashboard() {
+            // Validate we have proper data
+            if (!currentUser) {
+                showAuth();
+                return;
+            }
+            
             document.getElementById('auth-container').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
             
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            document.getElementById('user-name').textContent = user.full_name || user.email || 'User';
-            document.getElementById('user-email').textContent = user.email || '';
-            document.getElementById('user-avatar').textContent = (user.full_name || user.email || 'U')[0].toUpperCase();
+            // Update user info safely
+            const displayName = currentUser.full_name || currentUser.name || currentUser.email || 'Trader';
+            const displayEmail = currentUser.email || '';
+            const avatar = (displayName[0] || 'U').toUpperCase();
+            
+            document.getElementById('user-name').textContent = displayName;
+            document.getElementById('user-email').textContent = displayEmail;
+            document.getElementById('user-avatar').textContent = avatar;
             
             loadDashboardData();
         }
 
         function showSection(sectionName) {
+            // Update nav active state
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             event.target.closest('.nav-link').classList.add('active');
             
+            // Show section
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
             document.getElementById(`${sectionName}-section`).classList.add('active');
             
@@ -1791,19 +1841,23 @@
 
         async function loadStats() {
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('pipways_token');
                 
+                // Load trades count
                 const tradesRes = await fetch(`${API_URL}/trades`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const tradesData = await tradesRes.json();
                 document.getElementById('stat-trades').textContent = tradesData.total || 0;
                 
+                // Calculate total pips
                 const totalPips = tradesData.trades?.reduce((sum, t) => sum + parseFloat(t.pips || 0), 0) || 0;
                 document.getElementById('stat-pips').textContent = (totalPips > 0 ? '+' : '') + totalPips.toFixed(1);
                 
+                // Update analysis count
                 document.getElementById('stat-analyses').textContent = analysisHistory.length;
                 
+                // Load courses count
                 const coursesRes = await fetch(`${API_URL}/courses`);
                 const coursesData = await coursesRes.json();
                 document.getElementById('stat-courses').textContent = coursesData.total || 0;
@@ -1819,7 +1873,7 @@
 
         async function loadRecentTrades() {
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('pipways_token');
                 const response = await fetch(`${API_URL}/trades?per_page=5`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -1860,7 +1914,7 @@
         async function loadTrades() {
             await loadRecentTrades();
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('pipways_token');
                 const response = await fetch(`${API_URL}/trades?per_page=50`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -1900,7 +1954,7 @@
 
         async function handleTrade(e) {
             e.preventDefault();
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('pipways_token');
             
             const formData = new URLSearchParams();
             formData.append('pair', document.getElementById('trade-pair').value);
@@ -1967,7 +2021,7 @@
         async function analyzeChart() {
             if (!selectedFile) return;
             
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('pipways_token');
             const formData = new FormData();
             formData.append('image', selectedFile);
 
@@ -2301,4 +2355,271 @@
                     icon: 'fa-chart-line'
                 },
                 {
-                    title: '
+                    title: 'Risk Management Pro',
+                    level: 'Advanced',
+                    desc: 'Professional position sizing and portfolio management techniques.',
+                    icon: 'fa-shield-alt'
+                },
+                {
+                    title: 'Psychology of Trading',
+                    level: 'All Levels',
+                    desc: 'Master your emotions and develop a winning trader mindset.',
+                    icon: 'fa-brain'
+                }
+            ];
+            
+            return courses.map(course => `
+                <div class="course-card">
+                    <div class="course-image">
+                        <div class="course-badge">${course.level}</div>
+                        <i class="fas ${course.icon}"></i>
+                    </div>
+                    <div class="course-content">
+                        <span class="course-level">${course.level}</span>
+                        <h3 class="course-title">${course.title}</h3>
+                        <p class="course-desc">${course.desc}</p>
+                        <div class="course-stats">
+                            <span><i class="fas fa-clock"></i> 8 hours</span>
+                            <span><i class="fas fa-user"></i> 2.5k students</span>
+                            <span><i class="fas fa-star"></i> 4.9</span>
+                        </div>
+                        <div class="course-footer">
+                            <span class="course-price">Free</span>
+                            <button class="btn btn-small" onclick="showToast('Enrolled successfully!', 'success')">
+                                Enroll Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function enrollCourse(courseId) {
+            const token = localStorage.getItem('pipways_token');
+            try {
+                const response = await fetch(`${API_URL}/courses/${courseId}/enroll`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                showToast(data.message || 'Enrolled successfully!', 'success');
+            } catch (error) {
+                showToast('Error enrolling in course');
+            }
+        }
+
+        // ==========================================
+        // Webinars Functions
+        // ==========================================
+
+        async function loadWebinars() {
+            const container = document.getElementById('webinars-list');
+            
+            try {
+                const response = await fetch(`${API_URL}/webinars`);
+                const data = await response.json();
+
+                if (!data.webinars || data.webinars.length === 0) {
+                    // Show sample webinars
+                    container.innerHTML = getSampleWebinars();
+                    return;
+                }
+
+                container.innerHTML = data.webinars.map(webinar => {
+                    const date = new Date(webinar.scheduled_at);
+                    return `
+                        <div class="webinar-item">
+                            <div class="webinar-date">
+                                <div class="day">${date.getDate()}</div>
+                                <div class="month">${date.toLocaleString('default', { month: 'short' })}</div>
+                            </div>
+                            <div class="webinar-info">
+                                <h4>${webinar.title}</h4>
+                                <p>${webinar.description || 'Live trading session with Q&A'}</p>
+                                <div class="webinar-meta">
+                                    <span><i class="fas fa-user"></i> ${webinar.presenter || 'Expert Trader'}</span>
+                                    <span><i class="fas fa-clock"></i> ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                    <span><i class="fas fa-users"></i> ${webinar.max_attendees || 100} spots</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-small" onclick="registerWebinar(${webinar.id})">
+                                Register
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                container.innerHTML = getSampleWebinars();
+            }
+        }
+
+        function getSampleWebinars() {
+            const webinars = [
+                {
+                    title: 'Live Forex Trading Session',
+                    presenter: 'Master Trader John',
+                    date: new Date(Date.now() + 86400000 * 2),
+                    desc: 'Watch live trading and ask questions in real-time.'
+                },
+                {
+                    title: 'Risk Management Workshop',
+                    presenter: 'Sarah Johnson',
+                    date: new Date(Date.now() + 86400000 * 5),
+                    desc: 'Learn professional risk management strategies.'
+                }
+            ];
+            
+            return webinars.map(webinar => `
+                <div class="webinar-item">
+                    <div class="webinar-date">
+                        <div class="day">${webinar.date.getDate()}</div>
+                        <div class="month">${webinar.date.toLocaleString('default', { month: 'short' })}</div>
+                    </div>
+                    <div class="webinar-info">
+                        <h4>${webinar.title}</h4>
+                        <p>${webinar.desc}</p>
+                        <div class="webinar-meta">
+                            <span><i class="fas fa-user"></i> ${webinar.presenter}</span>
+                            <span><i class="fas fa-clock"></i> ${webinar.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <span><i class="fas fa-users"></i> 100 spots</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-small" onclick="showToast('Registered successfully!', 'success')">
+                        Register
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function registerWebinar(webinarId) {
+            const token = localStorage.getItem('pipways_token');
+            try {
+                const response = await fetch(`${API_URL}/webinars/${webinarId}/register`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                showToast(data.message || 'Registered successfully!', 'success');
+            } catch (error) {
+                showToast('Error registering for webinar');
+            }
+        }
+
+        // ==========================================
+        // Blog Functions
+        // ==========================================
+
+        async function loadBlog() {
+            const container = document.getElementById('blog-grid');
+            
+            try {
+                const response = await fetch(`${API_URL}/blog/posts`);
+                const data = await response.json();
+
+                if (!data.posts || data.posts.length === 0) {
+                    container.innerHTML = getSampleBlogPosts();
+                    return;
+                }
+
+                container.innerHTML = data.posts.map(post => `
+                    <div class="blog-card" onclick="openBlogPost(${post.id})">
+                        <div class="blog-image">
+                            <i class="fas fa-newspaper"></i>
+                        </div>
+                        <div class="blog-content">
+                            <span class="blog-category">${post.category || 'General'}</span>
+                            <h3 class="blog-title">${post.title}</h3>
+                            <p class="blog-excerpt">${post.excerpt || post.content.substring(0, 150)}...</p>
+                            <div class="blog-footer">
+                                <div class="blog-author">
+                                    <div class="blog-author-avatar">A</div>
+                                    <div class="blog-author-info">
+                                        <div class="blog-author-name">Admin</div>
+                                        <div class="blog-date">${new Date(post.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                </div>
+                                <span class="read-more">Read <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                container.innerHTML = getSampleBlogPosts();
+            }
+        }
+
+        function getSampleBlogPosts() {
+            const posts = [
+                {
+                    title: 'Understanding Support and Resistance',
+                    category: 'Technical Analysis',
+                    excerpt: 'Learn how to identify key support and resistance levels that can help you make better trading decisions.',
+                    date: new Date(Date.now() - 86400000 * 2)
+                },
+                {
+                    title: 'The Psychology of Winning Traders',
+                    category: 'Trading Psychology',
+                    excerpt: 'Discover the mental frameworks and habits that separate successful traders from the rest.',
+                    date: new Date(Date.now() - 86400000 * 5)
+                },
+                {
+                    title: 'Risk Management: The 2% Rule',
+                    category: 'Risk Management',
+                    excerpt: 'Why professional traders never risk more than 2% of their account on a single trade.',
+                    date: new Date(Date.now() - 86400000 * 7)
+                }
+            ];
+            
+            return posts.map(post => `
+                <div class="blog-card" onclick="showToast('Opening article...', 'success')">
+                    <div class="blog-image">
+                        <i class="fas fa-newspaper"></i>
+                    </div>
+                    <div class="blog-content">
+                        <span class="blog-category">${post.category}</span>
+                        <h3 class="blog-title">${post.title}</h3>
+                        <p class="blog-excerpt">${post.excerpt}</p>
+                        <div class="blog-footer">
+                            <div class="blog-author">
+                                <div class="blog-author-avatar">P</div>
+                                <div class="blog-author-info">
+                                    <div class="blog-author-name">Pipways Team</div>
+                                    <div class="blog-date">${post.date.toLocaleDateString()}</div>
+                                </div>
+                            </div>
+                            <span class="read-more">Read <i class="fas fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openBlogPost(postId) {
+            // Show modal with full post
+            const modal = document.getElementById('blog-modal');
+            const content = document.getElementById('modal-content-area');
+            
+            content.innerHTML = `
+                <div class="modal-header">
+                    <span class="blog-category">Article</span>
+                    <h2 style="margin-top: 10px;">Trading Article #${postId}</h2>
+                </div>
+                <div class="modal-body">
+                    <p>Full article content would be loaded here from the API...</p>
+                    <p>This is a placeholder for the complete blog post content.</p>
+                </div>
+            `;
+            
+            modal.classList.add('show');
+        }
+
+        function closeBlogModal(e) {
+            if (!e || e.target.id === 'blog-modal') {
+                document.getElementById('blog-modal').classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>

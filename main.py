@@ -68,12 +68,21 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = Field(default="")
     FROM_EMAIL: str = Field(default="noreply@pipways.com")
     FRONTEND_URL: str = Field(default="https://pipways-web-nhem.onrender.com")
-    CORS_ORIGINS: List[str] = Field(default=["https://pipways-web-nhem.onrender.com", "http://localhost:3000"])
+    
+    # CORS - Comma-separated list of allowed origins
+    CORS_ORIGINS: str = Field(default="https://pipways-web-nhem.onrender.com,http://localhost:3000,http://localhost:5173")
+    
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024
-    ALLOWED_IMAGE_TYPES: List[str] = Field(default=["image/jpeg", "image/png", "image/webp"])
+    ALLOWED_IMAGE_TYPES: str = Field(default="image/jpeg,image/png,image/webp")
+
+    def get_cors_origins(self) -> List[str]:
+        """Parse CORS_ORIGINS string into list"""
+        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        # Ensure no trailing slashes for consistency
+        return [origin.rstrip('/') for origin in origins]
 
 settings = Settings()
 
@@ -200,15 +209,11 @@ async def init_db():
             # STEP 1: Create base tables (if not exist) - MINIMAL SCHEMA
             # ============================================================================
             await conn.execute("""
-                -- Users table - minimal
+                -- Users table - minimal (only columns that must exist)
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     email VARCHAR(255) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
-                    full_name VARCHAR(255),
-                    role VARCHAR(20) DEFAULT 'user',
-                    is_active BOOLEAN DEFAULT TRUE,
-                    is_verified BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -226,9 +231,6 @@ async def init_db():
                 CREATE TABLE IF NOT EXISTS courses (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    content TEXT,
-                    price DECIMAL(10,2) DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -237,17 +239,37 @@ async def init_db():
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(255) NOT NULL,
                     slug VARCHAR(255) UNIQUE NOT NULL,
-                    content TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
             
             # ============================================================================
-            # STEP 2: Migrate Users table - add missing columns
+            # STEP 2: Migrate Users table - add ALL missing columns
             # ============================================================================
             await conn.execute("""
                 DO $$
                 BEGIN
+                    -- Check and add each column individually
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='full_name') THEN
+                        ALTER TABLE users ADD COLUMN full_name VARCHAR(255);
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='role') THEN
+                        ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user';
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='is_active') THEN
+                        ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='is_verified') THEN
+                        ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+                    END IF;
+                    
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                                    WHERE table_name='users' AND column_name='password_reset_token') THEN
                         ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255);
@@ -330,6 +352,16 @@ async def init_db():
                     END IF;
                     
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='description') THEN
+                        ALTER TABLE courses ADD COLUMN description TEXT;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='content') THEN
+                        ALTER TABLE courses ADD COLUMN content TEXT;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                                    WHERE table_name='courses' AND column_name='level') THEN
                         ALTER TABLE courses ADD COLUMN level VARCHAR(20) DEFAULT 'beginner';
                     END IF;
@@ -337,6 +369,11 @@ async def init_db():
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                                    WHERE table_name='courses' AND column_name='is_published') THEN
                         ALTER TABLE courses ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+                    END IF;
+                    
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='courses' AND column_name='price') THEN
+                        ALTER TABLE courses ADD COLUMN price DECIMAL(10,2) DEFAULT 0;
                     END IF;
                     
                     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
@@ -393,6 +430,12 @@ async def init_db():
                     ) THEN
                         ALTER TABLE blog_posts
                         ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+                    END IF;
+
+                    -- Add content if missing
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='blog_posts' AND column_name='content') THEN
+                        ALTER TABLE blog_posts ADD COLUMN content TEXT;
                     END IF;
 
                     -- Add other missing columns
@@ -520,11 +563,6 @@ async def init_db():
                 CREATE TABLE IF NOT EXISTS mentor_chats (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                    session_id VARCHAR(100) NOT NULL,
-                    message TEXT NOT NULL,
-                    response TEXT NOT NULL,
-                    context JSONB,
-                    tokens_used INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -954,6 +992,10 @@ async def lifespan(app: FastAPI):
     if redis_client:
         await redis_client.close()
 
+# Get CORS origins
+cors_origins = settings.get_cors_origins()
+logger.info(f"Configured CORS origins: {cors_origins}")
+
 app = FastAPI(
     title="Pipways API",
     description="Professional Trading Education Platform API",
@@ -964,13 +1006,14 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+# CORS middleware - MUST be added before other middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
-    expose_headers=["X-Total-Count", "X-Page", "X-Per-Page"],
+    expose_headers=["X-Total-Count", "X-Page", "X-Per-Page", "Authorization"],
     max_age=3600
 )
 
@@ -1407,7 +1450,7 @@ async def analyze_chart(
     current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    if image.content_type not in settings.ALLOWED_IMAGE_TYPES:
+    if image.content_type not in ["image/jpeg", "image/png", "image/webp"]:
         raise HTTPException(status_code=400, detail="Invalid file type. Use PNG, JPG, or WebP")
     
     contents = await image.read()

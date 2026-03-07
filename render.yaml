@@ -1,14 +1,21 @@
 # Render Blueprint for Pipways Trading Platform
-# Version: 2.0.4 - Production Ready
+# Version: 2.0.6 - Separate API and Frontend Services
 
 services:
-  # Main Web Service - Serves both Frontend and API
+  # ==========================================
+  # API SERVICE - Python Backend
+  # ==========================================
   - type: web
-    name: pipways-web
+    name: pipways-api-nhem
     runtime: python
     region: oregon
-    plan: pro
+    plan: standard
     branch: main
+
+    # Force Python 3.11 to avoid 3.14 build errors
+    runtimeConfig:
+      python:
+        version: "3.11.0"
 
     buildCommand: |
       echo "Python version:"
@@ -17,19 +24,16 @@ services:
       pip install --upgrade pip setuptools wheel
       echo "Installing dependencies..."
       pip install -r requirements.txt
-      echo "Build completed successfully"
+      echo "Build completed!"
 
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
 
     healthCheckPath: /health
 
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
-
       - key: DATABASE_URL
         fromDatabase:
-          name: pipways-db
+          name: pipways-db-nhem
           property: connectionString
 
       - key: SECRET_KEY
@@ -41,24 +45,42 @@ services:
       - key: ENVIRONMENT
         value: production
 
-      - key: STATIC_DIR
-        value: static
+      # CORS - Allow frontend to access API
+      - key: FRONTEND_URL
+        value: https://pipways-web-nhem.onrender.com
 
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "1440"
-
-      - key: MAX_FILE_SIZE
-        value: "10485760"
-
-      - key: LOG_LEVEL
-        value: INFO
+      - key: CORS_ORIGINS
+        value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000"
 
     autoDeploy: true
 
-    previews:
-      generation: automatic
+  # ==========================================
+  # FRONTEND SERVICE - Static Site
+  # ==========================================
+  - type: web
+    name: pipways-web-nhem
+    runtime: static
+    region: oregon
+    plan: standard
+    branch: main
+
+    buildCommand: echo "Static site - no build needed"
+
+    publishPath: ./static
+
+    # SPA routing support
+    routes:
+      - type: rewrite
+        source: /(.*)
+        destination: /index.html
+
+    envVars:
+      - key: API_URL
+        value: https://pipways-api-nhem.onrender.com
+
+    autoDeploy: true
 
 databases:
-  - name: pipways-db
+  - name: pipways-db-nhem
     region: oregon
     plan: standard

@@ -1,13 +1,6 @@
 """
 Pipways Trading Education Platform
-Single-file FastAPI application with:
-- AI Chart Analysis (image upload)
-- AI Performance Analysis (statement upload)
-- AI Mentor (personalized coaching with LMS integration)
-- Webinars (Zoom integration)
-- LMS (Learning Management System)
-- Blog (WordPress-style editor with SEO)
-- Admin Dashboard
+Complete FastAPI application with all endpoints for the updated frontend
 """
 
 import os
@@ -19,11 +12,12 @@ import asyncpg
 import bcrypt
 import requests
 from datetime import datetime, timedelta
-from typing import Optional, List
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Depends, Query
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from contextlib import asynccontextmanager
 import xml.etree.ElementTree as ET
@@ -159,12 +153,28 @@ async def init_db():
         )
     """)
 
+    # Trades table - NEW
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS trades (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            pair VARCHAR(20) NOT NULL,
+            direction VARCHAR(10) NOT NULL CHECK (direction IN ('LONG', 'SHORT')),
+            pips DECIMAL(10,2) NOT NULL,
+            grade VARCHAR(5) DEFAULT 'C' CHECK (grade IN ('A', 'B', 'C', 'D', 'F')),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Chart analyses
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS chart_analyses (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
             image_data TEXT,
+            pair VARCHAR(20),
+            timeframe VARCHAR(10),
             analysis_result JSONB,
             grade VARCHAR(10),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -175,13 +185,18 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS performance_analyses (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
             file_data TEXT,
             trader_type VARCHAR(100),
             strengths TEXT[],
             weaknesses TEXT[],
+            key_mistakes TEXT[],
             recommendations TEXT[],
             overall_score INTEGER,
+            risk_management_score INTEGER,
+            strategy_effectiveness INTEGER,
+            psychology_score INTEGER,
+            discipline_score INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -190,9 +205,9 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS mentorship_sessions (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            message TEXT,
-            ai_response TEXT,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            message TEXT NOT NULL,
+            ai_response TEXT NOT NULL,
             context JSONB,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -202,7 +217,7 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS user_insights (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id) UNIQUE,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
             trader_type VARCHAR(100),
             personality_profile JSONB,
             learning_path JSONB,
@@ -215,12 +230,13 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS webinars (
             id SERIAL PRIMARY KEY,
-            title VARCHAR(255),
+            title VARCHAR(255) NOT NULL,
             description TEXT,
             zoom_link VARCHAR(500),
             zoom_meeting_id VARCHAR(100),
-            scheduled_at TIMESTAMP,
+            scheduled_at TIMESTAMP NOT NULL,
             max_participants INTEGER DEFAULT 100,
+            status VARCHAR(20) DEFAULT 'UPCOMING',
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -230,8 +246,8 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS webinar_registrations (
             id SERIAL PRIMARY KEY,
-            webinar_id INTEGER REFERENCES webinars(id),
-            user_id INTEGER REFERENCES users(id),
+            webinar_id INTEGER REFERENCES webinars(id) ON DELETE CASCADE,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
             registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(webinar_id, user_id)
         )
@@ -241,7 +257,7 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS courses (
             id SERIAL PRIMARY KEY,
-            title VARCHAR(255),
+            title VARCHAR(255) NOT NULL,
             description TEXT,
             thumbnail VARCHAR(500),
             difficulty VARCHAR(50),
@@ -257,13 +273,13 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS course_modules (
             id SERIAL PRIMARY KEY,
-            course_id INTEGER REFERENCES courses(id),
-            title VARCHAR(255),
+            course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
             content_type VARCHAR(50),
             content TEXT,
             video_url VARCHAR(500),
-            order_index INTEGER,
-            duration_minutes INTEGER,
+            order_index INTEGER DEFAULT 0,
+            duration_minutes INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -272,11 +288,22 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS user_progress (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            module_id INTEGER REFERENCES course_modules(id),
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            module_id INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
             completed BOOLEAN DEFAULT FALSE,
             completed_at TIMESTAMP,
             UNIQUE(user_id, module_id)
+        )
+    """)
+
+    # Course enrollments - NEW
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS course_enrollments (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+            enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, course_id)
         )
     """)
 
@@ -284,15 +311,15 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blog_posts (
             id SERIAL PRIMARY KEY,
-            title VARCHAR(255),
-            slug VARCHAR(255) UNIQUE,
-            content TEXT,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) UNIQUE NOT NULL,
+            content TEXT NOT NULL,
             excerpt TEXT,
             featured_image VARCHAR(500),
             meta_title VARCHAR(255),
             meta_description VARCHAR(255),
             meta_keywords VARCHAR(255),
-            status VARCHAR(20) DEFAULT 'draft',
+            status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
             published_at TIMESTAMP,
             author_id INTEGER REFERENCES users(id),
             seo_score INTEGER,
@@ -307,8 +334,8 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blog_categories (
             id SERIAL PRIMARY KEY,
-            name VARCHAR(100),
-            slug VARCHAR(100) UNIQUE,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            slug VARCHAR(100) UNIQUE NOT NULL,
             description TEXT
         )
     """)
@@ -317,16 +344,16 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blog_tags (
             id SERIAL PRIMARY KEY,
-            name VARCHAR(100),
-            slug VARCHAR(100) UNIQUE
+            name VARCHAR(100) UNIQUE NOT NULL,
+            slug VARCHAR(100) UNIQUE NOT NULL
         )
     """)
 
     # Post categories relationship
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS post_categories (
-            post_id INTEGER REFERENCES blog_posts(id),
-            category_id INTEGER REFERENCES blog_categories(id),
+            post_id INTEGER REFERENCES blog_posts(id) ON DELETE CASCADE,
+            category_id INTEGER REFERENCES blog_categories(id) ON DELETE CASCADE,
             PRIMARY KEY (post_id, category_id)
         )
     """)
@@ -334,8 +361,8 @@ async def init_db():
     # Post tags relationship
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS post_tags (
-            post_id INTEGER REFERENCES blog_posts(id),
-            tag_id INTEGER REFERENCES blog_tags(id),
+            post_id INTEGER REFERENCES blog_posts(id) ON DELETE CASCADE,
+            tag_id INTEGER REFERENCES blog_tags(id) ON DELETE CASCADE,
             PRIMARY KEY (post_id, tag_id)
         )
     """)
@@ -344,8 +371,8 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS media_files (
             id SERIAL PRIMARY KEY,
-            filename VARCHAR(255),
-            url VARCHAR(500),
+            filename VARCHAR(255) NOT NULL,
+            url VARCHAR(500) UNIQUE NOT NULL,
             file_type VARCHAR(50),
             file_size INTEGER,
             uploaded_by INTEGER REFERENCES users(id),
@@ -361,14 +388,21 @@ async def init_db():
             "INSERT INTO users (email, password_hash, name, is_admin) VALUES ($1, $2, $3, $4)",
             DEFAULT_ADMIN_EMAIL, hashed, "Admin", True
         )
+        logger.info(f"Default admin created: {DEFAULT_ADMIN_EMAIL}")
 
     # Create default blog categories
-    categories = ["Strategy", "Psychology", "Risk Management", "Technical Analysis", "Fundamental Analysis"]
-    for cat in categories:
-        slug = generate_slug(cat)
+    categories = [
+        ("Strategy", "strategy", "Trading strategies and methodologies"),
+        ("Psychology", "psychology", "Trading psychology and mental game"),
+        ("Risk Management", "risk-management", "Position sizing and risk control"),
+        ("Technical Analysis", "technical-analysis", "Charts, patterns, and indicators"),
+        ("Fundamental Analysis", "fundamental-analysis", "Economic events and news trading"),
+        ("Education", "education", "General trading education")
+    ]
+    for name, slug, desc in categories:
         await conn.execute(
             "INSERT INTO blog_categories (name, slug, description) VALUES ($1, $2, $3) ON CONFLICT (slug) DO NOTHING",
-            cat, slug, f"Articles about {cat.lower()}"
+            name, slug, desc
         )
 
     await conn.close()
@@ -383,12 +417,12 @@ async def lifespan(app: FastAPI):
     await init_db()
     yield
 
-app = FastAPI(title="Pipways API", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 security = HTTPBearer()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Change to specific domains in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -403,8 +437,7 @@ async def log_requests(request, call_next):
     logger.info(f"{request.method} {request.url.path} - {response.status_code} - {duration:.3f}s")
     return response
 
-# Mount uploads directory for serving media files
-from fastapi.staticfiles import StaticFiles
+# Mount uploads directory
 os.makedirs("uploads/images", exist_ok=True)
 os.makedirs("uploads/videos", exist_ok=True)
 os.makedirs("uploads/documents", exist_ok=True)
@@ -442,6 +475,14 @@ async def register(
     conn=Depends(get_db)
 ):
     """Register new user"""
+    # Validate email format
+    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+
+    # Validate password length
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
     existing = await conn.fetchrow("SELECT id FROM users WHERE email = $1", email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -478,30 +519,108 @@ async def login(email: str = Form(...), password: str = Form(...), conn=Depends(
     }
 
 # ============================================================================
+# TRADE JOURNAL - NEW ENDPOINTS
+# ============================================================================
+
+@app.post("/trades")
+async def create_trade(
+    pair: str = Form(...),
+    direction: str = Form(...),
+    pips: float = Form(...),
+    grade: str = Form("C"),
+    notes: Optional[str] = Form(None),
+    current_user: str = Depends(get_current_user),
+    conn=Depends(get_db)
+):
+    """Create a new trade entry"""
+    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
+
+    # Validate inputs
+    pair = pair.upper().strip()
+    if len(pair) != 6 or not pair.isalpha():
+        raise HTTPException(status_code=400, detail="Invalid currency pair format (e.g., EURUSD)")
+
+    direction = direction.upper()
+    if direction not in ["LONG", "SHORT"]:
+        raise HTTPException(status_code=400, detail="Direction must be LONG or SHORT")
+
+    grade = grade.upper()
+    if grade not in ["A", "B", "C", "D", "F"]:
+        grade = "C"
+
+    trade_id = await conn.fetchval(
+        """INSERT INTO trades (user_id, pair, direction, pips, grade, notes) 
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
+        user["id"], pair, direction, pips, grade, notes
+    )
+
+    return {
+        "success": True,
+        "trade_id": trade_id,
+        "message": "Trade logged successfully"
+    }
+
+@app.get("/trades")
+async def get_trades(
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    current_user: str = Depends(get_current_user),
+    conn=Depends(get_db)
+):
+    """Get user's trade history"""
+    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
+    trades = await conn.fetch(
+        """SELECT * FROM trades 
+           WHERE user_id = $1 
+           ORDER BY created_at DESC 
+           LIMIT $2 OFFSET $3""",
+        user["id"], limit, offset
+    )
+    return [dict(t) for t in trades]
+
+@app.get("/trades/stats")
+async def get_trade_stats(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
+    """Get trading statistics"""
+    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
+
+    stats = await conn.fetchrow(
+        """SELECT 
+            COUNT(*) as total_trades,
+            COUNT(CASE WHEN pips > 0 THEN 1 END) as winning_trades,
+            COUNT(CASE WHEN pips < 0 THEN 1 END) as losing_trades,
+            SUM(pips) as total_pips,
+            AVG(pips) as avg_pips,
+            AVG(CASE WHEN pips > 0 THEN pips END) as avg_win,
+            AVG(CASE WHEN pips < 0 THEN pips END) as avg_loss
+           FROM trades 
+           WHERE user_id = $1""",
+        user["id"]
+    )
+
+    return dict(stats) if stats else {}
+
+# ============================================================================
 # AI CHART ANALYSIS
 # ============================================================================
 
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
-    pair: str = Form(...),
-    timeframe: str = Form(...),
+    pair: Optional[str] = Form("UNKNOWN"),
+    timeframe: Optional[str] = Form("1H"),
     current_user: str = Depends(get_current_user),
     conn=Depends(get_db)
 ):
     """Analyze trading chart image using AI"""
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
 
-    # Read and encode image
+    # Validate file size (10MB max)
     contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max size is 10MB.")
+
     base64_image = base64.b64encode(contents).decode('utf-8')
 
-    # Validate API key
-    if not OPENROUTER_API_KEY:
-        return {"success": False, "error": "OpenRouter API key not configured"}
-
-    # Call OpenRouter API
-    # Validate API key
     if not OPENROUTER_API_KEY:
         return {"success": False, "error": "OpenRouter API key not configured"}
 
@@ -518,7 +637,7 @@ async def analyze_chart(
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Analyze this {pair} {timeframe} trading chart. Provide: 1) Trade setup quality (A/B/C grade), 2) Entry/exit points, 3) Risk/reward ratio, 4) Key support/resistance, 5) Suggested improvements. Return as JSON with fields: grade, entry_price, exit_price, stop_loss, take_profit, risk_reward, analysis, key_levels, improvements"
+                        "text": f"Analyze this {pair} {timeframe} trading chart. Provide detailed analysis including: 1) Trade setup quality (A/B/C grade), 2) Entry/exit points with specific prices, 3) Risk/reward ratio, 4) Key support/resistance levels, 5) Suggested improvements. Return as JSON with fields: grade, pair, direction, entry_price, stop_loss, take_profit, risk_reward, analysis, key_levels, recommendations"
                     },
                     {
                         "type": "image_url",
@@ -530,10 +649,13 @@ async def analyze_chart(
     }
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", 
-                                headers=headers, json=payload, timeout=30)
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions", 
+            headers=headers, 
+            json=payload, 
+            timeout=60
+        )
 
-        # Validate response structure
         if response.status_code != 200:
             return {"success": False, "error": f"API error: {response.status_code}"}
 
@@ -546,13 +668,16 @@ async def analyze_chart(
         # Extract JSON from response
         json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
         if json_match:
-            analysis_result = json.loads(json_match.group())
+            try:
+                analysis_result = json.loads(json_match.group())
+            except json.JSONDecodeError:
+                analysis_result = {"raw_analysis": ai_response}
         else:
             analysis_result = {"raw_analysis": ai_response}
 
         grade = analysis_result.get("grade", "C")
 
-        # Save image to file instead of database
+        # Save image to file
         upload_dir = "uploads/images"
         os.makedirs(upload_dir, exist_ok=True)
         timestamp = int(datetime.utcnow().timestamp())
@@ -564,24 +689,35 @@ async def analyze_chart(
 
         image_url = f"/uploads/images/{image_filename}"
 
-        # Save to database (only URL, not base64)
+        # Save to database
         await conn.execute(
-            "INSERT INTO chart_analyses (user_id, image_data, analysis_result, grade) VALUES ($1, $2, $3, $4)",
-            user["id"], image_url, json.dumps(analysis_result), grade
+            """INSERT INTO chart_analyses 
+               (user_id, image_data, pair, timeframe, analysis_result, grade) 
+               VALUES ($1, $2, $3, $4, $5, $6)""",
+            user["id"], image_url, pair, timeframe, json.dumps(analysis_result), grade
         )
 
         return {"success": True, "analysis": analysis_result, "grade": grade}
 
     except Exception as e:
+        logger.error(f"Chart analysis error: {e}")
         return {"success": False, "error": str(e)}
 
 @app.get("/analyze/chart/history")
-async def get_chart_history(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
+async def get_chart_history(
+    limit: int = Query(20, ge=1, le=100),
+    current_user: str = Depends(get_current_user),
+    conn=Depends(get_db)
+):
     """Get user's chart analysis history"""
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
     analyses = await conn.fetch(
-        "SELECT id, analysis_result, grade, created_at FROM chart_analyses WHERE user_id = $1 ORDER BY created_at DESC",
-        user["id"]
+        """SELECT id, pair, timeframe, analysis_result, grade, created_at 
+           FROM chart_analyses 
+           WHERE user_id = $1 
+           ORDER BY created_at DESC 
+           LIMIT $2""",
+        user["id"], limit
     )
     return [dict(a) for a in analyses]
 
@@ -599,13 +735,20 @@ async def analyze_performance(
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
 
     contents = await file.read()
-    text_content = contents.decode('utf-8', errors='ignore')
+
+    # Validate file size (10MB max)
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max size is 10MB.")
+
+    try:
+        text_content = contents.decode('utf-8', errors='ignore')
+    except:
+        text_content = "[Binary file - content extracted via OCR would go here]"
 
     # Truncate if too long
-    if len(text_content) > 10000:
-        text_content = text_content[:10000]
+    if len(text_content) > 15000:
+        text_content = text_content[:15000] + "..."
 
-    # Validate API key
     if not OPENROUTER_API_KEY:
         return {"success": False, "error": "OpenRouter API key not configured"}
 
@@ -614,36 +757,43 @@ async def analyze_performance(
         "Content-Type": "application/json"
     }
 
-    prompt = f"""Analyze this trading statement and provide a detailed trader profile:
+    prompt = f"""Analyze this trading statement and provide a comprehensive trader profile:
 
-    Trading Data:
-    {text_content}
+Trading Data:
+{text_content[:5000]}
 
-    Provide analysis in this JSON format:
-    {{
-        "trader_type": "e.g., Scalper, Day Trader, Swing Trader, Revenge Trader, FOMO Trader",
-        "overall_score": "1-100",
-        "strengths": ["list 3-5 strengths"],
-        "weaknesses": ["list 3-5 weaknesses"],
-        "key_mistakes": ["list recurring mistakes"],
-        "psychology_profile": "description of trading psychology",
-        "risk_management_score": "1-100",
-        "strategy_effectiveness": "1-100",
-        "recommendations": ["specific actionable recommendations"],
-        "suggested_courses": ["course topics that would help"]
-    }}
-    """
+Provide analysis in this exact JSON format:
+{{
+    "trader_type": "e.g., Scalper, Day Trader, Swing Trader, Position Trader, or specific style like Revenge Trader, FOMO Trader",
+    "overall_score": 75,
+    "risk_management_score": 80,
+    "strategy_effectiveness": 70,
+    "psychology_score": 75,
+    "discipline_score": 65,
+    "strengths": ["List 3-5 specific strengths"],
+    "weaknesses": ["List 3-5 specific weaknesses"],
+    "key_mistakes": ["List 2-4 recurring mistakes"],
+    "psychology_profile": "Detailed description of trading psychology and behavioral patterns",
+    "recommendations": ["5-7 specific actionable recommendations"],
+    "suggested_courses": ["List 3-5 course topics that would help this trader"]
+}}
+
+Be specific and actionable. Use real trading terminology."""
 
     payload = {
         "model": "anthropic/claude-3-opus-20240229",
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
     }
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                                headers=headers, json=payload, timeout=30)
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, 
+            json=payload, 
+            timeout=90
+        )
 
-        # Validate response structure
         if response.status_code != 200:
             return {"success": False, "error": f"API error: {response.status_code}"}
 
@@ -653,24 +803,35 @@ async def analyze_performance(
 
         ai_response = response_data["choices"][0]["message"]["content"]
 
+        # Extract JSON from response
         json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
         if json_match:
-            analysis = json.loads(json_match.group())
+            try:
+                analysis = json.loads(json_match.group())
+            except json.JSONDecodeError:
+                analysis = {"raw_analysis": ai_response}
         else:
             analysis = {"raw_analysis": ai_response}
 
         # Save to database
         await conn.execute(
             """INSERT INTO performance_analyses 
-               (user_id, file_data, trader_type, strengths, weaknesses, recommendations, overall_score)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+               (user_id, file_data, trader_type, strengths, weaknesses, key_mistakes, 
+                recommendations, overall_score, risk_management_score, strategy_effectiveness,
+                psychology_score, discipline_score) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)""",
             user["id"],
             text_content[:2000],
             analysis.get("trader_type", "Unknown"),
             analysis.get("strengths", []),
             analysis.get("weaknesses", []),
+            analysis.get("key_mistakes", []),
             analysis.get("recommendations", []),
-            int(analysis.get("overall_score", 50))
+            int(analysis.get("overall_score", 50)),
+            int(analysis.get("risk_management_score", 50)),
+            int(analysis.get("strategy_effectiveness", 50)),
+            int(analysis.get("psychology_score", 50)),
+            int(analysis.get("discipline_score", 50))
         )
 
         # Update or create user insights
@@ -680,23 +841,42 @@ async def analyze_performance(
             ON CONFLICT (user_id) DO UPDATE SET
             trader_type = $2,
             personality_profile = $3,
+            learning_path = $4,
             last_updated = CURRENT_TIMESTAMP
-        """, user["id"], analysis.get("trader_type"), 
-            json.dumps({"psychology": analysis.get("psychology_profile"), "score": analysis.get("overall_score")}),
-            json.dumps({"suggested_courses": analysis.get("suggested_courses", [])}))
+        """, 
+            user["id"], 
+            analysis.get("trader_type"),
+            json.dumps({
+                "psychology": analysis.get("psychology_profile"),
+                "score": analysis.get("overall_score"),
+                "risk_score": analysis.get("risk_management_score"),
+                "strategy_score": analysis.get("strategy_effectiveness")
+            }),
+            json.dumps({"suggested_courses": analysis.get("suggested_courses", [])})
+        )
 
         return {"success": True, "analysis": analysis}
 
     except Exception as e:
+        logger.error(f"Performance analysis error: {e}")
         return {"success": False, "error": str(e)}
 
 @app.get("/analyze/performance/history")
-async def get_performance_history(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
+async def get_performance_history(
+    limit: int = Query(10, ge=1, le=50),
+    current_user: str = Depends(get_current_user),
+    conn=Depends(get_db)
+):
     """Get performance analysis history"""
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
     analyses = await conn.fetch(
-        "SELECT id, trader_type, overall_score, strengths, weaknesses, created_at FROM performance_analyses WHERE user_id = $1 ORDER BY created_at DESC",
-        user["id"]
+        """SELECT id, trader_type, overall_score, strengths, weaknesses, 
+                  risk_management_score, strategy_effectiveness, created_at 
+           FROM performance_analyses 
+           WHERE user_id = $1 
+           ORDER BY created_at DESC 
+           LIMIT $2""",
+        user["id"], limit
     )
     return [dict(a) for a in analyses]
 
@@ -716,40 +896,48 @@ async def mentor_chat(
     # Get user insights
     insights = await conn.fetchrow("SELECT * FROM user_insights WHERE user_id = $1", user["id"])
 
-    # Get recent chat history
+    # Get recent chat history (last 10 messages for context)
     history = await conn.fetch(
-        "SELECT message, ai_response FROM mentorship_sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5",
+        """SELECT message, ai_response 
+           FROM mentorship_sessions 
+           WHERE user_id = $1 
+           ORDER BY created_at DESC 
+           LIMIT 10""",
         user["id"]
     )
 
     # Get available courses for recommendations
-    courses = await conn.fetch("SELECT id, title, category FROM courses WHERE is_published = TRUE LIMIT 10")
+    courses = await conn.fetch(
+        "SELECT id, title, category FROM courses WHERE is_published = TRUE LIMIT 10"
+    )
 
-    # Build history text separately to avoid f-string backslash issue
-    history_lines = []
+    # Build conversation history
+    history_text = ""
     for h in reversed(history):
-        history_lines.append(f"User: {h['message']}")
-        history_lines.append(f"Mentor: {h['ai_response']}")
-    history_text = "\n".join(history_lines)
+        history_text += f"\nUser: {h['message']}\nMentor: {h['ai_response']}"
 
     # Build context
-    context = f"""You are a professional trading mentor. Be direct, supportive but honest.
+    context = f"""You are a professional trading mentor and psychologist. Be direct, supportive but honest. Your goal is to help traders improve their performance and mindset.
 
-    Student: {user['name']}
-    Trader Type: {insights['trader_type'] if insights else 'Not analyzed yet'}
-    Profile: {json.dumps(insights['personality_profile']) if insights else 'N/A'}
+Student: {user['name']}
+Trader Type: {insights['trader_type'] if insights else 'Not analyzed yet'}
+Profile: {json.dumps(insights['personality_profile']) if insights else 'N/A'}
 
-    Available Courses: {json.dumps([dict(c) for c in courses])}
+Available Courses: {json.dumps([dict(c) for c in courses])}
 
-    Recent conversation:
-    {history_text}
+Recent conversation:{history_text}
 
-    Instructions:
-    - Reference their specific weaknesses/strengths if relevant
-    - Suggest specific courses from the available list when appropriate
-    - Keep responses concise (2-3 paragraphs max)
-    - Be encouraging but hold them accountable
-    """
+Instructions:
+- Reference their specific weaknesses/strengths if relevant to their question
+- Suggest specific courses from the available list when appropriate
+- Keep responses concise (2-4 paragraphs max)
+- Be encouraging but hold them accountable
+- If they ask about their performance, reference their analysis data
+- Use trading terminology appropriately
+- For psychological issues, provide actionable coping strategies"""
+
+    if not OPENROUTER_API_KEY:
+        return {"success": False, "error": "OpenRouter API key not configured"}
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -761,41 +949,59 @@ async def mentor_chat(
         "messages": [
             {"role": "system", "content": context},
             {"role": "user", "content": message}
-        ]
+        ],
+        "temperature": 0.8,
+        "max_tokens": 1000
     }
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                                headers=headers, json=payload, timeout=30)
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, 
+            json=payload, 
+            timeout=60
+        )
 
-        # Validate response structure
         if response.status_code != 200:
             return {"success": False, "error": f"API error: {response.status_code}"}
 
         response_data = response.json()
         if "choices" not in response_data or not response_data["choices"]:
-            return {"success": False, "error": "Invalid AI response structure"}
+            return {"success": False, "error": "Invalid AI response"}
 
         ai_response = response_data["choices"][0]["message"]["content"]
 
         # Save conversation
         await conn.execute(
-            "INSERT INTO mentorship_sessions (user_id, message, ai_response, context) VALUES ($1, $2, $3, $4)",
-            user["id"], message, ai_response, json.dumps({"trader_type": insights["trader_type"] if insights else None})
+            """INSERT INTO mentorship_sessions (user_id, message, ai_response, context) 
+               VALUES ($1, $2, $3, $4)""",
+            user["id"], 
+            message, 
+            ai_response, 
+            json.dumps({"trader_type": insights["trader_type"] if insights else None})
         )
 
         return {"success": True, "response": ai_response}
 
     except Exception as e:
+        logger.error(f"Mentor chat error: {e}")
         return {"success": False, "error": str(e)}
 
 @app.get("/mentor/history")
-async def get_mentor_history(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
+async def get_mentor_history(
+    limit: int = Query(50, ge=1, le=100),
+    current_user: str = Depends(get_current_user),
+    conn=Depends(get_db)
+):
     """Get mentorship chat history"""
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
     sessions = await conn.fetch(
-        "SELECT message, ai_response, created_at FROM mentorship_sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
-        user["id"]
+        """SELECT message, ai_response, created_at 
+           FROM mentorship_sessions 
+           WHERE user_id = $1 
+           ORDER BY created_at DESC 
+           LIMIT $2""",
+        user["id"], limit
     )
     return [dict(s) for s in sessions]
 
@@ -806,13 +1012,17 @@ async def get_mentor_insights(current_user: str = Depends(get_current_user), con
     insights = await conn.fetchrow("SELECT * FROM user_insights WHERE user_id = $1", user["id"])
 
     if not insights:
-        return {"message": "Complete a performance analysis first to get insights"}
+        return {
+            "message": "Complete a performance analysis first to get personalized insights",
+            "trader_type": None
+        }
 
     return {
         "trader_type": insights["trader_type"],
         "personality_profile": insights["personality_profile"],
         "learning_path": insights["learning_path"],
-        "recommended_courses": insights["recommended_courses"]
+        "recommended_courses": insights["recommended_courses"],
+        "last_updated": insights["last_updated"].isoformat() if insights["last_updated"] else None
     }
 
 # ============================================================================
@@ -823,7 +1033,7 @@ async def get_mentor_insights(current_user: str = Depends(get_current_user), con
 async def create_webinar(
     title: str = Form(...),
     description: str = Form(...),
-    scheduled_at: str = Form(...),
+    scheduled_at: str = Form(...),  # ISO format datetime
     max_participants: int = Form(100),
     current_user: str = Depends(get_current_admin),
     conn=Depends(get_db)
@@ -844,41 +1054,74 @@ async def create_webinar(
                 algorithm="HS256"
             )
 
-            zoom_headers = {"Authorization": f"Bearer {zoom_token}", "Content-Type": "application/json"}
+            zoom_headers = {
+                "Authorization": f"Bearer {zoom_token}",
+                "Content-Type": "application/json"
+            }
             zoom_payload = {
                 "topic": title,
-                "type": 2,
+                "type": 2,  # Scheduled meeting
                 "start_time": scheduled_at,
                 "duration": 60,
-                "settings": {"join_before_host": True}
+                "settings": {
+                    "join_before_host": True,
+                    "waiting_room": False
+                }
             }
 
-            zoom_response = requests.post("https://api.zoom.us/v2/users/me/meetings",
-                                         headers=zoom_headers, json=zoom_payload)
-            zoom_data = zoom_response.json()
-            zoom_link = zoom_data.get("join_url", "")
-            zoom_meeting_id = str(zoom_data.get("id", ""))
-        except:
-            pass
+            zoom_response = requests.post(
+                "https://api.zoom.us/v2/users/me/meetings",
+                headers=zoom_headers, 
+                json=zoom_payload,
+                timeout=30
+            )
+
+            if zoom_response.status_code == 201:
+                zoom_data = zoom_response.json()
+                zoom_link = zoom_data.get("join_url", "")
+                zoom_meeting_id = str(zoom_data.get("id", ""))
+        except Exception as e:
+            logger.error(f"Zoom integration error: {e}")
 
     webinar_id = await conn.fetchval(
-        """INSERT INTO webinars (title, description, zoom_link, zoom_meeting_id, scheduled_at, max_participants, created_by)
+        """INSERT INTO webinars 
+           (title, description, zoom_link, zoom_meeting_id, scheduled_at, max_participants, created_by) 
            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id""",
         title, description, zoom_link, zoom_meeting_id, scheduled_at, max_participants, user["id"]
     )
 
-    return {"success": True, "webinar_id": webinar_id, "zoom_link": zoom_link}
+    return {
+        "success": True, 
+        "webinar_id": webinar_id, 
+        "zoom_link": zoom_link,
+        "message": "Webinar created successfully"
+    }
 
 @app.get("/webinars")
 async def list_webinars(conn=Depends(get_db)):
-    """List upcoming webinars"""
+    """List upcoming webinars with registration counts"""
     webinars = await conn.fetch(
         """SELECT w.*, COUNT(r.id) as registered_count 
            FROM webinars w 
            LEFT JOIN webinar_registrations r ON w.id = r.webinar_id
-           WHERE w.scheduled_at > NOW()
+           WHERE w.scheduled_at > NOW() - INTERVAL '1 hour'
            GROUP BY w.id 
            ORDER BY w.scheduled_at"""
+    )
+    return [dict(w) for w in webinars]
+
+@app.get("/webinars/my")
+async def my_webinars(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
+    """Get user's registered webinars"""
+    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
+    webinars = await conn.fetch(
+        """SELECT w.*, r.registered_at 
+           FROM webinars w
+           JOIN webinar_registrations r ON w.id = r.webinar_id
+           WHERE r.user_id = $1 
+           AND w.scheduled_at > NOW() - INTERVAL '1 hour'
+           ORDER BY w.scheduled_at""",
+        user["id"]
     )
     return [dict(w) for w in webinars]
 
@@ -891,26 +1134,34 @@ async def register_webinar(
     """Register for webinar"""
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
 
+    # Check if webinar exists and has space
+    webinar = await conn.fetchrow(
+        """SELECT w.*, COUNT(r.id) as registered_count 
+           FROM webinars w 
+           LEFT JOIN webinar_registrations r ON w.id = r.webinar_id
+           WHERE w.id = $1 
+           GROUP BY w.id""",
+        webinar_id
+    )
+
+    if not webinar:
+        raise HTTPException(status_code=404, detail="Webinar not found")
+
+    if webinar["registered_count"] >= webinar["max_participants"]:
+        return {"success": False, "message": "Webinar is full"}
+
     try:
         await conn.execute(
             "INSERT INTO webinar_registrations (webinar_id, user_id) VALUES ($1, $2)",
             webinar_id, user["id"]
         )
-        return {"success": True, "message": "Registered successfully"}
+        return {
+            "success": True, 
+            "message": "Registered successfully",
+            "zoom_link": webinar["zoom_link"]
+        }
     except asyncpg.UniqueViolationError:
         return {"success": False, "message": "Already registered"}
-
-@app.get("/webinars/my")
-async def my_webinars(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
-    """Get user's registered webinars"""
-    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-    webinars = await conn.fetch(
-        """SELECT w.* FROM webinars w
-           JOIN webinar_registrations r ON w.id = r.webinar_id
-           WHERE r.user_id = $1 ORDER BY w.scheduled_at""",
-        user["id"]
-    )
-    return [dict(w) for w in webinars]
 
 # ============================================================================
 # LMS (Learning Management System)
@@ -930,7 +1181,9 @@ async def create_course(
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
 
     course_id = await conn.fetchval(
-        "INSERT INTO courses (title, description, difficulty, estimated_hours, category, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        """INSERT INTO courses 
+           (title, description, difficulty, estimated_hours, category, created_by) 
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id""",
         title, description, difficulty, estimated_hours, category, user["id"]
     )
 
@@ -943,54 +1196,135 @@ async def create_module(
     content_type: str = Form(...),
     content: str = Form(...),
     video_url: Optional[str] = Form(None),
-    order_index: int = Form(...),
-    duration_minutes: int = Form(...),
+    order_index: int = Form(0),
+    duration_minutes: int = Form(0),
     current_user: str = Depends(get_current_admin),
     conn=Depends(get_db)
 ):
     """Add module to course (admin only)"""
     module_id = await conn.fetchval(
-        "INSERT INTO course_modules (course_id, title, content_type, content, video_url, order_index, duration_minutes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+        """INSERT INTO course_modules 
+           (course_id, title, content_type, content, video_url, order_index, duration_minutes) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id""",
         course_id, title, content_type, content, video_url, order_index, duration_minutes
     )
     return {"success": True, "module_id": module_id}
 
 @app.get("/courses")
 async def list_courses(conn=Depends(get_db)):
-    """List all published courses"""
+    """List all published courses with stats"""
     courses = await conn.fetch(
-        """SELECT c.*, COUNT(cm.id) as module_count,
-           (SELECT COUNT(*) FROM course_modules cm2 
-            JOIN user_progress up ON cm2.id = up.module_id 
-            WHERE cm2.course_id = c.id AND up.completed = TRUE) as completions
+        """SELECT c.*, 
+                  COUNT(DISTINCT cm.id) as module_count,
+                  COUNT(DISTINCT ce.user_id) as enrollments,
+                  COALESCE(SUM(CASE WHEN up.completed THEN 1 ELSE 0 END), 0) as completions
            FROM courses c
            LEFT JOIN course_modules cm ON c.id = cm.course_id
+           LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+           LEFT JOIN user_progress up ON cm.id = up.module_id
            WHERE c.is_published = TRUE
-           GROUP BY c.id"""
+           GROUP BY c.id
+           ORDER BY c.created_at DESC"""
     )
     return [dict(c) for c in courses]
 
+@app.get("/courses/recommended")
+async def get_recommended_courses(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
+    """Get AI-recommended courses based on user insights"""
+    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
+    insights = await conn.fetchrow("SELECT * FROM user_insights WHERE user_id = $1", user["id"])
+
+    if not insights or not insights["recommended_courses"]:
+        # Return default recommendations (newest courses)
+        courses = await conn.fetch(
+            """SELECT c.*, COUNT(cm.id) as module_count
+               FROM courses c
+               LEFT JOIN course_modules cm ON c.id = cm.course_id
+               WHERE c.is_published = TRUE
+               GROUP BY c.id
+               ORDER BY c.created_at DESC LIMIT 3"""
+        )
+    else:
+        # Return AI-recommended courses
+        courses = await conn.fetch(
+            """SELECT c.*, COUNT(cm.id) as module_count
+               FROM courses c
+               LEFT JOIN course_modules cm ON c.id = cm.course_id
+               WHERE c.id = ANY($1) AND c.is_published = TRUE
+               GROUP BY c.id""",
+            insights["recommended_courses"]
+        )
+
+    return [dict(c) for c in courses]
+
 @app.get("/courses/{course_id}")
-async def get_course(course_id: int, current_user: str = Depends(get_current_user), conn=Depends(get_db)):
-    """Get course details with modules"""
+async def get_course(
+    course_id: int, 
+    current_user: str = Depends(get_current_user), 
+    conn=Depends(get_db)
+):
+    """Get course details with modules and user progress"""
     user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
 
-    course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+    course = await conn.fetchrow(
+        """SELECT c.*, COUNT(ce.user_id) as total_enrollments
+           FROM courses c
+           LEFT JOIN course_enrollments ce ON c.id = ce.course_id
+           WHERE c.id = $1 AND c.is_published = TRUE
+           GROUP BY c.id""",
+        course_id
+    )
+
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+
+    # Check if user is enrolled
+    enrollment = await conn.fetchrow(
+        "SELECT * FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
+        user["id"], course_id
+    )
 
     modules = await conn.fetch(
         """SELECT cm.*, up.completed, up.completed_at 
            FROM course_modules cm
            LEFT JOIN user_progress up ON cm.id = up.module_id AND up.user_id = $1
-           WHERE cm.course_id = $2 ORDER BY cm.order_index""",
+           WHERE cm.course_id = $2 
+           ORDER BY cm.order_index""",
         user["id"], course_id
     )
 
     return {
         "course": dict(course),
+        "is_enrolled": enrollment is not None,
         "modules": [dict(m) for m in modules]
     }
+
+@app.post("/courses/{course_id}/enroll")
+async def enroll_course(
+    course_id: int,
+    current_user: str = Depends(get_current_user),
+    conn=Depends(get_db)
+):
+    """Enroll in a course"""
+    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
+
+    # Check if course exists and is published
+    course = await conn.fetchrow(
+        "SELECT id FROM courses WHERE id = $1 AND is_published = TRUE",
+        course_id
+    )
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    try:
+        await conn.execute(
+            "INSERT INTO course_enrollments (user_id, course_id) VALUES ($1, $2)",
+            user["id"], course_id
+        )
+        return {"success": True, "message": "Enrolled successfully"}
+    except asyncpg.UniqueViolationError:
+        return {"success": False, "message": "Already enrolled"}
 
 @app.post("/courses/{course_id}/modules/{module_id}/complete")
 async def complete_module(
@@ -1009,26 +1343,7 @@ async def complete_module(
         completed = TRUE, completed_at = CURRENT_TIMESTAMP
     """, user["id"], module_id)
 
-    return {"success": True}
-
-@app.get("/courses/recommended")
-async def get_recommended_courses(current_user: str = Depends(get_current_user), conn=Depends(get_db)):
-    """Get AI-recommended courses based on user insights"""
-    user = await conn.fetchrow("SELECT id FROM users WHERE email = $1", current_user)
-    insights = await conn.fetchrow("SELECT * FROM user_insights WHERE user_id = $1", user["id"])
-
-    if not insights or not insights["recommended_courses"]:
-        # Return default recommendations
-        courses = await conn.fetch(
-            "SELECT * FROM courses WHERE is_published = TRUE ORDER BY created_at DESC LIMIT 3"
-        )
-    else:
-        courses = await conn.fetch(
-            "SELECT * FROM courses WHERE id = ANY($1) AND is_published = TRUE",
-            insights["recommended_courses"]
-        )
-
-    return [dict(c) for c in courses]
+    return {"success": True, "message": "Module completed"}
 
 # ============================================================================
 # BLOG (WordPress-style with SEO)
@@ -1040,12 +1355,11 @@ async def create_blog_post(
     content: str = Form(...),
     excerpt: Optional[str] = Form(None),
     featured_image: Optional[str] = Form(None),
-    featured_image_upload: Optional[UploadFile] = File(None),  # Allow direct upload
+    featured_image_upload: Optional[UploadFile] = File(None),
     meta_title: Optional[str] = Form(None),
     meta_description: Optional[str] = Form(None),
     meta_keywords: Optional[str] = Form(None),
-    category_ids: Optional[str] = Form(""),
-    tag_ids: Optional[str] = Form(""),
+    category: Optional[str] = Form("general"),
     status: str = Form("draft"),
     current_user: str = Depends(get_current_admin),
     conn=Depends(get_db)
@@ -1055,7 +1369,6 @@ async def create_blog_post(
 
     # Handle featured image upload
     if featured_image_upload and not featured_image:
-        # Save uploaded image
         upload_dir = "uploads/images"
         os.makedirs(upload_dir, exist_ok=True)
 
@@ -1065,6 +1378,11 @@ async def create_blog_post(
         file_path = f"{upload_dir}/{unique_filename}"
 
         contents = await featured_image_upload.read()
+
+        # Validate image size (5MB max)
+        if len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image too large. Max 5MB.")
+
         with open(file_path, "wb") as f:
             f.write(contents)
 
@@ -1072,7 +1390,9 @@ async def create_blog_post(
 
         # Save to media library
         await conn.execute(
-            "INSERT INTO media_files (filename, url, file_type, file_size, uploaded_by) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (url) DO NOTHING",
+            """INSERT INTO media_files (filename, url, file_type, file_size, uploaded_by) 
+               VALUES ($1, $2, $3, $4, $5) 
+               ON CONFLICT (url) DO NOTHING""",
             unique_filename, featured_image, "image", len(contents), user["id"]
         )
 
@@ -1090,31 +1410,37 @@ async def create_blog_post(
     if status == "published":
         published_at = datetime.utcnow()
 
+    # Get category ID
+    category_id = None
+    if category:
+        cat = await conn.fetchrow("SELECT id FROM blog_categories WHERE slug = $1", category)
+        if cat:
+            category_id = cat["id"]
+
     post_id = await conn.fetchval(
         """INSERT INTO blog_posts 
            (title, slug, content, excerpt, featured_image, meta_title, meta_description, meta_keywords, 
             status, published_at, author_id, seo_score, seo_suggestions)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id""",
         title, slug, content, excerpt, featured_image, meta_title or title, 
-        meta_description, meta_keywords, status, published_at, user["id"], seo_data["score"], 
-        json.dumps(seo_data["suggestions"])
+        meta_description, meta_keywords, status, published_at, user["id"], 
+        seo_data["score"], json.dumps(seo_data["suggestions"])
     )
 
-    # Add categories
-    if category_ids:
-        cat_ids = [int(x) for x in category_ids.split(",") if x]
-        for cat_id in cat_ids:
-            await conn.execute("INSERT INTO post_categories (post_id, category_id) VALUES ($1, $2) ON CONFLICT (post_id, category_id) DO NOTHING",
-                             post_id, cat_id)
+    # Add category relationship
+    if category_id:
+        await conn.execute(
+            "INSERT INTO post_categories (post_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            post_id, category_id
+        )
 
-    # Add tags
-    if tag_ids:
-        t_ids = [int(x) for x in tag_ids.split(",") if x]
-        for t_id in t_ids:
-            await conn.execute("INSERT INTO post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT (post_id, tag_id) DO NOTHING",
-                             post_id, t_id)
-
-    return {"success": True, "post_id": post_id, "slug": slug, "seo_score": seo_data["score"], "suggestions": seo_data["suggestions"]}
+    return {
+        "success": True, 
+        "post_id": post_id, 
+        "slug": slug, 
+        "seo_score": seo_data["score"], 
+        "suggestions": seo_data["suggestions"]
+    }
 
 @app.put("/admin/blog/posts/{post_id}")
 async def update_blog_post(
@@ -1131,7 +1457,6 @@ async def update_blog_post(
     conn=Depends(get_db)
 ):
     """Update blog post (admin only)"""
-
     updates = []
     values = []
 
@@ -1173,42 +1498,53 @@ async def update_blog_post(
 
     return {"success": True}
 
+@app.delete("/admin/blog/posts/{post_id}")
+async def delete_blog_post(
+    post_id: int,
+    current_user: str = Depends(get_current_admin),
+    conn=Depends(get_db)
+):
+    """Delete blog post (admin only)"""
+    await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
+    return {"success": True, "message": "Post deleted"}
+
 @app.get("/blog/posts")
 async def list_blog_posts(
     category: Optional[str] = None,
     tag: Optional[str] = None,
     search: Optional[str] = None,
-    page: int = 1,
-    per_page: int = 10,
+    status: str = Query("published"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=50),
     conn=Depends(get_db)
 ):
-    """List published blog posts with filtering"""
-
-    where_clauses = ["status = 'published'"]
-    params = []
+    """List blog posts with filtering and pagination"""
+    where_clauses = ["bp.status = $1"]
+    params = [status]
 
     if category:
-        where_clauses.append(f"id IN (SELECT post_id FROM post_categories pc JOIN blog_categories bc ON pc.category_id = bc.id WHERE bc.slug = ${len(params) + 1})")
+        where_clauses.append(f"EXISTS (SELECT 1 FROM post_categories pc JOIN blog_categories bc ON pc.category_id = bc.id WHERE pc.post_id = bp.id AND bc.slug = ${len(params) + 1})")
         params.append(category)
 
     if tag:
-        where_clauses.append(f"id IN (SELECT post_id FROM post_tags pt JOIN blog_tags bt ON pt.tag_id = bt.id WHERE bt.slug = ${len(params) + 1})")
+        where_clauses.append(f"EXISTS (SELECT 1 FROM post_tags pt JOIN blog_tags bt ON pt.tag_id = bt.id WHERE pt.post_id = bp.id AND bt.slug = ${len(params) + 1})")
         params.append(tag)
 
     if search:
-        where_clauses.append(f"(title ILIKE ${len(params) + 1} OR content ILIKE ${len(params) + 1})")
+        where_clauses.append(f"(bp.title ILIKE ${len(params) + 1} OR bp.content ILIKE ${len(params) + 1})")
         params.append(f"%{search}%")
 
     where_str = " AND ".join(where_clauses)
 
     # Get total count
-    count_query = f"SELECT COUNT(*) FROM blog_posts WHERE {where_str}"
+    count_query = f"SELECT COUNT(*) FROM blog_posts bp WHERE {where_str}"
     total = await conn.fetchval(count_query, *params)
 
     # Get posts
+    offset = (page - 1) * per_page
     query = f"""SELECT bp.*, u.name as author_name,
-                ARRAY_AGG(DISTINCT bc.name) as categories,
-                ARRAY_AGG(DISTINCT bt.name) as tags
+                COALESCE(json_agg(DISTINCT bc.name) FILTER (WHERE bc.name IS NOT NULL), '[]') as categories,
+                COALESCE(json_agg(DISTINCT bt.name) FILTER (WHERE bt.name IS NOT NULL), '[]') as tags
                 FROM blog_posts bp
                 JOIN users u ON bp.author_id = u.id
                 LEFT JOIN post_categories pc ON bp.id = pc.post_id
@@ -1217,10 +1553,10 @@ async def list_blog_posts(
                 LEFT JOIN blog_tags bt ON pt.tag_id = bt.id
                 WHERE {where_str}
                 GROUP BY bp.id, u.name
-                ORDER BY bp.published_at DESC
+                ORDER BY bp.published_at DESC NULLS LAST
                 LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}"""
 
-    params.extend([per_page, (page - 1) * per_page])
+    params.extend([per_page, offset])
     posts = await conn.fetch(query, *params)
 
     return {
@@ -1234,13 +1570,12 @@ async def list_blog_posts(
 @app.get("/blog/posts/{slug}")
 async def get_blog_post(slug: str, conn=Depends(get_db)):
     """Get single blog post by slug"""
-
     # Increment views
     await conn.execute("UPDATE blog_posts SET views = views + 1 WHERE slug = $1", slug)
 
     post = await conn.fetchrow("""SELECT bp.*, u.name as author_name,
-                                  ARRAY_AGG(DISTINCT bc.name) as categories,
-                                  ARRAY_AGG(DISTINCT bt.name) as tags
+                                  COALESCE(json_agg(DISTINCT bc.name) FILTER (WHERE bc.name IS NOT NULL), '[]') as categories,
+                                  COALESCE(json_agg(DISTINCT bt.name) FILTER (WHERE bt.name IS NOT NULL), '[]') as tags
                                   FROM blog_posts bp
                                   JOIN users u ON bp.author_id = u.id
                                   LEFT JOIN post_categories pc ON bp.id = pc.post_id
@@ -1257,22 +1592,24 @@ async def get_blog_post(slug: str, conn=Depends(get_db)):
 
 @app.get("/blog/categories")
 async def list_categories(conn=Depends(get_db)):
-    """List all blog categories"""
-    categories = await conn.fetch("""SELECT bc.*, COUNT(pc.post_id) as post_count 
+    """List all blog categories with post counts"""
+    categories = await conn.fetch("""SELECT bc.*, COUNT(DISTINCT pc.post_id) as post_count 
                                      FROM blog_categories bc
                                      LEFT JOIN post_categories pc ON bc.id = pc.category_id
                                      LEFT JOIN blog_posts bp ON pc.post_id = bp.id AND bp.status = 'published'
-                                     GROUP BY bc.id""")
+                                     GROUP BY bc.id
+                                     ORDER BY bc.name""")
     return [dict(c) for c in categories]
 
 @app.get("/blog/tags")
 async def list_tags(conn=Depends(get_db)):
-    """List all blog tags"""
-    tags = await conn.fetch("""SELECT bt.*, COUNT(pt.post_id) as post_count 
+    """List all blog tags with post counts"""
+    tags = await conn.fetch("""SELECT bt.*, COUNT(DISTINCT pt.post_id) as post_count 
                                FROM blog_tags bt
                                LEFT JOIN post_tags pt ON bt.id = pt.tag_id
                                LEFT JOIN blog_posts bp ON pt.post_id = bp.id AND bp.status = 'published'
-                               GROUP BY bt.id""")
+                               GROUP BY bt.id
+                               ORDER BY bt.name""")
     return [dict(t) for t in tags]
 
 @app.get("/blog/sitemap.xml")
@@ -1293,13 +1630,12 @@ async def generate_sitemap(conn=Depends(get_db)):
     for post in posts:
         url = ET.SubElement(root, "url")
         ET.SubElement(url, "loc").text = f"https://pipways.com/blog/{post['slug']}"
-        ET.SubElement(url, "lastmod").text = post["updated_at"].isoformat()
+        ET.SubElement(url, "lastmod").text = post["updated_at"].isoformat() if post["updated_at"] else datetime.utcnow().isoformat()
         ET.SubElement(url, "changefreq").text = "weekly"
         ET.SubElement(url, "priority").text = "0.8"
 
     xml_str = ET.tostring(root, encoding='unicode')
     return HTMLResponse(content=xml_str, media_type="application/xml")
-
 
 # ============================================================================
 # MEDIA UPLOADS (for Blog and Content)
@@ -1331,7 +1667,7 @@ async def upload_media(
     if not file_type:
         raise HTTPException(status_code=400, detail=f"File type {file.content_type} not allowed")
 
-    # Create uploads directory if not exists
+    # Create uploads directory
     upload_dir = f"uploads/{file_type}s"
     os.makedirs(upload_dir, exist_ok=True)
 
@@ -1343,6 +1679,12 @@ async def upload_media(
 
     # Save file
     contents = await file.read()
+
+    # Validate file size (10MB max for images, 50MB for videos)
+    max_size = 50 * 1024 * 1024 if file_type == 'video' else 10 * 1024 * 1024
+    if len(contents) > max_size:
+        raise HTTPException(status_code=400, detail=f"File too large. Max size is {max_size // (1024*1024)}MB.")
+
     with open(file_path, "wb") as f:
         f.write(contents)
 
@@ -1352,7 +1694,12 @@ async def upload_media(
 
     # Save to database
     media_id = await conn.fetchval(
-        "INSERT INTO media_files (filename, url, file_type, file_size, uploaded_by) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (url) DO NOTHING RETURNING id",
+        """INSERT INTO media_files (filename, url, file_type, file_size, uploaded_by) 
+           VALUES ($1, $2, $3, $4, $5) 
+           ON CONFLICT (url) DO UPDATE SET
+           file_size = $4,
+           uploaded_by = $5
+           RETURNING id""",
         unique_filename, url_path, file_type, file_size, user["id"]
     )
 
@@ -1367,21 +1714,47 @@ async def upload_media(
 
 @app.get("/admin/media")
 async def list_media(
-    file_type: Optional[str] = None,
+    file_type: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     current_user: str = Depends(get_current_admin),
     conn=Depends(get_db)
 ):
-    """List all uploaded media files (admin only)"""
+    """List all uploaded media files (admin only) with pagination"""
+    offset = (page - 1) * per_page
+
     if file_type:
-        media = await conn.fetch(
-            "SELECT m.*, u.name as uploaded_by_name FROM media_files m JOIN users u ON m.uploaded_by = u.id WHERE m.file_type = $1 ORDER BY m.created_at DESC",
+        total = await conn.fetchval(
+            "SELECT COUNT(*) FROM media_files WHERE file_type = $1",
             file_type
         )
-    else:
         media = await conn.fetch(
-            "SELECT m.*, u.name as uploaded_by_name FROM media_files m JOIN users u ON m.uploaded_by = u.id ORDER BY m.created_at DESC"
+            """SELECT m.*, u.name as uploaded_by_name 
+               FROM media_files m 
+               JOIN users u ON m.uploaded_by = u.id 
+               WHERE m.file_type = $1 
+               ORDER BY m.created_at DESC 
+               LIMIT $2 OFFSET $3""",
+            file_type, per_page, offset
         )
-    return [dict(m) for m in media]
+    else:
+        total = await conn.fetchval("SELECT COUNT(*) FROM media_files")
+        media = await conn.fetch(
+            """SELECT m.*, u.name as uploaded_by_name 
+               FROM media_files m 
+               JOIN users u ON m.uploaded_by = u.id 
+               ORDER BY m.created_at DESC 
+               LIMIT $1 OFFSET $2""",
+            per_page, offset
+        )
+
+    return {
+        "media": [dict(m) for m in media],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page
+    }
 
 @app.delete("/admin/media/{media_id}")
 async def delete_media(
@@ -1404,61 +1777,6 @@ async def delete_media(
 
     return {"success": True, "message": "Media deleted"}
 
-@app.get("/uploads/{file_type}/{filename}")
-async def serve_media(file_type: str, filename: str):
-    """Serve uploaded media files"""
-    file_path = f"uploads/{file_type}s/{filename}"
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    # Determine content type
-    content_types = {
-        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-        '.png': 'image/png', '.gif': 'image/gif',
-        '.webp': 'image/webp', '.svg': 'image/svg+xml',
-        '.mp4': 'video/mp4', '.webm': 'video/webm',
-        '.pdf': 'application/pdf'
-    }
-
-    ext = os.path.splitext(filename)[1].lower()
-    content_type = content_types.get(ext, 'application/octet-stream')
-
-    return FileResponse(file_path, media_type=content_type)
-
-
-@app.get("/admin/media/browser")
-async def media_browser(
-    type: Optional[str] = "image",
-    page: int = 1,
-    per_page: int = 20,
-    current_user: str = Depends(get_current_admin),
-    conn=Depends(get_db)
-):
-    """Media browser for frontend editor (paginated)"""
-    offset = (page - 1) * per_page
-
-    total = await conn.fetchval(
-        "SELECT COUNT(*) FROM media_files WHERE file_type = $1",
-        type
-    )
-
-    media = await conn.fetch(
-        """SELECT id, url, filename, file_type, file_size, created_at 
-           FROM media_files 
-           WHERE file_type = $1 
-           ORDER BY created_at DESC 
-           LIMIT $2 OFFSET $3""",
-        type, per_page, offset
-    )
-
-    return {
-        "media": [dict(m) for m in media],
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": (total + per_page - 1) // per_page
-    }
-
 # ============================================================================
 # ADMIN DASHBOARD
 # ============================================================================
@@ -1466,33 +1784,106 @@ async def media_browser(
 @app.get("/admin/stats")
 async def admin_stats(current_user: str = Depends(get_current_admin), conn=Depends(get_db)):
     """Get admin dashboard statistics"""
-
     stats = {
         "users": await conn.fetchval("SELECT COUNT(*) FROM users"),
+        "trades": await conn.fetchval("SELECT COUNT(*) FROM trades"),
         "chart_analyses": await conn.fetchval("SELECT COUNT(*) FROM chart_analyses"),
         "performance_analyses": await conn.fetchval("SELECT COUNT(*) FROM performance_analyses"),
+        "mentorship_sessions": await conn.fetchval("SELECT COUNT(*) FROM mentorship_sessions"),
         "courses": await conn.fetchval("SELECT COUNT(*) FROM courses"),
         "published_courses": await conn.fetchval("SELECT COUNT(*) FROM courses WHERE is_published = TRUE"),
-        "webinars": await conn.fetchval("SELECT COUNT(*) FROM webinars WHERE scheduled_at > NOW()"),
+        "webinars": await conn.fetchval("SELECT COUNT(*) FROM webinars WHERE scheduled_at > NOW() - INTERVAL '1 hour'"),
+        "webinar_registrations": await conn.fetchval("SELECT COUNT(*) FROM webinar_registrations"),
         "blog_posts": await conn.fetchval("SELECT COUNT(*) FROM blog_posts"),
         "published_posts": await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'published'"),
-        "total_views": await conn.fetchval("SELECT COALESCE(SUM(views), 0) FROM blog_posts")
+        "total_views": await conn.fetchval("SELECT COALESCE(SUM(views), 0) FROM blog_posts"),
+        "media_files": await conn.fetchval("SELECT COUNT(*) FROM media_files"),
+        "course_enrollments": await conn.fetchval("SELECT COUNT(*) FROM course_enrollments")
     }
 
     return stats
 
 @app.get("/admin/users")
-async def list_users(current_user: str = Depends(get_current_admin), conn=Depends(get_db)):
-    """List all users (admin only)"""
-    users = await conn.fetch("SELECT id, email, name, is_admin, created_at FROM users ORDER BY created_at DESC")
-    return [dict(u) for u in users]
+async def list_users(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    current_user: str = Depends(get_current_admin),
+    conn=Depends(get_db)
+):
+    """List all users with pagination (admin only)"""
+    offset = (page - 1) * per_page
 
+    total = await conn.fetchval("SELECT COUNT(*) FROM users")
+
+    users = await conn.fetch(
+        """SELECT id, email, name, is_admin, created_at,
+                  (SELECT COUNT(*) FROM trades WHERE user_id = users.id) as trade_count,
+                  (SELECT COUNT(*) FROM chart_analyses WHERE user_id = users.id) as analysis_count
+           FROM users 
+           ORDER BY created_at DESC 
+           LIMIT $1 OFFSET $2""",
+        per_page, offset
+    )
+
+    return {
+        "users": [dict(u) for u in users],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page
+    }
+
+@app.get("/admin/users/{user_id}/activity")
+async def get_user_activity(
+    user_id: int,
+    current_user: str = Depends(get_current_admin),
+    conn=Depends(get_db)
+):
+    """Get detailed activity for a specific user (admin only)"""
+    user = await conn.fetchrow(
+        "SELECT id, email, name, is_admin, created_at FROM users WHERE id = $1",
+        user_id
+    )
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Get recent trades
+    trades = await conn.fetch(
+        "SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10",
+        user_id
+    )
+
+    # Get recent analyses
+    analyses = await conn.fetch(
+        """SELECT 'chart' as type, id, created_at FROM chart_analyses WHERE user_id = $1
+           UNION ALL
+           SELECT 'performance' as type, id, created_at FROM performance_analyses WHERE user_id = $1
+           ORDER BY created_at DESC LIMIT 10""",
+        user_id
+    )
+
+    # Get insights
+    insights = await conn.fetchrow(
+        "SELECT * FROM user_insights WHERE user_id = $1",
+        user_id
+    )
+
+    return {
+        "user": dict(user),
+        "recent_trades": [dict(t) for t in trades],
+        "recent_analyses": [dict(a) for a in analyses],
+        "insights": dict(insights) if insights else None
+    }
+
+# ============================================================================
+# DEBUG ENDPOINTS
+# ============================================================================
 
 @app.get("/debug/admin")
 async def debug_admin(conn=Depends(get_db)):
     """Debug endpoint to check admin user status"""
     try:
-        # Check users table
         table_exists = await conn.fetchval("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
@@ -1503,10 +1894,8 @@ async def debug_admin(conn=Depends(get_db)):
         if not table_exists:
             return {"error": "Users table does not exist", "fix": "Restart server to trigger init_db()"}
 
-        # Count users
         user_count = await conn.fetchval("SELECT COUNT(*) FROM users")
 
-        # Check admin
         admin = await conn.fetchrow(
             "SELECT id, email, is_admin, created_at FROM users WHERE email = $1",
             DEFAULT_ADMIN_EMAIL
@@ -1516,7 +1905,6 @@ async def debug_admin(conn=Depends(get_db)):
             "users_table_exists": True,
             "total_users": user_count,
             "admin_configured": DEFAULT_ADMIN_EMAIL,
-            "admin_password_configured": DEFAULT_ADMIN_PASSWORD,
             "admin_found_in_db": dict(admin) if admin else None,
             "login_credentials": {
                 "email": DEFAULT_ADMIN_EMAIL,
@@ -1530,7 +1918,6 @@ async def debug_admin(conn=Depends(get_db)):
 async def debug_fix_admin(conn=Depends(get_db)):
     """Emergency admin creation"""
     try:
-        # Ensure table exists
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -1542,7 +1929,6 @@ async def debug_fix_admin(conn=Depends(get_db)):
             )
         """)
 
-        # Check existing
         existing = await conn.fetchrow(
             "SELECT id FROM users WHERE email = $1", DEFAULT_ADMIN_EMAIL
         )
@@ -1550,7 +1936,6 @@ async def debug_fix_admin(conn=Depends(get_db)):
         if existing:
             return {"message": "Admin already exists", "email": DEFAULT_ADMIN_EMAIL}
 
-        # Create admin
         hashed = get_password_hash(DEFAULT_ADMIN_PASSWORD)
         await conn.execute(
             "INSERT INTO users (email, password_hash, name, is_admin) VALUES ($1, $2, $3, $4)",
@@ -1568,8 +1953,6 @@ async def debug_fix_admin(conn=Depends(get_db)):
 # ============================================================================
 # FRONTEND SERVING
 # ============================================================================
-# FRONTEND SERVING
-# ============================================================================
 
 @app.get("/")
 async def root():
@@ -1579,11 +1962,21 @@ async def root():
     return HTMLResponse("""
     <!DOCTYPE html>
     <html>
-    <head><title>Pipways</title></head>
-    <body>
-        <h1>Pipways API is running</h1>
-        <p>Frontend not found. Please place index.html in the root folder.</p>
-        <p>API Documentation: <a href="/docs">/docs</a></p>
+    <head><title>Pipways API</title></head>
+    <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px;">
+        <h1>🚀 Pipways API is running</h1>
+        <p>Backend Status: <strong style="color: green;">Operational</strong></p>
+        <p>Frontend not detected. Please place index.html in the root folder.</p>
+        <hr>
+        <h3>Quick Links:</h3>
+        <ul>
+            <li><a href="/docs">API Documentation (Swagger UI)</a></li>
+            <li><a href="/redoc">API Documentation (ReDoc)</a></li>
+            <li><a href="/health">Health Check</a></li>
+            <li><a href="/debug/admin">Debug Admin Status</a></li>
+        </ul>
+        <hr>
+        <p><small>Version 2.0.0 | Built with FastAPI</small></p>
     </body>
     </html>
     """)
@@ -1594,7 +1987,16 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "2.0.0",
-        "features": ["chart_analysis", "performance_analysis", "ai_mentor", "webinars", "lms", "blog"],
+        "features": [
+            "trade_journal",
+            "chart_analysis",
+            "performance_analysis", 
+            "ai_mentor",
+            "webinars",
+            "lms",
+            "blog",
+            "media_upload"
+        ],
         "timestamp": datetime.utcnow().isoformat()
     }
 

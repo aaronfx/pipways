@@ -1,5 +1,5 @@
 """
-Pipways API - Production Ready
+Pipways API - Production Ready (Auth Disabled for Testing)
 Week 1: Core Infrastructure + AI + Auth + Admin
 """
 
@@ -676,86 +676,10 @@ async def get_db():
         yield conn
 
 # ==========================================
-# AUTHENTICATION UTILITIES
+# AUTHENTICATION UTILITIES (DISABLED)
 # ==========================================
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    """Generate password hash"""
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT access token"""
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({
-        "exp": expire,
-        "type": "access",
-        "iat": datetime.utcnow()
-    })
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
-
-def create_refresh_token(data: dict) -> str:
-    """Create JWT refresh token"""
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({
-        "exp": expire,
-        "type": "refresh",
-        "iat": datetime.utcnow()
-    })
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
-
-def create_password_reset_token() -> str:
-    """Generate secure random token for password reset"""
-    return secrets.token_urlsafe(32)
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    conn: asyncpg.Connection = Depends(get_db)
-) -> Dict[str, Any]:
-    """Validate JWT and return current user"""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=["HS256"])
-        
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        
-        email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user = await conn.fetchrow(
-            "SELECT id, email, full_name, role, is_active, is_verified FROM users WHERE email = $1",
-            email
-        )
-        
-        if user is None:
-            raise HTTPException(status_code=401, detail="User not found")
-        
-        if not user["is_active"]:
-            raise HTTPException(status_code=403, detail="Account disabled")
-        
-        return dict(user)
-        
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-async def get_current_admin(
-    current_user: Dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """Verify user is admin"""
-    if current_user["role"] != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return current_user
+# All auth dependencies removed - public access only
 
 # ==========================================
 # EMAIL SERVICE
@@ -1054,247 +978,25 @@ async def root():
     }
 
 # ==========================================
-# AUTHENTICATION ENDPOINTS
+# AUTHENTICATION ENDPOINTS (REMOVED)
 # ==========================================
-
-@app.post("/auth/register", response_model=TokenResponse, tags=["Authentication"])
-async def register(
-    background_tasks: BackgroundTasks,
-    email: str = Form(...),
-    password: str = Form(...),
-    full_name: Optional[str] = Form(None),
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Register new user"""
-    try:
-        user_data = UserCreate(email=email, password=password, full_name=full_name)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    existing = await conn.fetchrow("SELECT id FROM users WHERE email = $1", email)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(password)
-    user_id = await conn.fetchval(
-        """INSERT INTO users (email, password_hash, full_name, role, is_active, is_verified) 
-           VALUES ($1, $2, $3, 'user', TRUE, FALSE) RETURNING id""",
-        email, hashed_password, full_name
-    )
-    
-    access_token = create_access_token({"sub": email, "user_id": user_id, "role": "user"})
-    refresh_token = create_refresh_token({"sub": email, "user_id": user_id})
-    
-    logger.info(f"User registered: {email}")
-    
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user": {
-            "id": user_id,
-            "email": email,
-            "full_name": full_name,
-            "role": UserRole.USER,
-            "is_active": True,
-            "created_at": datetime.utcnow()
-        }
-    }
-
-@app.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
-async def login(
-    email: str = Form(...),
-    password: str = Form(...),
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Login user"""
-    user = await conn.fetchrow(
-        """SELECT id, email, password_hash, full_name, role, is_active, is_verified 
-           FROM users WHERE email = $1""",
-        email
-    )
-    
-    if not user or not verify_password(password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if not user["is_active"]:
-        raise HTTPException(status_code=403, detail="Account disabled")
-    
-    await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
-    
-    access_token = create_access_token({
-        "sub": email, 
-        "user_id": user["id"], 
-        "role": user["role"]
-    })
-    refresh_token = create_refresh_token({
-        "sub": email, 
-        "user_id": user["id"]
-    })
-    
-    logger.info(f"User logged in: {email}")
-    
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "full_name": user["full_name"],
-            "role": user["role"],
-            "is_active": user["is_active"],
-            "created_at": datetime.utcnow()
-        }
-    }
-
-@app.post("/auth/refresh", response_model=TokenResponse, tags=["Authentication"])
-async def refresh_token(
-    refresh_token: str = Form(...),
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Refresh access token"""
-    try:
-        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=["HS256"])
-        if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        
-        email = payload.get("sub")
-        user_id = payload.get("user_id")
-        
-        user = await conn.fetchrow(
-            "SELECT email, role, is_active FROM users WHERE id = $1 AND email = $2",
-            user_id, email
-        )
-        
-        if not user or not user["is_active"]:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-        
-        new_access = create_access_token({
-            "sub": email,
-            "user_id": user_id,
-            "role": user["role"]
-        })
-        new_refresh = create_refresh_token({"sub": email, "user_id": user_id})
-        
-        return {
-            "access_token": new_access,
-            "refresh_token": new_refresh,
-            "token_type": "bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {
-                "id": user_id,
-                "email": user["email"],
-                "full_name": user.get("full_name"),
-                "role": user["role"],
-                "is_active": user["is_active"],
-                "created_at": datetime.utcnow()
-            }
-        }
-        
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Refresh token expired")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-
-@app.post("/auth/password-reset-request", tags=["Authentication"])
-async def password_reset_request(
-    background_tasks: BackgroundTasks,
-    email: str = Form(...),
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Request password reset"""
-    user = await conn.fetchrow("SELECT id, email, full_name FROM users WHERE email = $1", email)
-    
-    if not user:
-        return {"success": True, "message": "If the email exists, a reset link has been sent"}
-    
-    token = create_password_reset_token()
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    expires = datetime.utcnow() + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
-    
-    await conn.execute(
-        """INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) 
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id) DO UPDATE 
-           SET token_hash = $2, expires_at = $3, used_at = NULL""",
-        user["id"], token_hash, expires
-    )
-    
-    background_tasks.add_task(send_password_reset_email, email, token)
-    
-    logger.info(f"Password reset requested for: {email}")
-    
-    return {"success": True, "message": "If the email exists, a reset link has been sent"}
-
-@app.post("/auth/password-reset-confirm", tags=["Authentication"])
-async def password_reset_confirm(
-    token: str = Form(...),
-    new_password: str = Form(...),
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Confirm password reset"""
-    if len(new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    
-    reset_record = await conn.fetchrow(
-        """SELECT t.user_id, t.expires_at, t.used_at 
-           FROM password_reset_tokens t
-           WHERE t.token_hash = $1""",
-        token_hash
-    )
-    
-    if not reset_record:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
-    
-    if reset_record["used_at"]:
-        raise HTTPException(status_code=400, detail="Token already used")
-    
-    if reset_record["expires_at"] < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Token expired")
-    
-    hashed_password = get_password_hash(new_password)
-    await conn.execute(
-        "UPDATE users SET password_hash = $1 WHERE id = $2",
-        hashed_password, reset_record["user_id"]
-    )
-    
-    await conn.execute(
-        "UPDATE password_reset_tokens SET used_at = NOW() WHERE token_hash = $1",
-        token_hash
-    )
-    
-    logger.info(f"Password reset completed for user: {reset_record['user_id']}")
-    
-    return {"success": True, "message": "Password reset successful"}
-
-@app.get("/auth/me", response_model=UserResponse, tags=["Authentication"])
-async def get_me(current_user: Dict = Depends(get_current_user)):
-    return UserResponse(**current_user)
-
-@app.post("/auth/logout", tags=["Authentication"])
-async def logout(current_user: Dict = Depends(get_current_user)):
-    return {"success": True, "message": "Logged out successfully"}
+# Login, register, and all auth endpoints removed for testing
 
 # ==========================================
-# TRADE JOURNAL ENDPOINTS
+# TRADE JOURNAL ENDPOINTS (PUBLIC)
 # ==========================================
 
 @app.post("/trades", tags=["Trade Journal"])
 async def create_trade(
     trade: TradeCreate,
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
+    # Using user_id = 1 as default test user
     trade_id = await conn.fetchval(
         """INSERT INTO trades 
            (user_id, pair, direction, pips, grade, notes, entry_price, exit_price, screenshot_url)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id""",
-        current_user["id"],
+        1,  # Default test user
         trade.pair.upper(),
         trade.direction.value,
         trade.pips,
@@ -1315,11 +1017,10 @@ async def get_trades(
     direction: Optional[TradeDirection] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     conditions = ["user_id = $1"]
-    params = [current_user["id"]]
+    params = [1]  # Default test user
     param_idx = 2
     
     if pair:
@@ -1364,7 +1065,7 @@ async def get_trades(
             MAX(pips) as best_trade,
             MIN(pips) as worst_trade
            FROM trades WHERE user_id = $1""",
-        current_user["id"]
+        1  # Default test user
     )
     
     return {
@@ -1382,7 +1083,6 @@ async def get_trades(
 @app.get("/trades/stats", tags=["Trade Journal"])
 async def get_trade_stats(
     period: str = Query("all", enum=["week", "month", "quarter", "year", "all"]),
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     now = datetime.utcnow()
@@ -1411,12 +1111,12 @@ async def get_trade_stats(
             MIN(pips) as max_loss
            FROM trades 
            WHERE user_id = $1 AND created_at >= $2""",
-        current_user["id"], start_date
+        1, start_date  # Default test user
     )
     
     grades = await conn.fetch(
         "SELECT grade, COUNT(*) as count FROM trades WHERE user_id = $1 AND created_at >= $2 GROUP BY grade",
-        current_user["id"], start_date
+        1, start_date
     )
     
     monthly = await conn.fetch(
@@ -1428,7 +1128,7 @@ async def get_trade_stats(
            WHERE user_id = $1 AND created_at >= $2
            GROUP BY DATE_TRUNC('month', created_at)
            ORDER BY month""",
-        current_user["id"], start_date
+        1, start_date
     )
     
     return {
@@ -1440,7 +1140,7 @@ async def get_trade_stats(
     }
 
 # ==========================================
-# AI ANALYSIS ENDPOINTS
+# AI ANALYSIS ENDPOINTS (PUBLIC)
 # ==========================================
 
 @app.post("/analyze/chart", tags=["AI Analysis"])
@@ -1449,7 +1149,6 @@ async def analyze_chart(
     image: UploadFile = File(...),
     prompt: Optional[str] = Form(None),
     save_to_journal: bool = Form(True),
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     if image.content_type not in ["image/jpeg", "image/png", "image/webp"]:
@@ -1463,7 +1162,7 @@ async def analyze_chart(
     
     existing = await conn.fetchrow(
         "SELECT id, analysis_text FROM chart_analyses WHERE image_hash = $1 AND user_id = $2",
-        image_hash, current_user["id"]
+        image_hash, 1  # Default test user
     )
     
     if existing:
@@ -1484,7 +1183,7 @@ async def analyze_chart(
             confidence_score, support_levels, resistance_levels, entry_zone,
             stop_loss, take_profit_1, take_profit_2, risk_reward_ratio, indicators)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id""",
-        current_user["id"],
+        1,  # Default test user
         image.filename,
         image_hash,
         json.dumps(analysis),
@@ -1511,12 +1210,11 @@ async def analyze_chart(
 async def get_analysis_history(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=50),
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     total = await conn.fetchval(
         "SELECT COUNT(*) FROM chart_analyses WHERE user_id = $1",
-        current_user["id"]
+        1  # Default test user
     )
     
     offset = (page - 1) * per_page
@@ -1526,7 +1224,7 @@ async def get_analysis_history(
            FROM chart_analyses 
            WHERE user_id = $1 
            ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
-        current_user["id"], per_page, offset
+        1, per_page, offset  # Default test user
     )
     
     return {
@@ -1546,16 +1244,15 @@ async def get_analysis_history(
 async def mentor_chat(
     message: str = Form(...),
     session_id: Optional[str] = Form(None),
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    session_id = session_id or f"session_{current_user['id']}_{datetime.utcnow().timestamp()}"
+    session_id = session_id or f"session_1_{datetime.utcnow().timestamp()}"
     
     history = await conn.fetch(
         """SELECT message, response FROM mentor_chats 
            WHERE user_id = $1 AND session_id = $2 
            ORDER BY created_at DESC LIMIT 10""",
-        current_user["id"], session_id
+        1, session_id  # Default test user
     )
     
     context = []
@@ -1563,13 +1260,13 @@ async def mentor_chat(
         context.append({"role": "user", "content": h["message"]})
         context.append({"role": "assistant", "content": h["response"]})
     
-    result = await chat_with_mentor(message, context, current_user["id"])
+    result = await chat_with_mentor(message, context, 1)
     
     await conn.execute(
         """INSERT INTO mentor_chats 
            (user_id, session_id, message, response, context, tokens_used)
            VALUES ($1, $2, $3, $4, $5, $6)""",
-        current_user["id"],
+        1,  # Default test user
         session_id,
         message,
         result["response"],
@@ -1585,7 +1282,7 @@ async def mentor_chat(
     }
 
 # ==========================================
-# ADMIN ENDPOINTS
+# ADMIN ENDPOINTS (PUBLIC - NO AUTH)
 # ==========================================
 
 @app.post("/admin/courses", tags=["Admin"])
@@ -1597,7 +1294,6 @@ async def admin_create_course(
     level: str = Form(...),
     price: float = Form(0),
     is_published: bool = Form(False),
-    current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     try:
@@ -1605,7 +1301,7 @@ async def admin_create_course(
             """INSERT INTO courses 
                (title, slug, description, content, level, price, is_published, instructor_id)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
-            title, slug, description, content, level, price, is_published, current_user["id"]
+            title, slug, description, content, level, price, is_published, 1  # Default test user
         )
         
         return {"success": True, "course_id": course_id}
@@ -1622,7 +1318,6 @@ async def admin_update_course(
     level: Optional[str] = Form(None),
     price: Optional[float] = Form(None),
     is_published: Optional[bool] = Form(None),
-    current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     updates = []
@@ -1669,7 +1364,6 @@ async def admin_create_blog_post(
     category: str = Form("general"),
     tags: Optional[str] = Form(None),
     is_published: bool = Form(False),
-    current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
@@ -1681,7 +1375,7 @@ async def admin_create_blog_post(
                 published_at, author_id, meta_title, meta_description)
                VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 THEN NOW() END, $8, $9, $10) RETURNING id""",
             title, slug, content, excerpt or content[:200], category, tag_list,
-            is_published, current_user["id"], title, excerpt or content[:160]
+            is_published, 1, title, excerpt or content[:160]  # Default test user
         )
         
         return {"success": True, "post_id": post_id}
@@ -1698,7 +1392,6 @@ async def admin_create_webinar(
     max_attendees: int = Form(100),
     price: float = Form(0),
     zoom_link: Optional[str] = Form(None),
-    current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     webinar_id = await conn.fetchval(
@@ -1706,7 +1399,7 @@ async def admin_create_webinar(
            (title, description, presenter_id, scheduled_at, duration_minutes, 
             max_attendees, price, zoom_link, is_published)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING id""",
-        title, description, current_user["id"], scheduled_at, duration_minutes,
+        title, description, 1, scheduled_at, duration_minutes,  # Default test user
         max_attendees, price, zoom_link
     )
     
@@ -1717,7 +1410,6 @@ async def admin_list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
-    current_user: Dict = Depends(get_current_admin),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     conditions = ["1=1"]
@@ -1807,7 +1499,6 @@ async def get_courses(
 @app.get("/courses/{slug}", tags=["Courses"])
 async def get_course_detail(
     slug: str,
-    current_user: Optional[Dict] = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     course = await conn.fetchrow(
@@ -1823,20 +1514,19 @@ async def get_course_detail(
     
     result = dict(course)
     
-    if current_user:
-        enrollment = await conn.fetchrow(
-            "SELECT * FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
-            current_user["id"], course["id"]
-        )
-        result["enrolled"] = enrollment is not None
-        result["progress"] = enrollment["progress_percent"] if enrollment else 0
+    # Check enrollment for default test user
+    enrollment = await conn.fetchrow(
+        "SELECT * FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
+        1, course["id"]
+    )
+    result["enrolled"] = enrollment is not None
+    result["progress"] = enrollment["progress_percent"] if enrollment else 0
     
     return {"success": True, "course": result}
 
 @app.post("/courses/{course_id}/enroll", tags=["Courses"])
 async def enroll_course(
     course_id: int,
-    current_user: Dict = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db)
 ):
     course = await conn.fetchrow(
@@ -1849,7 +1539,7 @@ async def enroll_course(
     
     existing = await conn.fetchrow(
         "SELECT id FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
-        current_user["id"], course_id
+        1, course_id
     )
     
     if existing:
@@ -1857,7 +1547,7 @@ async def enroll_course(
     
     await conn.execute(
         "INSERT INTO course_enrollments (user_id, course_id) VALUES ($1, $2)",
-        current_user["id"], course_id
+        1, course_id
     )
     
     return {"success": True, "message": "Enrolled successfully"}

@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from enum import Enum
 import hashlib
 import secrets
+import re
 
 # Configure logging
 logging.basicConfig(
@@ -36,6 +37,9 @@ import asyncpg
 from asyncpg import Pool
 from pydantic import BaseModel, EmailStr, validator, Field
 
+# Import BaseSettings from pydantic_settings for Pydantic v2
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 # Optional imports with fallbacks
 try:
     import redis.asyncio as redis
@@ -48,10 +52,18 @@ except ImportError:
 
 class Settings(BaseSettings):
     """Application settings with validation"""
+    # Use SettingsConfigDict for Pydantic v2
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra='ignore'  # Ignore extra fields from environment
+    )
+
     SECRET_KEY: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
     DATABASE_URL: str = Field(...)
     REDIS_URL: str = Field(default="redis://localhost:6379")
-    OPENROUTER_API_KEY: str = Field(...)
+    OPENROUTER_API_KEY: str = Field(default="")
     OPENROUTER_MODEL: str = "anthropic/claude-3-opus-20240229"
     
     # Email settings (Resend/SendGrid)
@@ -72,10 +84,6 @@ class Settings(BaseSettings):
     # File upload
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     ALLOWED_IMAGE_TYPES: List[str] = Field(default=["image/jpeg", "image/png", "image/webp"])
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 settings = Settings()
 
@@ -627,7 +635,6 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
             content = result["choices"][0]["message"]["content"]
             
             # Extract JSON from response (handle markdown code blocks)
-            import re
             json_match = re.search(r'```json\n(.*?)\n```', content, re.DOTALL)
             if json_match:
                 content = json_match.group(1)
@@ -719,7 +726,7 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    logger.info("🛑 Shutting down...")
+    logger.info("🛠️ Shutting down...")
     if pool:
         await pool.close()
     if redis_client:

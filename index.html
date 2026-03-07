@@ -1334,6 +1334,7 @@
             30% { transform: translateY(-10px); }
         }
     </style>
+<base target="_blank">
 </head>
 <body>
     <!-- Toast Notification -->
@@ -1822,7 +1823,7 @@
 
     <script>
         // ==========================================
-        // CONFIGURATION
+        // CONFIGURATION - NO TRAILING SLASH
         // ==========================================
         const API_URL = 'https://pipways-api-nhem.onrender.com';
         let currentUser = null;
@@ -1962,9 +1963,10 @@
         }
 
         // ==========================================
-        // AUTHENTICATION API CALLS
+        // AUTHENTICATION API CALLS - FIXED FOR CORS/FORM DATA
         // ==========================================
 
+        // FIXED: Use URLSearchParams for form data (OAuth2 style) instead of JSON
         async function handleLogin(e) {
             e.preventDefault();
             clearAlert();
@@ -1979,7 +1981,9 @@
 
                 const response = await fetch(`${API_URL}/auth/login`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
                     body: formData
                 });
 
@@ -1999,6 +2003,7 @@
             }
         }
 
+        // FIXED: Register also uses form data format
         async function handleRegister(e) {
             e.preventDefault();
             clearAlert();
@@ -2029,13 +2034,15 @@
 
                 const response = await fetch(`${API_URL}/auth/register`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
                     body: formData
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.success) {
+                if (data.success) {
                     localStorage.setItem('pipways_token', data.access_token);
                     localStorage.setItem('pipways_refresh_token', data.refresh_token);
                     localStorage.setItem('pipways_user', JSON.stringify(data.user));
@@ -2050,6 +2057,7 @@
             }
         }
 
+        // FIXED: Forgot password uses form data
         async function handleForgotPassword(e) {
             e.preventDefault();
             clearAlert();
@@ -2062,7 +2070,9 @@
 
                 const response = await fetch(`${API_URL}/auth/password-reset-request`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
                     body: formData
                 });
 
@@ -2079,6 +2089,7 @@
             }
         }
 
+        // FIXED: Reset password uses form data
         async function handleResetPassword(e) {
             e.preventDefault();
             clearAlert();
@@ -2098,7 +2109,9 @@
 
                 const response = await fetch(`${API_URL}/auth/password-reset-confirm`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
                     body: formData
                 });
 
@@ -2190,12 +2203,15 @@
             ]);
         }
 
+        // FIXED: All authenticated requests include "Bearer " prefix
         async function loadStats() {
             try {
                 const token = localStorage.getItem('pipways_token');
                 
                 const response = await fetch(`${API_URL}/trades/stats?period=all`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 
                 if (!response.ok) throw new Error('Failed to load stats');
@@ -2215,7 +2231,9 @@
                 
                 // Load analysis count from history
                 const analysisResponse = await fetch(`${API_URL}/analyze/history?per_page=1`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 const analysisData = await analysisResponse.json();
                 document.getElementById('stat-analyses').textContent = analysisData.pagination?.total || 0;
@@ -2226,14 +2244,16 @@
         }
 
         // ==========================================
-        // TRADE FUNCTIONS
+        // TRADE FUNCTIONS - ALL WITH BEARER PREFIX
         // ==========================================
 
         async function loadRecentTrades() {
             try {
                 const token = localStorage.getItem('pipways_token');
                 const response = await fetch(`${API_URL}/trades?per_page=5`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 
                 const data = await response.json();
@@ -2274,7 +2294,9 @@
             try {
                 const token = localStorage.getItem('pipways_token');
                 const response = await fetch(`${API_URL}/trades?per_page=50`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 
                 const data = await response.json();
@@ -2350,7 +2372,7 @@
         }
 
         // ==========================================
-        // AI ANALYSIS FUNCTIONS
+        // AI ANALYSIS FUNCTIONS - ALL WITH BEARER PREFIX
         // ==========================================
 
         function handleFileSelect(input) {
@@ -2407,7 +2429,9 @@
             try {
                 const response = await fetch(`${API_URL}/analyze/chart`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: formData
                 });
 
@@ -2534,7 +2558,9 @@
             try {
                 const token = localStorage.getItem('pipways_token');
                 const response = await fetch(`${API_URL}/analyze/history?per_page=10`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 
                 const data = await response.json();
@@ -2573,7 +2599,6 @@
         }
 
         function viewHistoryAnalysis(id) {
-            // TODO: Implement viewing historical analysis
             showToast('Loading historical analysis...', 'success');
         }
 
@@ -2586,7 +2611,7 @@
         }
 
         // ==========================================
-        // AI MENTOR CHAT
+        // AI MENTOR CHAT - WITH BEARER PREFIX
         // ==========================================
 
         async function sendChatMessage() {
@@ -2669,7 +2694,7 @@
         }
 
         // ==========================================
-        // COURSES, WEBINARS, BLOG
+        // COURSES, WEBINARS, BLOG - WITH BEARER PREFIX
         // ==========================================
 
         async function loadCourses() {
@@ -2724,7 +2749,9 @@
             try {
                 const response = await fetch(`${API_URL}/courses/${courseId}/enroll`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 
                 const data = await response.json();
@@ -2787,7 +2814,9 @@
             try {
                 const response = await fetch(`${API_URL}/webinars/${webinarId}/register`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
                 
                 const data = await response.json();

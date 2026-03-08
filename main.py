@@ -12,7 +12,6 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 
 # FastAPI and related
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, status, Query
@@ -34,7 +33,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 
 # Pydantic models
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, validator, ConfigDict
 
 # Configure logging
 logging.basicConfig(
@@ -490,6 +489,8 @@ ai_service = AIService()
 # ==================== PYDANTIC MODELS ====================
 
 class UserRegister(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {"email": "user@example.com", "password": "password123", "full_name": "John Doe"}})
+
     email: EmailStr
     password: str = Field(..., min_length=6)
     full_name: Optional[str] = None
@@ -505,7 +506,7 @@ class Token(BaseModel):
 
 class SignalCreate(BaseModel):
     pair: str
-    type: str = Field(..., regex="^(buy|sell|neutral)$")
+    type: str = Field(..., pattern="^(buy|sell|neutral)$")
     entry_price: Optional[float] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None

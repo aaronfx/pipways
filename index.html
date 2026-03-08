@@ -144,6 +144,18 @@
             color: var(--text-secondary);
         }
 
+        .admin-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--warning);
+            color: var(--bg-dark);
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
         /* Main Content */
         .main-content {
             margin-left: 260px;
@@ -1024,6 +1036,18 @@
             opacity: 0.5;
         }
 
+        /* Error State */
+        .error-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--danger);
+        }
+
+        .error-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
         /* Toast Notification */
         .toast {
             position: fixed;
@@ -1173,13 +1197,44 @@
             0%, 60%, 100% { transform: translateY(0); }
             30% { transform: translateY(-10px); }
         }
+
+        /* Connection Status */
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            left: 280px;
+            padding: 8px 16px;
+            background: var(--danger);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            z-index: 999;
+        }
+
+        .connection-status.show {
+            display: flex;
+        }
+
+        .connection-status.online {
+            background: var(--secondary);
+        }
     </style>
+<base target="_blank">
 </head>
 <body>
     <!-- Toast Notification -->
     <div class="toast" id="toast">
         <i class="fas fa-exclamation-circle"></i>
         <span id="toast-message">Error message</span>
+    </div>
+
+    <!-- Connection Status -->
+    <div class="connection-status" id="connection-status">
+        <i class="fas fa-wifi"></i>
+        <span>Backend disconnected</span>
     </div>
 
     <!-- Blog Post Modal -->
@@ -1252,10 +1307,11 @@
 
             <div class="sidebar-footer">
                 <div class="user-info">
-                    <div class="user-avatar">T</div>
+                    <div class="user-avatar">A</div>
                     <div class="user-details">
-                        <div class="user-name">Test User</div>
-                        <div class="user-email">test@pipways.com</div>
+                        <div class="user-name">Admin User</div>
+                        <div class="user-email">admin@pipways.com</div>
+                        <span class="admin-badge">Admin</span>
                     </div>
                 </div>
             </div>
@@ -1330,9 +1386,8 @@
                         </div>
                         <div class="card-body">
                             <div id="recent-trades-list">
-                                <div class="empty-state">
-                                    <i class="fas fa-book"></i>
-                                    <p>No trades recorded yet</p>
+                                <div class="loading">
+                                    <i class="fas fa-spinner"></i> Loading trades...
                                 </div>
                             </div>
                         </div>
@@ -1344,9 +1399,8 @@
                         </div>
                         <div class="card-body">
                             <div id="trading-stats">
-                                <div class="empty-state">
-                                    <i class="fas fa-chart-pie"></i>
-                                    <p>No data available</p>
+                                <div class="loading">
+                                    <i class="fas fa-spinner"></i> Loading stats...
                                 </div>
                             </div>
                         </div>
@@ -1424,9 +1478,8 @@
                         </div>
                         <div class="card-body">
                             <div class="trade-list" id="trade-history-list">
-                                <div class="empty-state">
-                                    <i class="fas fa-history"></i>
-                                    <p>No trades recorded</p>
+                                <div class="loading">
+                                    <i class="fas fa-spinner"></i> Loading trades...
                                 </div>
                             </div>
                         </div>
@@ -1483,9 +1536,8 @@
                 <div class="analysis-history" id="analysis-history-section">
                     <h3 style="margin-bottom: 20px;">Analysis History</h3>
                     <div id="analysis-history-list">
-                        <div class="empty-state">
-                            <i class="fas fa-history"></i>
-                            <p>No previous analyses</p>
+                        <div class="loading">
+                            <i class="fas fa-spinner"></i> Loading history...
                         </div>
                     </div>
                 </div>
@@ -1567,13 +1619,78 @@
         let selectedFile = null;
         let chatSessionId = null;
         let currentSection = 'overview';
+        let isBackendConnected = false;
 
         // ==========================================
         // INITIALIZATION - LOAD DASHBOARD DIRECTLY
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
-            loadDashboardData();
+            checkBackendConnection();
         });
+
+        // ==========================================
+        // BACKEND CONNECTION CHECK
+        // ==========================================
+        async function checkBackendConnection() {
+            try {
+                const response = await fetch(`${API_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    isBackendConnected = true;
+                    showConnectionStatus(true);
+                    loadDashboardData();
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                console.error('Backend connection failed:', error);
+                isBackendConnected = false;
+                showConnectionStatus(false);
+                showToast('Backend is not responding. Please try again later.', 'error');
+                
+                // Show error states in all sections
+                showErrorInAllSections();
+            }
+        }
+
+        function showConnectionStatus(online) {
+            const statusEl = document.getElementById('connection-status');
+            if (online) {
+                statusEl.classList.add('online');
+                statusEl.innerHTML = '<i class="fas fa-wifi"></i><span>Backend connected</span>';
+                statusEl.classList.add('show');
+                setTimeout(() => statusEl.classList.remove('show'), 3000);
+            } else {
+                statusEl.classList.remove('online');
+                statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Backend disconnected</span>';
+                statusEl.classList.add('show');
+            }
+        }
+
+        function showErrorInAllSections() {
+            const errorHtml = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>Failed to connect to backend</p>
+                    <button class="btn btn-small" onclick="checkBackendConnection()" style="margin-top: 15px;">
+                        <i class="fas fa-sync"></i> Retry
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('recent-trades-list').innerHTML = errorHtml;
+            document.getElementById('trading-stats').innerHTML = errorHtml;
+            document.getElementById('trade-history-list').innerHTML = errorHtml;
+            document.getElementById('analysis-history-list').innerHTML = errorHtml;
+            document.getElementById('courses-grid').innerHTML = errorHtml;
+            document.getElementById('webinars-list').innerHTML = errorHtml;
+            document.getElementById('blog-grid').innerHTML = errorHtml;
+        }
 
         // ==========================================
         // NOTIFICATIONS
@@ -1600,33 +1717,37 @@
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
             document.getElementById(`${sectionName}-section`)?.classList.add('active');
             
-            // Load section data
-            switch(sectionName) {
-                case 'overview':
-                    loadDashboardData();
-                    break;
-                case 'journal':
-                    loadTrades();
-                    break;
-                case 'analysis':
-                    loadAnalysisHistory();
-                    break;
-                case 'mentor':
-                    // Chat loads automatically
-                    break;
-                case 'courses':
-                    loadCourses();
-                    break;
-                case 'webinars':
-                    loadWebinars();
-                    break;
-                case 'blog':
-                    loadBlog();
-                    break;
+            // Load section data if backend is connected
+            if (isBackendConnected) {
+                switch(sectionName) {
+                    case 'overview':
+                        loadDashboardData();
+                        break;
+                    case 'journal':
+                        loadTrades();
+                        break;
+                    case 'analysis':
+                        loadAnalysisHistory();
+                        break;
+                    case 'mentor':
+                        // Chat loads automatically
+                        break;
+                    case 'courses':
+                        loadCourses();
+                        break;
+                    case 'webinars':
+                        loadWebinars();
+                        break;
+                    case 'blog':
+                        loadBlog();
+                        break;
+                }
             }
         }
 
         async function loadDashboardData() {
+            if (!isBackendConnected) return;
+            
             await Promise.all([
                 loadStats(),
                 loadRecentTrades()
@@ -1639,6 +1760,9 @@
         async function loadStats() {
             try {
                 const response = await fetch(`${API_URL}/trades/stats?period=all`);
+                
+                if (!response.ok) throw new Error('Failed to load stats');
+                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1665,6 +1789,9 @@
         async function loadRecentTrades() {
             try {
                 const response = await fetch(`${API_URL}/trades?per_page=5`);
+                
+                if (!response.ok) throw new Error('Failed to load trades');
+                
                 const data = await response.json();
                 const container = document.getElementById('recent-trades-list');
                 
@@ -1702,6 +1829,9 @@
             await loadRecentTrades();
             try {
                 const response = await fetch(`${API_URL}/trades?per_page=50`);
+                
+                if (!response.ok) throw new Error('Failed to load trades');
+                
                 const data = await response.json();
                 const container = document.getElementById('trade-history-list');
                 
@@ -1953,6 +2083,9 @@
         async function loadAnalysisHistory() {
             try {
                 const response = await fetch(`${API_URL}/analyze/history?per_page=10`);
+                
+                if (!response.ok) throw new Error('Failed to load history');
+                
                 const data = await response.json();
                 const container = document.getElementById('analysis-history-list');
                 
@@ -2089,6 +2222,9 @@
             
             try {
                 const response = await fetch(`${API_URL}/courses`);
+                
+                if (!response.ok) throw new Error('Failed to load courses');
+                
                 const data = await response.json();
 
                 if (!data.courses?.length) {
@@ -2121,7 +2257,7 @@
                 `).join('');
                 
             } catch (error) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading courses</p></div>';
+                container.innerHTML = '<div class="error-state"><i class="fas fa-exclamation-circle"></i><p>Error loading courses</p></div>';
             }
         }
 
@@ -2145,6 +2281,9 @@
             
             try {
                 const response = await fetch(`${API_URL}/webinars?upcoming=true`);
+                
+                if (!response.ok) throw new Error('Failed to load webinars');
+                
                 const data = await response.json();
 
                 if (!data.webinars?.length) {
@@ -2177,7 +2316,7 @@
                 }).join('');
                 
             } catch (error) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading webinars</p></div>';
+                container.innerHTML = '<div class="error-state"><i class="fas fa-exclamation-circle"></i><p>Error loading webinars</p></div>';
             }
         }
 
@@ -2201,6 +2340,9 @@
             
             try {
                 const response = await fetch(`${API_URL}/blog/posts`);
+                
+                if (!response.ok) throw new Error('Failed to load articles');
+                
                 const data = await response.json();
 
                 if (!data.posts?.length) {
@@ -2232,16 +2374,17 @@
                 `).join('');
                 
             } catch (error) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading articles</p></div>';
+                container.innerHTML = '<div class="error-state"><i class="fas fa-exclamation-circle"></i><p>Error loading articles</p></div>';
             }
         }
 
         async function openBlogPost(slug) {
             try {
                 const response = await fetch(`${API_URL}/blog/posts/${slug}`);
-                const data = await response.json();
                 
-                if (!data.success) throw new Error('Failed to load post');
+                if (!response.ok) throw new Error('Failed to load post');
+                
+                const data = await response.json();
                 
                 const modal = document.getElementById('blog-modal');
                 const content = document.getElementById('modal-content-area');

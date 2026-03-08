@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <meta name="description" content="Pipways - Professional AI-powered forex trading signals">
+    <meta name="description" content="Pipways - Professional AI-powered forex trading signals, analysis, and mentorship platform">
+    <meta property="og:title" content="Pipways - AI Trading Signals & Analysis">
+    <meta property="og:description" content="Professional forex trading signals with AI-powered chart analysis">
+    
     <title>Pipways - AI Trading Platform</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -24,18 +29,9 @@
             --text-primary: #f9fafb;
             --text-secondary: #9ca3af;
             --border: #374151;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.5);
             --radius: 12px;
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        [data-theme="light"] {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f3f4f6;
-            --bg-card: #ffffff;
-            --bg-hover: #e5e7eb;
-            --text-primary: #111827;
-            --text-secondary: #6b7280;
-            --border: #e5e7eb;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -49,21 +45,18 @@
         }
 
         .hidden { display: none !important; }
-
+        
         /* Auth Wall */
         .auth-wall {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1f2e 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 9999;
             padding: 20px;
-            overflow-y: auto;
         }
 
         .auth-container {
@@ -73,12 +66,7 @@
             border-radius: var(--radius);
             padding: 40px;
             border: 1px solid var(--border);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .auth-header {
-            text-align: center;
-            margin-bottom: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         }
 
         .auth-logo {
@@ -87,25 +75,12 @@
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            text-align: center;
             margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.9rem; }
         .form-input {
             width: 100%;
             padding: 12px 16px;
@@ -114,88 +89,37 @@
             border-radius: var(--radius);
             color: var(--text-primary);
             font-size: 1rem;
-            font-family: inherit;
-            transition: var(--transition);
         }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
-        }
+        .form-input:focus { outline: none; border-color: var(--primary); }
 
         .btn {
             width: 100%;
             padding: 12px 24px;
             border-radius: var(--radius);
             font-weight: 600;
-            font-size: 1rem;
             cursor: pointer;
-            transition: var(--transition);
             border: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
+            transition: var(--transition);
         }
-
         .btn-primary {
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: #000;
         }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(0, 212, 255, 0.3);
-        }
-
         .btn-secondary {
             background: transparent;
             color: var(--primary);
             border: 1px solid var(--primary);
             margin-top: 12px;
         }
-
-        .btn-danger {
-            background: var(--danger);
+        .btn-telegram {
+            background: #0088cc;
             color: white;
         }
-
-        .btn-sm {
-            padding: 8px 16px;
-            font-size: 0.875rem;
-            width: auto;
-        }
-
-        .btn-loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid transparent;
-            border-top-color: currentColor;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .auth-switch {
-            text-align: center;
-            margin-top: 24px;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .auth-switch a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
-            cursor: pointer;
-        }
+        .btn-loading { opacity: 0.7; pointer-events: none; }
 
         .error-message {
             color: var(--danger);
@@ -203,10 +127,7 @@
             margin-bottom: 16px;
             display: none;
         }
-
-        .error-message.visible {
-            display: block;
-        }
+        .error-message.visible { display: block; }
 
         .password-strength {
             height: 4px;
@@ -215,15 +136,13 @@
             margin-top: 8px;
             overflow: hidden;
         }
-
         .password-strength-bar {
             height: 100%;
             transition: all 0.3s;
             width: 0;
         }
-
         .strength-weak { width: 33%; background: var(--danger); }
-        .strength-medium { width: 66%; background: var(--warning); }
+        .strength-medium { width: 66%; background: var(--accent); }
         .strength-strong { width: 100%; background: var(--success); }
 
         /* Main App */
@@ -239,9 +158,8 @@
             top: 0;
             width: 100%;
             z-index: 1000;
-            padding: 0 20px;
+            padding: 0 24px;
         }
-
         .nav-container {
             display: flex;
             justify-content: space-between;
@@ -250,7 +168,6 @@
             max-width: 1400px;
             margin: 0 auto;
         }
-
         .logo {
             font-size: 1.5rem;
             font-weight: 700;
@@ -262,13 +179,11 @@
             align-items: center;
             gap: 8px;
         }
-
         .nav-links {
             display: flex;
             gap: 32px;
             align-items: center;
         }
-
         .nav-link {
             color: var(--text-secondary);
             text-decoration: none;
@@ -281,34 +196,12 @@
             font-family: inherit;
             padding: 8px 0;
         }
-
-        .nav-link:hover, .nav-link.active {
-            color: var(--primary);
-        }
-
+        .nav-link:hover, .nav-link.active { color: var(--primary); }
+        
         .nav-actions {
             display: flex;
-            align-items: center;
             gap: 16px;
-        }
-
-        .theme-toggle {
-            background: var(--bg-hover);
-            border: none;
-            color: var(--text-secondary);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
             align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-
-        .theme-toggle:hover {
-            color: var(--primary);
-            transform: rotate(20deg);
         }
 
         .user-badge {
@@ -321,80 +214,98 @@
             gap: 6px;
         }
 
-        .logout-btn {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-weight: 600;
+        /* Hero Carousel */
+        .hero-section {
+            margin-top: 64px;
+            position: relative;
+            height: 500px;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(124,58,237,0.1) 100%);
         }
-
-        /* Mobile Menu */
-        .mobile-toggle {
-            display: none;
-            flex-direction: column;
-            gap: 4px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
+        
+        .carousel-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
         }
-
-        .mobile-toggle span {
-            width: 24px;
-            height: 2px;
-            background: var(--text-primary);
-            border-radius: 2px;
-            transition: var(--transition);
-        }
-
-        .mobile-menu {
-            position: fixed;
-            top: 64px;
+        
+        .carousel-slide {
+            position: absolute;
+            top: 0;
             left: 0;
             width: 100%;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 20px;
-            display: none;
-            z-index: 999;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
         }
-
-        .mobile-menu.active {
-            display: block;
+        
+        .carousel-slide.active {
+            opacity: 1;
         }
-
-        .mobile-nav-link {
-            display: block;
-            padding: 12px;
-            color: var(--text-primary);
-            text-decoration: none;
-            border-radius: var(--radius);
-            margin-bottom: 8px;
+        
+        .carousel-content {
+            text-align: center;
+            max-width: 800px;
         }
-
-        .mobile-nav-link:hover {
-            background: var(--bg-hover);
-            color: var(--primary);
+        
+        .carousel-title {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--text-primary), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .carousel-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+        
+        .carousel-dots {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+        
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .dot.active {
+            background: var(--primary);
+            width: 30px;
+            border-radius: 5px;
         }
 
         /* Main Content */
         .main-content {
-            margin-top: 64px;
-            padding: 24px;
             max-width: 1400px;
-            margin-left: auto;
-            margin-right: auto;
+            margin: 0 auto;
+            padding: 24px;
         }
 
-        .section { display: none; }
-        .section.active { 
-            display: block; 
-            animation: fadeIn 0.4s ease; 
+        .section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+            padding: 40px 0;
         }
-
+        
+        .section.active { display: block; }
+        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -404,20 +315,18 @@
             margin-bottom: 32px;
             text-align: center;
         }
-
+        
         .section-title {
             font-size: 2.5rem;
             font-weight: 700;
             margin-bottom: 8px;
-            background: linear-gradient(135deg, var(--text-primary), var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
         }
 
+        /* Grid Systems */
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 24px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         }
 
         .card {
@@ -427,40 +336,32 @@
             padding: 24px;
             transition: var(--transition);
         }
-
+        
         .card:hover {
             transform: translateY(-5px);
             border-color: var(--primary);
             box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
         }
 
-        .skeleton {
-            background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            height: 200px;
-            border-radius: var(--radius);
-        }
-
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
         /* Signal Cards */
+        .signal-card {
+            position: relative;
+            overflow: hidden;
+        }
+        
         .signal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
         }
-
+        
         .signal-pair {
             font-size: 1.5rem;
             font-weight: 700;
-            font-family: 'Courier New', monospace;
+            font-family: 'JetBrains Mono', monospace;
         }
-
+        
         .signal-direction {
             padding: 4px 12px;
             border-radius: 20px;
@@ -468,10 +369,10 @@
             text-transform: uppercase;
             font-size: 0.875rem;
         }
-
+        
         .buy { background: rgba(16, 185, 129, 0.2); color: var(--success); }
         .sell { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
-
+        
         .signal-metrics {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -480,35 +381,101 @@
             padding-top: 16px;
             border-top: 1px solid var(--border);
         }
-
+        
         .metric-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
-        .metric-value { font-family: 'Courier New', monospace; font-weight: 600; font-size: 1.1rem; }
+        .metric-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+        
+        .premium-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--accent);
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
 
-        .signal-status {
-            display: inline-block;
+        /* Telegram Integration Section */
+        .telegram-section {
+            background: linear-gradient(135deg, rgba(0,136,204,0.1) 0%, rgba(0,212,255,0.1) 100%);
+            border: 1px solid rgba(0,136,204,0.3);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin: 40px 0;
+            text-align: center;
+        }
+        
+        .telegram-icon {
+            font-size: 3rem;
+            color: #0088cc;
+            margin-bottom: 16px;
+        }
+        
+        .telegram-bot-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,136,204,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 16px;
+            font-size: 0.875rem;
+        }
+        
+        .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
             background: var(--success);
-            margin-right: 6px;
             animation: pulse 2s infinite;
         }
-
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
 
-        /* Chat */
+        /* AI Analysis Upload */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            background: var(--bg-secondary);
+        }
+        
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(0,212,255,0.05);
+        }
+        
+        .upload-icon { font-size: 3rem; color: var(--primary); margin-bottom: 16px; }
+        
+        .analysis-result {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary);
+            padding: 24px;
+            margin-top: 24px;
+            border-radius: 0 var(--radius) var(--radius) 0;
+            white-space: pre-wrap;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Chat Interface */
         .chat-container {
             background: var(--bg-card);
             border-radius: var(--radius);
-            border: 1px solid var(--border);
             height: 600px;
             display: flex;
             flex-direction: column;
+            border: 1px solid var(--border);
         }
-
+        
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -517,26 +484,26 @@
             flex-direction: column;
             gap: 16px;
         }
-
+        
         .chat-message {
             max-width: 80%;
             padding: 12px 16px;
             border-radius: 12px;
             line-height: 1.5;
         }
-
+        
         .chat-message.user {
             align-self: flex-end;
             background: var(--primary);
             color: #000;
         }
-
+        
         .chat-message.assistant {
             align-self: flex-start;
             background: var(--bg-hover);
             border: 1px solid var(--border);
         }
-
+        
         .chat-input-container {
             padding: 16px;
             border-top: 1px solid var(--border);
@@ -544,7 +511,7 @@
             gap: 12px;
             background: var(--bg-secondary);
         }
-
+        
         .chat-input {
             flex: 1;
             padding: 12px;
@@ -557,13 +524,13 @@
         }
 
         /* Admin Dashboard */
-        .admin-stats {
+        .admin-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 24px;
             margin-bottom: 32px;
         }
-
+        
         .stat-card {
             background: var(--bg-card);
             border-radius: var(--radius);
@@ -571,41 +538,41 @@
             text-align: center;
             border: 1px solid var(--border);
         }
-
+        
         .stat-value {
             font-size: 2.5rem;
             font-weight: 700;
             color: var(--primary);
             margin: 8px 0;
         }
+        
+        .stat-label { color: var(--text-secondary); }
 
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* Upload Zone */
-        .upload-zone {
-            border: 2px dashed var(--border);
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            background: var(--bg-card);
             border-radius: var(--radius);
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
+            border: 1px solid var(--border);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
             background: var(--bg-secondary);
-        }
-
-        .upload-zone:hover {
-            border-color: var(--primary);
-            background: rgba(0, 212, 255, 0.05);
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--primary);
-            margin-bottom: 16px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
         }
 
         /* Toast Notifications */
@@ -618,7 +585,7 @@
             flex-direction: column;
             gap: 8px;
         }
-
+        
         .toast {
             background: var(--bg-card);
             border-left: 4px solid var(--success);
@@ -627,43 +594,50 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             animation: slideIn 0.3s;
             min-width: 300px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        }
+        
+        .toast.error { border-left-color: var(--danger); }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
         }
 
-        .toast.error { border-left-color: var(--danger); }
-        .toast.warning { border-left-color: var(--warning); }
-
-        @keyframes slideIn {
-            from { transform: translateX(400px); }
-            to { transform: translateX(0); }
+        /* Skeleton Loaders */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius);
+            height: 200px;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
 
         /* Responsive */
         @media (max-width: 768px) {
             .nav-links { display: none; }
-            .mobile-toggle { display: flex; }
+            .carousel-title { font-size: 2rem; }
             .section-title { font-size: 1.75rem; }
             .grid { grid-template-columns: 1fr; }
-            .auth-container { padding: 24px; }
-            .chat-container { height: 400px; }
+            .hero-section { height: 400px; }
         }
     </style>
-<base target="_blank">
 </head>
 <body>
 
     <!-- AUTH WALL -->
     <div id="auth-wall" class="auth-wall">
         <div class="auth-container">
-            <div class="auth-header">
-                <div class="auth-logo">
-                    <i class="fas fa-chart-line"></i>
-                    Pipways
-                </div>
-                <p style="color: var(--text-secondary);">Professional AI Trading Platform</p>
+            <div class="auth-logo">
+                <i class="fas fa-chart-line"></i> Pipways
             </div>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">
+                Professional AI Trading Platform
+            </p>
 
             <!-- Login Form -->
             <form id="login-form" onsubmit="handleLogin(event)">
@@ -679,11 +653,9 @@
                 <button type="submit" class="btn btn-primary" id="login-btn">
                     <span>Login</span>
                 </button>
-                <div style="text-align: center; margin-top: 16px;">
-                    <a onclick="switchAuthMode('forgot')" style="color: var(--primary); cursor: pointer; font-size: 0.9rem;">Forgot password?</a>
-                </div>
-                <div class="auth-switch">
-                    Don't have an account? <a onclick="switchAuthMode('register')">Register</a>
+                <div style="text-align: center; margin-top: 16px; color: var(--text-secondary); font-size: 0.9rem;">
+                    Don't have an account? 
+                    <a onclick="switchAuthMode('register')" style="color: var(--primary); cursor: pointer; font-weight: 600;">Register</a>
                 </div>
             </form>
 
@@ -691,46 +663,29 @@
             <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
                 <div class="form-group">
                     <label class="form-label">Full Name</label>
-                    <input type="text" name="full_name" class="form-input" required placeholder="John Doe">
+                    <input type="text" name="full_name" class="form-input" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-input" required placeholder="john@example.com">
+                    <input type="email" name="email" class="form-input" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Password</label>
-                    <input type="password" name="password" class="form-input" required id="reg-password" oninput="checkPasswordStrength(this.value)" placeholder="Min 8 chars">
+                    <input type="password" name="password" class="form-input" required id="reg-password" oninput="checkPasswordStrength(this.value)">
                     <div class="password-strength">
                         <div class="password-strength-bar" id="strength-bar"></div>
                     </div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                        Uppercase, lowercase, number, special char (@$!%*?&)
+                        Min 8 chars: uppercase, lowercase, number, special char (@$!%*?&)
                     </p>
                 </div>
                 <div class="error-message" id="register-error"></div>
                 <button type="submit" class="btn btn-primary" id="register-btn">
                     <span>Create Account</span>
                 </button>
-                <div class="auth-switch">
-                    Already have an account? <a onclick="switchAuthMode('login')">Login</a>
-                </div>
-            </form>
-
-            <!-- Forgot Password Form -->
-            <form id="forgot-form" class="hidden" onsubmit="handleForgotPassword(event)">
-                <p style="margin-bottom: 16px; color: var(--text-secondary);">
-                    Enter your email to receive a password reset link.
-                </p>
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-input" required>
-                </div>
-                <div class="error-message" id="forgot-error"></div>
-                <button type="submit" class="btn btn-primary" id="forgot-btn">
-                    <span>Send Reset Link</span>
-                </button>
-                <div class="auth-switch">
-                    <a onclick="switchAuthMode('login')">Back to Login</a>
+                <div style="text-align: center; margin-top: 16px; color: var(--text-secondary); font-size: 0.9rem;">
+                    Already have an account? 
+                    <a onclick="switchAuthMode('login')" style="color: var(--primary); cursor: pointer; font-weight: 600;">Login</a>
                 </div>
             </form>
         </div>
@@ -738,16 +693,16 @@
 
     <!-- MAIN APP -->
     <div class="main-app" id="main-app">
+        
         <!-- Navigation -->
         <nav class="navbar">
             <div class="nav-container">
-                <div class="logo" onclick="showSection('signals')">
-                    <i class="fas fa-chart-line"></i>
-                    Pipways
+                <div class="logo" onclick="showSection('home')">
+                    <i class="fas fa-chart-line"></i> Pipways
                 </div>
                 
                 <div class="nav-links">
-                    <button class="nav-link active" onclick="showSection('signals')">Signals</button>
+                    <button class="nav-link active" onclick="showSection('home')">Signals</button>
                     <button class="nav-link" onclick="showSection('analysis')">AI Analysis</button>
                     <button class="nav-link" onclick="showSection('mentor')">Mentor</button>
                     <button class="nav-link" onclick="showSection('learn')">Learn</button>
@@ -755,88 +710,162 @@
                 </div>
 
                 <div class="nav-actions">
-                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-                        <i class="fas fa-sun" id="theme-icon"></i>
+                    <button class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="connectTelegram()">
+                        <i class="fab fa-telegram"></i> Connect
                     </button>
                     <div class="user-badge">
                         <i class="fas fa-user"></i>
                         <span id="username">User</span>
                     </div>
-                    <button class="logout-btn" onclick="logout()">
+                    <button class="btn btn-primary" style="width: auto; padding: 8px 16px; background: var(--danger);" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </div>
-
-                <button class="mobile-toggle" onclick="toggleMobileMenu()">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
             </div>
         </nav>
 
-        <!-- Mobile Menu -->
-        <div class="mobile-menu" id="mobile-menu">
-            <a class="mobile-nav-link" onclick="showSection('signals'); toggleMobileMenu()">Signals</a>
-            <a class="mobile-nav-link" onclick="showSection('analysis'); toggleMobileMenu()">AI Analysis</a>
-            <a class="mobile-nav-link" onclick="showSection('mentor'); toggleMobileMenu()">Mentor</a>
-            <a class="mobile-nav-link" onclick="showSection('learn'); toggleMobileMenu()">Learn</a>
-            <a class="mobile-nav-link hidden" id="mobile-admin-link" onclick="showSection('admin'); toggleMobileMenu()">Admin</a>
-        </div>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            
-            <!-- Signals Section -->
-            <section id="signals" class="section active">
-                <div class="section-header">
-                    <h1 class="section-title">Trading Signals</h1>
-                    <p style="color: var(--text-secondary);">Real-time forex and crypto trading signals</p>
+        <!-- HOME SECTION (with Carousel) -->
+        <section id="home" class="section active">
+            <!-- Hero Carousel -->
+            <div class="hero-section">
+                <div class="carousel-container" id="carousel">
+                    <div class="carousel-slide active">
+                        <div class="carousel-content">
+                            <h1 class="carousel-title">AI-Powered Trading Signals</h1>
+                            <p class="carousel-subtitle">Get real-time forex and crypto signals with 85%+ accuracy</p>
+                            <button class="btn btn-primary" style="width: auto; padding: 16px 32px;" onclick="showSection('analysis')">
+                                <i class="fas fa-robot"></i> Try AI Analysis
+                            </button>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="carousel-content">
+                            <h1 class="carousel-title">Expert Mentorship 24/7</h1>
+                            <p class="carousel-subtitle">Learn from professional traders and AI mentors</p>
+                            <button class="btn btn-primary" style="width: auto; padding: 16px 32px;" onclick="showSection('mentor')">
+                                <i class="fas fa-user-tie"></i> Start Learning
+                            </button>
+                        </div>
+                    </div>
+                    <div class="carousel-slide">
+                        <div class="carousel-content">
+                            <h1 class="carousel-title">Premium Webinars & Courses</h1>
+                            <p class="carousel-subtitle">Access exclusive trading education content</p>
+                            <button class="btn btn-primary" style="width: auto; padding: 16px 32px;" onclick="showSection('learn')">
+                                <i class="fas fa-graduation-cap"></i> Browse Courses
+                            </button>
+                        </div>
+                    </div>
                 </div>
+                <div class="carousel-dots">
+                    <span class="dot active" onclick="currentSlide(1)"></span>
+                    <span class="dot" onclick="currentSlide(2)"></span>
+                    <span class="dot" onclick="currentSlide(3)"></span>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <!-- Telegram Integration Banner -->
+                <div class="telegram-section">
+                    <i class="fab fa-telegram telegram-icon"></i>
+                    <h2>Get Signals on Telegram</h2>
+                    <p style="color: var(--text-secondary); margin: 12px 0;">
+                        Receive instant notifications for new trading signals directly on your Telegram
+                    </p>
+                    <button class="btn btn-telegram" style="width: auto; margin-top: 16px;" onclick="connectTelegram()">
+                        <i class="fab fa-telegram"></i> Connect Telegram Bot
+                    </button>
+                    <div class="telegram-bot-status" id="telegram-status">
+                        <span class="status-dot"></span>
+                        <span>Bot Active - @PipwaysBot</span>
+                    </div>
+                </div>
+
+                <!-- Signals Grid -->
+                <div class="section-header">
+                    <h2 class="section-title">Live Trading Signals</h2>
+                    <p style="color: var(--text-secondary);">Real-time market opportunities</p>
+                </div>
+                
                 <div id="signals-list" class="grid">
                     <div class="skeleton"></div>
                     <div class="skeleton"></div>
                     <div class="skeleton"></div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- AI Analysis Section -->
-            <section id="analysis" class="section">
+        <!-- AI Analysis Section -->
+        <section id="analysis" class="section">
+            <div class="main-content">
                 <div class="section-header">
                     <h1 class="section-title">AI Chart Analysis</h1>
-                    <p style="color: var(--text-secondary);">Upload your charts for instant AI-powered analysis</p>
+                    <p style="color: var(--text-secondary);">Upload your charts for instant technical analysis</p>
                 </div>
-                
-                <div class="grid grid-1" style="max-width: 800px; margin: 0 auto;">
-                    <div class="card">
+
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 40px;">
+                    <div>
                         <div class="upload-zone" onclick="document.getElementById('chart-upload').click()">
                             <div class="upload-icon">
                                 <i class="fas fa-cloud-upload-alt"></i>
                             </div>
                             <h3>Upload Chart Image</h3>
-                            <p style="color: var(--text-secondary); margin-top: 8px;">Click to select or drag and drop</p>
-                            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 4px;">PNG, JPG up to 10MB</p>
-                            <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="analyzeChart()">
+                            <p style="color: var(--text-secondary); margin-top: 8px;">
+                                Click to select or drag and drop<br>
+                                <small>PNG, JPG up to 10MB</small>
+                            </p>
+                            <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="analyzeChart(event)">
                         </div>
                         
-                        <div id="analysis-result" style="margin-top: 24px; display: none;">
-                            <h3 style="color: var(--primary); margin-bottom: 12px;">
-                                <i class="fas fa-robot"></i> AI Analysis
-                            </h3>
-                            <div style="background: var(--bg-secondary); padding: 20px; border-radius: var(--radius); white-space: pre-wrap; font-family: 'Courier New', monospace; line-height: 1.8; border-left: 4px solid var(--primary);">
+                        <div style="margin-top: 24px;">
+                            <div class="form-group">
+                                <label class="form-label">Currency Pair</label>
+                                <select id="analysis-pair" class="form-input">
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="XAUUSD">XAU/USD (Gold)</option>
+                                    <option value="BTCUSD">BTC/USD</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Timeframe</label>
+                                <select id="analysis-timeframe" class="form-input">
+                                    <option value="1H">1 Hour</option>
+                                    <option value="4H">4 Hours</option>
+                                    <option value="D1">Daily</option>
+                                </select>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
 
-            <!-- Mentor Section -->
-            <section id="mentor" class="section">
+                    <div>
+                        <div id="analysis-placeholder" style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
+                            <i class="fas fa-chart-area" style="font-size: 4rem; opacity: 0.3; margin-bottom: 16px;"></i>
+                            <p>Upload a chart to get AI-powered analysis</p>
+                        </div>
+                        <div id="analysis-result-container" class="hidden">
+                            <h3 style="color: var(--primary); margin-bottom: 16px;">
+                                <i class="fas fa-robot"></i> AI Analysis Result
+                            </h3>
+                            <div id="analysis-content" class="analysis-result"></div>
+                            <button class="btn btn-secondary" style="margin-top: 16px;" onclick="saveAnalysis()">
+                                <i class="fas fa-save"></i> Save Analysis
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mentor Section -->
+        <section id="mentor" class="section">
+            <div class="main-content">
                 <div class="section-header">
                     <h1 class="section-title">AI Trading Mentor</h1>
-                    <p style="color: var(--text-secondary);">Get personalized trading advice and mentorship</p>
+                    <p style="color: var(--text-secondary);">Get personalized trading advice 24/7</p>
                 </div>
-                
+
                 <div class="chat-container">
                     <div class="chat-messages" id="chat-messages">
                         <div class="chat-message assistant">
@@ -846,161 +875,175 @@
                             • Risk management strategies<br>
                             • Trade psychology<br>
                             • Market structure analysis<br><br>
-                            What would you like to discuss?
+                            What would you like to discuss today?
                         </div>
                     </div>
-                    
                     <div class="chat-input-container">
-                        <input type="text" id="chat-input" class="chat-input" placeholder="Type your question..." onkeypress="if(event.key==='Enter') sendMessage()">
-                        <button class="btn btn-primary" onclick="sendMessage()" style="width: auto; border-radius: 50%; width: 44px; height: 44px; padding: 0;">
+                        <input type="text" id="chat-input" class="chat-input" placeholder="Ask your question..." onkeypress="if(event.key==='Enter') sendMessage()">
+                        <button class="btn btn-primary" style="width: auto;" onclick="sendMessage()">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
                 </div>
-                
-                <div style="text-align: center; margin-top: 16px;">
-                    <button class="btn btn-secondary btn-sm" onclick="clearChat()">
-                        <i class="fas fa-trash"></i> Clear Chat
-                    </button>
-                </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- Learn Section -->
-            <section id="learn" class="section">
+        <!-- Learn Section -->
+        <section id="learn" class="section">
+            <div class="main-content">
                 <div class="section-header">
                     <h1 class="section-title">Trading Education</h1>
-                    <p style="color: var(--text-secondary);">Courses, webinars, and resources to improve your trading</p>
-                </div>
-                
-                <div style="display: flex; gap: 12px; margin-bottom: 24px; justify-content: center;">
-                    <button class="btn btn-primary btn-sm" onclick="switchLearnTab('courses')" id="tab-courses" style="width: auto;">Courses</button>
-                    <button class="btn btn-secondary btn-sm" onclick="switchLearnTab('webinars')" id="tab-webinars" style="width: auto;">Webinars</button>
+                    <p style="color: var(--text-secondary);">Courses, webinars, and resources</p>
                 </div>
 
-                <div id="learn-courses" class="grid">
-                    <div class="skeleton"></div>
-                    <div class="skeleton"></div>
+                <div style="display: flex; gap: 16px; margin-bottom: 32px; justify-content: center;">
+                    <button class="btn btn-primary" style="width: auto;" onclick="switchLearnTab('courses')">Courses</button>
+                    <button class="btn btn-secondary" style="width: auto;" onclick="switchLearnTab('webinars')">Webinars</button>
+                    <button class="btn btn-secondary" style="width: auto;" onclick="switchLearnTab('blog')">Blog</button>
                 </div>
 
-                <div id="learn-webinars" class="grid hidden">
-                    <div class="skeleton"></div>
+                <div id="learn-courses" class="learn-tab">
+                    <div id="courses-list" class="grid">
+                        <div class="skeleton"></div>
+                        <div class="skeleton"></div>
+                    </div>
                 </div>
-            </section>
 
-            <!-- Admin Section -->
-            <section id="admin" class="section">
+                <div id="learn-webinars" class="learn-tab hidden">
+                    <div id="webinars-list" class="grid"></div>
+                </div>
+
+                <div id="learn-blog" class="learn-tab hidden">
+                    <div id="blog-list" class="grid"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Section -->
+        <section id="admin" class="section">
+            <div class="main-content">
                 <div class="section-header">
                     <h1 class="section-title">Admin Dashboard</h1>
-                    <p style="color: var(--text-secondary);">Manage users, signals, and content</p>
                 </div>
 
-                <!-- Stats -->
-                <div class="admin-stats" id="admin-stats">
+                <div class="admin-grid" id="admin-stats">
                     <div class="stat-card">
+                        <i class="fas fa-users" style="font-size: 2rem; color: var(--primary);"></i>
                         <div class="stat-value" id="stat-users">-</div>
                         <div class="stat-label">Total Users</div>
                     </div>
                     <div class="stat-card">
+                        <i class="fas fa-signal" style="font-size: 2rem; color: var(--success);"></i>
                         <div class="stat-value" id="stat-signals">-</div>
                         <div class="stat-label">Active Signals</div>
                     </div>
                     <div class="stat-card">
+                        <i class="fas fa-crown" style="font-size: 2rem; color: var(--accent);"></i>
                         <div class="stat-value" id="stat-premium">-</div>
                         <div class="stat-label">Premium Users</div>
                     </div>
                 </div>
 
-                <!-- Create Signal -->
                 <div class="card" style="margin-bottom: 32px;">
-                    <h3 style="margin-bottom: 20px;"><i class="fas fa-plus-circle"></i> Create New Signal</h3>
-                    <form id="create-signal-form" onsubmit="createSignal(event)">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                            <div class="form-group">
-                                <label class="form-label">Currency Pair</label>
-                                <input type="text" name="pair" class="form-input" placeholder="EURUSD" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Direction</label>
-                                <select name="direction" class="form-input">
-                                    <option value="buy">Buy</option>
-                                    <option value="sell">Sell</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Entry Price</label>
-                                <input type="number" name="entry_price" class="form-input" step="0.00001" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Stop Loss</label>
-                                <input type="number" name="stop_loss" class="form-input" step="0.00001">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Take Profit</label>
-                                <input type="number" name="take_profit" class="form-input" step="0.00001">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Type</label>
-                                <select name="is_premium" class="form-input">
-                                    <option value="false">Free</option>
-                                    <option value="true">Premium</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group" style="margin-top: 16px;">
-                            <label class="form-label">Analysis</label>
-                            <textarea name="analysis" class="form-input" rows="3" placeholder="Technical analysis..."></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="width: auto; margin-top: 16px;">
+                    <h3 style="margin-bottom: 24px;"><i class="fas fa-plus-circle"></i> Create New Signal</h3>
+                    <form onsubmit="createSignal(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <input type="text" name="pair" placeholder="Pair (EURUSD)" class="form-input" required>
+                        <select name="direction" class="form-input">
+                            <option value="buy">Buy</option>
+                            <option value="sell">Sell</option>
+                        </select>
+                        <input type="number" name="entry_price" placeholder="Entry Price" class="form-input" step="0.00001" required>
+                        <input type="number" name="stop_loss" placeholder="Stop Loss" class="form-input" step="0.00001">
+                        <input type="number" name="take_profit" placeholder="Take Profit" class="form-input" step="0.00001">
+                        <select name="is_premium" class="form-input">
+                            <option value="false">Free</option>
+                            <option value="true">Premium</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary" style="grid-column: 1 / -1;">
                             <i class="fas fa-paper-plane"></i> Publish Signal
                         </button>
                     </form>
                 </div>
-            </section>
 
-        </main>
+                <div class="card">
+                    <h3 style="margin-bottom: 24px;"><i class="fas fa-users-cog"></i> User Management</h3>
+                    <div class="table-container">
+                        <table id="users-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Role</th>
+                                    <th>Subscription</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </div>
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
     <script>
-        // Configuration
         const API_URL = 'https://pipways-api-nhem.onrender.com';
         let authToken = localStorage.getItem('access_token');
         let currentUser = null;
-        let currentSection = 'signals';
+        let slideIndex = 0;
+        let carouselInterval;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            initTheme();
             if (authToken) {
                 validateToken();
             } else {
                 showAuthWall();
             }
+            initCarousel();
         });
 
-        // Theme Management
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
+        // Carousel Functions
+        function initCarousel() {
+            showSlides(slideIndex);
+            carouselInterval = setInterval(() => {
+                slideIndex++;
+                showSlides(slideIndex);
+            }, 5000);
         }
 
-        function toggleTheme() {
-            const current = document.documentElement.getAttribute('data-theme');
-            const next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-            updateThemeIcon(next);
+        function currentSlide(n) {
+            clearInterval(carouselInterval);
+            slideIndex = n - 1;
+            showSlides(slideIndex);
+            carouselInterval = setInterval(() => {
+                slideIndex++;
+                showSlides(slideIndex);
+            }, 5000);
         }
 
-        function updateThemeIcon(theme) {
-            const icon = document.getElementById('theme-icon');
-            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        function showSlides(n) {
+            let slides = document.getElementsByClassName("carousel-slide");
+            let dots = document.getElementsByClassName("dot");
+            
+            if (n >= slides.length) slideIndex = 0;
+            if (n < 0) slideIndex = slides.length - 1;
+            
+            for (let i = 0; i < slides.length; i++) {
+                slides[i].classList.remove("active");
+            }
+            for (let i = 0; i < dots.length; i++) {
+                dots[i].classList.remove("active");
+            }
+            
+            slides[slideIndex].classList.add("active");
+            dots[slideIndex].classList.add("active");
         }
 
-        // Auth Wall
+        // Auth Functions
         function showAuthWall() {
             document.getElementById('auth-wall').classList.remove('hidden');
             document.getElementById('main-app').classList.remove('visible');
@@ -1015,18 +1058,10 @@
         function switchAuthMode(mode) {
             document.getElementById('login-form').classList.add('hidden');
             document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('forgot-form').classList.add('hidden');
-            
             document.getElementById(`${mode}-form`).classList.remove('hidden');
-            
-            // Clear errors
-            document.querySelectorAll('.error-message').forEach(e => {
-                e.classList.remove('visible');
-                e.textContent = '';
-            });
+            document.querySelectorAll('.error-message').forEach(e => e.classList.remove('visible'));
         }
 
-        // Auth Functions
         async function validateToken() {
             try {
                 const response = await fetch(`${API_URL}/auth/refresh`, {
@@ -1041,11 +1076,6 @@
                     const data = await response.json();
                     authToken = data.access_token;
                     localStorage.setItem('access_token', authToken);
-                    
-                    // Decode user info
-                    const payload = JSON.parse(atob(authToken.split('.')[1]));
-                    currentUser = payload;
-                    updateUI();
                     showMainApp();
                 } else {
                     throw new Error('Invalid token');
@@ -1061,7 +1091,7 @@
             const errorDiv = document.getElementById('login-error');
             
             btn.classList.add('btn-loading');
-            btn.innerHTML = '<div class="spinner"></div>';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             errorDiv.classList.remove('visible');
             
             try {
@@ -1089,7 +1119,7 @@
                     errorDiv.classList.add('visible');
                 }
             } catch (error) {
-                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.textContent = 'Network error. Check CORS configuration.';
                 errorDiv.classList.add('visible');
             } finally {
                 btn.classList.remove('btn-loading');
@@ -1103,7 +1133,7 @@
             const errorDiv = document.getElementById('register-error');
             
             btn.classList.add('btn-loading');
-            btn.innerHTML = '<div class="spinner"></div>';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             errorDiv.classList.remove('visible');
             
             const password = e.target.password.value;
@@ -1155,27 +1185,6 @@
             }
         }
 
-        async function handleForgotPassword(e) {
-            e.preventDefault();
-            const btn = document.getElementById('forgot-btn');
-            btn.classList.add('btn-loading');
-            
-            try {
-                const response = await fetch(`${API_URL}/auth/forgot-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: e.target.email.value })
-                });
-                
-                showToast('Reset link sent to your email');
-                switchAuthMode('login');
-            } catch (error) {
-                showToast('Error sending reset link', 'error');
-            } finally {
-                btn.classList.remove('btn-loading');
-            }
-        }
-
         function checkPasswordStrength(password) {
             const bar = document.getElementById('strength-bar');
             let strength = 0;
@@ -1186,7 +1195,7 @@
             if (/[@$!%*?&]/.test(password)) strength++;
             
             bar.className = 'password-strength-bar';
-            if (strength >= 2) bar.classList.add('strength-weak');
+            if (strength >= 1) bar.classList.add('strength-weak');
             if (strength >= 3) bar.classList.add('strength-medium');
             if (strength >= 4) bar.classList.add('strength-strong');
         }
@@ -1197,8 +1206,6 @@
                 
                 if (currentUser.role === 'admin' || currentUser.role === 'moderator') {
                     document.getElementById('admin-link').classList.remove('hidden');
-                    document.getElementById('mobile-admin-link').classList.remove('hidden');
-                    loadAdminStats();
                 }
             }
         }
@@ -1212,7 +1219,7 @@
             showToast('Logged out successfully');
         }
 
-        // API Helper
+        // API Helper with CORS handling
         async function apiCall(endpoint, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -1226,7 +1233,8 @@
             try {
                 const response = await fetch(`${API_URL}${endpoint}`, {
                     ...options,
-                    headers
+                    headers,
+                    credentials: 'include'
                 });
                 
                 if (response.status === 401) {
@@ -1237,46 +1245,43 @@
                 
                 return response;
             } catch (error) {
-                console.error('API Error:', error);
+                showToast('Network error. Please check connection.', 'error');
                 return null;
             }
         }
 
         // Navigation
-        function toggleMobileMenu() {
-            document.getElementById('mobile-menu').classList.toggle('active');
-        }
-
         function showSection(sectionName) {
-            // Hide all sections
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
             
-            // Show selected section
-            const section = document.getElementById(sectionName);
-            if (section) {
-                section.classList.add('active');
-            }
-            
-            // Update nav active state
-            if (event && event.target) {
-                event.target.classList.add('active');
-            }
-            
-            currentSection = sectionName;
-            
-            // Load section data
-            if (sectionName === 'signals') loadSignals();
-            if (sectionName === 'learn') {
-                loadCourses();
-                loadWebinars();
-            }
-            if (sectionName === 'admin' && currentUser?.role === 'admin') {
-                loadAdminStats();
+            if (sectionName === 'home') {
+                document.getElementById('home').classList.add('active');
+                document.querySelector('[onclick="showSection(\'home\')"]').classList.add('active');
+                loadSignals();
+            } else {
+                document.getElementById(sectionName).classList.add('active');
+                document.querySelector(`[onclick="showSection('${sectionName}')"]`)?.classList.add('active');
+                
+                if (sectionName === 'learn') loadCourses();
+                if (sectionName === 'admin' && currentUser?.role === 'admin') loadAdminStats();
             }
         }
 
-        // Signals
+        // Telegram Integration
+        function connectTelegram() {
+            // Open Telegram bot connection
+            window.open('https://t.me/PipwaysBot?start=connect', '_blank');
+            showToast('Opening Telegram bot...');
+            
+            // In production, this would handle the webhook callback
+            setTimeout(() => {
+                document.getElementById('telegram-status').innerHTML = 
+                    '<span class="status-dot" style="background: var(--success);"></span><span>Connected</span>';
+            }, 2000);
+        }
+
+        // Load Signals
         async function loadSignals() {
             const container = document.getElementById('signals-list');
             container.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
@@ -1287,20 +1292,17 @@
             const signals = await response.json();
             
             if (signals.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 40px;">No signals available</p>';
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); grid-column: 1/-1;">No signals available</p>';
                 return;
             }
             
             container.innerHTML = signals.map(signal => `
-                <div class="card">
+                <div class="card signal-card">
+                    ${signal.is_premium ? '<div class="premium-badge">PREMIUM</div>' : ''}
                     <div class="signal-header">
-                        <div>
-                            <span class="signal-status"></span>
-                            <span class="signal-pair">${signal.pair}</span>
-                        </div>
-                        <span class="signal-direction ${signal.direction}">${signal.direction}</span>
+                        <div class="signal-pair">${signal.pair}</div>
+                        <div class="signal-direction ${signal.direction}">${signal.direction}</div>
                     </div>
-                    
                     <div class="signal-metrics">
                         <div>
                             <div class="metric-label">Entry</div>
@@ -1315,34 +1317,155 @@
                             <div class="metric-value" style="color: var(--success);">${signal.take_profit || '-'}</div>
                         </div>
                     </div>
-                    
-                    ${signal.pips_gain ? `
-                    <div style="margin-top: 12px;">
-                        <span style="color: ${signal.pips_gain >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">
-                            ${signal.pips_gain >= 0 ? '+' : ''}${signal.pips_gain} pips
-                        </span>
-                    </div>
-                    ` : ''}
-                    
                     <p style="margin-top: 12px; color: var(--text-secondary); font-size: 0.9rem;">
-                        ${signal.analysis || 'Technical setup based on price action and key levels.'}
+                        ${signal.analysis || 'Technical setup based on price action'}
                     </p>
-                    
                     <div style="margin-top: 12px; font-size: 0.75rem; color: var(--text-secondary);">
-                        <i class="fas fa-clock"></i> ${signal.timeframe} • ${new Date(signal.created_at).toLocaleDateString()}
+                        <i class="fas fa-clock"></i> ${signal.timeframe} | 
+                        <i class="fas fa-calendar"></i> ${new Date(signal.created_at).toLocaleDateString()}
                     </div>
-                    
-                    ${signal.is_premium ? '<span style="position: absolute; top: 20px; right: 20px; background: var(--accent); color: #000; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">PREMIUM</span>' : ''}
                 </div>
+            `).join('');
+        }
+
+        // AI Analysis
+        async function analyzeChart(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('pair', document.getElementById('analysis-pair').value);
+            formData.append('timeframe', document.getElementById('analysis-timeframe').value);
+            
+            showToast('Analyzing chart... Please wait');
+            
+            try {
+                const response = await fetch(`${API_URL}/analyze/chart`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('analysis-placeholder').classList.add('hidden');
+                    document.getElementById('analysis-result-container').classList.remove('hidden');
+                    document.getElementById('analysis-content').textContent = data.analysis;
+                    showToast('Analysis complete!');
+                } else {
+                    showToast('Analysis failed. Please try again.', 'error');
+                }
+            } catch (error) {
+                showToast('Network error during analysis', 'error');
+            }
+        }
+
+        function saveAnalysis() {
+            const analysis = document.getElementById('analysis-content').textContent;
+            const blob = new Blob([analysis], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `analysis-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            showToast('Analysis saved');
+        }
+
+        // Mentor Chat
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            const container = document.getElementById('chat-messages');
+            container.innerHTML += `<div class="chat-message user"><strong>You:</strong> ${message}</div>`;
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+            
+            const response = await apiCall('/mentor/chat', {
+                method: 'POST',
+                body: JSON.stringify({ message, context: 'Forex trading' })
+            });
+            
+            if (response && response.ok) {
+                const data = await response.json();
+                container.innerHTML += `<div class="chat-message assistant"><strong>AI Mentor:</strong> ${data.response}</div>`;
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // Learn Section
+        function switchLearnTab(tab) {
+            document.querySelectorAll('.learn-tab').forEach(t => t.classList.add('hidden'));
+            document.getElementById(`learn-${tab}`).classList.remove('hidden');
+        }
+
+        async function loadCourses() {
+            const container = document.getElementById('courses-list');
+            const response = await apiCall('/courses');
+            if (!response) return;
+            
+            const courses = await response.json();
+            container.innerHTML = courses.map(course => `
+                <div class="card">
+                    <h3>${course.title}</h3>
+                    <p style="color: var(--text-secondary); margin: 12px 0;">${course.description}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+                        <span style="color: ${course.is_premium ? 'var(--accent)' : 'var(--success)'};">
+                            ${course.is_premium ? '<i class="fas fa-crown"></i> Premium' : '<i class="fas fa-unlock"></i> Free'}
+                        </span>
+                        <button class="btn btn-primary" style="width: auto; padding: 8px 16px;">Start</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Admin Functions
+        async function loadAdminStats() {
+            const response = await apiCall('/admin/stats');
+            if (!response) return;
+            
+            const stats = await response.json();
+            document.getElementById('stat-users').textContent = stats.total_users;
+            document.getElementById('stat-signals').textContent = stats.active_signals;
+            document.getElementById('stat-premium').textContent = stats.premium_users;
+            
+            loadUsers();
+        }
+
+        async function loadUsers() {
+            const tbody = document.querySelector('#users-table tbody');
+            const response = await apiCall('/admin/users');
+            if (!response) return;
+            
+            const data = await response.json();
+            tbody.innerHTML = data.users.map(user => `
+                <tr>
+                    <td>
+                        <div style="font-weight: 600;">${user.full_name}</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">${user.email}</div>
+                    </td>
+                    <td>${user.role}</td>
+                    <td>
+                        <span style="color: ${user.subscription_status === 'active' ? 'var(--success)' : 'var(--danger)'};">
+                            ${user.subscription_tier}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-primary" style="width: auto; padding: 4px 8px; font-size: 0.875rem;">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
             `).join('');
         }
 
         async function createSignal(e) {
             e.preventDefault();
             const form = e.target;
-            const btn = form.querySelector('button[type="submit"]');
-            
-            btn.classList.add('btn-loading');
             
             const response = await apiCall('/signals', {
                 method: 'POST',
@@ -1353,179 +1476,15 @@
                     stop_loss: form.stop_loss.value ? parseFloat(form.stop_loss.value) : null,
                     take_profit: form.take_profit.value ? parseFloat(form.take_profit.value) : null,
                     timeframe: '1H',
-                    analysis: form.analysis.value,
                     is_premium: form.is_premium.value === 'true'
                 })
             });
             
             if (response && response.ok) {
-                showToast('Signal published successfully!');
+                showToast('Signal created successfully!');
                 form.reset();
-                loadSignals();
-            } else {
-                showToast('Failed to create signal', 'error');
+                showSection('home');
             }
-            
-            btn.classList.remove('btn-loading');
-        }
-
-        // AI Analysis
-        async function analyzeChart() {
-            const fileInput = document.getElementById('chart-upload');
-            const file = fileInput.files[0];
-            
-            if (!file) return;
-            
-            if (file.size > 10 * 1024 * 1024) {
-                showToast('File too large. Max 10MB.', 'error');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('pair', 'EURUSD');
-            
-            showToast('Analyzing chart...');
-            
-            const response = await fetch(`${API_URL}/analyze/chart`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: formData
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                const resultDiv = document.getElementById('analysis-result');
-                resultDiv.style.display = 'block';
-                resultDiv.querySelector('div').textContent = data.analysis;
-                showToast('Analysis complete!');
-            } else {
-                showToast('Analysis failed', 'error');
-            }
-        }
-
-        // Mentor Chat
-        async function sendMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            
-            if (!message) return;
-            
-            const container = document.getElementById('chat-messages');
-            
-            // Add user message
-            const userMsg = document.createElement('div');
-            userMsg.className = 'chat-message user';
-            userMsg.innerHTML = `<strong>You:</strong><br>${escapeHtml(message)}`;
-            container.appendChild(userMsg);
-            
-            input.value = '';
-            container.scrollTop = container.scrollHeight;
-            
-            const response = await apiCall('/mentor/chat', {
-                method: 'POST',
-                body: JSON.stringify({ message })
-            });
-            
-            if (response && response.ok) {
-                const data = await response.json();
-                const aiMsg = document.createElement('div');
-                aiMsg.className = 'chat-message assistant';
-                aiMsg.innerHTML = `<strong>AI Mentor:</strong><br>${escapeHtml(data.response)}`;
-                container.appendChild(aiMsg);
-                container.scrollTop = container.scrollHeight;
-            } else {
-                showToast('Failed to get response', 'error');
-            }
-        }
-
-        function clearChat() {
-            document.getElementById('chat-messages').innerHTML = `
-                <div class="chat-message assistant">
-                    <strong>AI Mentor:</strong><br>
-                    Chat cleared. How can I help you?
-                </div>
-            `;
-        }
-
-        // Learn Section
-        function switchLearnTab(tab) {
-            document.getElementById('learn-courses').classList.add('hidden');
-            document.getElementById('learn-webinars').classList.add('hidden');
-            document.getElementById(`learn-${tab}`).classList.remove('hidden');
-            
-            // Update buttons
-            document.getElementById('tab-courses').className = tab === 'courses' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
-            document.getElementById('tab-webinars').className = tab === 'webinars' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
-        }
-
-        async function loadCourses() {
-            const container = document.getElementById('learn-courses');
-            
-            const response = await apiCall('/courses');
-            if (!response) return;
-            
-            const courses = await response.json();
-            
-            if (courses.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No courses available yet</p>';
-                return;
-            }
-            
-            container.innerHTML = courses.map(course => `
-                <div class="card">
-                    <h3>${course.title}</h3>
-                    <p style="color: var(--text-secondary); margin: 12px 0;">${course.description}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-                        <span style="color: ${course.is_premium ? 'var(--accent)' : 'var(--success)'}; font-weight: 600;">
-                            ${course.is_premium ? '<i class="fas fa-crown"></i> Premium' : '<i class="fas fa-unlock"></i> Free'}
-                        </span>
-                        <button class="btn btn-primary btn-sm" style="width: auto;">Start Learning</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function loadWebinars() {
-            const container = document.getElementById('learn-webinars');
-            
-            const response = await apiCall('/webinars');
-            if (!response) return;
-            
-            const webinars = await response.json();
-            
-            if (webinars.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No upcoming webinars</p>';
-                return;
-            }
-            
-            container.innerHTML = webinars.map(webinar => `
-                <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
-                        <h3>${webinar.title}</h3>
-                        ${webinar.is_premium ? '<span style="background: var(--accent); color: #000; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">PREMIUM</span>' : ''}
-                    </div>
-                    <p style="color: var(--text-secondary); margin-bottom: 16px;">${webinar.description}</p>
-                    <div style="display: flex; align-items: center; gap: 16px; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-                        <span><i class="fas fa-calendar"></i> ${new Date(webinar.scheduled_at).toLocaleString()}</span>
-                        <span><i class="fas fa-clock"></i> ${webinar.duration_minutes} min</span>
-                    </div>
-                    ${webinar.meeting_link ? `<a href="${webinar.meeting_link}" target="_blank" class="btn btn-primary btn-sm" style="display: inline-flex;"><i class="fas fa-video"></i> Join Meeting</a>` : ''}
-                </div>
-            `).join('');
-        }
-
-        // Admin
-        async function loadAdminStats() {
-            const response = await apiCall('/admin/stats');
-            if (!response) return;
-            
-            const stats = await response.json();
-            document.getElementById('stat-users').textContent = stats.total_users;
-            document.getElementById('stat-signals').textContent = stats.active_signals;
-            document.getElementById('stat-premium').textContent = stats.premium_users;
         }
 
         // Utilities
@@ -1533,30 +1492,11 @@
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            
-            const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
-            toast.innerHTML = `<i class="fas fa-${icon}"></i><span>${message}</span>`;
-            
+            toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
             container.appendChild(toast);
             
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(400px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 5000);
+            setTimeout(() => toast.remove(), 3000);
         }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Global error handler
-        window.onerror = function(msg, url, line) {
-            console.error(`Error: ${msg} at ${url}:${line}`);
-            return false;
-        };
     </script>
 </body>
 </html>

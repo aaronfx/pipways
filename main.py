@@ -12,7 +12,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # FastAPI and related
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, status, Query
@@ -45,35 +45,38 @@ logger = logging.getLogger(__name__)
 
 # ==================== CONFIGURATION ====================
 
-@dataclass
 class Settings:
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
+    def __init__(self):
+        self.DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+        self.REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-    # OpenRouter AI Configuration
-    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
-    OPENROUTER_VISION_MODEL: str = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
-    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+        # OpenRouter AI Configuration
+        self.OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+        self.OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
+        self.OPENROUTER_VISION_MODEL: str = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
+        self.OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
-    # JWT Configuration
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+        # JWT Configuration
+        self.SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+        self.ALGORITHM: str = "HS256"
+        self.ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # Telegram Configuration
-    TELEGRAM_FREE_CHANNEL_LINK: str = os.getenv("TELEGRAM_FREE_CHANNEL_LINK", "https://t.me/pipways_free")
-    TELEGRAM_PREMIUM_CHANNEL_LINK: str = os.getenv("TELEGRAM_PREMIUM_CHANNEL_LINK", "https://t.me/pipways_vip")
-    TELEGRAM_BOT_USERNAME: str = os.getenv("TELEGRAM_BOT_USERNAME", "pipways_bot")
+        # Telegram Configuration
+        self.TELEGRAM_FREE_CHANNEL_LINK: str = os.getenv("TELEGRAM_FREE_CHANNEL_LINK", "https://t.me/pipways_free")
+        self.TELEGRAM_PREMIUM_CHANNEL_LINK: str = os.getenv("TELEGRAM_PREMIUM_CHANNEL_LINK", "https://t.me/pipways_vip")
+        self.TELEGRAM_BOT_USERNAME: str = os.getenv("TELEGRAM_BOT_USERNAME", "pipways_bot")
 
-    # App Configuration
-    SUBSCRIPTION_ENABLED: bool = os.getenv("SUBSCRIPTION_ENABLED", "false").lower() == "true"
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://pipways-web-nhem.onrender.com")
-    CORS_ORIGINS: List[str] = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+        # App Configuration
+        self.SUBSCRIPTION_ENABLED: bool = os.getenv("SUBSCRIPTION_ENABLED", "false").lower() == "true"
+        self.FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://pipways-web-nhem.onrender.com")
 
-    # Admin Configuration
-    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
-    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
+        # CORS Origins - parse from env
+        cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+        self.CORS_ORIGINS: List[str] = [origin.strip() for origin in cors_env.split(",")]
+
+        # Admin Configuration
+        self.ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
+        self.ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
 
 settings = Settings()
 
@@ -569,7 +572,7 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

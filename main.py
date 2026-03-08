@@ -1,6 +1,6 @@
 """
 Pipways Trading Platform API
-Complete implementation with auth, multi-admin, AI integration, and mobile-ready endpoints
+Complete implementation with auth, multi-admin, AI integration
 """
 
 import os
@@ -11,7 +11,7 @@ import asyncpg
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 class Settings:
     DATABASE_URL = os.getenv("DATABASE_URL")
-    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars-long")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60
     REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -41,7 +41,10 @@ class Settings:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+    
+    # CORS Origins
+    cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+    CORS_ORIGINS = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
 
 settings = Settings()
 
@@ -51,27 +54,50 @@ db_pool: Optional[asyncpg.Pool] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db_pool
-    db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=5, max_size=20)
+    db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
     await init_db()
     yield
     await db_pool.close()
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS
+# CORS Middleware - MUST be before routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    expose_headers=["*"],
+    max_age=3600,
 )
+
+# Additional CORS handler for preflight
+@app.middleware("http")
+async def cors_handler(request, call_next):
+    if request.method == "OPTIONS":
+        return JSONResponse(
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin",
+                "Access-Control-Allow-Credentials": "true",
+            },
+        )
+    response = await call_next(request)
+    origin = request.headers.get("origin")
+    if origin in settings.CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        response.headers["Access-Control-Allow-Origin"] = settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # Security
 security = HTTPBearer()
 
-# Models
+# Pydantic Models with fixed validation (no look-ahead regex)
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -80,7 +106,7 @@ class UserRegister(BaseModel):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Validate password complexity without using look-ahead regex"""
+        """Validate password without look-ahead regex"""
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         if not any(c.islower() for c in v):
@@ -257,7 +283,6 @@ async def init_db():
             )
         """)
         
-        # Create default admin
         await create_default_admin(conn)
 
 async def create_default_admin(conn):
@@ -697,7 +722,7 @@ async def mentor_chat(
                 json={
                     "model": settings.OPENROUTER_MODEL,
                     "messages": [
-                        {"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."},
+                        {"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice."},
                         *messages
                     ]
                 },
@@ -782,7 +807,6 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
         """, course.title, course.description, course.content, course.is_premium, admin["id"])
         return {"id": course_id, "message": "Course created"}
 
-# Config
 @app.get("/config")
 async def get_config():
     return {

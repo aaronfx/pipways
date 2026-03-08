@@ -1,5 +1,6 @@
 """
-Pipways API - Trading Signals Platform with Telegram Integration
+Pipways API - Professional Trading Signals & Education Platform
+Complete working version with professional AI prompts
 """
 import os
 import sys
@@ -62,21 +63,21 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str = Field(default="")
     OPENROUTER_MODEL: str = "anthropic/claude-3-opus-20240229"
     OPENROUTER_VISION_MODEL: str = "anthropic/claude-3-opus-20240229"
-    
+
     # Telegram Configuration
     TELEGRAM_FREE_CHANNEL_LINK: str = Field(default="https://t.me/pipways_free")
     TELEGRAM_PREMIUM_CHANNEL_LINK: str = Field(default="https://t.me/pipways_vip")
     TELEGRAM_BOT_USERNAME: str = Field(default="pipways_bot")
-    
+
     # Feature Flags
-    SUBSCRIPTION_ENABLED: bool = Field(default=False)  # Disabled for testing
-    
+    SUBSCRIPTION_ENABLED: bool = Field(default=False)
+
     RESEND_API_KEY: str = Field(default="")
     FROM_EMAIL: str = Field(default="noreply@pipways.com")
     FRONTEND_URL: str = Field(default="https://pipways-web-nhem.onrender.com")
-    
+
     CORS_ORIGINS: str = Field(default="https://pipways-web-nhem.onrender.com,http://localhost:3000,http://localhost:5173")
-    
+
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
@@ -238,12 +239,12 @@ Current date: {current_date}"""
 async def init_db():
     """Initialize database with comprehensive migrations"""
     global pool, redis_client
-    
+
     logger.info("Initializing database...")
-    
+
     if not settings.DATABASE_URL:
         raise RuntimeError("DATABASE_URL not configured")
-    
+
     try:
         pool = await asyncpg.create_pool(
             settings.DATABASE_URL,
@@ -253,7 +254,7 @@ async def init_db():
             server_settings={'jit': 'off'}
         )
         logger.info("Database pool created")
-        
+
         if redis:
             try:
                 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -262,9 +263,9 @@ async def init_db():
             except Exception as e:
                 logger.warning(f"Redis not available: {e}")
                 redis_client = None
-        
+
         async with pool.acquire() as conn:
-            # Create tables
+            # Create tables (if not exist)
             await conn.execute("""
                 -- Users table
                 CREATE TABLE IF NOT EXISTS users (
@@ -275,13 +276,16 @@ async def init_db():
                     role VARCHAR(50) DEFAULT 'user',
                     is_active BOOLEAN DEFAULT TRUE,
                     is_verified BOOLEAN DEFAULT FALSE,
-                    subscription_tier VARCHAR(50) DEFAULT 'free',
-                    subscription_expires_at TIMESTAMP,
-                    telegram_username VARCHAR(100),
-                    telegram_chat_id BIGINT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
+                -- Add new columns to existing users table
+                ALTER TABLE users 
+                    ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(50) DEFAULT 'free',
+                    ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP,
+                    ADD COLUMN IF NOT EXISTS telegram_username VARCHAR(100),
+                    ADD COLUMN IF NOT EXISTS telegram_chat_id BIGINT;
+
                 -- Trading Signals table
                 CREATE TABLE IF NOT EXISTS signals (
                     id SERIAL PRIMARY KEY,
@@ -302,7 +306,7 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     closed_at TIMESTAMP
                 );
-                
+
                 -- Chart analyses table
                 CREATE TABLE IF NOT EXISTS chart_analyses (
                     id SERIAL PRIMARY KEY,
@@ -314,7 +318,7 @@ async def init_db():
                     is_premium BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 -- Mentor chat sessions
                 CREATE TABLE IF NOT EXISTS mentor_sessions (
                     id SERIAL PRIMARY KEY,
@@ -324,7 +328,7 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 -- Courses table
                 CREATE TABLE IF NOT EXISTS courses (
                     id SERIAL PRIMARY KEY,
@@ -339,7 +343,7 @@ async def init_db():
                     is_published BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 -- Course enrollments
                 CREATE TABLE IF NOT EXISTS course_enrollments (
                     id SERIAL PRIMARY KEY,
@@ -348,7 +352,7 @@ async def init_db():
                     enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, course_id)
                 );
-                
+
                 -- Webinars table
                 CREATE TABLE IF NOT EXISTS webinars (
                     id SERIAL PRIMARY KEY,
@@ -363,7 +367,7 @@ async def init_db():
                     is_published BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 -- Webinar registrations
                 CREATE TABLE IF NOT EXISTS webinar_registrations (
                     id SERIAL PRIMARY KEY,
@@ -372,7 +376,7 @@ async def init_db():
                     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(webinar_id, user_id)
                 );
-                
+
                 -- Blog posts table
                 CREATE TABLE IF NOT EXISTS blog_posts (
                     id SERIAL PRIMARY KEY,
@@ -388,7 +392,7 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                
+
                 -- Telegram bot messages log
                 CREATE TABLE IF NOT EXISTS telegram_messages (
                     id SERIAL PRIMARY KEY,
@@ -399,16 +403,16 @@ async def init_db():
                     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
-            
-            # Add admin user
+
+            # Add admin user (only if not exists)
             await conn.execute("""
                 INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_verified, subscription_tier)
                 VALUES (1, 'admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE, 'premium')
                 ON CONFLICT (id) DO NOTHING;
             """)
-            
+
             logger.info("Database schema initialized successfully")
-            
+
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
@@ -428,14 +432,14 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
     """Analyze trading chart using OpenRouter AI with vision capabilities"""
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
-    
+
     prompt = user_prompt if user_prompt else CHART_ANALYSIS_PROMPT
-    
+
     if ',' in image_base64:
         image_data = image_base64
     else:
         image_data = f"data:image/jpeg;base64,{image_base64}"
-    
+
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -470,14 +474,14 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
                     "temperature": 0.2
                 }
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"OpenRouter error: {response.status_code} - {response.text}")
                 raise HTTPException(status_code=503, detail="AI analysis service error")
-            
+
             result = response.json()
             content = result['choices'][0]['message']['content']
-            
+
             try:
                 analysis = json.loads(content)
             except json.JSONDecodeError:
@@ -486,9 +490,9 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
                 elif "```" in content:
                     content = content.split("```")[1].split("```")[0].strip()
                 analysis = json.loads(content)
-            
+
             return analysis
-            
+
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="AI analysis timeout - please try again")
     except Exception as e:
@@ -499,23 +503,23 @@ async def chat_with_mentor(message: str, context: Optional[List[Dict]] = None, u
     """Chat with AI trading mentor using OpenRouter"""
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
-    
+
     messages = [
         {
             "role": "system",
             "content": MENTOR_SYSTEM_PROMPT.format(current_date=datetime.utcnow().strftime("%Y-%m-%d"))
         }
     ]
-    
+
     if context:
         for msg in context[-10:]:
             messages.append(msg)
-    
+
     messages.append({
         "role": "user",
         "content": message
     })
-    
+
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -533,19 +537,19 @@ async def chat_with_mentor(message: str, context: Optional[List[Dict]] = None, u
                     "temperature": 0.7
                 }
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"OpenRouter error: {response.status_code}")
                 raise HTTPException(status_code=503, detail="Mentor service error")
-            
+
             result = response.json()
             reply = result['choices'][0]['message']['content']
-            
+
             return {
                 "response": reply,
                 "tokens_used": result.get('usage', {}).get('total_tokens', 0)
             }
-            
+
     except Exception as e:
         logger.error(f"Mentor chat error: {e}")
         raise HTTPException(status_code=500, detail="Mentor service unavailable")
@@ -559,9 +563,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("🚀 Starting Pipways API...")
     await init_db()
-    
+
     yield
-    
+
     logger.info("🛠️ Shutting down...")
     if pool:
         await pool.close()
@@ -571,7 +575,7 @@ async def lifespan(app: FastAPI):
 # Create app
 app = FastAPI(
     title="Pipways API",
-    description="Professional Trading Signals & Education Platform",
+    description="Professional Trading Education Platform API",
     version="4.0.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -677,26 +681,26 @@ async def get_signals(
     """Get trading signals (filtered by subscription if enabled)"""
     query = "SELECT * FROM signals WHERE 1=1"
     params = []
-    
+
     if status != "all":
         query += f" AND status = ${len(params)+1}"
         params.append(status)
-    
+
     if is_premium is not None:
         query += f" AND is_premium = ${len(params)+1}"
         params.append(is_premium)
-    
+
     # If subscription enabled, free users only see free signals
     if settings.SUBSCRIPTION_ENABLED:
         query += f" AND (is_premium = FALSE OR ${len(params)+1} = 'premium')"
         params.append('free')  # Would check actual user tier
-    
+
     query += " ORDER BY created_at DESC"
     query += f" LIMIT ${len(params)+1}"
     params.append(limit)
-    
+
     signals = await conn.fetch(query, *params)
-    
+
     return {
         "success": True,
         "signals": [dict(s) for s in signals],
@@ -713,7 +717,7 @@ async def get_signal_stats(
 ):
     """Get signal performance statistics"""
     since = datetime.utcnow() - timedelta(days=days)
-    
+
     stats = await conn.fetchrow("""
         SELECT 
             COUNT(*) as total_signals,
@@ -725,7 +729,7 @@ async def get_signal_stats(
         FROM signals 
         WHERE created_at >= $1
     """, since)
-    
+
     return {
         "success": True,
         "period_days": days,
@@ -760,7 +764,7 @@ async def create_signal(
         signal.is_premium,
         1  # Admin user
     )
-    
+
     return {
         "success": True, 
         "signal_id": signal_id,
@@ -779,7 +783,7 @@ async def update_signal(
         SET status = $1, exit_price = $2, pips_result = $3, closed_at = CASE WHEN $1 = 'closed' THEN NOW() ELSE closed_at END
         WHERE id = $4
     """, update.status.value, update.exit_price, update.pips_result, signal_id)
-    
+
     return {"success": True, "message": "Signal updated"}
 
 @app.delete("/admin/signals/{signal_id}", tags=["Admin - Signals"])
@@ -799,7 +803,7 @@ async def get_all_signals_admin(
 ):
     """Get all signals for admin"""
     total = await conn.fetchval("SELECT COUNT(*) FROM signals")
-    
+
     offset = (page - 1) * per_page
     signals = await conn.fetch("""
         SELECT s.*, u.full_name as created_by_name
@@ -807,7 +811,7 @@ async def get_all_signals_admin(
         LEFT JOIN users u ON s.created_by = u.id
         ORDER BY s.created_at DESC LIMIT $1 OFFSET $2
     """, per_page, offset)
-    
+
     return {
         "success": True,
         "signals": [dict(s) for s in signals],
@@ -829,16 +833,16 @@ async def analyze_chart(
     """Analyze chart using professional AI"""
     if image.content_type not in ["image/jpeg", "image/png", "image/webp"]:
         raise HTTPException(status_code=400, detail="Invalid file type")
-    
+
     contents = await image.read()
     if len(contents) > settings.MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File too large")
-    
+
     image_base64 = base64.b64encode(contents).decode('utf-8')
-    
+
     try:
         analysis = await analyze_chart_with_ai(image_base64, prompt)
-        
+
         if save_to_journal:
             await conn.execute(
                 """INSERT INTO chart_analyses 
@@ -850,13 +854,13 @@ async def analyze_chart(
                 0.8,
                 json.dumps(analysis)
             )
-        
+
         return {
             "success": True,
             "analysis": analysis,
             "cached": False
         }
-        
+
     except Exception as e:
         logger.error(f"Chart analysis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -871,7 +875,7 @@ async def get_analysis_history(
     total = await conn.fetchval(
         "SELECT COUNT(*) FROM chart_analyses WHERE user_id = $1", 1
     )
-    
+
     offset = (page - 1) * per_page
     analyses = await conn.fetch(
         """SELECT * FROM chart_analyses 
@@ -879,14 +883,14 @@ async def get_analysis_history(
            ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
         1, per_page, offset
     )
-    
+
     results = []
     for a in analyses:
         row = dict(a)
         if row.get('analysis_data'):
             row['analysis'] = json.loads(row['analysis_data'])
         results.append(row)
-    
+
     return {
         "success": True,
         "analyses": results,
@@ -910,7 +914,7 @@ async def mentor_chat(
     """Chat with AI trading mentor"""
     if not session_id:
         session_id = f"session_1_{datetime.utcnow().timestamp()}"
-    
+
     context = []
     if session_id:
         session = await conn.fetchrow(
@@ -919,21 +923,21 @@ async def mentor_chat(
         )
         if session and session['context']:
             context = json.loads(session['context'])
-    
+
     result = await chat_with_mentor(message, context, 1)
-    
+
     new_context = context + [
         {"role": "user", "content": message},
         {"role": "assistant", "content": result['response']}
     ]
-    
+
     await conn.execute("""
         INSERT INTO mentor_sessions (user_id, session_id, context, updated_at)
         VALUES ($1, $2, $3, NOW())
         ON CONFLICT (session_id) 
         DO UPDATE SET context = $3, updated_at = NOW()
     """, 1, session_id, json.dumps(new_context[-20:]))
-    
+
     return {
         "success": True,
         "response": result['response'],
@@ -954,16 +958,16 @@ async def create_blog_post(
     slug = post.slug
     if not slug:
         slug = re.sub(r'[^a-z0-9]+', '-', post.title.lower()).strip('-')
-    
+
     existing = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug)
     if existing:
         slug = f"{slug}-{int(datetime.utcnow().timestamp())}"
-    
+
     post_id = await conn.fetchval("""
         INSERT INTO blog_posts (title, slug, content, excerpt, category, author_id, featured_image_url, is_published)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
     """, post.title, slug, post.content, post.excerpt, post.category, 1, post.featured_image_url, post.is_published)
-    
+
     return {"success": True, "post_id": post_id, "slug": slug}
 
 @app.put("/admin/blog/{post_id}", tags=["Admin - Blog"])
@@ -980,7 +984,7 @@ async def update_blog_post(
         WHERE id = $7 AND author_id = $8
     """, post.title, post.content, post.excerpt, post.category, 
         post.featured_image_url, post.is_published, post_id, 1)
-    
+
     return {"success": True, "message": "Post updated"}
 
 @app.delete("/admin/blog/{post_id}", tags=["Admin - Blog"])
@@ -1000,7 +1004,7 @@ async def get_all_blog_posts_admin(
 ):
     """Get all blog posts including drafts (admin only)"""
     total = await conn.fetchval("SELECT COUNT(*) FROM blog_posts")
-    
+
     offset = (page - 1) * per_page
     posts = await conn.fetch("""
         SELECT bp.*, u.full_name as author_name
@@ -1008,7 +1012,7 @@ async def get_all_blog_posts_admin(
         LEFT JOIN users u ON bp.author_id = u.id
         ORDER BY bp.created_at DESC LIMIT $1 OFFSET $2
     """, per_page, offset)
-    
+
     return {
         "success": True,
         "posts": [dict(p) for p in posts],
@@ -1026,7 +1030,7 @@ async def create_webinar(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
     """, webinar.title, webinar.description, webinar.scheduled_at, 
         webinar.duration_minutes, webinar.max_attendees, 1, webinar.meeting_link, webinar.is_published, webinar.is_premium)
-    
+
     return {"success": True, "webinar_id": webinar_id}
 
 @app.put("/admin/webinars/{webinar_id}", tags=["Admin - Webinars"])
@@ -1044,7 +1048,7 @@ async def update_webinar(
     """, webinar.title, webinar.description, webinar.scheduled_at,
         webinar.duration_minutes, webinar.max_attendees, webinar.meeting_link,
         webinar.is_published, webinar.is_premium, webinar_id, 1)
-    
+
     return {"success": True, "message": "Webinar updated"}
 
 @app.delete("/admin/webinars/{webinar_id}", tags=["Admin - Webinars"])
@@ -1070,7 +1074,7 @@ async def get_all_webinars_admin(
         GROUP BY w.id, u.full_name
         ORDER BY w.scheduled_at DESC
     """)
-    
+
     return {
         "success": True,
         "webinars": [dict(w) for w in webinars]
@@ -1087,7 +1091,7 @@ async def create_course(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
     """, course.title, course.description, course.level, course.duration_minutes,
         course.price, 1, course.thumbnail_url, course.is_published, course.is_premium)
-    
+
     return {"success": True, "course_id": course_id}
 
 @app.put("/admin/courses/{course_id}", tags=["Admin - Courses"])
@@ -1104,7 +1108,7 @@ async def update_course(
         WHERE id = $9 AND instructor_id = $10
     """, course.title, course.description, course.level, course.duration_minutes,
         course.price, course.thumbnail_url, course.is_published, course.is_premium, course_id, 1)
-    
+
     return {"success": True, "message": "Course updated"}
 
 @app.delete("/admin/courses/{course_id}", tags=["Admin - Courses"])
@@ -1130,7 +1134,7 @@ async def get_all_courses_admin(
         GROUP BY c.id, u.full_name
         ORDER BY c.created_at DESC
     """)
-    
+
     return {
         "success": True,
         "courses": [dict(c) for c in courses]
@@ -1148,7 +1152,7 @@ async def get_courses(
 ):
     """Get all published courses"""
     total = await conn.fetchval("SELECT COUNT(*) FROM courses WHERE is_published = TRUE")
-    
+
     offset = (page - 1) * per_page
     courses = await conn.fetch("""
         SELECT c.*, u.full_name as instructor_name
@@ -1157,7 +1161,7 @@ async def get_courses(
         WHERE c.is_published = TRUE
         ORDER BY c.created_at DESC LIMIT $1 OFFSET $2
     """, per_page, offset)
-    
+
     return {
         "success": True,
         "courses": [dict(c) for c in courses],
@@ -1175,15 +1179,15 @@ async def enroll_course(course_id: int, conn: asyncpg.Connection = Depends(get_d
         "SELECT id FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
         1, course_id
     )
-    
+
     if existing:
         return {"success": True, "message": "Already enrolled"}
-    
+
     await conn.execute(
         "INSERT INTO course_enrollments (user_id, course_id) VALUES ($1, $2)",
         1, course_id
     )
-    
+
     return {"success": True, "message": "Enrolled successfully"}
 
 @app.get("/webinars", tags=["Webinars"])
@@ -1207,7 +1211,7 @@ async def get_webinars(upcoming: bool = Query(True), conn: asyncpg.Connection = 
             WHERE w.is_published = TRUE
             ORDER BY w.scheduled_at DESC
         """)
-    
+
     return {"success": True, "webinars": [dict(w) for w in webinars]}
 
 @app.post("/webinars/{webinar_id}/register", tags=["Webinars"])
@@ -1217,15 +1221,15 @@ async def register_webinar(webinar_id: int, conn: asyncpg.Connection = Depends(g
         "SELECT id FROM webinar_registrations WHERE webinar_id = $1 AND user_id = $2",
         webinar_id, 1
     )
-    
+
     if existing:
         return {"success": True, "message": "Already registered"}
-    
+
     await conn.execute(
         "INSERT INTO webinar_registrations (webinar_id, user_id) VALUES ($1, $2)",
         webinar_id, 1
     )
-    
+
     return {"success": True, "message": "Registered successfully"}
 
 @app.get("/blog/posts", tags=["Blog"])
@@ -1236,14 +1240,14 @@ async def get_blog_posts(
 ):
     """Get blog posts"""
     total = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE is_published = TRUE")
-    
+
     offset = (page - 1) * per_page
     posts = await conn.fetch("""
         SELECT id, title, slug, excerpt, category, created_at, featured_image_url
         FROM blog_posts WHERE is_published = TRUE
         ORDER BY created_at DESC LIMIT $1 OFFSET $2
     """, per_page, offset)
-    
+
     return {
         "success": True,
         "posts": [dict(p) for p in posts],
@@ -1261,17 +1265,17 @@ async def get_blog_post(slug: str, conn: asyncpg.Connection = Depends(get_db)):
         "UPDATE blog_posts SET view_count = view_count + 1 WHERE slug = $1",
         slug
     )
-    
+
     post = await conn.fetchrow("""
         SELECT bp.*, u.full_name as author_name
         FROM blog_posts bp
         LEFT JOIN users u ON bp.author_id = u.id
         WHERE bp.slug = $1 AND bp.is_published = TRUE
     """, slug)
-    
+
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    
+
     return {"success": True, "post": dict(post)}
 
 # ==========================================

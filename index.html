@@ -15,6 +15,7 @@
             --secondary: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
+            --telegram: #0088cc;
             --bg-dark: #0f172a;
             --bg-card: #1e293b;
             --bg-hover: #334155;
@@ -72,10 +73,8 @@
             margin-bottom: 32px;
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
+        .form-group { margin-bottom: 20px; }
+        
         .form-label {
             display: block;
             margin-bottom: 8px;
@@ -101,10 +100,8 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
-        select.form-input {
-            cursor: pointer;
-        }
-
+        select.form-input { cursor: pointer; }
+        
         textarea.form-input {
             min-height: 120px;
             resize: vertical;
@@ -145,26 +142,22 @@
             color: var(--text-primary);
         }
 
-        .btn-danger {
-            background: var(--danger);
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        
+        .btn-telegram {
+            background: var(--telegram);
         }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: #000;
-        }
-
-        .btn-success {
-            background: var(--secondary);
+        
+        .btn-premium {
+            background: var(--premium);
+            color: var(--bg-dark);
         }
 
         .btn-sm {
             padding: 8px 16px;
             font-size: 14px;
+            width: auto;
         }
 
         .error-message {
@@ -174,17 +167,9 @@
             display: none;
         }
 
-        .error-message.show {
-            display: block;
-        }
+        .error-message.show { display: block; }
 
-        .text-center {
-            text-align: center;
-        }
-
-        .mt-3 {
-            margin-top: 12px;
-        }
+        .hidden { display: none !important; }
 
         /* Mobile Header */
         .mobile-header {
@@ -201,16 +186,6 @@
             justify-content: space-between;
             padding: 0 20px;
         }
-
-        .mobile-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 20px;
-            font-weight: 700;
-        }
-
-        .mobile-logo i { color: var(--primary); }
 
         .hamburger {
             width: 40px;
@@ -328,15 +303,6 @@
             font-weight: 600;
         }
 
-        .user-details { flex: 1; }
-
-        .user-name { font-weight: 600; font-size: 14px; }
-
-        .user-email {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
         .admin-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -368,6 +334,239 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* Hero Carousel */
+        .hero-carousel {
+            height: calc(100vh - 80px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .swiper {
+            width: 100%;
+            height: 100%;
+        }
+
+        .swiper-slide {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-card) 100%);
+            padding: 60px;
+        }
+
+        .slide-content {
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .slide-text h1 {
+            font-size: 56px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.1;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .slide-text p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .slide-features {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .slide-feature {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+        }
+
+        .slide-feature i {
+            color: var(--secondary);
+            font-size: 20px;
+        }
+
+        .slide-image {
+            background: var(--bg-hover);
+            border-radius: 20px;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 120px;
+            color: var(--primary);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid var(--border);
+        }
+
+        /* Telegram Section */
+        .telegram-section {
+            padding: 80px 40px;
+            background: var(--bg-card);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 50px;
+        }
+
+        .telegram-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .telegram-card {
+            background: var(--bg-dark);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            border: 2px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .telegram-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--telegram);
+        }
+
+        .telegram-card.premium {
+            border-color: var(--premium);
+            background: linear-gradient(135deg, var(--bg-dark) 0%, rgba(251, 191, 36, 0.1) 100%);
+        }
+
+        .telegram-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--telegram);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+            color: white;
+        }
+
+        .telegram-card.premium .telegram-icon {
+            background: var(--premium);
+            color: var(--bg-dark);
+        }
+
+        .price {
+            font-size: 48px;
+            font-weight: 700;
+            margin: 20px 0;
+            color: var(--text-primary);
+        }
+
+        .features-list {
+            list-style: none;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .features-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .features-list li.disabled {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+
+        .features-list li i {
+            color: var(--secondary);
+        }
+
+        .features-list li.disabled i {
+            color: var(--danger);
+        }
+
+        /* Page Header */
+        .page-header {
+            padding: 40px;
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-dark) 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .page-header h2 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            font-size: 18px;
+        }
+
+        /* Content Grid */
+        .content-grid {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .content-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .content-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .content-card h3 {
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        .content-card p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .content-meta {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
         /* Admin Dashboard Styles */
         .admin-container {
             padding: 30px;
@@ -393,6 +592,7 @@
             margin-bottom: 30px;
             border-bottom: 1px solid var(--border);
             padding-bottom: 20px;
+            flex-wrap: wrap;
         }
 
         .admin-tab {
@@ -599,15 +799,6 @@
             color: var(--text-secondary);
         }
 
-        .sub-active {
-            border: 1px solid var(--secondary);
-        }
-
-        .sub-inactive {
-            border: 1px solid var(--danger);
-            opacity: 0.7;
-        }
-
         .action-btns {
             display: flex;
             gap: 8px;
@@ -781,25 +972,101 @@
         .toast.show { display: flex; }
         .toast.success { background: var(--secondary); }
 
-        /* Overlay for mobile */
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 99;
+        /* Chat Interface */
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            height: 600px;
+            display: flex;
+            flex-direction: column;
         }
 
-        .sidebar-overlay.show { display: block; }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        .chat-message {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 12px;
+        }
+
+        .chat-message.user {
+            justify-content: flex-end;
+        }
+
+        .chat-message-content {
+            max-width: 80%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            line-height: 1.5;
+        }
+
+        .chat-message.bot .chat-message-content {
+            background: var(--bg-hover);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.user .chat-message-content {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            padding: 60px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .upload-area i {
+            font-size: 64px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
 
         /* Responsive */
         @media (max-width: 1024px) {
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
+            .form-grid { grid-template-columns: 1fr; }
+            .slide-content { grid-template-columns: 1fr; text-align: center; }
+            .slide-text h1 { font-size: 36px; }
+            .slide-image { height: 300px; }
         }
 
         @media (max-width: 768px) {
@@ -822,30 +1089,26 @@
                 flex-wrap: nowrap;
             }
 
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+            .stats-grid { grid-template-columns: 1fr; }
 
             table {
                 display: block;
                 overflow-x: auto;
             }
 
-            th, td {
-                white-space: nowrap;
-            }
+            th, td { white-space: nowrap; }
 
             .data-table-header {
                 flex-direction: column;
                 align-items: stretch;
             }
 
-            .search-box {
-                max-width: 100%;
-            }
+            .search-box { max-width: 100%; }
+            
+            .content-grid { grid-template-columns: 1fr; }
+            
+            .telegram-cards { grid-template-columns: 1fr; }
         }
-
-        .hidden { display: none !important; }
 
         .loading {
             display: flex;
@@ -865,115 +1128,19 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Page Header */
-        .page-header {
-            padding: 40px;
-            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-dark) 100%);
-            border-bottom: 1px solid var(--border);
+        /* Overlay for mobile */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
         }
 
-        .page-header h2 {
-            font-size: 36px;
-            margin-bottom: 10px;
-        }
-
-        .page-header p {
-            color: var(--text-secondary);
-            font-size: 18px;
-        }
-
-        /* Overview Carousel Styles */
-        .overview-carousel {
-            height: calc(100vh - 80px);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .swiper {
-            width: 100%;
-            height: 100%;
-        }
-
-        .swiper-slide {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-card) 100%);
-            padding: 60px;
-        }
-
-        .slide-content {
-            max-width: 1200px;
-            width: 100%;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 60px;
-            align-items: center;
-        }
-
-        .slide-text h1 {
-            font-size: 56px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            line-height: 1.1;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .slide-text p {
-            font-size: 20px;
-            color: var(--text-secondary);
-            margin-bottom: 30px;
-            line-height: 1.6;
-        }
-
-        .slide-features {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .slide-feature {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 16px;
-        }
-
-        .slide-feature i {
-            color: var(--secondary);
-            font-size: 20px;
-        }
-
-        .slide-image {
-            background: var(--bg-hover);
-            border-radius: 20px;
-            height: 500px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 120px;
-            color: var(--primary);
-            position: relative;
-            overflow: hidden;
-            border: 2px solid var(--border);
-        }
-
-        @media (max-width: 1024px) {
-            .slide-content {
-                grid-template-columns: 1fr;
-                text-align: center;
-            }
-            .slide-text h1 { font-size: 36px; }
-            .slide-image { height: 300px; }
-        }
-
-        @media (max-width: 768px) {
-            .swiper-slide { padding: 30px; }
-            .slide-text h1 { font-size: 28px; }
-        }
+        .sidebar-overlay.show { display: block; }
     </style>
 <base target="_blank">
 </head>
@@ -1044,8 +1211,8 @@
         
         <!-- Mobile Header -->
         <div class="mobile-header">
-            <div class="mobile-logo">
-                <i class="fas fa-chart-line"></i>
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700;">
+                <i class="fas fa-chart-line" style="color: var(--primary);"></i>
                 <span>Pipways</span>
             </div>
             <button class="hamburger" onclick="toggleSidebar()">
@@ -1067,51 +1234,51 @@
 
             <ul class="nav-menu">
                 <li class="nav-item">
-                    <button class="nav-link active" onclick="showSection('overview', event)">
+                    <button class="nav-link active" onclick="showSection('home', this)">
                         <i class="fas fa-home"></i>
                         <span>Overview</span>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('signals', event)">
+                    <button class="nav-link" onclick="showSection('signals', this)">
                         <i class="fas fa-satellite-dish"></i>
                         <span>Trading Signals</span>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('analysis', event)">
+                    <button class="nav-link" onclick="showSection('analysis', this)">
                         <i class="fas fa-robot"></i>
                         <span>AI Analysis</span>
                         <span class="premium-badge">PRO</span>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('mentor', event)">
+                    <button class="nav-link" onclick="showSection('mentor', this)">
                         <i class="fas fa-comments"></i>
                         <span>AI Mentor</span>
                         <span class="premium-badge">PRO</span>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('courses', event)">
+                    <button class="nav-link" onclick="showSection('courses', this)">
                         <i class="fas fa-graduation-cap"></i>
                         <span>Courses</span>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('webinars', event)">
+                    <button class="nav-link" onclick="showSection('webinars', this)">
                         <i class="fas fa-video"></i>
                         <span>Webinars</span>
                     </button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('blog', event)">
+                    <button class="nav-link" onclick="showSection('blog', this)">
                         <i class="fas fa-newspaper"></i>
                         <span>Blog</span>
                     </button>
                 </li>
-                <li class="nav-item admin-only hidden" id="admin-nav-item">
-                    <button class="nav-link" onclick="showSection('admin', event)" style="color: var(--warning);">
+                <li class="nav-item hidden" id="admin-nav-item">
+                    <button class="nav-link" onclick="showSection('admin', this)" style="color: var(--warning);">
                         <i class="fas fa-cog"></i>
                         <span>Admin Dashboard</span>
                     </button>
@@ -1121,13 +1288,13 @@
             <div class="sidebar-footer">
                 <div class="user-info">
                     <div class="user-avatar" id="user-avatar">A</div>
-                    <div class="user-details">
-                        <div class="user-name" id="user-name">Admin User</div>
-                        <div class="user-email" id="user-email">admin@pipways.com</div>
-                        <span class="admin-badge hidden" id="admin-badge">Admin</span>
+                    <div>
+                        <div style="font-weight: 600;" id="user-name">Admin User</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" id="user-email">admin@pipways.com</div>
+                        <span class="admin-badge hidden" id="admin-badge">ADMIN</span>
                     </div>
                 </div>
-                <button class="btn" onclick="logout()" style="background: var(--danger);">
+                <button class="btn btn-danger" onclick="logout()">
                     <i class="fas fa-sign-out-alt"></i> Logout
                 </button>
             </div>
@@ -1135,11 +1302,12 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Overview Section -->
-            <div class="section active" id="overview-section">
-                <div class="overview-carousel">
+            <!-- Home Section with Carousel -->
+            <div class="section active" id="home-section">
+                <div class="hero-carousel">
                     <div class="swiper mySwiper">
                         <div class="swiper-wrapper">
+                            <!-- Slide 1: AI Analysis -->
                             <div class="swiper-slide">
                                 <div class="slide-content">
                                     <div class="slide-text">
@@ -1150,19 +1318,49 @@
                                             <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Support & Resistance Detection</span></div>
                                             <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Risk/Reward Calculation</span></div>
                                         </div>
-                                        <button class="btn" onclick="showSection('analysis', event)"><i class="fas fa-robot"></i> Try AI Analysis</button>
+                                        <button class="btn" onclick="showSection('analysis', document.querySelectorAll('.nav-link')[2])" style="width: auto; padding: 16px 32px;">
+                                            <i class="fas fa-robot"></i> Try AI Analysis
+                                        </button>
                                     </div>
                                     <div class="slide-image"><i class="fas fa-brain"></i></div>
                                 </div>
                             </div>
+                            
+                            <!-- Slide 2: Trading Signals -->
                             <div class="swiper-slide">
                                 <div class="slide-content">
                                     <div class="slide-text">
                                         <h1>Professional Trading Signals</h1>
                                         <p>Join our Telegram community and receive high-quality trading signals with detailed analysis.</p>
-                                        <button class="btn" style="background: #0088cc;" onclick="showSection('signals', event)"><i class="fab fa-telegram"></i> Join Telegram</button>
+                                        <div class="slide-features">
+                                            <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Forex & Crypto Signals</span></div>
+                                            <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Entry, SL & TP Levels</span></div>
+                                            <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Real-time Notifications</span></div>
+                                        </div>
+                                        <button class="btn btn-telegram" onclick="showSection('signals', document.querySelectorAll('.nav-link')[1])" style="width: auto; padding: 16px 32px;">
+                                            <i class="fab fa-telegram"></i> Join Telegram
+                                        </button>
                                     </div>
-                                    <div class="slide-image" style="color: #0088cc;"><i class="fas fa-satellite-dish"></i></div>
+                                    <div class="slide-image" style="color: var(--telegram);"><i class="fas fa-satellite-dish"></i></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Slide 3: AI Mentor -->
+                            <div class="swiper-slide">
+                                <div class="slide-content">
+                                    <div class="slide-text">
+                                        <h1>Your Personal AI Trading Mentor</h1>
+                                        <p>Get personalized trading education and advice from our AI mentor available 24/7.</p>
+                                        <div class="slide-features">
+                                            <div class="slide-feature"><i class="fas fa-check-circle"></i><span>24/7 Availability</span></div>
+                                            <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Personalized Guidance</span></div>
+                                            <div class="slide-feature"><i class="fas fa-check-circle"></i><span>Strategy Development</span></div>
+                                        </div>
+                                        <button class="btn" onclick="showSection('mentor', document.querySelectorAll('.nav-link')[3])" style="width: auto; padding: 16px 32px;">
+                                            <i class="fas fa-comments"></i> Chat with Mentor
+                                        </button>
+                                    </div>
+                                    <div class="slide-image"><i class="fas fa-user-graduate"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -1171,30 +1369,66 @@
                         <div class="swiper-button-prev"></div>
                     </div>
                 </div>
+
+                <!-- Telegram Section -->
+                <div class="telegram-section">
+                    <h2 class="section-title">Get Signals on Telegram</h2>
+                    <div class="telegram-cards">
+                        <div class="telegram-card">
+                            <div class="telegram-icon"><i class="fab fa-telegram"></i></div>
+                            <h3>Free Channel</h3>
+                            <div class="price">FREE</div>
+                            <ul class="features-list">
+                                <li><i class="fas fa-check"></i> 3 signals per week</li>
+                                <li><i class="fas fa-check"></i> Forex major pairs</li>
+                                <li class="disabled"><i class="fas fa-times"></i> Crypto signals</li>
+                                <li class="disabled"><i class="fas fa-times"></i> Priority support</li>
+                            </ul>
+                            <button class="btn btn-telegram" onclick="window.open('https://t.me/pipways_free', '_blank')">
+                                <i class="fab fa-telegram"></i> Join Free Channel
+                            </button>
+                        </div>
+
+                        <div class="telegram-card premium">
+                            <div class="telegram-icon"><i class="fas fa-crown"></i></div>
+                            <h3>VIP Channel</h3>
+                            <div class="price">$29<span style="font-size: 16px; color: var(--text-secondary);">/month</span></div>
+                            <ul class="features-list">
+                                <li><i class="fas fa-check"></i> Unlimited signals</li>
+                                <li><i class="fas fa-check"></i> All forex pairs</li>
+                                <li><i class="fas fa-check"></i> Crypto signals</li>
+                                <li><i class="fas fa-check"></i> Priority support</li>
+                            </ul>
+                            <button class="btn btn-premium" onclick="window.open('https://t.me/pipways_vip', '_blank')">
+                                <i class="fas fa-crown"></i> Join VIP Channel
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Trading Signals Section -->
             <div class="section" id="signals-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-satellite-dish"></i> Trading Signals</h2>
+                    <h2><i class="fas fa-satellite-dish" style="color: var(--telegram);"></i> Trading Signals</h2>
                     <p>Professional trading signals with detailed analysis</p>
                 </div>
-                <div style="padding: 30px; max-width: 1200px; margin: 0 auto;">
-                    <div id="signals-list"><div class="loading"><i class="fas fa-spinner"></i> Loading signals...</div></div>
+                <div class="content-grid" id="signals-list">
+                    <div class="loading"><i class="fas fa-spinner"></i> Loading signals...</div>
                 </div>
             </div>
 
             <!-- AI Analysis Section -->
             <div class="section" id="analysis-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-robot"></i> AI Chart Analysis</h2>
+                    <h2><i class="fas fa-robot" style="color: var(--primary);"></i> AI Chart Analysis</h2>
                     <p>Upload your charts for professional AI-powered technical analysis</p>
                 </div>
                 <div style="padding: 30px; max-width: 800px; margin: 0 auto;">
-                    <div onclick="document.getElementById('chart-upload').click()" style="border: 2px dashed var(--border); border-radius: 20px; padding: 60px; text-align: center; cursor: pointer;">
-                        <i class="fas fa-cloud-upload-alt" style="font-size: 64px; color: var(--primary); margin-bottom: 20px;"></i>
+                    <div class="upload-area" onclick="document.getElementById('chart-upload').click()">
+                        <i class="fas fa-cloud-upload-alt"></i>
                         <h3>Upload Chart for Analysis</h3>
-                        <p style="color: var(--text-secondary);">Supported formats: PNG, JPG (Max 10MB)</p>
+                        <p style="color: var(--text-secondary); margin-top: 10px;">Supported formats: PNG, JPG (Max 10MB)</p>
                         <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="handleChartUpload(this)">
                     </div>
                     <div id="analysis-result" class="hidden" style="margin-top: 30px;"></div>
@@ -1204,21 +1438,23 @@
             <!-- AI Mentor Section -->
             <div class="section" id="mentor-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-comments"></i> AI Trading Mentor</h2>
+                    <h2><i class="fas fa-comments" style="color: var(--secondary);"></i> AI Trading Mentor</h2>
                     <p>Get personalized trading advice from our AI mentor</p>
                 </div>
-                <div style="padding: 30px; max-width: 800px; margin: 0 auto;">
-                    <div style="background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); height: 600px; display: flex; flex-direction: column;">
-                        <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 30px;">
-                            <div style="display: flex; margin-bottom: 20px;">
-                                <div style="background: var(--bg-hover); padding: 15px 20px; border-radius: 18px; border-bottom-left-radius: 4px; max-width: 80%;">
-                                    <p>Hello! I'm your AI trading mentor. How can I help you today?</p>
+                <div style="padding: 30px;">
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="chat-message bot">
+                                <div class="chat-message-content">
+                                    Hello! I'm your AI trading mentor. How can I help you today?
                                 </div>
                             </div>
                         </div>
-                        <div style="padding: 20px; border-top: 1px solid var(--border); display: flex; gap: 12px;">
-                            <input type="text" id="chat-input" placeholder="Ask your question..." style="flex: 1; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-primary); padding: 14px; border-radius: 8px;" onkeypress="if(event.key==='Enter') sendChatMessage()">
-                            <button class="btn" style="width: auto;" onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
+                        <div class="chat-input-container">
+                            <input type="text" class="chat-input" id="chat-input" placeholder="Ask your question..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                            <button class="btn" style="width: auto;" onclick="sendChatMessage()">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1227,28 +1463,34 @@
             <!-- Courses Section -->
             <div class="section" id="courses-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-graduation-cap"></i> Trading Courses</h2>
+                    <h2><i class="fas fa-graduation-cap" style="color: var(--warning);"></i> Trading Courses</h2>
                     <p>Master the markets with our comprehensive curriculum</p>
                 </div>
-                <div id="courses-list" style="padding: 30px;"><div class="loading"><i class="fas fa-spinner"></i> Loading...</div></div>
+                <div class="content-grid" id="courses-list">
+                    <div class="loading"><i class="fas fa-spinner"></i> Loading courses...</div>
+                </div>
             </div>
 
             <!-- Webinars Section -->
             <div class="section" id="webinars-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-video"></i> Live Webinars</h2>
+                    <h2><i class="fas fa-video" style="color: var(--secondary);"></i> Live Webinars</h2>
                     <p>Join live trading sessions with expert Q&A</p>
                 </div>
-                <div id="webinars-list" style="padding: 30px;"><div class="loading"><i class="fas fa-spinner"></i> Loading...</div></div>
+                <div class="content-grid" id="webinars-list">
+                    <div class="loading"><i class="fas fa-spinner"></i> Loading webinars...</div>
+                </div>
             </div>
 
             <!-- Blog Section -->
             <div class="section" id="blog-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-newspaper"></i> Trading Blog</h2>
+                    <h2><i class="fas fa-newspaper" style="color: var(--primary);"></i> Trading Blog</h2>
                     <p>Latest insights, strategies, and market updates</p>
                 </div>
-                <div id="blog-list" style="padding: 30px;"><div class="loading"><i class="fas fa-spinner"></i> Loading...</div></div>
+                <div class="content-grid" id="blog-list">
+                    <div class="loading"><i class="fas fa-spinner"></i> Loading posts...</div>
+                </div>
             </div>
 
             <!-- Admin Dashboard Section -->
@@ -1260,15 +1502,15 @@
                     </div>
 
                     <div class="admin-tabs">
-                        <button class="admin-tab active" onclick="showAdminTab('stats', event)">Statistics</button>
-                        <button class="admin-tab" onclick="showAdminTab('users', event)">User Management</button>
-                        <button class="admin-tab" onclick="showAdminTab('signals', event)">Create Signal</button>
-                        <button class="admin-tab" onclick="showAdminTab('content', event)">Content</button>
+                        <button class="admin-tab active" onclick="showAdminTab('stats', this)">Statistics</button>
+                        <button class="admin-tab" onclick="showAdminTab('users', this)">User Management</button>
+                        <button class="admin-tab" onclick="showAdminTab('signals', this)">Create Signal</button>
+                        <button class="admin-tab" onclick="showAdminTab('content', this)">Content</button>
                     </div>
 
                     <!-- Stats Panel -->
                     <div class="admin-panel active" id="admin-stats-panel">
-                        <div class="stats-grid" id="admin-stats-grid">
+                        <div class="stats-grid">
                             <div class="stat-card">
                                 <div class="stat-icon"><i class="fas fa-users"></i></div>
                                 <div class="stat-value" id="stat-total-users">-</div>
@@ -1330,7 +1572,7 @@
                                 <div class="form-grid">
                                     <div class="form-group">
                                         <label class="form-label">Currency Pair</label>
-                                        <input type="text" name="pair" class="form-input" placeholder="EURUSD" required>
+                                        <input type="text" name="pair" class="form-input" placeholder="EURUSD" required style="text-transform: uppercase;">
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Direction</label>
@@ -1368,7 +1610,7 @@
                                     </div>
                                     <div class="form-group full-width">
                                         <label class="form-label">Analysis</label>
-                                        <textarea name="analysis" class="form-input" placeholder="Technical analysis..."></textarea>
+                                        <textarea name="analysis" class="form-input" rows="4" placeholder="Technical analysis..."></textarea>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn" style="margin-top: 20px;"><i class="fas fa-paper-plane"></i> Publish Signal</button>
@@ -1380,7 +1622,7 @@
                     <div class="admin-panel" id="admin-content-panel">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                             <div style="background: var(--bg-card); padding: 24px; border-radius: 16px; border: 1px solid var(--border);">
-                                <h3><i class="fas fa-newspaper"></i> Create Blog Post</h3>
+                                <h3><i class="fas fa-newspaper" style="color: var(--primary);"></i> Create Blog Post</h3>
                                 <form onsubmit="createBlogPost(event)" style="margin-top: 16px;">
                                     <div class="form-group">
                                         <input type="text" name="title" class="form-input" placeholder="Title" required>
@@ -1399,7 +1641,7 @@
                             </div>
 
                             <div style="background: var(--bg-card); padding: 24px; border-radius: 16px; border: 1px solid var(--border);">
-                                <h3><i class="fas fa-video"></i> Create Webinar</h3>
+                                <h3><i class="fas fa-video" style="color: var(--secondary);"></i> Create Webinar</h3>
                                 <form onsubmit="createWebinar(event)" style="margin-top: 16px;">
                                     <div class="form-group">
                                         <input type="text" name="title" class="form-input" placeholder="Title" required>
@@ -1416,12 +1658,12 @@
                                             <option value="true">Premium</option>
                                         </select>
                                     </div>
-                                    <button type="submit" class="btn btn-sm">Create Webinar</button>
+                                    <button type="submit" class="btn btn-sm" style="background: var(--secondary);">Create Webinar</button>
                                 </form>
                             </div>
 
                             <div style="background: var(--bg-card); padding: 24px; border-radius: 16px; border: 1px solid var(--border);">
-                                <h3><i class="fas fa-graduation-cap"></i> Create Course</h3>
+                                <h3><i class="fas fa-graduation-cap" style="color: var(--warning);"></i> Create Course</h3>
                                 <form onsubmit="createCourse(event)" style="margin-top: 16px;">
                                     <div class="form-group">
                                         <input type="text" name="title" class="form-input" placeholder="Title" required>
@@ -1438,7 +1680,7 @@
                                             <option value="true">Premium</option>
                                         </select>
                                     </div>
-                                    <button type="submit" class="btn btn-sm">Create Course</button>
+                                    <button type="submit" class="btn btn-sm" style="background: var(--warning); color: var(--bg-dark);">Create Course</button>
                                 </form>
                             </div>
                         </div>
@@ -1537,9 +1779,18 @@
             document.getElementById('auth-wall').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');
             initSwiper();
+            
+            // Check if user is admin/moderator and show admin link
             if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'moderator')) {
                 document.getElementById('admin-nav-item').classList.remove('hidden');
                 document.getElementById('admin-badge').classList.remove('hidden');
+            }
+            
+            // Update UI with user info
+            if (currentUser) {
+                document.getElementById('user-name').textContent = currentUser.full_name || currentUser.email;
+                document.getElementById('user-email').textContent = currentUser.email;
+                document.getElementById('user-avatar').textContent = (currentUser.full_name || currentUser.email).charAt(0).toUpperCase();
             }
         }
 
@@ -1555,10 +1806,11 @@
 
         async function validateToken() {
             try {
+                const refreshToken = localStorage.getItem('refresh_token');
                 const response = await fetch(`${API_URL}/auth/refresh`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('refresh_token') || authToken}`,
+                        'Authorization': `Bearer ${refreshToken || authToken}`,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -1567,11 +1819,17 @@
                     const data = await response.json();
                     authToken = data.access_token;
                     localStorage.setItem('access_token', authToken);
+                    
+                    // Get user info from token or fetch it
+                    const payload = JSON.parse(atob(authToken.split('.')[1]));
+                    currentUser = payload; // In real app, fetch full user details
                     showMainApp();
                 } else {
                     throw new Error('Invalid token');
                 }
             } catch (error) {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
                 showAuthWall();
             }
         }
@@ -1598,7 +1856,6 @@
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('refresh_token', data.refresh_token);
                     currentUser = data.user;
-                    updateUIForUser();
                     showMainApp();
                     showToast('Welcome back!', 'success');
                 } else {
@@ -1635,7 +1892,6 @@
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('refresh_token', data.refresh_token);
                     currentUser = data.user;
-                    updateUIForUser();
                     showMainApp();
                     showToast('Account created!', 'success');
                 } else {
@@ -1646,14 +1902,6 @@
                 showToast('Network error', 'error');
             } finally {
                 btn.innerHTML = '<span>Create Account</span>';
-            }
-        }
-
-        function updateUIForUser() {
-            if (currentUser) {
-                document.getElementById('user-name').textContent = currentUser.full_name || currentUser.email;
-                document.getElementById('user-email').textContent = currentUser.email;
-                document.getElementById('user-avatar').textContent = (currentUser.full_name || currentUser.email).charAt(0).toUpperCase();
             }
         }
 
@@ -1676,15 +1924,16 @@
             overlay.classList.toggle('show');
         }
 
-        function showSection(sectionName, event) {
+        function showSection(sectionName, element) {
+            // Update nav active state
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            if (event && event.currentTarget) {
-                event.currentTarget.classList.add('active');
-            }
+            if (element) element.classList.add('active');
             
+            // Show section
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
             document.getElementById(`${sectionName}-section`).classList.add('active');
             
+            // Load section data
             if (sectionName === 'admin') {
                 loadAdminStats();
                 loadUsers();
@@ -1703,11 +1952,9 @@
             }
         }
 
-        function showAdminTab(tabName, event) {
+        function showAdminTab(tabName, element) {
             document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
-            if (event && event.target) {
-                event.target.classList.add('active');
-            }
+            element.classList.add('active');
             
             document.querySelectorAll('.admin-panel').forEach(panel => panel.classList.remove('active'));
             document.getElementById(`admin-${tabName}-panel`).classList.add('active');
@@ -1745,6 +1992,7 @@
                 document.getElementById('stat-conversion-rate').textContent = data.conversion_rate + '%';
             } catch (error) {
                 console.error('Error loading stats:', error);
+                showToast('Failed to load statistics', 'error');
             }
         }
 
@@ -1760,16 +2008,16 @@
                 const data = await response.json();
                 const tbody = document.getElementById('users-table-body');
                 
-                if (data.users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No users found</td></tr>';
+                if (!data.users || data.users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">No users found</td></tr>';
                 } else {
                     tbody.innerHTML = data.users.map(user => `
                         <tr>
                             <td>
                                 <div class="user-cell">
-                                    <div class="user-avatar-small">${user.full_name.charAt(0).toUpperCase()}</div>
+                                    <div class="user-avatar-small">${(user.full_name || user.email).charAt(0).toUpperCase()}</div>
                                     <div>
-                                        <div style="font-weight: 600;">${user.full_name}</div>
+                                        <div style="font-weight: 600;">${user.full_name || 'No Name'}</div>
                                         <div style="font-size: 12px; color: var(--text-secondary);">${user.email}</div>
                                     </div>
                                 </div>
@@ -1896,10 +2144,10 @@
                     e.target.reset();
                 } else {
                     const err = await response.json();
-                    throw new Error(err.detail);
+                    throw new Error(err.detail || 'Failed to create signal');
                 }
             } catch (error) {
-                showToast(error.message || 'Error creating signal', 'error');
+                showToast(error.message, 'error');
             }
         }
 
@@ -2000,16 +2248,16 @@
                 const container = document.getElementById('signals-list');
                 
                 if (!data || data.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 40px;">No active signals</p>';
+                    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">No active signals</div>';
                     return;
                 }
-                
+
                 container.innerHTML = data.map(signal => `
-                    <div style="background: var(--bg-card); border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid var(--border);">
+                    <div class="content-card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <h3 style="font-size: 20px;">${signal.pair}</h3>
                             <span style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; background: ${signal.direction === 'buy' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${signal.direction === 'buy' ? 'var(--secondary)' : 'var(--danger)'};">
-                                ${signal.direction}
+                                ${signal.direction.toUpperCase()}
                             </span>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 12px;">
@@ -2027,10 +2275,11 @@
                             </div>
                         </div>
                         ${signal.analysis ? `<p style="color: var(--text-secondary); font-size: 14px;">${signal.analysis}</p>` : ''}
+                        ${signal.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-top: 10px;">PREMIUM</span>' : ''}
                     </div>
                 `).join('');
             } catch (error) {
-                document.getElementById('signals-list').innerHTML = '<p style="color: var(--danger); text-align: center;">Error loading signals</p>';
+                document.getElementById('signals-list').innerHTML = '<div style="color: var(--danger); text-align: center;">Error loading signals</div>';
             }
         }
 
@@ -2065,11 +2314,14 @@
                 resultDiv.innerHTML = `
                     <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; border: 1px solid var(--border);">
                         <h3 style="color: var(--primary); margin-bottom: 16px;"><i class="fas fa-robot"></i> Analysis Result</h3>
-                        <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;">${data.analysis}</pre>
+                        <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6; color: var(--text-primary);">${data.analysis}</pre>
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-secondary);">
+                            <i class="fas fa-clock"></i> ${new Date(data.timestamp).toLocaleString()}
+                        </div>
                     </div>
                 `;
             } catch (error) {
-                resultDiv.innerHTML = '<p style="color: var(--danger);">Analysis failed. Please try again.</p>';
+                resultDiv.innerHTML = '<p style="color: var(--danger); text-align: center;">Analysis failed. Please try again.</p>';
             }
         }
 
@@ -2080,8 +2332,8 @@
             
             const container = document.getElementById('chat-messages');
             container.innerHTML += `
-                <div style="display: flex; margin-bottom: 20px; justify-content: flex-end;">
-                    <div style="background: var(--primary); color: white; padding: 15px 20px; border-radius: 18px; border-bottom-right-radius: 4px; max-width: 80%;">${message}</div>
+                <div class="chat-message user">
+                    <div class="chat-message-content">${message}</div>
                 </div>
             `;
             input.value = '';
@@ -2094,15 +2346,15 @@
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ message, context: 'Forex trading' })
+                    body: JSON.stringify({ message: message, context: 'Forex trading' })
                 });
                 
                 if (!response.ok) throw new Error('Failed');
                 
                 const data = await response.json();
                 container.innerHTML += `
-                    <div style="display: flex; margin-bottom: 20px;">
-                        <div style="background: var(--bg-hover); padding: 15px 20px; border-radius: 18px; border-bottom-left-radius: 4px; max-width: 80%;">${data.response}</div>
+                    <div class="chat-message bot">
+                        <div class="chat-message-content">${data.response}</div>
                     </div>
                 `;
                 container.scrollTop = container.scrollHeight;
@@ -2120,19 +2372,19 @@
                 const container = document.getElementById('courses-list');
                 
                 if (!courses.length) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No courses available</p>';
+                    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">No courses available</div>';
                     return;
                 }
-                
+
                 container.innerHTML = courses.map(course => `
-                    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; margin-bottom: 16px; border: 1px solid var(--border);">
+                    <div class="content-card">
                         <h3>${course.title}</h3>
                         <p style="color: var(--text-secondary); margin-top: 8px;">${course.description}</p>
-                        ${course.is_premium ? '<span class="premium-badge">PREMIUM</span>' : ''}
+                        ${course.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-top: 10px;">PREMIUM</span>' : ''}
                     </div>
                 `).join('');
             } catch (error) {
-                document.getElementById('courses-list').innerHTML = '<p style="color: var(--danger); text-align: center;">Error loading courses</p>';
+                document.getElementById('courses-list').innerHTML = '<div style="color: var(--danger); text-align: center;">Error loading courses</div>';
             }
         }
 
@@ -2145,19 +2397,22 @@
                 const container = document.getElementById('webinars-list');
                 
                 if (!webinars.length) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No upcoming webinars</p>';
+                    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">No upcoming webinars</div>';
                     return;
                 }
-                
+
                 container.innerHTML = webinars.map(webinar => `
-                    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; margin-bottom: 16px; border: 1px solid var(--border);">
+                    <div class="content-card">
                         <h3>${webinar.title}</h3>
                         <p style="color: var(--text-secondary); margin-top: 8px;">${webinar.description}</p>
-                        <p style="margin-top: 12px; font-size: 14px;"><i class="fas fa-calendar"></i> ${new Date(webinar.scheduled_at).toLocaleString()}</p>
+                        <div style="margin-top: 12px; font-size: 14px; color: var(--text-secondary);">
+                            <i class="fas fa-calendar"></i> ${new Date(webinar.scheduled_at).toLocaleString()}
+                        </div>
+                        ${webinar.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-top: 10px;">PREMIUM</span>' : ''}
                     </div>
                 `).join('');
             } catch (error) {
-                document.getElementById('webinars-list').innerHTML = '<p style="color: var(--danger); text-align: center;">Error loading webinars</p>';
+                document.getElementById('webinars-list').innerHTML = '<div style="color: var(--danger); text-align: center;">Error loading webinars</div>';
             }
         }
 
@@ -2170,18 +2425,22 @@
                 const container = document.getElementById('blog-list');
                 
                 if (!posts.length) {
-                    container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No posts available</p>';
+                    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">No posts available</div>';
                     return;
                 }
-                
+
                 container.innerHTML = posts.map(post => `
-                    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; margin-bottom: 16px; border: 1px solid var(--border);">
+                    <div class="content-card">
                         <h3>${post.title}</h3>
                         <p style="color: var(--text-secondary); margin-top: 8px;">${post.excerpt || post.content.substring(0, 200)}...</p>
+                        <div style="margin-top: 12px; font-size: 14px; color: var(--text-secondary);">
+                            <i class="fas fa-clock"></i> ${new Date(post.created_at).toLocaleDateString()}
+                        </div>
+                        ${post.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-top: 10px;">PREMIUM</span>' : ''}
                     </div>
                 `).join('');
             } catch (error) {
-                document.getElementById('blog-list').innerHTML = '<p style="color: var(--danger); text-align: center;">Error loading blog</p>';
+                document.getElementById('blog-list').innerHTML = '<div style="color: var(--danger); text-align: center;">Error loading blog</div>';
             }
         }
     </script>

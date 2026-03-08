@@ -14,10 +14,11 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
 # FastAPI and related
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, status, Query
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, status, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 # Database
 import asyncpg
@@ -33,7 +34,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 
 # Pydantic models
-from pydantic import BaseModel, EmailStr, Field, validator, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 # Configure logging
 logging.basicConfig(
@@ -124,13 +125,17 @@ db_pool: Optional[Pool] = None
 async def init_db():
     global db_pool
     try:
+        if not settings.DATABASE_URL:
+            logger.error("DATABASE_URL not set!")
+            raise ValueError("DATABASE_URL environment variable is required")
+
         db_pool = await asyncpg.create_pool(
             settings.DATABASE_URL,
-            min_size=5,
-            max_size=20,
+            min_size=2,
+            max_size=10,
             command_timeout=60
         )
-        logger.info("Database pool created")
+        logger.info("Database pool created successfully")
 
         async with db_pool.acquire() as conn:
             # Check if users table exists
@@ -289,7 +294,7 @@ async def init_db():
                 )
                 logger.info("Admin user created")
 
-            logger.info("Database initialization completed")
+            logger.info("Database initialization completed successfully")
 
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
@@ -305,17 +310,21 @@ async def close_db():
 
 class AIService:
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=120.0)
-        self.headers = {
-            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": settings.FRONTEND_URL,
-            "X-Title": "Pipways Trading API"
-        }
+        self.client = None
+
+    async def init_client(self):
+        if self.client is None:
+            self.client = httpx.AsyncClient(
+                timeout=httpx.Timeout(120.0, connect=30.0),
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+            )
 
     async def analyze_chart(self, image_base64: str, pair: str = "", timeframe: str = "", additional_info: str = "") -> Dict[str, Any]:
+        await self.init_client()
+
         if not settings.OPENROUTER_API_KEY:
-            raise HTTPException(status_code=503, detail="AI service not configured")
+            logger.error("OPENROUTER_API_KEY not configured")
+            raise HTTPException(status_code=503, detail="AI service not configured. Please set OPENROUTER_API_KEY.")
 
         prompt = f"""You are an expert forex/crypto trading analyst with 20+ years of experience. Analyze this trading chart with extreme precision and professional insight.
 
@@ -377,10 +386,18 @@ class AIService:
 
 Provide ONLY the JSON response, no markdown formatting, no additional commentary."""
 
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": settings.FRONTEND_URL,
+            "X-Title": "Pipways Trading API"
+        }
+
         try:
+            logger.info(f"Sending chart analysis request to OpenRouter. Model: {settings.OPENROUTER_VISION_MODEL}")
             response = await self.client.post(
                 f"{settings.OPENROUTER_BASE_URL}/chat/completions",
-                headers=self.headers,
+                headers=headers,
                 json={
                     "model": settings.OPENROUTER_VISION_MODEL,
                     "messages": [
@@ -403,6 +420,8 @@ Provide ONLY the JSON response, no markdown formatting, no additional commentary
             result = response.json()
 
             content = result["choices"][0]["message"]["content"]
+            logger.info("Chart analysis received successfully")
+
             # Try to parse JSON from the response
             try:
                 # Remove markdown code blocks if present
@@ -411,7 +430,8 @@ Provide ONLY the JSON response, no markdown formatting, no additional commentary
                 elif "```" in content:
                     content = content.split("```")[1].split("```")[0]
                 analysis_json = json.loads(content.strip())
-            except:
+            except Exception as e:
+                logger.warning(f"Could not parse JSON response: {e}")
                 analysis_json = {"raw_analysis": content}
 
             return {
@@ -421,16 +441,27 @@ Provide ONLY the JSON response, no markdown formatting, no additional commentary
                 "timestamp": datetime.utcnow().isoformat()
             }
 
-        except httpx.HTTPError as e:
-            logger.error(f"OpenRouter API error: {e}")
-            raise HTTPException(status_code=502, detail=f"AI service error: {str(e)}")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter API HTTP error: {e.response.status_code} - {e.response.text}")
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=502, detail="AI service authentication failed. Check OPENROUTER_API_KEY.")
+            elif e.response.status_code == 429:
+                raise HTTPException(status_code=502, detail="AI service rate limit exceeded. Please try again later.")
+            else:
+                raise HTTPException(status_code=502, detail=f"AI service error: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"OpenRouter request error: {e}")
+            raise HTTPException(status_code=502, detail="Cannot connect to AI service. Please check your internet connection.")
         except Exception as e:
             logger.error(f"Chart analysis error: {e}")
-            raise HTTPException(status_code=500, detail="Analysis failed")
+            raise HTTPException(status_code=500, detail="Analysis failed due to internal error")
 
     async def mentor_chat(self, message: str, chat_history: List[Dict] = None, user_context: Dict = None) -> str:
+        await self.init_client()
+
         if not settings.OPENROUTER_API_KEY:
-            raise HTTPException(status_code=503, detail="AI service not configured")
+            logger.error("OPENROUTER_API_KEY not configured")
+            raise HTTPException(status_code=503, detail="AI service not configured. Please set OPENROUTER_API_KEY.")
 
         system_prompt = """You are an elite trading mentor with expertise in:
 - Technical Analysis (Price Action, Indicators, Chart Patterns)
@@ -462,10 +493,18 @@ Provide ONLY the JSON response, no markdown formatting, no additional commentary
 
         messages.append({"role": "user", "content": message})
 
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": settings.FRONTEND_URL,
+            "X-Title": "Pipways Trading API"
+        }
+
         try:
+            logger.info(f"Sending mentor chat request to OpenRouter. Model: {settings.OPENROUTER_MODEL}")
             response = await self.client.post(
                 f"{settings.OPENROUTER_BASE_URL}/chat/completions",
-                headers=self.headers,
+                headers=headers,
                 json={
                     "model": settings.OPENROUTER_MODEL,
                     "messages": messages,
@@ -475,14 +514,23 @@ Provide ONLY the JSON response, no markdown formatting, no additional commentary
             )
             response.raise_for_status()
             result = response.json()
+            logger.info("Mentor chat response received successfully")
             return result["choices"][0]["message"]["content"]
 
-        except httpx.HTTPError as e:
-            logger.error(f"OpenRouter API error: {e}")
-            raise HTTPException(status_code=502, detail="AI service unavailable")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter API HTTP error: {e.response.status_code} - {e.response.text}")
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=502, detail="AI service authentication failed. Check OPENROUTER_API_KEY.")
+            elif e.response.status_code == 429:
+                raise HTTPException(status_code=502, detail="AI service rate limit exceeded. Please try again later.")
+            else:
+                raise HTTPException(status_code=502, detail=f"AI service error: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"OpenRouter request error: {e}")
+            raise HTTPException(status_code=502, detail="Cannot connect to AI service. Please check your internet connection.")
         except Exception as e:
             logger.error(f"Mentor chat error: {e}")
-            raise HTTPException(status_code=500, detail="Chat failed")
+            raise HTTPException(status_code=500, detail="Chat failed due to internal error")
 
 ai_service = AIService()
 
@@ -559,9 +607,11 @@ class MentorChatRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting up Pipways API...")
     await init_db()
     yield
     await close_db()
+    logger.info("Shutting down Pipways API...")
 
 app = FastAPI(
     title="Pipways Trading API",
@@ -570,14 +620,29 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware
+# CORS Middleware - Enhanced for better compatibility
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
+
+# ==================== REQUEST LOGGING MIDDLEWARE ====================
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"{request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+        logger.info(f"{request.method} {request.url.path} - {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"{request.method} {request.url.path} - ERROR: {e}")
+        raise
 
 # ==================== AUTH ROUTES ====================
 
@@ -797,6 +862,8 @@ async def analyze_chart(
     additional_info: Optional[str] = Form(None),
     current_user: Dict = Depends(get_current_user)
 ):
+    logger.info(f"Chart analysis request from user {current_user['user_id']}")
+
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
@@ -806,22 +873,29 @@ async def analyze_chart(
 
     image_base64 = base64.b64encode(contents).decode()
 
-    analysis = await ai_service.analyze_chart(image_base64, pair, timeframe, additional_info)
+    try:
+        analysis = await ai_service.analyze_chart(image_base64, pair, timeframe, additional_info)
 
-    # Save to history
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-            INSERT INTO chart_analyses (user_id, image_url, analysis_text, pair, timeframe)
-            VALUES ($1, $2, $3, $4, $5)
-        """,
-            int(current_user["user_id"]),
-            f"data:{file.content_type};base64,{image_base64[:100]}...",  # Store truncated reference
-            json.dumps(analysis["analysis"]),
-            pair,
-            timeframe
-        )
+        # Save to history
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO chart_analyses (user_id, image_url, analysis_text, pair, timeframe)
+                VALUES ($1, $2, $3, $4, $5)
+            """,
+                int(current_user["user_id"]),
+                f"data:{file.content_type};base64,{image_base64[:100]}...",
+                json.dumps(analysis["analysis"]),
+                pair,
+                timeframe
+            )
 
-    return analysis
+        return analysis
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in analyze_chart: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during analysis")
 
 @app.get("/analyze/history")
 async def get_analysis_history(
@@ -856,6 +930,8 @@ async def mentor_chat(
     request: MentorChatRequest,
     current_user: Dict = Depends(get_current_user)
 ):
+    logger.info(f"Mentor chat request from user {current_user['user_id']}")
+
     # Get chat history for context
     async with db_pool.acquire() as conn:
         history = await conn.fetch("""
@@ -868,19 +944,26 @@ async def mentor_chat(
 
         chat_history = [dict(row) for row in history]
 
-        # Get AI response
-        response_text = await ai_service.mentor_chat(request.message, chat_history)
+        try:
+            # Get AI response
+            response_text = await ai_service.mentor_chat(request.message, chat_history)
 
-        # Save chat
-        await conn.execute("""
-            INSERT INTO mentor_chats (user_id, message, response)
-            VALUES ($1, $2, $3)
-        """, int(current_user["user_id"]), request.message, response_text)
+            # Save chat
+            await conn.execute("""
+                INSERT INTO mentor_chats (user_id, message, response)
+                VALUES ($1, $2, $3)
+            """, int(current_user["user_id"]), request.message, response_text)
 
-        return {
-            "response": response_text,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+            return {
+                "response": response_text,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in mentor_chat: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error during chat")
 
 @app.get("/mentor/history")
 async def get_mentor_history(
@@ -1188,7 +1271,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0.0"
+        "version": "2.0.0",
+        "database_connected": db_pool is not None
     }
 
 @app.get("/")
@@ -1203,9 +1287,9 @@ async def root():
 # ==================== ERROR HANDLERS ====================
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"}
+        content={"detail": "Internal server error", "message": str(exc) if os.getenv("DEBUG") else "Something went wrong"}
     )

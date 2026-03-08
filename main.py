@@ -74,8 +74,24 @@ security = HTTPBearer()
 # Models
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$")
+    password: str = Field(..., min_length=8)
     full_name: str = Field(..., min_length=2, max_length=100)
+    
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Validate password complexity without using look-ahead regex"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain a lowercase letter')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain an uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain a number')
+        if not any(c in '@$!%*?&' for c in v):
+            raise ValueError('Password must contain a special character (@$!%*?&)')
+        return v
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -92,10 +108,25 @@ class PasswordResetRequest(BaseModel):
 
 class PasswordReset(BaseModel):
     token: str
-    new_password: str = Field(..., min_length=8, pattern=r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$")
+    new_password: str = Field(..., min_length=8)
+    
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain a lowercase letter')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain an uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain a number')
+        if not any(c in '@$!%*?&' for c in v):
+            raise ValueError('Password must contain a special character (@$!%*?&)')
+        return v
 
 class SignalCreate(BaseModel):
-    pair: str
+    pair: str = Field(..., min_length=1)
     direction: str = Field(..., pattern="^(buy|sell)$")
     entry_price: float
     stop_loss: Optional[float] = None
@@ -105,27 +136,27 @@ class SignalCreate(BaseModel):
     is_premium: bool = False
 
 class BlogPostCreate(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
     excerpt: Optional[str] = None
     is_premium: bool = False
 
 class WebinarCreate(BaseModel):
-    title: str
-    description: str
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
     scheduled_at: datetime
-    duration_minutes: int = 60
+    duration_minutes: int = Field(default=60, ge=1)
     is_premium: bool = False
     meeting_link: Optional[str] = None
 
 class CourseCreate(BaseModel):
-    title: str
-    description: str
-    content: str
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
     is_premium: bool = False
 
 class MentorChatMessage(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1)
     context: Optional[str] = None
 
 # Database initialization
@@ -356,7 +387,7 @@ async def forgot_password(request: PasswordResetRequest):
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", request.email)
         if not user:
-            return {"message": "If email exists, reset link sent"}  # Security through obscurity
+            return {"message": "If email exists, reset link sent"}
         
         reset_token = create_reset_token()
         expires = datetime.utcnow() + timedelta(hours=settings.RESET_TOKEN_EXPIRE_HOURS)
@@ -365,7 +396,6 @@ async def forgot_password(request: PasswordResetRequest):
             UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3
         """, reset_token, expires, user["id"])
         
-        # Log for testing (replace with email in production)
         reset_url = f"https://pipways-web-nhem.onrender.com?reset_token={reset_token}"
         logger.info(f"Password reset URL for {request.email}: {reset_url}")
         
@@ -393,7 +423,6 @@ async def reset_password(reset_data: PasswordReset):
 
 @app.post("/auth/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
-    # Client-side token removal, server-side we could blacklist if needed
     return {"message": "Logged out successfully"}
 
 # Admin User Management
@@ -574,9 +603,8 @@ async def analyze_chart(
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    # Read file content
     contents = await file.read()
-    if len(contents) > 10 * 1024 * 1024:  # 10MB limit
+    if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large")
     
     import base64
@@ -638,7 +666,6 @@ async def mentor_chat(
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    # Get chat history for context
     async with db_pool.acquire() as conn:
         history = await conn.fetch("""
             SELECT message, response FROM chat_history 
@@ -680,7 +707,6 @@ async def mentor_chat(
             result = response.json()
             ai_response = result["choices"][0]["message"]["content"]
             
-            # Save to history
             await conn.execute("""
                 INSERT INTO chat_history (user_id, message, response, context)
                 VALUES ($1, $2, $3, $4)

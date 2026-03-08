@@ -6,12 +6,8 @@
     <title>Pipways - Professional Trading Education</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         :root {
             --primary: #6366f1;
             --primary-dark: #4f46e5;
@@ -34,10 +30,7 @@
             line-height: 1.6;
         }
 
-        /* Dashboard Layout */
-        .dashboard {
-            min-height: 100vh;
-        }
+        .dashboard { min-height: 100vh; }
 
         .sidebar {
             position: fixed;
@@ -67,18 +60,14 @@
             color: var(--text-primary);
         }
 
-        .sidebar-logo i {
-            color: var(--primary);
-        }
+        .sidebar-logo i { color: var(--primary); }
 
         .nav-menu {
             list-style: none;
             padding: 0 10px;
         }
 
-        .nav-item {
-            margin-bottom: 5px;
-        }
+        .nav-item { margin-bottom: 5px; }
 
         .nav-link {
             display: flex;
@@ -92,16 +81,12 @@
             cursor: pointer;
         }
 
-        .nav-link:hover,
-        .nav-link.active {
+        .nav-link:hover, .nav-link.active {
             background: var(--primary);
             color: white;
         }
 
-        .nav-link i {
-            width: 20px;
-            text-align: center;
-        }
+        .nav-link i { width: 20px; text-align: center; }
 
         .sidebar-footer {
             position: absolute;
@@ -130,14 +115,9 @@
             font-weight: 600;
         }
 
-        .user-details {
-            flex: 1;
-        }
+        .user-details { flex: 1; }
 
-        .user-name {
-            font-weight: 600;
-            font-size: 14px;
-        }
+        .user-name { font-weight: 600; font-size: 14px; }
 
         .user-email {
             font-size: 12px;
@@ -156,16 +136,13 @@
             margin-top: 4px;
         }
 
-        /* Main Content */
         .main-content {
             margin-left: 260px;
             padding: 30px;
             min-height: 100vh;
         }
 
-        .page-header {
-            margin-bottom: 30px;
-        }
+        .page-header { margin-bottom: 30px; }
 
         .page-header h2 {
             font-size: 28px;
@@ -173,11 +150,8 @@
             margin-bottom: 5px;
         }
 
-        .page-header p {
-            color: var(--text-secondary);
-        }
+        .page-header p { color: var(--text-secondary); }
 
-        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -193,9 +167,7 @@
             transition: transform 0.3s;
         }
 
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
+        .stat-card:hover { transform: translateY(-5px); }
 
         .stat-header {
             display: flex;
@@ -219,18 +191,10 @@
         .stat-icon.orange { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
         .stat-icon.red { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
+        .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
 
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+        .stat-label { color: var(--text-secondary); font-size: 14px; }
 
-        /* Cards */
         .card {
             background: var(--bg-card);
             border-radius: 16px;
@@ -247,27 +211,17 @@
             justify-content: space-between;
         }
 
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
+        .card-title { font-size: 18px; font-weight: 600; }
 
-        .card-body {
-            padding: 24px;
-        }
+        .card-body { padding: 24px; }
 
-        /* Content Grid */
         .content-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 30px;
         }
 
-        /* Trade Form */
-        .trade-form {
-            display: grid;
-            gap: 20px;
-        }
+        .trade-form { display: grid; gap: 20px; }
 
         .form-row {
             display: grid;
@@ -275,10 +229,9 @@
             gap: 20px;
         }
 
-        /* Dashboard form inputs (dark theme) */
-        .section .form-group input,
-        .section .form-group select,
-        .section .form-group textarea {
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
             background: var(--bg-dark);
             border: 1px solid var(--border);
             color: var(--text-primary);
@@ -288,9 +241,9 @@
             font-size: 15px;
         }
 
-        .section .form-group input:focus,
-        .section .form-group select:focus,
-        .section .form-group textarea:focus {
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
         }
@@ -303,11 +256,7 @@
             font-size: 14px;
         }
 
-        /* Trade History */
-        .trade-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
+        .trade-list { max-height: 400px; overflow-y: auto; }
 
         .trade-item {
             display: flex;
@@ -318,24 +267,13 @@
             transition: background 0.3s;
         }
 
-        .trade-item:hover {
-            background: var(--bg-hover);
-        }
+        .trade-item:hover { background: var(--bg-hover); }
 
-        .trade-info h4 {
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
+        .trade-info h4 { font-weight: 600; margin-bottom: 4px; }
 
-        .trade-info span {
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
+        .trade-info span { font-size: 13px; color: var(--text-secondary); }
 
-        .trade-pips {
-            font-weight: 700;
-            font-size: 18px;
-        }
+        .trade-pips { font-weight: 700; font-size: 18px; }
 
         .trade-pips.positive { color: var(--secondary); }
         .trade-pips.negative { color: var(--danger); }
@@ -354,7 +292,6 @@
         .grade-d { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
         .grade-f { background: rgba(100, 116, 139, 0.2); color: var(--text-secondary); }
 
-        /* Buttons */
         .btn {
             padding: 14px 24px;
             background: var(--primary);
@@ -383,21 +320,12 @@
             border: 2px solid var(--primary);
         }
 
-        .btn-secondary:hover {
-            background: var(--primary);
-            color: white;
-        }
+        .btn-secondary:hover { background: var(--primary); color: white; }
 
-        .btn-success {
-            background: var(--secondary);
-        }
+        .btn-success { background: var(--secondary); }
 
-        .btn-small {
-            padding: 10px 20px;
-            font-size: 14px;
-        }
+        .btn-small { padding: 10px 20px; font-size: 14px; }
 
-        /* AI Analysis Section */
         .upload-area {
             border: 2px dashed var(--border);
             border-radius: 16px;
@@ -413,30 +341,15 @@
             background: rgba(99, 102, 241, 0.05);
         }
 
-        .upload-area i {
-            font-size: 64px;
-            color: var(--primary);
-            margin-bottom: 20px;
-        }
+        .upload-area i { font-size: 64px; color: var(--primary); margin-bottom: 20px; }
 
-        .upload-area h3 {
-            margin-bottom: 10px;
-            font-size: 20px;
-        }
+        .upload-area h3 { margin-bottom: 10px; font-size: 20px; }
 
-        .upload-area p {
-            color: var(--text-secondary);
-            margin-bottom: 25px;
-        }
+        .upload-area p { color: var(--text-secondary); margin-bottom: 25px; }
 
-        .file-input {
-            display: none;
-        }
+        .file-input { display: none; }
 
-        /* Analysis Result Styles */
-        .analysis-container {
-            margin-top: 30px;
-        }
+        .analysis-container { margin-top: 30px; }
 
         .analysis-result-card {
             background: var(--bg-dark);
@@ -472,19 +385,11 @@
             font-size: 24px;
         }
 
-        .analysis-title h3 {
-            font-size: 20px;
-            margin-bottom: 5px;
-        }
+        .analysis-title h3 { font-size: 20px; margin-bottom: 5px; }
 
-        .analysis-title span {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+        .analysis-title span { color: var(--text-secondary); font-size: 14px; }
 
-        .analysis-section {
-            margin-bottom: 25px;
-        }
+        .analysis-section { margin-bottom: 25px; }
 
         .analysis-section h4 {
             color: var(--primary);
@@ -510,21 +415,11 @@
             border-top: 1px solid var(--border);
         }
 
-        .metric {
-            text-align: center;
-        }
+        .metric { text-align: center; }
 
-        .metric-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary);
-        }
+        .metric-value { font-size: 24px; font-weight: 700; color: var(--primary); }
 
-        .metric-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-top: 5px;
-        }
+        .metric-label { font-size: 13px; color: var(--text-secondary); margin-top: 5px; }
 
         .analysis-actions {
             display: flex;
@@ -533,7 +428,6 @@
             flex-wrap: wrap;
         }
 
-        /* Chat Interface */
         .chat-container {
             background: var(--bg-card);
             border-radius: 16px;
@@ -549,19 +443,11 @@
             padding: 20px;
         }
 
-        .chat-message {
-            margin-bottom: 16px;
-            max-width: 80%;
-        }
+        .chat-message { margin-bottom: 16px; max-width: 80%; }
 
-        .chat-message.user {
-            margin-left: auto;
-            text-align: right;
-        }
+        .chat-message.user { margin-left: auto; text-align: right; }
 
-        .chat-message.assistant {
-            margin-right: auto;
-        }
+        .chat-message.assistant { margin-right: auto; }
 
         .chat-bubble {
             display: inline-block;
@@ -600,15 +486,9 @@
             font-size: 14px;
         }
 
-        .chat-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
+        .chat-input:focus { outline: none; border-color: var(--primary); }
 
-        /* Analysis History */
-        .analysis-history {
-            margin-top: 30px;
-        }
+        .analysis-history { margin-top: 30px; }
 
         .history-item {
             display: flex;
@@ -623,9 +503,7 @@
             cursor: pointer;
         }
 
-        .history-item:hover {
-            border-color: var(--primary);
-        }
+        .history-item:hover { border-color: var(--primary); }
 
         .history-thumb {
             width: 80px;
@@ -639,13 +517,9 @@
             color: var(--primary);
         }
 
-        .history-info {
-            flex: 1;
-        }
+        .history-info { flex: 1; }
 
-        .history-info h4 {
-            margin-bottom: 8px;
-        }
+        .history-info h4 { margin-bottom: 8px; }
 
         .history-info p {
             color: var(--text-secondary);
@@ -660,7 +534,6 @@
             color: var(--text-secondary);
         }
 
-        /* Courses Grid */
         .courses-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -675,9 +548,7 @@
             transition: transform 0.3s;
         }
 
-        .course-card:hover {
-            transform: translateY(-5px);
-        }
+        .course-card:hover { transform: translateY(-5px); }
 
         .course-image {
             height: 180px;
@@ -702,9 +573,7 @@
             font-weight: 600;
         }
 
-        .course-content {
-            padding: 24px;
-        }
+        .course-content { padding: 24px; }
 
         .course-level {
             display: inline-block;
@@ -718,11 +587,7 @@
             margin-bottom: 12px;
         }
 
-        .course-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
+        .course-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
 
         .course-desc {
             color: var(--text-secondary);
@@ -739,9 +604,7 @@
             color: var(--text-secondary);
         }
 
-        .course-stats i {
-            margin-right: 5px;
-        }
+        .course-stats i { margin-right: 5px; }
 
         .course-footer {
             display: flex;
@@ -749,13 +612,8 @@
             justify-content: space-between;
         }
 
-        .course-price {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--secondary);
-        }
+        .course-price { font-size: 24px; font-weight: 700; color: var(--secondary); }
 
-        /* Webinars */
         .webinar-list {
             display: flex;
             flex-direction: column;
@@ -772,9 +630,7 @@
             transition: all 0.3s;
         }
 
-        .webinar-item:hover {
-            border-color: var(--primary);
-        }
+        .webinar-item:hover { border-color: var(--primary); }
 
         .webinar-date {
             text-align: center;
@@ -784,11 +640,7 @@
             border-radius: 12px;
         }
 
-        .webinar-date .day {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--primary);
-        }
+        .webinar-date .day { font-size: 32px; font-weight: 700; color: var(--primary); }
 
         .webinar-date .month {
             font-size: 13px;
@@ -796,15 +648,9 @@
             text-transform: uppercase;
         }
 
-        .webinar-info {
-            flex: 1;
-        }
+        .webinar-info { flex: 1; }
 
-        .webinar-info h4 {
-            font-weight: 600;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
+        .webinar-info h4 { font-weight: 600; margin-bottom: 10px; font-size: 18px; }
 
         .webinar-info p {
             color: var(--text-secondary);
@@ -820,11 +666,8 @@
             color: var(--text-secondary);
         }
 
-        .webinar-meta i {
-            margin-right: 6px;
-        }
+        .webinar-meta i { margin-right: 6px; }
 
-        /* Blog Styles */
         .blog-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -840,9 +683,7 @@
             cursor: pointer;
         }
 
-        .blog-card:hover {
-            transform: translateY(-5px);
-        }
+        .blog-card:hover { transform: translateY(-5px); }
 
         .blog-image {
             height: 200px;
@@ -854,9 +695,7 @@
             color: white;
         }
 
-        .blog-content {
-            padding: 24px;
-        }
+        .blog-content { padding: 24px; }
 
         .blog-category {
             display: inline-block;
@@ -870,12 +709,7 @@
             margin-bottom: 12px;
         }
 
-        .blog-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            line-height: 1.4;
-        }
+        .blog-title { font-size: 20px; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
 
         .blog-excerpt {
             color: var(--text-secondary);
@@ -892,11 +726,7 @@
             border-top: 1px solid var(--border);
         }
 
-        .blog-author {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .blog-author { display: flex; align-items: center; gap: 10px; }
 
         .blog-author-avatar {
             width: 32px;
@@ -910,18 +740,11 @@
             font-weight: 600;
         }
 
-        .blog-author-info {
-            font-size: 13px;
-        }
+        .blog-author-info { font-size: 13px; }
 
-        .blog-author-name {
-            font-weight: 600;
-        }
+        .blog-author-name { font-weight: 600; }
 
-        .blog-date {
-            color: var(--text-secondary);
-            font-size: 12px;
-        }
+        .blog-date { color: var(--text-secondary); font-size: 12px; }
 
         .read-more {
             color: var(--primary);
@@ -933,7 +756,6 @@
             gap: 5px;
         }
 
-        /* Blog Post Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -948,9 +770,7 @@
             padding: 20px;
         }
 
-        .modal-overlay.show {
-            display: flex;
-        }
+        .modal-overlay.show { display: flex; }
 
         .modal-content {
             background: var(--bg-card);
@@ -962,10 +782,7 @@
             position: relative;
         }
 
-        .modal-header {
-            padding: 30px;
-            border-bottom: 1px solid var(--border);
-        }
+        .modal-header { padding: 30px; border-bottom: 1px solid var(--border); }
 
         .modal-close {
             position: absolute;
@@ -984,19 +801,11 @@
             font-size: 18px;
         }
 
-        .modal-close:hover {
-            background: var(--danger);
-            color: white;
-        }
+        .modal-close:hover { background: var(--danger); color: white; }
 
-        .modal-body {
-            padding: 30px;
-        }
+        .modal-body { padding: 30px; }
 
-        .modal-body h2 {
-            font-size: 28px;
-            margin-bottom: 20px;
-        }
+        .modal-body h2 { font-size: 28px; margin-bottom: 20px; }
 
         .modal-body p {
             color: var(--text-secondary);
@@ -1005,7 +814,6 @@
             font-size: 16px;
         }
 
-        /* Loading States */
         .loading {
             display: flex;
             align-items: center;
@@ -1014,15 +822,9 @@
             color: var(--text-secondary);
         }
 
-        .loading i {
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
+        .loading i { animation: spin 1s linear infinite; margin-right: 10px; }
 
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .empty-state {
             text-align: center;
@@ -1030,25 +832,16 @@
             color: var(--text-secondary);
         }
 
-        .empty-state i {
-            font-size: 48px;
-            margin-bottom: 15px;
-            opacity: 0.5;
-        }
+        .empty-state i { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
 
-        /* Error State */
         .error-state {
             text-align: center;
             padding: 60px 20px;
             color: var(--danger);
         }
 
-        .error-state i {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
+        .error-state i { font-size: 48px; margin-bottom: 15px; }
 
-        /* Toast Notification */
         .toast {
             position: fixed;
             top: 20px;
@@ -1070,60 +863,28 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        .toast.show {
-            display: flex;
-        }
+        .toast.show { display: flex; }
 
-        .toast.success {
-            background: var(--secondary);
-        }
+        .toast.success { background: var(--secondary); }
 
-        /* Section Visibility */
-        .section {
-            display: none;
-        }
+        .section { display: none; }
 
-        .section.active {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
+        .section.active { display: block; animation: fadeIn 0.3s ease; }
 
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Responsive */
         @media (max-width: 1024px) {
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .analysis-metrics {
-                grid-template-columns: 1fr;
-            }
+            .content-grid { grid-template-columns: 1fr; }
+            .analysis-metrics { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .courses-grid,
-            .blog-grid {
-                grid-template-columns: 1fr;
-            }
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+            .form-row { grid-template-columns: 1fr; }
+            .courses-grid, .blog-grid { grid-template-columns: 1fr; }
         }
 
-        /* Selected File Display */
         .selected-file-display {
             display: flex;
             align-items: center;
@@ -1147,31 +908,16 @@
             overflow: hidden;
         }
 
-        .file-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .file-preview img { width: 100%; height: 100%; object-fit: cover; }
 
-        .file-info {
-            flex: 1;
-        }
+        .file-info { flex: 1; }
 
-        .file-info h4 {
-            margin-bottom: 5px;
-        }
+        .file-info h4 { margin-bottom: 5px; }
 
-        .file-info p {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
+        .file-info p { color: var(--text-secondary); font-size: 14px; }
 
-        .file-actions {
-            display: flex;
-            gap: 10px;
-        }
+        .file-actions { display: flex; gap: 10px; }
 
-        /* Typing indicator */
         .typing-indicator {
             display: flex;
             gap: 4px;
@@ -1198,7 +944,6 @@
             30% { transform: translateY(-10px); }
         }
 
-        /* Connection Status */
         .connection-status {
             position: fixed;
             top: 20px;
@@ -1214,15 +959,10 @@
             z-index: 999;
         }
 
-        .connection-status.show {
-            display: flex;
-        }
+        .connection-status.show { display: flex; }
 
-        .connection-status.online {
-            background: var(--secondary);
-        }
+        .connection-status.online { background: var(--secondary); }
     </style>
-<base target="_blank">
 </head>
 <body>
     <!-- Toast Notification -->
@@ -1243,9 +983,7 @@
             <button class="modal-close" onclick="closeBlogModal()">
                 <i class="fas fa-times"></i>
             </button>
-            <div id="modal-content-area">
-                <!-- Content loaded dynamically -->
-            </div>
+            <div id="modal-content-area"></div>
         </div>
     </div>
 
@@ -1622,7 +1360,60 @@
         let isBackendConnected = false;
 
         // ==========================================
-        // INITIALIZATION - LOAD DASHBOARD DIRECTLY
+        // FETCH HELPER - PROPER CORS CONFIGURATION
+        // ==========================================
+        
+        /**
+         * Make API request with proper CORS settings
+         * CRITICAL: credentials must be 'omit' for CORS to work with our backend config
+         */
+        async function apiRequest(endpoint, options = {}) {
+            const url = `${API_URL}${endpoint}`;
+            
+            // Default fetch options for CORS
+            const defaultOptions = {
+                method: 'GET',
+                mode: 'cors',           // Enable CORS
+                credentials: 'omit',    // CRITICAL: Must be 'omit' (not 'include' or 'same-origin')
+                cache: 'no-cache',      // Don't cache CORS requests
+                headers: {
+                    'Accept': 'application/json',
+                }
+            };
+
+            // Merge options
+            const fetchOptions = {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            };
+
+            // For POST/PUT with JSON body, add Content-Type
+            if (options.body && typeof options.body === 'string' && 
+                !fetchOptions.headers['Content-Type']) {
+                fetchOptions.headers['Content-Type'] = 'application/json';
+            }
+
+            try {
+                const response = await fetch(url, fetchOptions);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error(`API Error (${endpoint}):`, error);
+                throw error;
+            }
+        }
+
+        // ==========================================
+        // INITIALIZATION
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
             checkBackendConnection();
@@ -1633,14 +1424,9 @@
         // ==========================================
         async function checkBackendConnection() {
             try {
-                const response = await fetch(`${API_URL}/health`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
+                const data = await apiRequest('/health');
                 
-                if (response.ok) {
+                if (data.status === 'healthy') {
                     isBackendConnected = true;
                     showConnectionStatus(true);
                     loadDashboardData();
@@ -1652,8 +1438,6 @@
                 isBackendConnected = false;
                 showConnectionStatus(false);
                 showToast('Backend is not responding. Please try again later.', 'error');
-                
-                // Show error states in all sections
                 showErrorInAllSections();
             }
         }
@@ -1755,15 +1539,11 @@
         }
 
         // ==========================================
-        // TRADE FUNCTIONS - NO AUTH HEADERS
+        // TRADE FUNCTIONS
         // ==========================================
         async function loadStats() {
             try {
-                const response = await fetch(`${API_URL}/trades/stats?period=all`);
-                
-                if (!response.ok) throw new Error('Failed to load stats');
-                
-                const data = await response.json();
+                const data = await apiRequest('/trades/stats?period=all');
                 
                 if (data.success) {
                     const stats = data.summary || {};
@@ -1777,8 +1557,7 @@
                 }
                 
                 // Load analysis count from history
-                const analysisResponse = await fetch(`${API_URL}/analyze/history?per_page=1`);
-                const analysisData = await analysisResponse.json();
+                const analysisData = await apiRequest('/analyze/history?per_page=1');
                 document.getElementById('stat-analyses').textContent = analysisData.pagination?.total || 0;
                 
             } catch (error) {
@@ -1788,11 +1567,7 @@
 
         async function loadRecentTrades() {
             try {
-                const response = await fetch(`${API_URL}/trades?per_page=5`);
-                
-                if (!response.ok) throw new Error('Failed to load trades');
-                
-                const data = await response.json();
+                const data = await apiRequest('/trades?per_page=5');
                 const container = document.getElementById('recent-trades-list');
                 
                 if (!data.trades?.length) {
@@ -1828,11 +1603,7 @@
         async function loadTrades() {
             await loadRecentTrades();
             try {
-                const response = await fetch(`${API_URL}/trades?per_page=50`);
-                
-                if (!response.ok) throw new Error('Failed to load trades');
-                
-                const data = await response.json();
+                const data = await apiRequest('/trades?per_page=50');
                 const container = document.getElementById('trade-history-list');
                 
                 if (!data.trades?.length) {
@@ -1879,15 +1650,10 @@
             };
 
             try {
-                const response = await fetch(`${API_URL}/trades`, {
+                const data = await apiRequest('/trades', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
                     body: JSON.stringify(tradeData)
                 });
-
-                const data = await response.json();
 
                 if (data.success) {
                     showToast('Trade logged successfully!', 'success');
@@ -1903,7 +1669,7 @@
         }
 
         // ==========================================
-        // AI ANALYSIS FUNCTIONS - NO AUTH HEADERS
+        // AI ANALYSIS FUNCTIONS
         // ==========================================
         function handleFileSelect(input) {
             if (input.files && input.files[0]) {
@@ -1956,9 +1722,14 @@
             `;
 
             try {
+                // For FormData, we must NOT set Content-Type header manually
+                // The browser will set it with the correct boundary
                 const response = await fetch(`${API_URL}/analyze/chart`, {
                     method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
                     body: formData
+                    // NO headers - browser sets Content-Type with boundary for FormData
                 });
 
                 const data = await response.json();
@@ -2082,11 +1853,7 @@
 
         async function loadAnalysisHistory() {
             try {
-                const response = await fetch(`${API_URL}/analyze/history?per_page=10`);
-                
-                if (!response.ok) throw new Error('Failed to load history');
-                
-                const data = await response.json();
+                const data = await apiRequest('/analyze/history?per_page=10');
                 const container = document.getElementById('analysis-history-list');
                 
                 if (!data.analyses?.length) {
@@ -2134,7 +1901,7 @@
         }
 
         // ==========================================
-        // AI MENTOR CHAT - NO AUTH HEADERS
+        // AI MENTOR CHAT
         // ==========================================
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
@@ -2155,8 +1922,11 @@
                 
                 const response = await fetch(`${API_URL}/mentor/chat`, {
                     method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
                     },
                     body: formData
                 });
@@ -2214,18 +1984,14 @@
         }
 
         // ==========================================
-        // COURSES, WEBINARS, BLOG - NO AUTH HEADERS
+        // COURSES, WEBINARS, BLOG
         // ==========================================
         async function loadCourses() {
             const container = document.getElementById('courses-grid');
             container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading courses...</div>';
             
             try {
-                const response = await fetch(`${API_URL}/courses`);
-                
-                if (!response.ok) throw new Error('Failed to load courses');
-                
-                const data = await response.json();
+                const data = await apiRequest('/courses');
 
                 if (!data.courses?.length) {
                     container.innerHTML = '<div class="empty-state"><i class="fas fa-graduation-cap"></i><p>No courses available</p></div>';
@@ -2263,11 +2029,9 @@
 
         async function enrollCourse(courseId) {
             try {
-                const response = await fetch(`${API_URL}/courses/${courseId}/enroll`, {
+                const data = await apiRequest(`/courses/${courseId}/enroll`, {
                     method: 'POST'
                 });
-                
-                const data = await response.json();
                 showToast(data.message, 'success');
                 
             } catch (error) {
@@ -2280,11 +2044,7 @@
             container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading webinars...</div>';
             
             try {
-                const response = await fetch(`${API_URL}/webinars?upcoming=true`);
-                
-                if (!response.ok) throw new Error('Failed to load webinars');
-                
-                const data = await response.json();
+                const data = await apiRequest('/webinars?upcoming=true');
 
                 if (!data.webinars?.length) {
                     container.innerHTML = '<div class="empty-state"><i class="fas fa-video"></i><p>No upcoming webinars</p></div>';
@@ -2322,11 +2082,9 @@
 
         async function registerWebinar(webinarId) {
             try {
-                const response = await fetch(`${API_URL}/webinars/${webinarId}/register`, {
+                const data = await apiRequest(`/webinars/${webinarId}/register`, {
                     method: 'POST'
                 });
-                
-                const data = await response.json();
                 showToast(data.message, 'success');
                 
             } catch (error) {
@@ -2339,11 +2097,7 @@
             container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading articles...</div>';
             
             try {
-                const response = await fetch(`${API_URL}/blog/posts`);
-                
-                if (!response.ok) throw new Error('Failed to load articles');
-                
-                const data = await response.json();
+                const data = await apiRequest('/blog/posts');
 
                 if (!data.posts?.length) {
                     container.innerHTML = '<div class="empty-state"><i class="fas fa-newspaper"></i><p>No articles available</p></div>';
@@ -2380,11 +2134,7 @@
 
         async function openBlogPost(slug) {
             try {
-                const response = await fetch(`${API_URL}/blog/posts/${slug}`);
-                
-                if (!response.ok) throw new Error('Failed to load post');
-                
-                const data = await response.json();
+                const data = await apiRequest(`/blog/posts/${slug}`);
                 
                 const modal = document.getElementById('blog-modal');
                 const content = document.getElementById('modal-content-area');

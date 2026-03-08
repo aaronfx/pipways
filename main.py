@@ -1,6 +1,6 @@
 """
 Pipways Trading Platform API
-Complete implementation with auth, multi-admin, AI integration, and mobile-ready endpoints
+Complete implementation with auth, multi-admin, AI integration
 """
 
 import os
@@ -42,14 +42,7 @@ class Settings:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
-    CORS_ORIGINS = [
-        "https://pipways-web-nhem.onrender.com",
-        "https://pipways.com",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5500",
-        "*"
-    ]
+    CORS_ORIGINS = ["*"]  # Allow all for debugging
 
 settings = Settings()
 
@@ -71,48 +64,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS Middleware - MUST be first
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for debugging
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
-
-# Custom middleware to ensure CORS headers on ALL responses
-@app.middleware("http")
-async def cors_debug_handler(request: Request, call_next):
-    origin = request.headers.get("origin", "*")
-    
-    # Handle preflight
-    if request.method == "OPTIONS":
-        headers = {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Max-Age": "3600",
-        }
-        return JSONResponse(content={}, headers=headers)
-    
-    try:
-        response = await call_next(request)
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        return response
-    except Exception as exc:
-        logger.error(f"Error processing request: {exc}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc)},
-            headers={
-                "Access-Control-Allow-Origin": origin,
-                "Access-Control-Allow-Credentials": "true",
-            }
-        )
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -352,7 +313,8 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             return dict(user) if user else None
-    except:
+    except Exception as e:
+        logger.error(f"Auth error: {e}")
         return None
 
 # Strict auth that raises exception
@@ -586,10 +548,10 @@ async def toggle_subscription(
 @app.get("/admin/stats")
 async def get_admin_stats(admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
-        total_users = await conn.fetchval("SELECT COUNT(*) FROM users")
-        total_signals = await conn.fetchval("SELECT COUNT(*) FROM signals")
-        active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'")
-        premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')")
+        total_users = await conn.fetchval("SELECT COUNT(*) FROM users") or 0
+        total_signals = await conn.fetchval("SELECT COUNT(*) FROM signals") or 0
+        active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'") or 0
+        premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')") or 0
         
         return {
             "total_users": total_users,
@@ -659,7 +621,7 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# AI Analysis - FIXED: Better error handling
+# AI Analysis
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -669,7 +631,7 @@ async def analyze_chart(
     current_user: dict = Depends(get_current_user)
 ):
     if not settings.OPENROUTER_API_KEY:
-        raise HTTPException(status_code=503, detail="AI service not configured - missing API key")
+        raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
         contents = await file.read()
@@ -695,8 +657,7 @@ Provide analysis in this format:
                 headers={
                     "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                     "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways AI Analysis",
-                    "Content-Type": "application/json"
+                    "X-Title": "Pipways AI Analysis"
                 },
                 json={
                     "model": settings.OPENROUTER_VISION_MODEL,
@@ -715,12 +676,9 @@ Provide analysis in this format:
             
             if response.status_code != 200:
                 logger.error(f"OpenRouter error: {response.text}")
-                raise HTTPException(status_code=500, detail=f"AI service error: {response.status_code}")
+                raise HTTPException(status_code=500, detail="AI service error")
             
             result = response.json()
-            if "choices" not in result or not result["choices"]:
-                raise HTTPException(status_code=500, detail="Invalid AI response format")
-                
             analysis = result["choices"][0]["message"]["content"]
             
             return {
@@ -733,9 +691,8 @@ Provide analysis in this format:
         raise
     except Exception as e:
         logger.error(f"AI Analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# FIXED: Mentor chat endpoint - accepts raw JSON to avoid 422 errors
 @app.post("/mentor/chat")
 async def mentor_chat(
     request: Request,
@@ -745,7 +702,6 @@ async def mentor_chat(
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
-        # Parse JSON manually to handle any format
         body = await request.json()
         message = body.get("message", "")
         context = body.get("context", "Forex trading")
@@ -779,8 +735,7 @@ async def mentor_chat(
                     headers={
                         "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                         "HTTP-Referer": "https://pipways.com",
-                        "X-Title": "Pipways AI Mentor",
-                        "Content-Type": "application/json"
+                        "X-Title": "Pipways AI Mentor"
                     },
                     json={
                         "model": settings.OPENROUTER_MODEL,
@@ -791,10 +746,6 @@ async def mentor_chat(
                     },
                     timeout=30.0
                 )
-                
-                if response.status_code != 200:
-                    logger.error(f"OpenRouter chat error: {response.text}")
-                    raise HTTPException(status_code=500, detail="AI service error")
                 
                 result = response.json()
                 ai_response = result["choices"][0]["message"]["content"]
@@ -811,7 +762,7 @@ async def mentor_chat(
         logger.error(f"Mentor chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Content Management - FIXED: Use optional auth
+# Content Management
 @app.get("/blog/posts")
 async def get_blog_posts(
     limit: int = Query(10, le=50),
@@ -827,7 +778,7 @@ async def get_blog_posts(
             rows = await conn.fetch(query, limit)
             return [dict(row) for row in rows]
     except Exception as e:
-        logger.error(f"Error fetching blog posts: {e}")
+        logger.error(f"Error fetching blog: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/blog/posts")
@@ -891,7 +842,6 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
         """, course.title, course.description, course.content, course.is_premium, admin["id"])
         return {"id": course_id, "message": "Course created"}
 
-# Config
 @app.get("/config")
 async def get_config():
     return {

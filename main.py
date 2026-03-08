@@ -1,5 +1,5 @@
 """
-Pipways API - Production Ready (Auth Disabled for Testing)
+Pipways API - Production Ready (Auth Disabled for Testing - Admin Access)
 Week 1: Core Infrastructure + AI + Auth + Admin
 """
 
@@ -650,14 +650,14 @@ async def init_db():
             """)
             
             # ============================================================================
-            # STEP 9: Insert default admin user
+            # STEP 9: Insert default admin user (ID = 1)
             # ============================================================================
             await conn.execute("""
                 DO $$
                 BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin' LIMIT 1) THEN
-                        INSERT INTO users (email, password_hash, full_name, role, is_active, is_verified)
-                        VALUES ('admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE);
+                    IF NOT EXISTS (SELECT 1 FROM users WHERE id = 1) THEN
+                        INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_verified)
+                        VALUES (1, 'admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE);
                     END IF;
                 END $$;
             """)
@@ -918,7 +918,7 @@ async def lifespan(app: FastAPI):
     if redis_client:
         await redis_client.close()
 
-# Get CORS origins
+# Get CORS origins - EXPLICITLY set to allow frontend
 cors_origins = settings.get_cors_origins()
 logger.info(f"Configured CORS origins: {cors_origins}")
 
@@ -932,14 +932,14 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# CORS middleware - temporarily use ["*"] for debugging
+# CORS middleware - FIXED: Use explicit origins, not wildcard with credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,  # Use specific origins from settings
+    allow_credentials=False,  # Set to False since we're not using cookies/auth
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Total-Count", "X-Page", "X-Per-Page", "Authorization"],
+    expose_headers=["X-Total-Count", "X-Page", "X-Per-Page"],
     max_age=3600
 )
 
@@ -983,7 +983,7 @@ async def root():
 # Login, register, and all auth endpoints removed for testing
 
 # ==========================================
-# TRADE JOURNAL ENDPOINTS (PUBLIC)
+# TRADE JOURNAL ENDPOINTS (PUBLIC - ADMIN USER)
 # ==========================================
 
 @app.post("/trades", tags=["Trade Journal"])
@@ -991,12 +991,12 @@ async def create_trade(
     trade: TradeCreate,
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    # Using user_id = 1 as default test user
+    # Using user_id = 1 as admin user
     trade_id = await conn.fetchval(
         """INSERT INTO trades 
            (user_id, pair, direction, pips, grade, notes, entry_price, exit_price, screenshot_url)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id""",
-        1,  # Default test user
+        1,  # Admin user
         trade.pair.upper(),
         trade.direction.value,
         trade.pips,
@@ -1020,7 +1020,7 @@ async def get_trades(
     conn: asyncpg.Connection = Depends(get_db)
 ):
     conditions = ["user_id = $1"]
-    params = [1]  # Default test user
+    params = [1]  # Admin user
     param_idx = 2
     
     if pair:
@@ -1065,7 +1065,7 @@ async def get_trades(
             MAX(pips) as best_trade,
             MIN(pips) as worst_trade
            FROM trades WHERE user_id = $1""",
-        1  # Default test user
+        1  # Admin user
     )
     
     return {
@@ -1111,7 +1111,7 @@ async def get_trade_stats(
             MIN(pips) as max_loss
            FROM trades 
            WHERE user_id = $1 AND created_at >= $2""",
-        1, start_date  # Default test user
+        1, start_date  # Admin user
     )
     
     grades = await conn.fetch(
@@ -1140,7 +1140,7 @@ async def get_trade_stats(
     }
 
 # ==========================================
-# AI ANALYSIS ENDPOINTS (PUBLIC)
+# AI ANALYSIS ENDPOINTS (PUBLIC - ADMIN USER)
 # ==========================================
 
 @app.post("/analyze/chart", tags=["AI Analysis"])
@@ -1162,7 +1162,7 @@ async def analyze_chart(
     
     existing = await conn.fetchrow(
         "SELECT id, analysis_text FROM chart_analyses WHERE image_hash = $1 AND user_id = $2",
-        image_hash, 1  # Default test user
+        image_hash, 1  # Admin user
     )
     
     if existing:
@@ -1183,7 +1183,7 @@ async def analyze_chart(
             confidence_score, support_levels, resistance_levels, entry_zone,
             stop_loss, take_profit_1, take_profit_2, risk_reward_ratio, indicators)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id""",
-        1,  # Default test user
+        1,  # Admin user
         image.filename,
         image_hash,
         json.dumps(analysis),
@@ -1214,7 +1214,7 @@ async def get_analysis_history(
 ):
     total = await conn.fetchval(
         "SELECT COUNT(*) FROM chart_analyses WHERE user_id = $1",
-        1  # Default test user
+        1  # Admin user
     )
     
     offset = (page - 1) * per_page
@@ -1224,7 +1224,7 @@ async def get_analysis_history(
            FROM chart_analyses 
            WHERE user_id = $1 
            ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
-        1, per_page, offset  # Default test user
+        1, per_page, offset  # Admin user
     )
     
     return {
@@ -1252,7 +1252,7 @@ async def mentor_chat(
         """SELECT message, response FROM mentor_chats 
            WHERE user_id = $1 AND session_id = $2 
            ORDER BY created_at DESC LIMIT 10""",
-        1, session_id  # Default test user
+        1, session_id  # Admin user
     )
     
     context = []
@@ -1266,7 +1266,7 @@ async def mentor_chat(
         """INSERT INTO mentor_chats 
            (user_id, session_id, message, response, context, tokens_used)
            VALUES ($1, $2, $3, $4, $5, $6)""",
-        1,  # Default test user
+        1,  # Admin user
         session_id,
         message,
         result["response"],
@@ -1282,7 +1282,7 @@ async def mentor_chat(
     }
 
 # ==========================================
-# ADMIN ENDPOINTS (PUBLIC - NO AUTH)
+# ADMIN ENDPOINTS (PUBLIC - NO AUTH REQUIRED)
 # ==========================================
 
 @app.post("/admin/courses", tags=["Admin"])
@@ -1301,7 +1301,7 @@ async def admin_create_course(
             """INSERT INTO courses 
                (title, slug, description, content, level, price, is_published, instructor_id)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
-            title, slug, description, content, level, price, is_published, 1  # Default test user
+            title, slug, description, content, level, price, is_published, 1  # Admin user
         )
         
         return {"success": True, "course_id": course_id}
@@ -1375,7 +1375,7 @@ async def admin_create_blog_post(
                 published_at, author_id, meta_title, meta_description)
                VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 THEN NOW() END, $8, $9, $10) RETURNING id""",
             title, slug, content, excerpt or content[:200], category, tag_list,
-            is_published, 1, title, excerpt or content[:160]  # Default test user
+            is_published, 1, title, excerpt or content[:160]  # Admin user
         )
         
         return {"success": True, "post_id": post_id}
@@ -1399,7 +1399,7 @@ async def admin_create_webinar(
            (title, description, presenter_id, scheduled_at, duration_minutes, 
             max_attendees, price, zoom_link, is_published)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING id""",
-        title, description, 1, scheduled_at, duration_minutes,  # Default test user
+        title, description, 1, scheduled_at, duration_minutes,  # Admin user
         max_attendees, price, zoom_link
     )
     
@@ -1514,10 +1514,10 @@ async def get_course_detail(
     
     result = dict(course)
     
-    # Check enrollment for default test user
+    # Check enrollment for admin user
     enrollment = await conn.fetchrow(
         "SELECT * FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
-        1, course["id"]
+        1, course["id"]  # Admin user
     )
     result["enrolled"] = enrollment is not None
     result["progress"] = enrollment["progress_percent"] if enrollment else 0
@@ -1539,7 +1539,7 @@ async def enroll_course(
     
     existing = await conn.fetchrow(
         "SELECT id FROM course_enrollments WHERE user_id = $1 AND course_id = $2",
-        1, course_id
+        1, course_id  # Admin user
     )
     
     if existing:
@@ -1547,7 +1547,7 @@ async def enroll_course(
     
     await conn.execute(
         "INSERT INTO course_enrollments (user_id, course_id) VALUES ($1, $2)",
-        1, course_id
+        1, course_id  # Admin user
     )
     
     return {"success": True, "message": "Enrolled successfully"}
@@ -1576,6 +1576,37 @@ async def get_webinars(
         )
     
     return {"success": True, "webinars": [dict(w) for w in webinars]}
+
+@app.post("/webinars/{webinar_id}/register", tags=["Webinars"])
+async def register_webinar(
+    webinar_id: int,
+    conn: asyncpg.Connection = Depends(get_db)
+):
+    # Check if webinar exists
+    webinar = await conn.fetchrow(
+        "SELECT id FROM webinars WHERE id = $1 AND is_published = TRUE",
+        webinar_id
+    )
+    
+    if not webinar:
+        raise HTTPException(status_code=404, detail="Webinar not found")
+    
+    # Check if already registered
+    existing = await conn.fetchrow(
+        "SELECT id FROM webinar_registrations WHERE webinar_id = $1 AND user_id = $2",
+        webinar_id, 1  # Admin user
+    )
+    
+    if existing:
+        return {"success": True, "message": "Already registered"}
+    
+    await conn.execute(
+        """INSERT INTO webinar_registrations (webinar_id, user_id)
+           VALUES ($1, $2)""",
+        webinar_id, 1  # Admin user
+    )
+    
+    return {"success": True, "message": "Registered successfully"}
 
 @app.get("/blog/posts", tags=["Blog"])
 async def get_blog_posts(

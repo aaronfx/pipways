@@ -1,11 +1,10 @@
 """
 Pipways Trading Platform API
-Complete implementation with auto-migration for missing columns
+Complete implementation with auth, multi-admin, AI integration, and mobile-ready endpoints
 """
 
 import os
-import sys
-import traceback
+import re
 import jwt
 import bcrypt
 import asyncpg
@@ -19,7 +18,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
-import base64
 from contextlib import asynccontextmanager
 
 # Load environment variables
@@ -44,11 +42,9 @@ class Settings:
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
     CORS_ORIGINS = [
         "https://pipways-web-nhem.onrender.com",
-        "http://localhost:3000", 
+        "http://localhost:3000",
         "http://localhost:5173",
-        "http://127.0.0.1:5500",
-        "null",
-        "*"
+        "http://127.0.0.1:5500"
     ]
 
 settings = Settings()
@@ -59,19 +55,14 @@ db_pool: Optional[asyncpg.Pool] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db_pool
-    try:
-        db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=1, max_size=10)
-        logger.info("Database connected")
-        await init_db()
-    except Exception as e:
-        logger.error(f"Database connection failed: {e}")
+    db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=5, max_size=20)
+    await init_db()
     yield
-    if db_pool:
-        await db_pool.close()
+    await db_pool.close()
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS
+# CRITICAL: CORS Middleware must be FIRST to handle all responses including errors
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -82,22 +73,50 @@ app.add_middleware(
     max_age=3600,
 )
 
-# Error handling
+# Custom middleware to ensure CORS headers on ALL responses (including 401, 403, 500)
 @app.middleware("http")
-async def error_handling_middleware(request: Request, call_next):
+async def cors_debug_handler(request: Request, call_next):
+    origin = request.headers.get("origin")
+    
+    # Handle preflight
+    if request.method == "OPTIONS":
+        headers = {
+            "Access-Control-Allow-Origin": origin if origin in settings.CORS_ORIGINS else settings.CORS_ORIGINS[0],
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+        return JSONResponse(content={}, headers=headers)
+    
     try:
         response = await call_next(request)
+        
+        # Add CORS headers to response
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        else:
+            response.headers["Access-Control-Allow-Origin"] = settings.CORS_ORIGINS[0]
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
         return response
-    except Exception as e:
-        logger.error(f"Error: {str(e)}\n{traceback.format_exc()}")
+        
+    except Exception as exc:
+        # Even on 500 errors, return CORS headers so frontend can see the error
+        logger.error(f"Error processing request: {exc}")
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Internal error: {str(e)}"}
+            content={"detail": "Internal server error"},
+            headers={
+                "Access-Control-Allow-Origin": origin if origin else settings.CORS_ORIGINS[0],
+                "Access-Control-Allow-Credentials": "true",
+            }
         )
 
-security = HTTPBearer(auto_error=False)
+# Security
+security = HTTPBearer(auto_error=False)  # auto_error=False prevents 403 without CORS headers
 
-# Models
+# Models (same as before - fixed for Pydantic v2)
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -156,11 +175,9 @@ class SignalCreate(BaseModel):
     entry_price: float
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    take_profit_2: Optional[float] = None
     timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
-    risk_percent: float = 1.0
 
 class BlogPostCreate(BaseModel):
     title: str = Field(..., min_length=1)
@@ -186,16 +203,9 @@ class MentorChatMessage(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = None
 
-# ==========================================
-# DATABASE INIT WITH MIGRATIONS
-# ==========================================
+# Database initialization
 async def init_db():
-    """Initialize database with migration support"""
-    if not db_pool:
-        return
-    
     async with db_pool.acquire() as conn:
-        # Create tables if not exist
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -207,16 +217,13 @@ async def init_db():
                 subscription_status VARCHAR(20) DEFAULT 'inactive',
                 email_verified BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                reset_token VARCHAR(255),
+                reset_token_expires TIMESTAMP
             )
         """)
         
-        # Add missing columns (migration)
-        await add_column_if_not_exists(conn, 'users', 'last_login', 'TIMESTAMP')
-        await add_column_if_not_exists(conn, 'users', 'reset_token', 'VARCHAR(255)')
-        await add_column_if_not_exists(conn, 'users', 'reset_token_expires', 'TIMESTAMP')
-        
-        # Create other tables
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -225,12 +232,10 @@ async def init_db():
                 entry_price DECIMAL(10,5),
                 stop_loss DECIMAL(10,5),
                 take_profit DECIMAL(10,5),
-                take_profit_2 DECIMAL(10,5),
                 timeframe VARCHAR(20),
                 analysis TEXT,
                 status VARCHAR(20) DEFAULT 'active',
                 pips_gain DECIMAL(10,2),
-                risk_percent DECIMAL(5,2) DEFAULT 1.0,
                 is_premium BOOLEAN DEFAULT FALSE,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -291,28 +296,6 @@ async def init_db():
         """)
         
         # Create default admin
-        await create_default_admin(conn)
-        logger.info("Database initialized")
-
-async def add_column_if_not_exists(conn, table, column, datatype):
-    """Add column if it doesn't exist (migration helper)"""
-    try:
-        # Check if column exists
-        result = await conn.fetchval("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name=$1 AND column_name=$2
-        """, table, column)
-        
-        if not result:
-            await conn.execute(f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {datatype}')
-            logger.info(f"Added column {column} to {table}")
-    except Exception as e:
-        logger.error(f"Error adding column {column}: {e}")
-
-async def create_default_admin(conn):
-    """Create default admin user"""
-    try:
         admin_exists = await conn.fetchval("SELECT id FROM users WHERE email = $1", settings.ADMIN_EMAIL)
         if not admin_exists:
             hashed = bcrypt.hashpw(settings.ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
@@ -320,18 +303,11 @@ async def create_default_admin(conn):
                 INSERT INTO users (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified)
                 VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
             """, settings.ADMIN_EMAIL, hashed, "System Administrator")
-            logger.info(f"Admin created: {settings.ADMIN_EMAIL}")
-    except Exception as e:
-        logger.error(f"Error creating admin: {e}")
+            logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
 
-# ==========================================
-# AUTH UTILITIES
-# ==========================================
+# Auth utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    try:
-        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
-    except Exception:
-        return False
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -352,6 +328,7 @@ def create_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
 
+# FIXED: get_current_user now handles missing tokens gracefully with CORS
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -380,9 +357,7 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
-# ==========================================
-# AUTH ENDPOINTS
-# ==========================================
+# Auth endpoints
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     async with db_pool.acquire() as conn:
@@ -414,11 +389,7 @@ async def login(credentials: UserLogin):
         if not user or not verify_password(credentials.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        # Update last login (wrapped in try in case column is still missing)
-        try:
-            await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
-        except Exception as e:
-            logger.warning(f"Could not update last_login: {e}")
+        await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
         
         access_token = create_access_token({"sub": str(user["id"])})
         refresh_token = create_refresh_token({"sub": str(user["id"])})
@@ -468,7 +439,7 @@ async def forgot_password(request: PasswordResetRequest):
         """, reset_token, expires, user["id"])
         
         reset_url = f"https://pipways-web-nhem.onrender.com?reset_token={reset_token}"
-        logger.info(f"Reset URL for {request.email}: {reset_url}")
+        logger.info(f"Password reset URL for {request.email}: {reset_url}")
         
         return {"message": "If email exists, reset link sent"}
 
@@ -496,9 +467,7 @@ async def reset_password(reset_data: PasswordReset):
 async def logout(current_user: dict = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
 
-# ==========================================
-# ADMIN ENDPOINTS
-# ==========================================
+# Admin endpoints
 @app.get("/admin/users")
 async def get_all_users(
     search: Optional[str] = Query(None),
@@ -543,8 +512,8 @@ async def get_all_users(
 
 @app.put("/admin/users/{user_id}/role")
 async def update_user_role(
-    user_id: int,
-    role: str = Query(..., pattern="^(user|admin|moderator)$"),
+    user_id: int, 
+    role: str = Query(..., pattern="^(user|admin|moderator)$"), 
     admin: dict = Depends(get_admin_user)
 ):
     if int(admin["id"]) == user_id and role != "admin":
@@ -608,9 +577,7 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
-# ==========================================
-# SIGNALS
-# ==========================================
+# Signals
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
@@ -629,6 +596,7 @@ async def get_signals(
             query += f" AND pair ILIKE ${len(params)+1}"
             params.append(f"%{pair}%")
         
+        # Filter premium signals for non-premium users
         if not current_user or current_user["subscription_tier"] == "free":
             query += " AND is_premium = FALSE"
         
@@ -643,11 +611,11 @@ async def get_signals(
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         signal_id = await conn.fetchval("""
-            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, take_profit_2, timeframe, analysis, is_premium, risk_percent, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, timeframe, analysis, is_premium, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
         """, signal.pair, signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit, signal.take_profit_2, signal.timeframe, signal.analysis, signal.is_premium, signal.risk_percent, admin["id"])
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, admin["id"])
         
         return {"id": signal_id, "message": "Signal created successfully"}
 
@@ -665,9 +633,7 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# ==========================================
-# AI ANALYSIS
-# ==========================================
+# AI Analysis
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -683,6 +649,7 @@ async def analyze_chart(
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large")
     
+    import base64
     image_base64 = base64.b64encode(contents).decode()
     
     prompt = f"""Analyze this forex/crypto chart for {pair or 'unknown pair'} on {timeframe or 'unknown timeframe'} timeframe.
@@ -724,7 +691,6 @@ async def analyze_chart(
             analysis = result["choices"][0]["message"]["content"]
             
             return {
-                "success": True,
                 "analysis": analysis,
                 "pair": pair,
                 "timeframe": timeframe,
@@ -788,11 +754,9 @@ async def mentor_chat(
                 VALUES ($1, $2, $3, $4)
             """, current_user["id"], message.message, ai_response, message.context)
             
-            return {"success": True, "response": ai_response, "timestamp": datetime.utcnow().isoformat()}
+            return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
 
-# ==========================================
-# CONTENT MANAGEMENT
-# ==========================================
+# Content Management
 @app.get("/blog/posts")
 async def get_blog_posts(
     limit: int = Query(10, le=50),
@@ -860,14 +824,10 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
         """, course.title, course.description, course.content, course.is_premium, admin["id"])
         return {"id": course_id, "message": "Course created"}
 
-# ==========================================
-# CONFIG & HEALTH
-# ==========================================
+# Config
 @app.get("/config")
 async def get_config():
     return {
-        "telegram_free_channel": "https://t.me/pipways_free",
-        "telegram_premium_channel": "https://t.me/pipways_vip",
         "features": {
             "ai_analysis": bool(settings.OPENROUTER_API_KEY),
             "mentor_chat": bool(settings.OPENROUTER_API_KEY),
@@ -877,8 +837,7 @@ async def get_config():
 
 @app.get("/health")
 async def health_check():
-    db_status = "connected" if db_pool else "disconnected"
-    return {"status": "healthy", "database": db_status, "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 if __name__ == "__main__":
     import uvicorn

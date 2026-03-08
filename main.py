@@ -1,5 +1,5 @@
 """
-Pipways API - Full Admin + Professional AI Analysis
+Pipways API - Trading Signals Platform with Telegram Integration
 """
 import os
 import sys
@@ -61,13 +61,20 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(default="redis://localhost:6379")
     OPENROUTER_API_KEY: str = Field(default="")
     OPENROUTER_MODEL: str = "anthropic/claude-3-opus-20240229"
-    OPENROUTER_VISION_MODEL: str = "anthropic/claude-3-opus-20240229"  # Vision-capable model
+    OPENROUTER_VISION_MODEL: str = "anthropic/claude-3-opus-20240229"
+    
+    # Telegram Configuration
+    TELEGRAM_FREE_CHANNEL_LINK: str = Field(default="https://t.me/pipways_free")
+    TELEGRAM_PREMIUM_CHANNEL_LINK: str = Field(default="https://t.me/pipways_vip")
+    TELEGRAM_BOT_USERNAME: str = Field(default="pipways_bot")
+    
+    # Feature Flags
+    SUBSCRIPTION_ENABLED: bool = Field(default=False)  # Disabled for testing
     
     RESEND_API_KEY: str = Field(default="")
     FROM_EMAIL: str = Field(default="noreply@pipways.com")
     FRONTEND_URL: str = Field(default="https://pipways-web-nhem.onrender.com")
     
-    # CORS - Comma-separated list of allowed origins
     CORS_ORIGINS: str = Field(default="https://pipways-web-nhem.onrender.com,http://localhost:3000,http://localhost:5173")
     
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
@@ -79,7 +86,6 @@ class Settings(BaseSettings):
     def get_cors_origins(self) -> List[str]:
         """Parse CORS_ORIGINS string into list"""
         origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-        # Ensure no trailing slashes for consistency
         return [o.rstrip('/') for o in origins]
 
 settings = Settings()
@@ -102,28 +108,32 @@ class UserRole(str, Enum):
     ADMIN = "admin"
     MENTOR = "mentor"
 
-class TradeDirection(str, Enum):
-    LONG = "LONG"
-    SHORT = "SHORT"
+class SignalDirection(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
 
-class TradeGrade(str, Enum):
-    A = "A"
-    B = "B"
-    C = "C"
-    D = "D"
-    F = "F"
+class SignalStatus(str, Enum):
+    ACTIVE = "active"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
 
-class TradeCreate(BaseModel):
+class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=3, max_length=20)
-    direction: TradeDirection
-    pips: float = Field(..., ge=-10000, le=10000)
-    grade: TradeGrade = TradeGrade.C
-    notes: Optional[str] = Field(None, max_length=1000)
-    entry_price: Optional[float] = None
-    exit_price: Optional[float] = None
-    screenshot_url: Optional[str] = None
+    direction: SignalDirection
+    entry_price: float = Field(..., gt=0)
+    stop_loss: float = Field(..., gt=0)
+    take_profit_1: float = Field(..., gt=0)
+    take_profit_2: Optional[float] = None
+    risk_percent: Optional[float] = Field(default=1.0, ge=0.1, le=5.0)
+    analysis: Optional[str] = Field(None, max_length=2000)
+    timeframe: str = Field(default="1H")
+    is_premium: bool = Field(default=False)
 
-# Admin Models
+class SignalUpdate(BaseModel):
+    status: SignalStatus
+    exit_price: Optional[float] = None
+    pips_result: Optional[float] = None
+
 class BlogPostCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     slug: Optional[str] = None
@@ -141,15 +151,17 @@ class WebinarCreate(BaseModel):
     max_attendees: int = Field(default=100, ge=1)
     is_published: bool = Field(default=True)
     meeting_link: Optional[str] = None
+    is_premium: bool = Field(default=False)
 
 class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1)
-    level: str = Field(default="Beginner")  # Beginner, Intermediate, Advanced
+    level: str = Field(default="Beginner")
     duration_minutes: int = Field(default=60, ge=1)
     price: float = Field(default=0.0, ge=0)
     is_published: bool = Field(default=True)
     thumbnail_url: Optional[str] = None
+    is_premium: bool = Field(default=False)
 
 # ==========================================
 # PROFESSIONAL AI PROMPTS
@@ -263,22 +275,32 @@ async def init_db():
                     role VARCHAR(50) DEFAULT 'user',
                     is_active BOOLEAN DEFAULT TRUE,
                     is_verified BOOLEAN DEFAULT FALSE,
+                    subscription_tier VARCHAR(50) DEFAULT 'free',
+                    subscription_expires_at TIMESTAMP,
+                    telegram_username VARCHAR(100),
+                    telegram_chat_id BIGINT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
-                -- Trades table
-                CREATE TABLE IF NOT EXISTS trades (
+                -- Trading Signals table
+                CREATE TABLE IF NOT EXISTS signals (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     pair VARCHAR(20) NOT NULL,
                     direction VARCHAR(10) NOT NULL,
-                    pips DECIMAL(10,2) NOT NULL,
-                    grade VARCHAR(10) DEFAULT 'C',
-                    notes TEXT,
-                    entry_price DECIMAL(15,5),
+                    entry_price DECIMAL(15,5) NOT NULL,
+                    stop_loss DECIMAL(15,5) NOT NULL,
+                    take_profit_1 DECIMAL(15,5) NOT NULL,
+                    take_profit_2 DECIMAL(15,5),
+                    risk_percent DECIMAL(4,2) DEFAULT 1.0,
+                    analysis TEXT,
+                    timeframe VARCHAR(10) DEFAULT '1H',
+                    status VARCHAR(20) DEFAULT 'active',
+                    is_premium BOOLEAN DEFAULT FALSE,
+                    pips_result DECIMAL(10,2),
                     exit_price DECIMAL(15,5),
-                    screenshot_url TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_by INTEGER REFERENCES users(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    closed_at TIMESTAMP
                 );
                 
                 -- Chart analyses table
@@ -289,6 +311,7 @@ async def init_db():
                     pattern_detected VARCHAR(100),
                     confidence_score DECIMAL(3,2),
                     analysis_data JSONB,
+                    is_premium BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -310,6 +333,7 @@ async def init_db():
                     level VARCHAR(50) DEFAULT 'Beginner',
                     duration_minutes INTEGER DEFAULT 60,
                     price DECIMAL(10,2) DEFAULT 0,
+                    is_premium BOOLEAN DEFAULT FALSE,
                     instructor_id INTEGER REFERENCES users(id),
                     thumbnail_url TEXT,
                     is_published BOOLEAN DEFAULT FALSE,
@@ -333,6 +357,7 @@ async def init_db():
                     scheduled_at TIMESTAMP,
                     duration_minutes INTEGER DEFAULT 60,
                     max_attendees INTEGER DEFAULT 100,
+                    is_premium BOOLEAN DEFAULT FALSE,
                     presenter_id INTEGER REFERENCES users(id),
                     meeting_link TEXT,
                     is_published BOOLEAN DEFAULT FALSE,
@@ -363,12 +388,22 @@ async def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                
+                -- Telegram bot messages log
+                CREATE TABLE IF NOT EXISTS telegram_messages (
+                    id SERIAL PRIMARY KEY,
+                    signal_id INTEGER REFERENCES signals(id),
+                    message_id BIGINT,
+                    chat_id BIGINT,
+                    message_type VARCHAR(50),
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
             """)
             
             # Add admin user
             await conn.execute("""
-                INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_verified)
-                VALUES (1, 'admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE)
+                INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_verified, subscription_tier)
+                VALUES (1, 'admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE, 'premium')
                 ON CONFLICT (id) DO NOTHING;
             """)
             
@@ -394,11 +429,8 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    # Prepare the prompt
     prompt = user_prompt if user_prompt else CHART_ANALYSIS_PROMPT
     
-    # Prepare image data for OpenRouter
-    # Ensure proper base64 format
     if ',' in image_base64:
         image_data = image_base64
     else:
@@ -446,12 +478,9 @@ async def analyze_chart_with_ai(image_base64: str, user_prompt: Optional[str] = 
             result = response.json()
             content = result['choices'][0]['message']['content']
             
-            # Extract JSON from response
             try:
-                # Try to parse directly
                 analysis = json.loads(content)
             except json.JSONDecodeError:
-                # Try to extract from markdown code blocks
                 if "```json" in content:
                     content = content.split("```json")[1].split("```")[0].strip()
                 elif "```" in content:
@@ -471,7 +500,6 @@ async def chat_with_mentor(message: str, context: Optional[List[Dict]] = None, u
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    # Prepare messages
     messages = [
         {
             "role": "system",
@@ -479,12 +507,10 @@ async def chat_with_mentor(message: str, context: Optional[List[Dict]] = None, u
         }
     ]
     
-    # Add context if available
     if context:
-        for msg in context[-10:]:  # Keep last 10 messages for context
+        for msg in context[-10:]:
             messages.append(msg)
     
-    # Add current message
     messages.append({
         "role": "user",
         "content": message
@@ -545,8 +571,8 @@ async def lifespan(app: FastAPI):
 # Create app
 app = FastAPI(
     title="Pipways API",
-    description="Professional Trading Education Platform API",
-    version="3.0.0",
+    description="Professional Trading Signals & Education Platform",
+    version="4.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -597,10 +623,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def health_check():
     return {
         "status": "healthy",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "cors_enabled": True,
         "admin_access": True,
         "ai_services": bool(settings.OPENROUTER_API_KEY),
+        "subscription_enabled": settings.SUBSCRIPTION_ENABLED,
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -608,101 +635,187 @@ async def health_check():
 async def root():
     return {
         "name": "Pipways API",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "docs": "/docs",
         "health": "/health",
         "admin_access": True
     }
 
 # ==========================================
-# TRADE ENDPOINTS (Admin User = 1)
+# CONFIGURATION ENDPOINTS
 # ==========================================
 
-@app.post("/trades", tags=["Trade Journal"])
-async def create_trade(
-    trade: TradeCreate,
+@app.get("/config", tags=["Configuration"])
+async def get_config():
+    """Get public configuration"""
+    return {
+        "telegram_free_channel": settings.TELEGRAM_FREE_CHANNEL_LINK,
+        "telegram_premium_channel": settings.TELEGRAM_PREMIUM_CHANNEL_LINK,
+        "telegram_bot": settings.TELEGRAM_BOT_USERNAME,
+        "subscription_enabled": settings.SUBSCRIPTION_ENABLED,
+        "features": {
+            "ai_analysis": True,
+            "ai_mentor": True,
+            "signals": True,
+            "courses": True,
+            "webinars": True,
+            "blog": True
+        }
+    }
+
+# ==========================================
+# TRADING SIGNALS ENDPOINTS
+# ==========================================
+
+@app.get("/signals", tags=["Trading Signals"])
+async def get_signals(
+    status: Optional[str] = Query("active", enum=["active", "closed", "all"]),
+    is_premium: Optional[bool] = None,
+    limit: int = Query(50, ge=1, le=100),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Create trade as admin user"""
-    trade_id = await conn.fetchval(
-        """INSERT INTO trades 
-           (user_id, pair, direction, pips, grade, notes, entry_price, exit_price)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id""",
-        1,  # Admin user
-        trade.pair.upper(),
-        trade.direction.value,
-        trade.pips,
-        trade.grade.value,
-        trade.notes,
-        trade.entry_price,
-        trade.exit_price
+    """Get trading signals (filtered by subscription if enabled)"""
+    query = "SELECT * FROM signals WHERE 1=1"
+    params = []
+    
+    if status != "all":
+        query += f" AND status = ${len(params)+1}"
+        params.append(status)
+    
+    if is_premium is not None:
+        query += f" AND is_premium = ${len(params)+1}"
+        params.append(is_premium)
+    
+    # If subscription enabled, free users only see free signals
+    if settings.SUBSCRIPTION_ENABLED:
+        query += f" AND (is_premium = FALSE OR ${len(params)+1} = 'premium')"
+        params.append('free')  # Would check actual user tier
+    
+    query += " ORDER BY created_at DESC"
+    query += f" LIMIT ${len(params)+1}"
+    params.append(limit)
+    
+    signals = await conn.fetch(query, *params)
+    
+    return {
+        "success": True,
+        "signals": [dict(s) for s in signals],
+        "telegram_links": {
+            "free": settings.TELEGRAM_FREE_CHANNEL_LINK,
+            "premium": settings.TELEGRAM_PREMIUM_CHANNEL_LINK
+        }
+    }
+
+@app.get("/signals/stats", tags=["Trading Signals"])
+async def get_signal_stats(
+    days: int = Query(30, ge=7, le=365),
+    conn: asyncpg.Connection = Depends(get_db)
+):
+    """Get signal performance statistics"""
+    since = datetime.utcnow() - timedelta(days=days)
+    
+    stats = await conn.fetchrow("""
+        SELECT 
+            COUNT(*) as total_signals,
+            SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_signals,
+            SUM(CASE WHEN pips_result > 0 THEN 1 ELSE 0 END) as winning_signals,
+            SUM(CASE WHEN pips_result < 0 THEN 1 ELSE 0 END) as losing_signals,
+            SUM(pips_result) as total_pips,
+            AVG(pips_result) FILTER (WHERE status = 'closed') as avg_pips_per_trade
+        FROM signals 
+        WHERE created_at >= $1
+    """, since)
+    
+    return {
+        "success": True,
+        "period_days": days,
+        "stats": dict(stats) if stats else {}
+    }
+
+# ==========================================
+# ADMIN SIGNAL MANAGEMENT
+# ==========================================
+
+@app.post("/admin/signals", tags=["Admin - Signals"])
+async def create_signal(
+    signal: SignalCreate,
+    conn: asyncpg.Connection = Depends(get_db)
+):
+    """Create trading signal (admin only)"""
+    signal_id = await conn.fetchval("""
+        INSERT INTO signals 
+        (pair, direction, entry_price, stop_loss, take_profit_1, take_profit_2, 
+         risk_percent, analysis, timeframe, is_premium, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id
+    """, 
+        signal.pair.upper(),
+        signal.direction.value,
+        signal.entry_price,
+        signal.stop_loss,
+        signal.take_profit_1,
+        signal.take_profit_2,
+        signal.risk_percent,
+        signal.analysis,
+        signal.timeframe,
+        signal.is_premium,
+        1  # Admin user
     )
     
-    return {"success": True, "trade_id": trade_id}
+    return {
+        "success": True, 
+        "signal_id": signal_id,
+        "message": "Signal created successfully"
+    }
 
-@app.get("/trades", tags=["Trade Journal"])
-async def get_trades(
+@app.put("/admin/signals/{signal_id}", tags=["Admin - Signals"])
+async def update_signal(
+    signal_id: int,
+    update: SignalUpdate,
+    conn: asyncpg.Connection = Depends(get_db)
+):
+    """Update signal status/result (admin only)"""
+    await conn.execute("""
+        UPDATE signals 
+        SET status = $1, exit_price = $2, pips_result = $3, closed_at = CASE WHEN $1 = 'closed' THEN NOW() ELSE closed_at END
+        WHERE id = $4
+    """, update.status.value, update.exit_price, update.pips_result, signal_id)
+    
+    return {"success": True, "message": "Signal updated"}
+
+@app.delete("/admin/signals/{signal_id}", tags=["Admin - Signals"])
+async def delete_signal(
+    signal_id: int,
+    conn: asyncpg.Connection = Depends(get_db)
+):
+    """Delete signal (admin only)"""
+    await conn.execute("DELETE FROM signals WHERE id = $1", signal_id)
+    return {"success": True, "message": "Signal deleted"}
+
+@app.get("/admin/signals", tags=["Admin - Signals"])
+async def get_all_signals_admin(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get all trades for admin user"""
-    total = await conn.fetchval("SELECT COUNT(*) FROM trades WHERE user_id = $1", 1)
+    """Get all signals for admin"""
+    total = await conn.fetchval("SELECT COUNT(*) FROM signals")
     
     offset = (page - 1) * per_page
-    trades = await conn.fetch(
-        """SELECT * FROM trades WHERE user_id = $1 
-           ORDER BY created_at DESC LIMIT $2 OFFSET $3""",
-        1, per_page, offset
-    )
+    signals = await conn.fetch("""
+        SELECT s.*, u.full_name as created_by_name
+        FROM signals s
+        LEFT JOIN users u ON s.created_by = u.id
+        ORDER BY s.created_at DESC LIMIT $1 OFFSET $2
+    """, per_page, offset)
     
     return {
         "success": True,
-        "trades": [dict(t) for t in trades],
-        "pagination": {
-            "total": total,
-            "page": page,
-            "per_page": per_page
-        }
-    }
-
-@app.get("/trades/stats", tags=["Trade Journal"])
-async def get_trade_stats(
-    period: str = Query("all", enum=["week", "month", "quarter", "year", "all"]),
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Get trade statistics for admin user"""
-    now = datetime.utcnow()
-    if period == "week":
-        start_date = now - timedelta(days=7)
-    elif period == "month":
-        start_date = now - timedelta(days=30)
-    elif period == "quarter":
-        start_date = now - timedelta(days=90)
-    elif period == "year":
-        start_date = now - timedelta(days=365)
-    else:
-        start_date = datetime.min
-    
-    stats = await conn.fetchrow(
-        """SELECT 
-            COUNT(*) as total_trades,
-            SUM(CASE WHEN pips > 0 THEN 1 ELSE 0 END) as winners,
-            SUM(CASE WHEN pips < 0 THEN 1 ELSE 0 END) as losers,
-            SUM(pips) as net_pips
-           FROM trades 
-           WHERE user_id = $1 AND created_at >= $2""",
-        1, start_date
-    )
-    
-    return {
-        "success": True,
-        "period": period,
-        "summary": dict(stats) if stats else None
+        "signals": [dict(s) for s in signals],
+        "pagination": {"total": total, "page": page, "per_page": per_page}
     }
 
 # ==========================================
-# AI ANALYSIS ENDPOINTS (PROFESSIONAL)
+# AI ANALYSIS ENDPOINTS
 # ==========================================
 
 @app.post("/analyze/chart", tags=["AI Analysis"])
@@ -721,14 +834,11 @@ async def analyze_chart(
     if len(contents) > settings.MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=400, detail="File too large")
     
-    # Convert to base64
     image_base64 = base64.b64encode(contents).decode('utf-8')
     
     try:
-        # Call AI analysis
         analysis = await analyze_chart_with_ai(image_base64, prompt)
         
-        # Save to database if requested
         if save_to_journal:
             await conn.execute(
                 """INSERT INTO chart_analyses 
@@ -737,7 +847,7 @@ async def analyze_chart(
                 1,
                 image.filename,
                 analysis.get('pattern', 'Unknown'),
-                float(analysis.get('confidence', '0').replace('%', '')) / 100 if '%' in str(analysis.get('confidence', '')) else 0.8,
+                0.8,
                 json.dumps(analysis)
             )
         
@@ -757,7 +867,7 @@ async def get_analysis_history(
     per_page: int = Query(10, ge=1, le=50),
     conn: asyncpg.Connection = Depends(get_db)
 ):
-    """Get analysis history for admin user"""
+    """Get analysis history"""
     total = await conn.fetchval(
         "SELECT COUNT(*) FROM chart_analyses WHERE user_id = $1", 1
     )
@@ -770,7 +880,6 @@ async def get_analysis_history(
         1, per_page, offset
     )
     
-    # Parse JSON data
     results = []
     for a in analyses:
         row = dict(a)
@@ -788,20 +897,8 @@ async def get_analysis_history(
         }
     }
 
-@app.delete("/analyze/history/{analysis_id}", tags=["AI Analysis"])
-async def delete_analysis(
-    analysis_id: int,
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Delete analysis (admin only)"""
-    await conn.execute(
-        "DELETE FROM chart_analyses WHERE id = $1 AND user_id = $2",
-        analysis_id, 1
-    )
-    return {"success": True, "message": "Analysis deleted"}
-
 # ==========================================
-# AI MENTOR ENDPOINTS (PROFESSIONAL)
+# AI MENTOR ENDPOINTS
 # ==========================================
 
 @app.post("/mentor/chat", tags=["AI Mentor"])
@@ -811,11 +908,9 @@ async def mentor_chat(
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Chat with AI trading mentor"""
-    # Get or create session
     if not session_id:
         session_id = f"session_1_{datetime.utcnow().timestamp()}"
     
-    # Get chat history
     context = []
     if session_id:
         session = await conn.fetchrow(
@@ -825,22 +920,19 @@ async def mentor_chat(
         if session and session['context']:
             context = json.loads(session['context'])
     
-    # Call AI mentor
     result = await chat_with_mentor(message, context, 1)
     
-    # Update context
     new_context = context + [
         {"role": "user", "content": message},
         {"role": "assistant", "content": result['response']}
     ]
     
-    # Save session
     await conn.execute("""
         INSERT INTO mentor_sessions (user_id, session_id, context, updated_at)
         VALUES ($1, $2, $3, NOW())
         ON CONFLICT (session_id) 
         DO UPDATE SET context = $3, updated_at = NOW()
-    """, 1, session_id, json.dumps(new_context[-20:]))  # Keep last 20 messages
+    """, 1, session_id, json.dumps(new_context[-20:]))
     
     return {
         "success": True,
@@ -849,37 +941,8 @@ async def mentor_chat(
         "tokens_used": result.get('tokens_used', 0)
     }
 
-@app.get("/mentor/sessions", tags=["AI Mentor"])
-async def get_mentor_sessions(
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Get all chat sessions for admin"""
-    sessions = await conn.fetch(
-        """SELECT session_id, created_at, updated_at 
-           FROM mentor_sessions 
-           WHERE user_id = $1 
-           ORDER BY updated_at DESC""",
-        1
-    )
-    return {
-        "success": True,
-        "sessions": [dict(s) for s in sessions]
-    }
-
-@app.delete("/mentor/sessions/{session_id}", tags=["AI Mentor"])
-async def delete_mentor_session(
-    session_id: str,
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Delete chat session"""
-    await conn.execute(
-        "DELETE FROM mentor_sessions WHERE session_id = $1 AND user_id = $2",
-        session_id, 1
-    )
-    return {"success": True}
-
 # ==========================================
-# ADMIN BLOG ENDPOINTS (FULL CRUD)
+# ADMIN CONTENT MANAGEMENT
 # ==========================================
 
 @app.post("/admin/blog", tags=["Admin - Blog"])
@@ -888,12 +951,10 @@ async def create_blog_post(
     conn: asyncpg.Connection = Depends(get_db)
 ):
     """Create blog post (admin only)"""
-    # Generate slug if not provided
     slug = post.slug
     if not slug:
         slug = re.sub(r'[^a-z0-9]+', '-', post.title.lower()).strip('-')
     
-    # Check for duplicate slug
     existing = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug)
     if existing:
         slug = f"{slug}-{int(datetime.utcnow().timestamp())}"
@@ -954,10 +1015,6 @@ async def get_all_blog_posts_admin(
         "pagination": {"total": total, "page": page, "per_page": per_page}
     }
 
-# ==========================================
-# ADMIN WEBINAR ENDPOINTS (FULL CRUD)
-# ==========================================
-
 @app.post("/admin/webinars", tags=["Admin - Webinars"])
 async def create_webinar(
     webinar: WebinarCreate,
@@ -965,10 +1022,10 @@ async def create_webinar(
 ):
     """Create webinar (admin only)"""
     webinar_id = await conn.fetchval("""
-        INSERT INTO webinars (title, description, scheduled_at, duration_minutes, max_attendees, presenter_id, meeting_link, is_published)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+        INSERT INTO webinars (title, description, scheduled_at, duration_minutes, max_attendees, presenter_id, meeting_link, is_published, is_premium)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
     """, webinar.title, webinar.description, webinar.scheduled_at, 
-        webinar.duration_minutes, webinar.max_attendees, 1, webinar.meeting_link, webinar.is_published)
+        webinar.duration_minutes, webinar.max_attendees, 1, webinar.meeting_link, webinar.is_published, webinar.is_premium)
     
     return {"success": True, "webinar_id": webinar_id}
 
@@ -982,11 +1039,11 @@ async def update_webinar(
     await conn.execute("""
         UPDATE webinars 
         SET title = $1, description = $2, scheduled_at = $3, duration_minutes = $4,
-            max_attendees = $5, meeting_link = $6, is_published = $7
-        WHERE id = $8 AND presenter_id = $9
+            max_attendees = $5, meeting_link = $6, is_published = $7, is_premium = $8
+        WHERE id = $9 AND presenter_id = $10
     """, webinar.title, webinar.description, webinar.scheduled_at,
         webinar.duration_minutes, webinar.max_attendees, webinar.meeting_link,
-        webinar.is_published, webinar_id, 1)
+        webinar.is_published, webinar.is_premium, webinar_id, 1)
     
     return {"success": True, "message": "Webinar updated"}
 
@@ -1019,28 +1076,6 @@ async def get_all_webinars_admin(
         "webinars": [dict(w) for w in webinars]
     }
 
-@app.get("/admin/webinars/{webinar_id}/registrations", tags=["Admin - Webinars"])
-async def get_webinar_registrations(
-    webinar_id: int,
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Get registrations for a webinar (admin only)"""
-    registrations = await conn.fetch("""
-        SELECT wr.*, u.email, u.full_name
-        FROM webinar_registrations wr
-        JOIN users u ON wr.user_id = u.id
-        WHERE wr.webinar_id = $1
-    """, webinar_id)
-    
-    return {
-        "success": True,
-        "registrations": [dict(r) for r in registrations]
-    }
-
-# ==========================================
-# ADMIN COURSE ENDPOINTS (FULL CRUD)
-# ==========================================
-
 @app.post("/admin/courses", tags=["Admin - Courses"])
 async def create_course(
     course: CourseCreate,
@@ -1048,10 +1083,10 @@ async def create_course(
 ):
     """Create course (admin only)"""
     course_id = await conn.fetchval("""
-        INSERT INTO courses (title, description, level, duration_minutes, price, instructor_id, thumbnail_url, is_published)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
+        INSERT INTO courses (title, description, level, duration_minutes, price, instructor_id, thumbnail_url, is_published, is_premium)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
     """, course.title, course.description, course.level, course.duration_minutes,
-        course.price, 1, course.thumbnail_url, course.is_published)
+        course.price, 1, course.thumbnail_url, course.is_published, course.is_premium)
     
     return {"success": True, "course_id": course_id}
 
@@ -1065,10 +1100,10 @@ async def update_course(
     await conn.execute("""
         UPDATE courses 
         SET title = $1, description = $2, level = $3, duration_minutes = $4,
-            price = $5, thumbnail_url = $6, is_published = $7
-        WHERE id = $8 AND instructor_id = $9
+            price = $5, thumbnail_url = $6, is_published = $7, is_premium = $8
+        WHERE id = $9 AND instructor_id = $10
     """, course.title, course.description, course.level, course.duration_minutes,
-        course.price, course.thumbnail_url, course.is_published, course_id, 1)
+        course.price, course.thumbnail_url, course.is_published, course.is_premium, course_id, 1)
     
     return {"success": True, "message": "Course updated"}
 
@@ -1101,26 +1136,8 @@ async def get_all_courses_admin(
         "courses": [dict(c) for c in courses]
     }
 
-@app.get("/admin/courses/{course_id}/enrollments", tags=["Admin - Courses"])
-async def get_course_enrollments(
-    course_id: int,
-    conn: asyncpg.Connection = Depends(get_db)
-):
-    """Get enrollments for a course (admin only)"""
-    enrollments = await conn.fetch("""
-        SELECT ce.*, u.email, u.full_name
-        FROM course_enrollments ce
-        JOIN users u ON ce.user_id = u.id
-        WHERE ce.course_id = $1
-    """, course_id)
-    
-    return {
-        "success": True,
-        "enrollments": [dict(e) for e in enrollments]
-    }
-
 # ==========================================
-# PUBLIC ENDPOINTS (Unchanged)
+# PUBLIC ENDPOINTS
 # ==========================================
 
 @app.get("/courses", tags=["Courses"])
@@ -1240,7 +1257,6 @@ async def get_blog_posts(
 @app.get("/blog/posts/{slug}", tags=["Blog"])
 async def get_blog_post(slug: str, conn: asyncpg.Connection = Depends(get_db)):
     """Get single blog post"""
-    # Increment view count
     await conn.execute(
         "UPDATE blog_posts SET view_count = view_count + 1 WHERE slug = $1",
         slug

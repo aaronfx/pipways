@@ -9,9 +9,11 @@ import jwt
 import bcrypt
 import asyncpg
 import logging
+import base64
+import json
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
@@ -42,9 +44,11 @@ class Settings:
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
     CORS_ORIGINS = [
         "https://pipways-web-nhem.onrender.com",
+        "https://pipways.com",
         "http://localhost:3000",
         "http://localhost:5173",
-        "http://127.0.0.1:5500"
+        "http://127.0.0.1:5500",
+        "*"
     ]
 
 settings = Settings()
@@ -55,17 +59,22 @@ db_pool: Optional[asyncpg.Pool] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db_pool
-    db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=5, max_size=20)
-    await init_db()
+    try:
+        db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
     yield
-    await db_pool.close()
+    if db_pool:
+        await db_pool.close()
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CRITICAL: CORS Middleware must be FIRST to handle all responses including errors
+# CORS Middleware - MUST be first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],  # Allow all origins for debugging
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,15 +82,15 @@ app.add_middleware(
     max_age=3600,
 )
 
-# Custom middleware to ensure CORS headers on ALL responses (including 401, 403, 500)
+# Custom middleware to ensure CORS headers on ALL responses
 @app.middleware("http")
 async def cors_debug_handler(request: Request, call_next):
-    origin = request.headers.get("origin")
+    origin = request.headers.get("origin", "*")
     
     # Handle preflight
     if request.method == "OPTIONS":
         headers = {
-            "Access-Control-Allow-Origin": origin if origin in settings.CORS_ORIGINS else settings.CORS_ORIGINS[0],
+            "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
             "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
             "Access-Control-Allow-Credentials": "true",
@@ -91,32 +100,24 @@ async def cors_debug_handler(request: Request, call_next):
     
     try:
         response = await call_next(request)
-        
-        # Add CORS headers to response
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-        else:
-            response.headers["Access-Control-Allow-Origin"] = settings.CORS_ORIGINS[0]
+        response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        
         return response
-        
     except Exception as exc:
-        # Even on 500 errors, return CORS headers so frontend can see the error
         logger.error(f"Error processing request: {exc}")
         return JSONResponse(
             status_code=500,
-            content={"detail": "Internal server error"},
+            content={"detail": str(exc)},
             headers={
-                "Access-Control-Allow-Origin": origin if origin else settings.CORS_ORIGINS[0],
+                "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Credentials": "true",
             }
         )
 
 # Security
-security = HTTPBearer(auto_error=False)  # auto_error=False prevents 403 without CORS headers
+security = HTTPBearer(auto_error=False)
 
-# Models (same as before - fixed for Pydantic v2)
+# Models
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -199,13 +200,14 @@ class CourseCreate(BaseModel):
     content: str = Field(..., min_length=1)
     is_premium: bool = False
 
-class MentorChatMessage(BaseModel):
+class MentorChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
-    context: Optional[str] = None
+    context: Optional[str] = ""
 
 # Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
+        # Users table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -224,6 +226,7 @@ async def init_db():
             )
         """)
         
+        # Signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -244,6 +247,7 @@ async def init_db():
             )
         """)
         
+        # Blog posts
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -257,6 +261,7 @@ async def init_db():
             )
         """)
         
+        # Webinars
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -271,6 +276,7 @@ async def init_db():
             )
         """)
         
+        # Courses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -284,6 +290,7 @@ async def init_db():
             )
         """)
         
+        # Chat history
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -296,14 +303,17 @@ async def init_db():
         """)
         
         # Create default admin
-        admin_exists = await conn.fetchval("SELECT id FROM users WHERE email = $1", settings.ADMIN_EMAIL)
-        if not admin_exists:
-            hashed = bcrypt.hashpw(settings.ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
-            await conn.execute("""
-                INSERT INTO users (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified)
-                VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
-            """, settings.ADMIN_EMAIL, hashed, "System Administrator")
-            logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
+        try:
+            admin_exists = await conn.fetchval("SELECT id FROM users WHERE email = $1", settings.ADMIN_EMAIL)
+            if not admin_exists:
+                hashed = bcrypt.hashpw(settings.ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
+                await conn.execute("""
+                    INSERT INTO users (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified)
+                    VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
+                """, settings.ADMIN_EMAIL, hashed, "System Administrator")
+                logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
+        except Exception as e:
+            logger.error(f"Error creating admin: {e}")
 
 # Auth utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -328,20 +338,34 @@ def create_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
 
-# FIXED: get_current_user now handles missing tokens gracefully with CORS
+# FIXED: Optional auth that returns None instead of raising exception
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        async with db_pool.acquire() as conn:
+            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
+            return dict(user) if user else None
+    except:
+        return None
+
+# Strict auth that raises exception
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             if not user:
@@ -404,10 +428,8 @@ async def login(credentials: UserLogin):
 async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
         
@@ -577,35 +599,39 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
-# Signals
+# Signals - FIXED: Use optional auth
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
     pair: Optional[str] = Query(None),
     limit: int = Query(50, le=100),
-    current_user: Optional[dict] = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM signals WHERE 1=1"
-        params = []
-        
-        if status:
-            query += f" AND status = ${len(params)+1}"
-            params.append(status)
-        if pair:
-            query += f" AND pair ILIKE ${len(params)+1}"
-            params.append(f"%{pair}%")
-        
-        # Filter premium signals for non-premium users
-        if not current_user or current_user["subscription_tier"] == "free":
-            query += " AND is_premium = FALSE"
-        
-        query += " ORDER BY created_at DESC"
-        query += f" LIMIT ${len(params)+1}"
-        params.append(limit)
-        
-        rows = await conn.fetch(query, *params)
-        return [dict(row) for row in rows]
+    try:
+        async with db_pool.acquire() as conn:
+            query = "SELECT * FROM signals WHERE 1=1"
+            params = []
+            
+            if status:
+                query += f" AND status = ${len(params)+1}"
+                params.append(status)
+            if pair:
+                query += f" AND pair ILIKE ${len(params)+1}"
+                params.append(f"%{pair}%")
+            
+            # Filter premium signals for non-premium users
+            if not current_user or current_user.get("subscription_tier") == "free":
+                query += " AND is_premium = FALSE"
+            
+            query += " ORDER BY created_at DESC"
+            query += f" LIMIT ${len(params)+1}"
+            params.append(limit)
+            
+            rows = await conn.fetch(query, *params)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error fetching signals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
@@ -633,44 +659,44 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# AI Analysis
+# AI Analysis - FIXED: Better error handling
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
-    pair: Optional[str] = Form(None),
-    timeframe: Optional[str] = Form(None),
-    additional_info: Optional[str] = Form(None),
+    pair: Optional[str] = Form("EURUSD"),
+    timeframe: Optional[str] = Form("1H"),
+    additional_info: Optional[str] = Form(""),
     current_user: dict = Depends(get_current_user)
 ):
     if not settings.OPENROUTER_API_KEY:
-        raise HTTPException(status_code=503, detail="AI service not configured")
+        raise HTTPException(status_code=503, detail="AI service not configured - missing API key")
     
-    contents = await file.read()
-    if len(contents) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File too large")
-    
-    import base64
-    image_base64 = base64.b64encode(contents).decode()
-    
-    prompt = f"""Analyze this forex/crypto chart for {pair or 'unknown pair'} on {timeframe or 'unknown timeframe'} timeframe.
-    Additional context: {additional_info or 'None'}
-    
-    Provide analysis in this format:
-    - Trend Direction (Bullish/Bearish/Neutral)
-    - Key Support Levels
-    - Key Resistance Levels
-    - Entry Suggestion (if any)
-    - Risk Management advice
-    - Confidence Level (1-10)"""
-    
-    async with httpx.AsyncClient() as client:
-        try:
+    try:
+        contents = await file.read()
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large")
+        
+        image_base64 = base64.b64encode(contents).decode()
+        
+        prompt = f"""Analyze this forex/crypto chart for {pair} on {timeframe} timeframe.
+Additional context: {additional_info}
+
+Provide analysis in this format:
+- Trend Direction (Bullish/Bearish/Neutral)
+- Key Support Levels
+- Key Resistance Levels
+- Entry Suggestion (if any)
+- Risk Management advice
+- Confidence Level (1-10)"""
+        
+        async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                     "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways AI Analysis"
+                    "X-Title": "Pipways AI Analysis",
+                    "Content-Type": "application/json"
                 },
                 json={
                     "model": settings.OPENROUTER_VISION_MODEL,
@@ -687,7 +713,14 @@ async def analyze_chart(
                 timeout=60.0
             )
             
+            if response.status_code != 200:
+                logger.error(f"OpenRouter error: {response.text}")
+                raise HTTPException(status_code=500, detail=f"AI service error: {response.status_code}")
+            
             result = response.json()
+            if "choices" not in result or not result["choices"]:
+                raise HTTPException(status_code=500, detail="Invalid AI response format")
+                
             analysis = result["choices"][0]["message"]["content"]
             
             return {
@@ -696,80 +729,106 @@ async def analyze_chart(
                 "timeframe": timeframe,
                 "timestamp": datetime.utcnow().isoformat()
             }
-        except Exception as e:
-            logger.error(f"AI Analysis error: {str(e)}")
-            raise HTTPException(status_code=500, detail="AI analysis failed")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI Analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
 
+# FIXED: Mentor chat endpoint - accepts raw JSON to avoid 422 errors
 @app.post("/mentor/chat")
 async def mentor_chat(
-    message: MentorChatMessage,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
-    async with db_pool.acquire() as conn:
-        history = await conn.fetch("""
-            SELECT message, response FROM chat_history 
-            WHERE user_id = $1 
-            ORDER BY created_at DESC 
-            LIMIT 5
-        """, current_user["id"])
+    try:
+        # Parse JSON manually to handle any format
+        body = await request.json()
+        message = body.get("message", "")
+        context = body.get("context", "Forex trading")
         
-        messages = []
-        for row in reversed(history):
-            messages.extend([
-                {"role": "user", "content": row["message"]},
-                {"role": "assistant", "content": row["response"]}
-            ])
+        if not message:
+            raise HTTPException(status_code=422, detail="Message is required")
         
-        messages.append({
-            "role": "user",
-            "content": f"{message.message}\n\nContext: {message.context or 'Forex trading'}"
-        })
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways AI Mentor"
-                },
-                json={
-                    "model": settings.OPENROUTER_MODEL,
-                    "messages": [
-                        {"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."},
-                        *messages
-                    ]
-                },
-                timeout=30.0
-            )
+        async with db_pool.acquire() as conn:
+            history = await conn.fetch("""
+                SELECT message, response FROM chat_history 
+                WHERE user_id = $1 
+                ORDER BY created_at DESC 
+                LIMIT 5
+            """, current_user["id"])
             
-            result = response.json()
-            ai_response = result["choices"][0]["message"]["content"]
+            messages = []
+            for row in reversed(history):
+                messages.extend([
+                    {"role": "user", "content": row["message"]},
+                    {"role": "assistant", "content": row["response"]}
+                ])
             
-            await conn.execute("""
-                INSERT INTO chat_history (user_id, message, response, context)
-                VALUES ($1, $2, $3, $4)
-            """, current_user["id"], message.message, ai_response, message.context)
+            messages.append({
+                "role": "user",
+                "content": f"{message}\n\nContext: {context}"
+            })
             
-            return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                        "HTTP-Referer": "https://pipways.com",
+                        "X-Title": "Pipways AI Mentor",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": settings.OPENROUTER_MODEL,
+                        "messages": [
+                            {"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."},
+                            *messages
+                        ]
+                    },
+                    timeout=30.0
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"OpenRouter chat error: {response.text}")
+                    raise HTTPException(status_code=500, detail="AI service error")
+                
+                result = response.json()
+                ai_response = result["choices"][0]["message"]["content"]
+                
+                await conn.execute("""
+                    INSERT INTO chat_history (user_id, message, response, context)
+                    VALUES ($1, $2, $3, $4)
+                """, current_user["id"], message, ai_response, context)
+                
+                return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mentor chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Content Management
+# Content Management - FIXED: Use optional auth
 @app.get("/blog/posts")
 async def get_blog_posts(
     limit: int = Query(10, le=50),
-    current_user: Optional[dict] = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM blog_posts"
-        if not current_user or current_user["subscription_tier"] == "free":
-            query += " WHERE is_premium = FALSE"
-        query += " ORDER BY created_at DESC LIMIT $1"
-        
-        rows = await conn.fetch(query, limit)
-        return [dict(row) for row in rows]
+    try:
+        async with db_pool.acquire() as conn:
+            query = "SELECT * FROM blog_posts"
+            if not current_user or current_user.get("subscription_tier") == "free":
+                query += " WHERE is_premium = FALSE"
+            query += " ORDER BY created_at DESC LIMIT $1"
+            
+            rows = await conn.fetch(query, limit)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error fetching blog posts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/blog/posts")
 async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin_user)):
@@ -782,15 +841,19 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
         return {"id": post_id, "message": "Blog post created"}
 
 @app.get("/webinars")
-async def get_webinars(current_user: Optional[dict] = Depends(get_current_user)):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM webinars WHERE scheduled_at > NOW()"
-        if not current_user or current_user["subscription_tier"] == "free":
-            query += " AND is_premium = FALSE"
-        query += " ORDER BY scheduled_at ASC"
-        
-        rows = await conn.fetch(query)
-        return [dict(row) for row in rows]
+async def get_webinars(current_user: Optional[dict] = Depends(get_current_user_optional)):
+    try:
+        async with db_pool.acquire() as conn:
+            query = "SELECT * FROM webinars WHERE scheduled_at > NOW()"
+            if not current_user or current_user.get("subscription_tier") == "free":
+                query += " AND is_premium = FALSE"
+            query += " ORDER BY scheduled_at ASC"
+            
+            rows = await conn.fetch(query)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error fetching webinars: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
@@ -804,15 +867,19 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
         return {"id": webinar_id, "message": "Webinar created"}
 
 @app.get("/courses")
-async def get_courses(current_user: Optional[dict] = Depends(get_current_user)):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM courses"
-        if not current_user or current_user["subscription_tier"] == "free":
-            query += " WHERE is_premium = FALSE"
-        query += " ORDER BY created_at DESC"
-        
-        rows = await conn.fetch(query)
-        return [dict(row) for row in rows]
+async def get_courses(current_user: Optional[dict] = Depends(get_current_user_optional)):
+    try:
+        async with db_pool.acquire() as conn:
+            query = "SELECT * FROM courses"
+            if not current_user or current_user.get("subscription_tier") == "free":
+                query += " WHERE is_premium = FALSE"
+            query += " ORDER BY created_at DESC"
+            
+            rows = await conn.fetch(query)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error fetching courses: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/courses")
 async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):

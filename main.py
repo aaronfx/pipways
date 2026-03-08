@@ -1,14 +1,15 @@
 """
-Pipways Trading Platform API
-Complete implementation with auth, multi-admin, AI integration
+Pipways Trading Platform API - COMPLETE VERSION
+With Auth, Multi-Admin, AI, Content Management
 """
 
 import os
-import re
 import jwt
 import bcrypt
 import asyncpg
 import logging
+import secrets
+import base64
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, status
@@ -18,20 +19,18 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
-import json
 from contextlib import asynccontextmanager
 
 # Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
 class Settings:
     DATABASE_URL = os.getenv("DATABASE_URL")
-    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars-long")
+    SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key-in-production-min-32-chars")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60
     REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -42,62 +41,45 @@ class Settings:
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
     
-    # CORS Origins
-    cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
-    CORS_ORIGINS = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
+    # Parse CORS origins
+    cors_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
+    CORS_ORIGINS = [url.strip() for url in cors_str.split(",") if url.strip()]
+    if "https://pipways-web-nhem.onrender.com" not in CORS_ORIGINS:
+        CORS_ORIGINS.append("https://pipways-web-nhem.onrender.com")
 
 settings = Settings()
-
-# Database pool
 db_pool: Optional[asyncpg.Pool] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db_pool
-    db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
-    await init_db()
+    try:
+        db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+        await init_db()
+        logger.info("Database connected successfully")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        raise
     yield
-    await db_pool.close()
+    if db_pool:
+        await db_pool.close()
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS Middleware - MUST be before routes
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],  # Allow all for debugging - change to settings.CORS_ORIGINS in production
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
 
-# Additional CORS handler for preflight
-@app.middleware("http")
-async def cors_handler(request, call_next):
-    if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin",
-                "Access-Control-Allow-Credentials": "true",
-            },
-        )
-    response = await call_next(request)
-    origin = request.headers.get("origin")
-    if origin in settings.CORS_ORIGINS:
-        response.headers["Access-Control-Allow-Origin"] = origin
-    else:
-        response.headers["Access-Control-Allow-Origin"] = settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
-
-# Security
 security = HTTPBearer()
 
-# Pydantic Models with fixed validation (no look-ahead regex)
+# Pydantic Models
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -106,17 +88,16 @@ class UserRegister(BaseModel):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Validate password without look-ahead regex"""
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         if not any(c.islower() for c in v):
-            raise ValueError('Password must contain a lowercase letter')
+            raise ValueError('Need lowercase letter')
         if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain an uppercase letter')
+            raise ValueError('Need uppercase letter')
         if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain a number')
+            raise ValueError('Need number')
         if not any(c in '@$!%*?&' for c in v):
-            raise ValueError('Password must contain a special character (@$!%*?&)')
+            raise ValueError('Need special character (@$!%*?&)')
         return v
 
 class UserLogin(BaseModel):
@@ -142,22 +123,22 @@ class PasswordReset(BaseModel):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         if not any(c.islower() for c in v):
-            raise ValueError('Password must contain a lowercase letter')
+            raise ValueError('Need lowercase letter')
         if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain an uppercase letter')
+            raise ValueError('Need uppercase letter')
         if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain a number')
+            raise ValueError('Need number')
         if not any(c in '@$!%*?&' for c in v):
-            raise ValueError('Password must contain a special character (@$!%*?&)')
+            raise ValueError('Need special character (@$!%*?&)')
         return v
 
 class SignalCreate(BaseModel):
-    pair: str = Field(..., min_length=1)
+    pair: str
     direction: str = Field(..., pattern="^(buy|sell)$")
     entry_price: float
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    timeframe: str
+    timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
 
@@ -172,8 +153,8 @@ class WebinarCreate(BaseModel):
     description: str = Field(..., min_length=1)
     scheduled_at: datetime
     duration_minutes: int = Field(default=60, ge=1)
-    is_premium: bool = False
     meeting_link: Optional[str] = None
+    is_premium: bool = False
 
 class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1)
@@ -185,7 +166,7 @@ class MentorChatMessage(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = None
 
-# Database initialization
+# Database Initialization
 async def init_db():
     async with db_pool.acquire() as conn:
         # Users table
@@ -283,6 +264,7 @@ async def init_db():
             )
         """)
         
+        # Create default admin
         await create_default_admin(conn)
 
 async def create_default_admin(conn):
@@ -295,16 +277,16 @@ async def create_default_admin(conn):
         """, settings.ADMIN_EMAIL, hashed, "System Administrator")
         logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
 
-# Auth utilities
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+# Auth Utilities
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -314,22 +296,15 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-def create_reset_token():
-    import secrets
-    return secrets.token_urlsafe(32)
-
+# Auth Dependency
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
         
         async with db_pool.acquire() as conn:
-            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
+            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(payload["sub"]))
             if not user:
                 raise HTTPException(status_code=401, detail="User not found")
             return dict(user)
@@ -343,7 +318,7 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
-# Auth endpoints
+# Auth Routes
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     async with db_pool.acquire() as conn:
@@ -388,20 +363,13 @@ async def login(credentials: UserLogin):
 
 @app.post("/auth/refresh")
 async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
         
-        user_id = payload.get("sub")
-        async with db_pool.acquire() as conn:
-            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
-            if not user:
-                raise HTTPException(status_code=401, detail="User not found")
-            
-            new_access = create_access_token({"sub": str(user_id)})
-            return {"access_token": new_access, "token_type": "bearer"}
+        new_access = create_access_token({"sub": payload["sub"]})
+        return {"access_token": new_access, "token_type": "bearer"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except jwt.JWTError:
@@ -414,13 +382,14 @@ async def forgot_password(request: PasswordResetRequest):
         if not user:
             return {"message": "If email exists, reset link sent"}
         
-        reset_token = create_reset_token()
+        reset_token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(hours=settings.RESET_TOKEN_EXPIRE_HOURS)
         
         await conn.execute("""
             UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3
         """, reset_token, expires, user["id"])
         
+        # Log for testing (replace with email in production)
         reset_url = f"https://pipways-web-nhem.onrender.com?reset_token={reset_token}"
         logger.info(f"Password reset URL for {request.email}: {reset_url}")
         
@@ -579,8 +548,7 @@ async def get_signals(
             query += f" AND pair ILIKE ${len(params)+1}"
             params.append(f"%{pair}%")
         
-        # Filter premium signals for non-premium users
-        if not current_user or current_user["subscription_tier"] == "free":
+        if not current_user or current_user.get("subscription_tier") == "free":
             query += " AND is_premium = FALSE"
         
         query += " ORDER BY created_at DESC"
@@ -632,7 +600,6 @@ async def analyze_chart(
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large")
     
-    import base64
     image_base64 = base64.b64encode(contents).decode()
     
     prompt = f"""Analyze this forex/crypto chart for {pair or 'unknown pair'} on {timeframe or 'unknown timeframe'} timeframe.
@@ -647,41 +614,37 @@ async def analyze_chart(
     - Confidence Level (1-10)"""
     
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways AI Analysis"
-                },
-                json={
-                    "model": settings.OPENROUTER_VISION_MODEL,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                            ]
-                        }
-                    ]
-                },
-                timeout=60.0
-            )
-            
-            result = response.json()
-            analysis = result["choices"][0]["message"]["content"]
-            
-            return {
-                "analysis": analysis,
-                "pair": pair,
-                "timeframe": timeframe,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        except Exception as e:
-            logger.error(f"AI Analysis error: {str(e)}")
-            raise HTTPException(status_code=500, detail="AI analysis failed")
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://pipways.com",
+                "X-Title": "Pipways AI Analysis"
+            },
+            json={
+                "model": settings.OPENROUTER_VISION_MODEL,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                        ]
+                    }
+                ]
+            },
+            timeout=60.0
+        )
+        
+        result = response.json()
+        analysis = result["choices"][0]["message"]["content"]
+        
+        return {
+            "analysis": analysis,
+            "pair": pair,
+            "timeframe": timeframe,
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.post("/mentor/chat")
 async def mentor_chat(
@@ -747,7 +710,7 @@ async def get_blog_posts(
 ):
     async with db_pool.acquire() as conn:
         query = "SELECT * FROM blog_posts"
-        if not current_user or current_user["subscription_tier"] == "free":
+        if not current_user or current_user.get("subscription_tier") == "free":
             query += " WHERE is_premium = FALSE"
         query += " ORDER BY created_at DESC LIMIT $1"
         
@@ -768,7 +731,7 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
 async def get_webinars(current_user: Optional[dict] = Depends(get_current_user)):
     async with db_pool.acquire() as conn:
         query = "SELECT * FROM webinars WHERE scheduled_at > NOW()"
-        if not current_user or current_user["subscription_tier"] == "free":
+        if not current_user or current_user.get("subscription_tier") == "free":
             query += " AND is_premium = FALSE"
         query += " ORDER BY scheduled_at ASC"
         
@@ -790,7 +753,7 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
 async def get_courses(current_user: Optional[dict] = Depends(get_current_user)):
     async with db_pool.acquire() as conn:
         query = "SELECT * FROM courses"
-        if not current_user or current_user["subscription_tier"] == "free":
+        if not current_user or current_user.get("subscription_tier") == "free":
             query += " WHERE is_premium = FALSE"
         query += " ORDER BY created_at DESC"
         

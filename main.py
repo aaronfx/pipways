@@ -233,7 +233,7 @@ If the user asks about a specific trade setup, ask for: entry, stop loss, target
 Current date: {current_date}"""
 
 # ==========================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION - FIXED
 # ==========================================
 
 async def init_db():
@@ -265,9 +265,9 @@ async def init_db():
                 redis_client = None
 
         async with pool.acquire() as conn:
-            # Create tables (if not exist)
+            # Step 1: Create tables if they don't exist (without new columns)
             await conn.execute("""
-                -- Users table
+                -- Users table (base version)
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     email VARCHAR(255) UNIQUE NOT NULL,
@@ -278,13 +278,6 @@ async def init_db():
                     is_verified BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
-                -- Add new columns to existing users table
-                ALTER TABLE users 
-                    ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(50) DEFAULT 'free',
-                    ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP,
-                    ADD COLUMN IF NOT EXISTS telegram_username VARCHAR(100),
-                    ADD COLUMN IF NOT EXISTS telegram_chat_id BIGINT;
 
                 -- Trading Signals table
                 CREATE TABLE IF NOT EXISTS signals (
@@ -404,7 +397,34 @@ async def init_db():
                 );
             """)
 
-            # Add admin user (only if not exists)
+            # Step 2: Now add new columns to existing tables (separate transaction)
+            await conn.execute("""
+                -- Add new columns to users table if they don't exist
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='subscription_tier') THEN
+                        ALTER TABLE users ADD COLUMN subscription_tier VARCHAR(50) DEFAULT 'free';
+                    END IF;
+
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='subscription_expires_at') THEN
+                        ALTER TABLE users ADD COLUMN subscription_expires_at TIMESTAMP;
+                    END IF;
+
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='telegram_username') THEN
+                        ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100);
+                    END IF;
+
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='users' AND column_name='telegram_chat_id') THEN
+                        ALTER TABLE users ADD COLUMN telegram_chat_id BIGINT;
+                    END IF;
+                END $$;
+            """)
+
+            # Step 3: Add admin user (only if not exists)
             await conn.execute("""
                 INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_verified, subscription_tier)
                 VALUES (1, 'admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE, 'premium')

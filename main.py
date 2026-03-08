@@ -1,6 +1,5 @@
 """
 Pipways API - Professional Trading Signals & Education Platform
-Complete working version with professional AI prompts
 """
 import os
 import sys
@@ -233,7 +232,7 @@ If the user asks about a specific trade setup, ask for: entry, stop loss, target
 Current date: {current_date}"""
 
 # ==========================================
-# DATABASE INITIALIZATION - FIXED
+# DATABASE INITIALIZATION - ROBUST VERSION
 # ==========================================
 
 async def init_db():
@@ -265,20 +264,11 @@ async def init_db():
                 redis_client = None
 
         async with pool.acquire() as conn:
-            # Step 1: Create tables if they don't exist (without new columns)
-            await conn.execute("""
-                -- Users table (base version)
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    email VARCHAR(255) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    full_name VARCHAR(255),
-                    role VARCHAR(50) DEFAULT 'user',
-                    is_active BOOLEAN DEFAULT TRUE,
-                    is_verified BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
+            # Check if users table exists and what columns it has
+            logger.info("Checking existing schema...")
 
+            # Step 1: Create tables that don't exist yet (new tables only)
+            await conn.execute("""
                 -- Trading Signals table
                 CREATE TABLE IF NOT EXISTS signals (
                     id SERIAL PRIMARY KEY,
@@ -295,7 +285,7 @@ async def init_db():
                     is_premium BOOLEAN DEFAULT FALSE,
                     pips_result DECIMAL(10,2),
                     exit_price DECIMAL(15,5),
-                    created_by INTEGER REFERENCES users(id),
+                    created_by INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     closed_at TIMESTAMP
                 );
@@ -303,7 +293,7 @@ async def init_db():
                 -- Chart analyses table
                 CREATE TABLE IF NOT EXISTS chart_analyses (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    user_id INTEGER,
                     image_url TEXT,
                     pattern_detected VARCHAR(100),
                     confidence_score DECIMAL(3,2),
@@ -315,7 +305,7 @@ async def init_db():
                 -- Mentor chat sessions
                 CREATE TABLE IF NOT EXISTS mentor_sessions (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    user_id INTEGER,
                     session_id VARCHAR(255) UNIQUE,
                     context JSONB DEFAULT '[]',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -331,7 +321,7 @@ async def init_db():
                     duration_minutes INTEGER DEFAULT 60,
                     price DECIMAL(10,2) DEFAULT 0,
                     is_premium BOOLEAN DEFAULT FALSE,
-                    instructor_id INTEGER REFERENCES users(id),
+                    instructor_id INTEGER,
                     thumbnail_url TEXT,
                     is_published BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -340,8 +330,8 @@ async def init_db():
                 -- Course enrollments
                 CREATE TABLE IF NOT EXISTS course_enrollments (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                    user_id INTEGER,
+                    course_id INTEGER,
                     enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, course_id)
                 );
@@ -355,7 +345,7 @@ async def init_db():
                     duration_minutes INTEGER DEFAULT 60,
                     max_attendees INTEGER DEFAULT 100,
                     is_premium BOOLEAN DEFAULT FALSE,
-                    presenter_id INTEGER REFERENCES users(id),
+                    presenter_id INTEGER,
                     meeting_link TEXT,
                     is_published BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -364,8 +354,8 @@ async def init_db():
                 -- Webinar registrations
                 CREATE TABLE IF NOT EXISTS webinar_registrations (
                     id SERIAL PRIMARY KEY,
-                    webinar_id INTEGER REFERENCES webinars(id) ON DELETE CASCADE,
-                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    webinar_id INTEGER,
+                    user_id INTEGER,
                     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(webinar_id, user_id)
                 );
@@ -378,7 +368,7 @@ async def init_db():
                     content TEXT,
                     excerpt TEXT,
                     category VARCHAR(100) DEFAULT 'General',
-                    author_id INTEGER REFERENCES users(id),
+                    author_id INTEGER,
                     featured_image_url TEXT,
                     is_published BOOLEAN DEFAULT FALSE,
                     view_count INTEGER DEFAULT 0,
@@ -389,7 +379,7 @@ async def init_db():
                 -- Telegram bot messages log
                 CREATE TABLE IF NOT EXISTS telegram_messages (
                     id SERIAL PRIMARY KEY,
-                    signal_id INTEGER REFERENCES signals(id),
+                    signal_id INTEGER,
                     message_id BIGINT,
                     chat_id BIGINT,
                     message_type VARCHAR(50),
@@ -397,34 +387,163 @@ async def init_db():
                 );
             """)
 
-            # Step 2: Now add new columns to existing tables (separate transaction)
+            # Step 2: Check if users table exists
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'users'
+                );
+            """)
+
+            if not table_exists:
+                logger.info("Creating users table...")
+                await conn.execute("""
+                    CREATE TABLE users (
+                        id SERIAL PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        full_name VARCHAR(255),
+                        role VARCHAR(50) DEFAULT 'user',
+                        is_active BOOLEAN DEFAULT TRUE,
+                        is_verified BOOLEAN DEFAULT FALSE,
+                        subscription_tier VARCHAR(50) DEFAULT 'free',
+                        subscription_expires_at TIMESTAMP,
+                        telegram_username VARCHAR(100),
+                        telegram_chat_id BIGINT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+            else:
+                logger.info("Users table exists, checking columns...")
+                # Add columns one by one with individual checks
+                columns_to_add = [
+                    ('full_name', 'VARCHAR(255)'),
+                    ('subscription_tier', 'VARCHAR(50) DEFAULT 'free''),
+                    ('subscription_expires_at', 'TIMESTAMP'),
+                    ('telegram_username', 'VARCHAR(100)'),
+                    ('telegram_chat_id', 'BIGINT')
+                ]
+
+                for col_name, col_type in columns_to_add:
+                    col_exists = await conn.fetchval(f"""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.columns 
+                            WHERE table_name = 'users' AND column_name = '{col_name}'
+                        );
+                    """)
+                    if not col_exists:
+                        logger.info(f"Adding column: {col_name}")
+                        await conn.execute(f"""
+                            ALTER TABLE users ADD COLUMN {col_name} {col_type};
+                        """)
+                    else:
+                        logger.info(f"Column already exists: {col_name}")
+
+            # Step 3: Now add foreign key constraints (after all tables exist)
             await conn.execute("""
-                -- Add new columns to users table if they don't exist
+                -- Add foreign keys if they don't exist
                 DO $$
                 BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='subscription_tier') THEN
-                        ALTER TABLE users ADD COLUMN subscription_tier VARCHAR(50) DEFAULT 'free';
+                    -- signals.created_by -> users.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'signals_created_by_fkey'
+                    ) THEN
+                        ALTER TABLE signals ADD CONSTRAINT signals_created_by_fkey 
+                        FOREIGN KEY (created_by) REFERENCES users(id);
                     END IF;
 
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='subscription_expires_at') THEN
-                        ALTER TABLE users ADD COLUMN subscription_expires_at TIMESTAMP;
+                    -- chart_analyses.user_id -> users.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'chart_analyses_user_id_fkey'
+                    ) THEN
+                        ALTER TABLE chart_analyses ADD CONSTRAINT chart_analyses_user_id_fkey 
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
                     END IF;
 
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='telegram_username') THEN
-                        ALTER TABLE users ADD COLUMN telegram_username VARCHAR(100);
+                    -- mentor_sessions.user_id -> users.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'mentor_sessions_user_id_fkey'
+                    ) THEN
+                        ALTER TABLE mentor_sessions ADD CONSTRAINT mentor_sessions_user_id_fkey 
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
                     END IF;
 
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                                   WHERE table_name='users' AND column_name='telegram_chat_id') THEN
-                        ALTER TABLE users ADD COLUMN telegram_chat_id BIGINT;
+                    -- courses.instructor_id -> users.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'courses_instructor_id_fkey'
+                    ) THEN
+                        ALTER TABLE courses ADD CONSTRAINT courses_instructor_id_fkey 
+                        FOREIGN KEY (instructor_id) REFERENCES users(id);
+                    END IF;
+
+                    -- course_enrollments
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'course_enrollments_user_id_fkey'
+                    ) THEN
+                        ALTER TABLE course_enrollments ADD CONSTRAINT course_enrollments_user_id_fkey 
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+                    END IF;
+
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'course_enrollments_course_id_fkey'
+                    ) THEN
+                        ALTER TABLE course_enrollments ADD CONSTRAINT course_enrollments_course_id_fkey 
+                        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE;
+                    END IF;
+
+                    -- webinars.presenter_id -> users.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'webinars_presenter_id_fkey'
+                    ) THEN
+                        ALTER TABLE webinars ADD CONSTRAINT webinars_presenter_id_fkey 
+                        FOREIGN KEY (presenter_id) REFERENCES users(id);
+                    END IF;
+
+                    -- webinar_registrations
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'webinar_registrations_webinar_id_fkey'
+                    ) THEN
+                        ALTER TABLE webinar_registrations ADD CONSTRAINT webinar_registrations_webinar_id_fkey 
+                        FOREIGN KEY (webinar_id) REFERENCES webinars(id) ON DELETE CASCADE;
+                    END IF;
+
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'webinar_registrations_user_id_fkey'
+                    ) THEN
+                        ALTER TABLE webinar_registrations ADD CONSTRAINT webinar_registrations_user_id_fkey 
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+                    END IF;
+
+                    -- blog_posts.author_id -> users.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'blog_posts_author_id_fkey'
+                    ) THEN
+                        ALTER TABLE blog_posts ADD CONSTRAINT blog_posts_author_id_fkey 
+                        FOREIGN KEY (author_id) REFERENCES users(id);
+                    END IF;
+
+                    -- telegram_messages.signal_id -> signals.id
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'telegram_messages_signal_id_fkey'
+                    ) THEN
+                        ALTER TABLE telegram_messages ADD CONSTRAINT telegram_messages_signal_id_fkey 
+                        FOREIGN KEY (signal_id) REFERENCES signals(id);
                     END IF;
                 END $$;
             """)
 
-            # Step 3: Add admin user (only if not exists)
+            # Step 4: Add admin user (only if not exists)
             await conn.execute("""
                 INSERT INTO users (id, email, password_hash, full_name, role, is_active, is_verified, subscription_tier)
                 VALUES (1, 'admin@pipways.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA.qGZvKG6G', 'Admin User', 'admin', TRUE, TRUE, 'premium')

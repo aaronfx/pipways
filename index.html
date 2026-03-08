@@ -1,35 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-    <!-- SEO Meta Tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <meta name="description" content="Pipways - Professional AI-powered forex trading signals, analysis, and mentorship platform. Get real-time trading signals and AI chart analysis.">
-    <meta name="keywords" content="forex trading, trading signals, AI analysis, forex mentor, trading courses, pipways">
-    <meta name="author" content="Pipways">
-    <meta name="robots" content="index, follow">
-    
-    <!-- Open Graph / Social Media -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://pipways-web-nhem.onrender.com">
-    <meta property="og:title" content="Pipways - AI Trading Signals & Analysis">
-    <meta property="og:description" content="Professional forex trading signals with AI-powered chart analysis and mentorship">
-    <meta property="og:image" content="https://pipways-web-nhem.onrender.com/og-image.jpg">
-    
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://pipways-web-nhem.onrender.com">
-    <meta property="twitter:title" content="Pipways - AI Trading Signals">
-    <meta property="twitter:description" content="Professional forex trading signals with AI analysis">
-    
-    <title>Pipways - AI Trading Signals & Analysis Platform</title>
-    
-    <!-- Fonts -->
+    <meta name="description" content="Pipways - Professional AI-powered forex trading signals">
+    <title>Pipways - AI Trading Platform</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -40,7 +17,6 @@
             --accent: #f59e0b;
             --success: #10b981;
             --danger: #ef4444;
-            --warning: #f59e0b;
             --bg-primary: #0a0e1a;
             --bg-secondary: #111827;
             --bg-card: #1f2937;
@@ -48,11 +24,8 @@
             --text-primary: #f9fafb;
             --text-secondary: #9ca3af;
             --border: #374151;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
             --radius: 12px;
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --font-main: 'Inter', sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
         }
 
         [data-theme="light"] {
@@ -63,407 +36,70 @@
             --text-primary: #111827;
             --text-secondary: #6b7280;
             --border: #e5e7eb;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: var(--font-main);
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
             overflow-x: hidden;
-            transition: var(--transition);
         }
 
-        /* Mobile-First Base Styles */
-        .container {
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 16px;
-        }
-
-        @media (min-width: 768px) {
-            .container {
-                padding: 0 24px;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .container {
-                padding: 0 32px;
-            }
-        }
-
-        /* Navigation */
-        .navbar {
-            background: rgba(17, 24, 39, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border);
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 1000;
-            transition: var(--transition);
-        }
-
-        [data-theme="light"] .navbar {
-            background: rgba(255, 255, 255, 0.95);
-        }
-
-        .nav-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 64px;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .nav-links {
-            display: none;
-            gap: 32px;
-            align-items: center;
-        }
-
-        @media (min-width: 1024px) {
-            .nav-links {
-                display: flex;
-            }
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: var(--transition);
-            position: relative;
-            padding: 8px 0;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            color: var(--primary);
-        }
-
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--primary);
-            transition: width 0.3s;
-        }
-
-        .nav-link:hover::after, .nav-link.active::after {
-            width: 100%;
-        }
-
-        .nav-actions {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        /* Mobile Menu Toggle */
-        .mobile-toggle {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
-            z-index: 1001;
-        }
-
-        .mobile-toggle span {
-            width: 24px;
-            height: 2px;
-            background: var(--text-primary);
-            transition: var(--transition);
-            border-radius: 2px;
-        }
-
-        .mobile-toggle.active span:nth-child(1) {
-            transform: rotate(45deg) translate(5px, 5px);
-        }
-
-        .mobile-toggle.active span:nth-child(2) {
-            opacity: 0;
-        }
-
-        .mobile-toggle.active span:nth-child(3) {
-            transform: rotate(-45deg) translate(5px, -5px);
-        }
-
-        @media (min-width: 1024px) {
-            .mobile-toggle {
-                display: none;
-            }
-        }
-
-        /* Mobile Sidebar */
-        .mobile-sidebar {
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 80%;
-            max-width: 300px;
-            height: 100vh;
-            background: var(--bg-secondary);
-            border-left: 1px solid var(--border);
-            padding: 80px 24px 24px;
-            transition: right 0.3s ease;
-            z-index: 999;
-            overflow-y: auto;
-        }
-
-        .mobile-sidebar.active {
-            right: 0;
-        }
-
-        .mobile-overlay {
+        /* Auth Wall - Blocks everything until login */
+        .auth-wall {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-            z-index: 998;
-        }
-
-        .mobile-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .mobile-nav-links {
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1f2e 100%);
             display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .mobile-nav-link {
-            color: var(--text-primary);
-            text-decoration: none;
-            font-size: 1.1rem;
-            font-weight: 500;
-            padding: 12px;
-            border-radius: var(--radius);
-            transition: var(--transition);
-        }
-
-        .mobile-nav-link:hover {
-            background: var(--bg-hover);
-            color: var(--primary);
-        }
-
-        /* Buttons */
-        .btn {
-            display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            padding: 12px 24px;
-            border-radius: var(--radius);
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: var(--transition);
-            border: none;
-            text-decoration: none;
-            position: relative;
-            overflow: hidden;
+            z-index: 9999;
+            padding: 20px;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: #000;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(0, 212, 255, 0.3);
-        }
-
-        .btn-secondary {
-            background: var(--bg-card);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-hover);
-            border-color: var(--primary);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-sm {
-            padding: 8px 16px;
-            font-size: 0.875rem;
-        }
-
-        .btn-lg {
-            padding: 16px 32px;
-            font-size: 1.1rem;
-        }
-
-        /* Touch-friendly button sizing for mobile */
-        @media (max-width: 768px) {
-            .btn {
-                min-height: 44px;
-                padding: 12px 20px;
-            }
-        }
-
-        /* Main Content */
-        .main-content {
-            margin-top: 64px;
-            min-height: calc(100vh - 64px);
-            padding-bottom: 40px;
-        }
-
-        /* Sections */
-        .section {
+        .auth-wall.hidden {
             display: none;
-            animation: fadeIn 0.4s ease;
-            padding: 24px 0;
         }
 
-        .section.active {
-            display: block;
+        .auth-container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 40px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .section-header {
-            margin-bottom: 32px;
+        .auth-header {
             text-align: center;
+            margin-bottom: 32px;
         }
 
-        .section-title {
+        .auth-logo {
             font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, var(--text-primary), var(--primary));
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-        }
-
-        @media (min-width: 768px) {
-            .section-title {
-                font-size: 2.5rem;
-            }
-        }
-
-        .section-subtitle {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
-
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 24px;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
-            border-color: var(--primary);
-        }
-
-        [data-theme="light"] .card:hover {
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
-        }
-
-        /* Skeleton Loaders */
-        .skeleton {
-            background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 4px;
-        }
-
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        .skeleton-card {
-            height: 200px;
-            margin-bottom: 16px;
-        }
-
-        .skeleton-text {
-            height: 16px;
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
 
-        .skeleton-text.short {
-            width: 60%;
+        .auth-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
         }
 
-        /* Grid Systems */
-        .grid {
-            display: grid;
-            gap: 24px;
-        }
-
-        .grid-1 { grid-template-columns: 1fr; }
-        .grid-2 { grid-template-columns: 1fr; }
-        .grid-3 { grid-template-columns: 1fr; }
-        .grid-4 { grid-template-columns: 1fr; }
-
-        @media (min-width: 768px) {
-            .grid-2 { grid-template-columns: repeat(2, 1fr); }
-            .grid-3 { grid-template-columns: repeat(2, 1fr); }
-            .grid-4 { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        @media (min-width: 1024px) {
-            .grid-3 { grid-template-columns: repeat(3, 1fr); }
-            .grid-4 { grid-template-columns: repeat(4, 1fr); }
-        }
-
-        /* Forms */
         .form-group {
             margin-bottom: 20px;
         }
@@ -485,7 +121,6 @@
             color: var(--text-primary);
             font-size: 1rem;
             transition: var(--transition);
-            font-family: inherit;
         }
 
         .form-input:focus {
@@ -494,483 +129,77 @@
             box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
         }
 
-        .form-input.error {
-            border-color: var(--danger);
+        .btn {
+            width: 100%;
+            padding: 12px 24px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            margin-top: 12px;
+        }
+
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .auth-switch a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
         }
 
         .error-message {
             color: var(--danger);
             font-size: 0.85rem;
-            margin-top: 4px;
+            margin-top: 6px;
             display: none;
         }
 
         .error-message.visible {
             display: block;
-        }
-
-        /* Touch-friendly inputs for mobile */
-        @media (max-width: 768px) {
-            .form-input {
-                font-size: 16px; /* Prevents zoom on iOS */
-                min-height: 44px;
-            }
-        }
-
-        /* Signal Cards */
-        .signal-card {
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            padding: 20px;
-            border: 1px solid var(--border);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .signal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .signal-pair {
-            font-size: 1.5rem;
-            font-weight: 700;
-            font-family: var(--font-mono);
-        }
-
-        .signal-direction {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-        }
-
-        .signal-direction.buy {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--success);
-        }
-
-        .signal-direction.sell {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--danger);
-        }
-
-        .signal-metrics {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border);
-        }
-
-        .metric {
-            text-align: center;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .metric-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-        }
-
-        .signal-status {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Performance Badges */
-        .performance-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .performance-badge.positive {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--success);
-        }
-
-        .performance-badge.negative {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--danger);
-        }
-
-        /* AI Analysis Section */
-        .upload-zone {
-            border: 2px dashed var(--border);
-            border-radius: var(--radius);
-            padding: 40px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            background: var(--bg-secondary);
-        }
-
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: var(--primary);
-            background: rgba(0, 212, 255, 0.05);
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--primary);
-            margin-bottom: 16px;
-        }
-
-        .image-preview {
-            max-width: 100%;
-            max-height: 400px;
-            border-radius: var(--radius);
-            margin-top: 20px;
-            display: none;
-        }
-
-        .image-preview.visible {
-            display: block;
-        }
-
-        .analysis-result {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 24px;
-            margin-top: 24px;
-            border-left: 4px solid var(--primary);
-            white-space: pre-wrap;
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-            line-height: 1.8;
-        }
-
-        /* Chat Interface */
-        .chat-container {
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            height: 600px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .chat-message {
-            max-width: 80%;
-            padding: 12px 16px;
-            border-radius: 12px;
-            line-height: 1.5;
-        }
-
-        .chat-message.user {
-            align-self: flex-end;
-            background: var(--primary);
-            color: #000;
-        }
-
-        .chat-message.assistant {
-            align-self: flex-start;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-        }
-
-        .chat-input-container {
-            padding: 16px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            gap: 12px;
-            background: var(--bg-secondary);
-        }
-
-        .chat-input {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            background: var(--bg-card);
-            color: var(--text-primary);
-            resize: none;
-            font-family: inherit;
-        }
-
-        .chat-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* Admin Dashboard */
-        .admin-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 24px;
-            margin-bottom: 32px;
-        }
-
-        .admin-card {
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            padding: 24px;
-            text-align: center;
-            border: 1px solid var(--border);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .admin-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--primary);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .admin-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-            font-size: 1.5rem;
-            color: white;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary);
-            margin: 8px 0;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        /* Tables */
-        .table-container {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 600px;
-        }
-
-        th, td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-
-        th {
-            background: var(--bg-secondary);
-            font-weight: 600;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
-        }
-
-        td {
-            font-size: 0.9rem;
-        }
-
-        tr:hover {
-            background: var(--bg-hover);
-        }
-
-        /* Modal */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-            padding: 16px;
-        }
-
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .modal-content {
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            width: 100%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-            transform: scale(0.9);
-            transition: transform 0.3s;
-            border: 1px solid var(--border);
-        }
-
-        .modal.active .modal-content {
-            transform: scale(1);
-        }
-
-        .modal-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-body {
-            padding: 24px;
-        }
-
-        .modal-footer {
-            padding: 16px 24px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-        }
-
-        /* Toast Notifications */
-        .toast-container {
-            position: fixed;
-            top: 80px;
-            right: 16px;
-            z-index: 3000;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-width: 400px;
-        }
-
-        .toast {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 16px 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transform: translateX(400px);
-            transition: transform 0.3s;
-            animation: slideIn 0.3s forwards;
-        }
-
-        @keyframes slideIn {
-            to { transform: translateX(0); }
-        }
-
-        .toast.success {
-            border-left: 4px solid var(--success);
-        }
-
-        .toast.error {
-            border-left: 4px solid var(--danger);
-        }
-
-        .toast.warning {
-            border-left: 4px solid var(--warning);
-        }
-
-        /* Theme Toggle */
-        .theme-toggle {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 1.2rem;
-            padding: 8px;
-            border-radius: 50%;
-            transition: var(--transition);
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .theme-toggle:hover {
-            background: var(--bg-hover);
-            color: var(--primary);
-        }
-
-        /* Auth Forms */
-        .auth-container {
-            max-width: 420px;
-            margin: 40px auto;
-            padding: 0 16px;
-        }
-
-        .auth-box {
-            background: var(--bg-card);
-            border-radius: var(--radius);
-            padding: 32px;
-            border: 1px solid var(--border);
-        }
-
-        .auth-title {
-            text-align: center;
-            margin-bottom: 24px;
-            font-size: 1.75rem;
-        }
-
-        .auth-footer {
-            text-align: center;
-            margin-top: 24px;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .auth-footer a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
         }
 
         .password-strength {
@@ -987,643 +216,505 @@
             width: 0;
         }
 
-        .password-strength-bar.weak { width: 33%; background: var(--danger); }
-        .password-strength-bar.medium { width: 66%; background: var(--warning); }
-        .password-strength-bar.strong { width: 100%; background: var(--success); }
+        .strength-weak { width: 33%; background: var(--danger); }
+        .strength-medium { width: 66%; background: var(--accent); }
+        .strength-strong { width: 100%; background: var(--success); }
 
-        /* Loading Spinner */
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        /* Main App (Hidden until auth) */
+        .main-app {
+            display: none;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .main-app.visible {
+            display: block;
         }
 
-        .btn-loading {
-            opacity: 0.7;
-            pointer-events: none;
+        /* Navigation */
+        .navbar {
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: 0 20px;
         }
 
-        /* Utility Classes */
-        .hidden { display: none !important; }
-        .text-center { text-align: center; }
-        .mt-4 { margin-top: 16px; }
-        .mb-4 { margin-bottom: 16px; }
-        .w-full { width: 100%; }
-        .flex { display: flex; }
-        .items-center { align-items: center; }
-        .justify-between { justify-content: space-between; }
-        .gap-4 { gap: 16px; }
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 64px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
 
-        /* Responsive Tables for Mobile */
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            cursor: pointer;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary);
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-badge {
+            background: var(--bg-hover);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .logout-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* Content Sections */
+        .main-content {
+            margin-top: 64px;
+            padding: 24px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        /* Cards */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
+            border-color: var(--primary);
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            height: 200px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 16px;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            background: var(--bg-card);
+            border-left: 4px solid var(--success);
+            padding: 16px 20px;
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+            min-width: 300px;
+        }
+
+        .toast.error { border-left-color: var(--danger); }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        /* Signal Cards */
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .signal-pair {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: monospace;
+        }
+
+        .signal-direction {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+        }
+
+        .buy { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .sell { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .signal-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .metric-label { font-size: 0.75rem; color: var(--text-secondary); }
+        .metric-value { font-family: monospace; font-weight: 600; }
+
+        /* Mobile */
+        .mobile-toggle {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        .mobile-toggle span {
+            width: 24px;
+            height: 2px;
+            background: var(--text-primary);
+            border-radius: 2px;
+        }
+
         @media (max-width: 768px) {
-            .mobile-card-view {
-                display: block;
-            }
-            .mobile-card-view table {
-                display: none;
-            }
-            .mobile-card {
-                background: var(--bg-card);
-                border: 1px solid var(--border);
-                border-radius: var(--radius);
-                padding: 16px;
-                margin-bottom: 12px;
-            }
-            .mobile-card-row {
-                display: flex;
-                justify-content: space-between;
-                padding: 8px 0;
-                border-bottom: 1px solid var(--border);
-            }
-            .mobile-card-row:last-child {
-                border-bottom: none;
-            }
-        }
-
-        /* Focus Visible for Accessibility */
-        *:focus-visible {
-            outline: 2px solid var(--primary);
-            outline-offset: 2px;
-        }
-
-        /* Reduced Motion */
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
+            .nav-links { display: none; }
+            .mobile-toggle { display: flex; }
+            .grid { grid-template-columns: 1fr; }
         }
     </style>
 <base target="_blank">
 </head>
 <body>
 
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container nav-container">
-            <a href="#" class="logo" onclick="showSection('home', this)">
-                <i class="fas fa-chart-line"></i>
-                Pipways
-            </a>
-            
-            <div class="nav-links">
-                <a href="#" class="nav-link active" onclick="showSection('home', this)">Signals</a>
-                <a href="#" class="nav-link" onclick="showSection('analysis', this)">AI Analysis</a>
-                <a href="#" class="nav-link" onclick="showSection('mentor', this)">Mentor</a>
-                <a href="#" class="nav-link" onclick="showSection('learn', this)">Learn</a>
-                <span id="admin-nav-link" class="nav-link hidden" onclick="showSection('admin', this)">Admin</span>
+    <!-- AUTH WALL - Blocks everything until logged in -->
+    <div id="auth-wall" class="auth-wall">
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="auth-logo">
+                    <i class="fas fa-chart-line"></i>
+                    Pipways
+                </div>
+                <p class="auth-subtitle">Professional AI Trading Platform</p>
             </div>
 
-            <div class="nav-actions">
-                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
-                    <i class="fas fa-sun" id="theme-icon"></i>
-                </button>
-                
-                <button id="auth-btn" class="btn btn-primary btn-sm" onclick="openAuthModal()">
-                    <i class="fas fa-user"></i>
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-input" required value="admin@pipways.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-input" required value="admin123">
+                </div>
+                <div class="error-message" id="login-error"></div>
+                <button type="submit" class="btn btn-primary" id="login-btn">
                     <span>Login</span>
                 </button>
+                <div class="auth-switch">
+                    Don't have an account? <a onclick="switchAuthMode('register')">Register</a>
+                </div>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="full_name" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-input" required id="reg-password" oninput="checkPasswordStrength(this.value)">
+                    <div class="password-strength">
+                        <div class="password-strength-bar" id="strength-bar"></div>
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                        Min 8 chars, uppercase, lowercase, number, special char
+                    </p>
+                </div>
+                <div class="error-message" id="register-error"></div>
+                <button type="submit" class="btn btn-primary" id="register-btn">
+                    <span>Create Account</span>
+                </button>
+                <div class="auth-switch">
+                    Already have an account? <a onclick="switchAuthMode('login')">Login</a>
+                </div>
+            </form>
+
+            <!-- Forgot Password Form -->
+            <form id="forgot-form" class="hidden" onsubmit="handleForgotPassword(event)">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-input" required>
+                </div>
+                <div class="error-message" id="forgot-error"></div>
+                <button type="submit" class="btn btn-primary" id="forgot-btn">
+                    <span>Send Reset Link</span>
+                </button>
+                <div class="auth-switch">
+                    <a onclick="switchAuthMode('login')">Back to Login</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP (Hidden until authenticated) -->
+    <div class="main-app" id="main-app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="logo" onclick="showSection('signals')">
+                    <i class="fas fa-chart-line"></i> Pipways
+                </div>
                 
-                <button class="mobile-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+                <div class="nav-links">
+                    <a class="nav-link active" onclick="showSection('signals')">Signals</a>
+                    <a class="nav-link" onclick="showSection('analysis')">AI Analysis</a>
+                    <a class="nav-link" onclick="showSection('mentor')">Mentor</a>
+                    <a class="nav-link" onclick="showSection('learn')">Learn</a>
+                    <a class="nav-link hidden" id="admin-link" onclick="showSection('admin')">Admin</a>
+                </div>
+
+                <div class="nav-user">
+                    <span class="user-badge" id="user-display">
+                        <i class="fas fa-user"></i>
+                        <span id="username">User</span>
+                    </span>
+                    <button class="logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+
+                <button class="mobile-toggle" onclick="toggleMobileMenu()">
                     <span></span>
                     <span></span>
                     <span></span>
                 </button>
             </div>
-        </div>
-    </nav>
+        </nav>
 
-    <!-- Mobile Overlay -->
-    <div class="mobile-overlay" onclick="toggleMobileMenu()"></div>
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Signals Section -->
+            <section id="signals" class="section active">
+                <div class="section-header">
+                    <h1 class="section-title">Trading Signals</h1>
+                    <p style="color: var(--text-secondary);">Real-time forex and crypto signals</p>
+                </div>
+                <div id="signals-list" class="grid">
+                    <div class="skeleton"></div>
+                    <div class="skeleton"></div>
+                    <div class="skeleton"></div>
+                </div>
+            </section>
 
-    <!-- Mobile Sidebar -->
-    <div class="mobile-sidebar">
-        <div class="mobile-nav-links">
-            <a href="#" class="mobile-nav-link" onclick="showSection('home', this); toggleMobileMenu()">
-                <i class="fas fa-signal"></i> Signals
-            </a>
-            <a href="#" class="mobile-nav-link" onclick="showSection('analysis', this); toggleMobileMenu()">
-                <i class="fas fa-robot"></i> AI Analysis
-            </a>
-            <a href="#" class="mobile-nav-link" onclick="showSection('mentor', this); toggleMobileMenu()">
-                <i class="fas fa-user-tie"></i> Mentor
-            </a>
-            <a href="#" class="mobile-nav-link" onclick="showSection('learn', this); toggleMobileMenu()">
-                <i class="fas fa-graduation-cap"></i> Learn
-            </a>
-            <a href="#" id="mobile-admin-link" class="mobile-nav-link hidden" onclick="showSection('admin', this); toggleMobileMenu()">
-                <i class="fas fa-cog"></i> Admin
-            </a>
-        </div>
+            <!-- AI Analysis Section -->
+            <section id="analysis" class="section">
+                <div class="section-header">
+                    <h1 class="section-title">AI Chart Analysis</h1>
+                    <p style="color: var(--text-secondary);">Upload charts for instant AI analysis</p>
+                </div>
+                <div class="card">
+                    <input type="file" id="chart-upload" accept="image/*" onchange="handleFileSelect(event)">
+                    <button class="btn btn-primary" onclick="document.getElementById('chart-upload').click()">
+                        <i class="fas fa-upload"></i> Select Chart Image
+                    </button>
+                    <div id="analysis-result" style="margin-top: 20px; white-space: pre-wrap; font-family: monospace;"></div>
+                </div>
+            </section>
+
+            <!-- Mentor Section -->
+            <section id="mentor" class="section">
+                <div class="section-header">
+                    <h1 class="section-title">AI Mentor</h1>
+                    <p style="color: var(--text-secondary);">Get personalized trading advice</p>
+                </div>
+                <div class="card" style="height: 600px; display: flex; flex-direction: column;">
+                    <div id="chat-messages" style="flex: 1; overflow-y: auto; margin-bottom: 16px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius);">
+                        <div style="margin-bottom: 12px;"><strong>AI Mentor:</strong> Hello! How can I help you today?</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="chat-input" class="form-input" placeholder="Ask a question..." onkeypress="if(event.key==='Enter') sendMessage()">
+                        <button class="btn btn-primary" onclick="sendMessage()" style="width: auto;">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Learn Section -->
+            <section id="learn" class="section">
+                <div class="section-header">
+                    <h1 class="section-title">Education</h1>
+                    <p style="color: var(--text-secondary);">Courses and webinars</p>
+                </div>
+                <div class="grid" id="courses-list">
+                    <div class="skeleton"></div>
+                    <div class="skeleton"></div>
+                </div>
+            </section>
+
+            <!-- Admin Section -->
+            <section id="admin" class="section">
+                <div class="section-header">
+                    <h1 class="section-title">Admin Dashboard</h1>
+                </div>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Create Signal</h3>
+                        <form onsubmit="createSignal(event)">
+                            <input type="text" name="pair" placeholder="Pair (EURUSD)" class="form-input" style="margin-bottom: 12px;" required>
+                            <select name="direction" class="form-input" style="margin-bottom: 12px;">
+                                <option value="buy">Buy</option>
+                                <option value="sell">Sell</option>
+                            </select>
+                            <input type="number" name="entry_price" placeholder="Entry Price" class="form-input" style="margin-bottom: 12px;" step="0.00001" required>
+                            <button type="submit" class="btn btn-primary">Publish Signal</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        
-        <!-- Home / Signals Section -->
-        <section id="home" class="section active">
-            <div class="container">
-                <div class="section-header">
-                    <h1 class="section-title">Trading Signals</h1>
-                    <p class="section-subtitle">Real-time forex and crypto trading signals with AI-powered insights</p>
-                </div>
-
-                <div class="mb-4 flex items-center justify-between">
-                    <div class="flex gap-4" style="flex-wrap: wrap;">
-                        <button class="btn btn-secondary btn-sm" onclick="filterSignals('all')">All</button>
-                        <button class="btn btn-secondary btn-sm" onclick="filterSignals('active')">Active</button>
-                        <button class="btn btn-secondary btn-sm" onclick="filterSignals('buy')">Buy</button>
-                        <button class="btn btn-secondary btn-sm" onclick="filterSignals('sell')">Sell</button>
-                    </div>
-                    <select class="form-input" style="width: auto;" onchange="sortSignals(this.value)">
-                        <option value="newest">Newest First</option>
-                        <option value="performance">Best Performance</option>
-                    </select>
-                </div>
-
-                <div id="signals-list" class="grid grid-3">
-                    <div class="skeleton skeleton-card"></div>
-                    <div class="skeleton skeleton-card"></div>
-                    <div class="skeleton skeleton-card"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- AI Analysis Section -->
-        <section id="analysis" class="section">
-            <div class="container">
-                <div class="section-header">
-                    <h1 class="section-title">AI Chart Analysis</h1>
-                    <p class="section-subtitle">Upload your charts for instant AI-powered technical analysis</p>
-                </div>
-
-                <div class="grid grid-2">
-                    <div>
-                        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('chart-upload').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                            <div class="upload-icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                            </div>
-                            <h3>Upload Chart Image</h3>
-                            <p style="color: var(--text-secondary); margin-top: 8px;">Click or drag and drop</p>
-                            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 4px;">PNG, JPG up to 10MB</p>
-                            <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="handleFileSelect(event)">
-                        </div>
-                        
-                        <img id="image-preview" class="image-preview" alt="Chart preview">
-                        
-                        <div class="grid grid-2 mt-4">
-                            <div class="form-group">
-                                <label class="form-label">Currency Pair</label>
-                                <input type="text" id="analysis-pair" class="form-input" placeholder="EURUSD" list="pairs-list">
-                                <datalist id="pairs-list">
-                                    <option value="EURUSD">
-                                    <option value="GBPUSD">
-                                    <option value="USDJPY">
-                                    <option value="AUDUSD">
-                                    <option value="USDCAD">
-                                    <option value="XAUUSD">
-                                    <option value="BTCUSD">
-                                </datalist>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Timeframe</label>
-                                <select id="analysis-timeframe" class="form-input">
-                                    <option value="1H">1 Hour</option>
-                                    <option value="4H">4 Hour</option>
-                                    <option value="D1">Daily</option>
-                                    <option value="W1">Weekly</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group mt-4">
-                            <label class="form-label">Additional Context (Optional)</label>
-                            <textarea id="analysis-context" class="form-input" rows="3" placeholder="Any specific patterns or concerns..."></textarea>
-                        </div>
-
-                        <button class="btn btn-primary w-full mt-4" id="analyze-btn" onclick="analyzeChart()">
-                            <i class="fas fa-magic"></i>
-                            <span>Analyze Chart</span>
-                        </button>
-                    </div>
-
-                    <div>
-                        <div id="analysis-result-container" class="hidden">
-                            <h3 style="margin-bottom: 16px; color: var(--primary);">
-                                <i class="fas fa-robot"></i> AI Analysis Result
-                            </h3>
-                            <div id="analysis-content" class="analysis-result"></div>
-                            <button class="btn btn-secondary btn-sm mt-4" onclick="saveAnalysis()">
-                                <i class="fas fa-save"></i> Save Analysis
-                            </button>
-                        </div>
-                        
-                        <div id="analysis-placeholder" style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
-                            <i class="fas fa-chart-area" style="font-size: 4rem; opacity: 0.3; margin-bottom: 16px;"></i>
-                            <p>Upload a chart to get started</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- AI Mentor Section -->
-        <section id="mentor" class="section">
-            <div class="container">
-                <div class="section-header">
-                    <h1 class="section-title">AI Trading Mentor</h1>
-                    <p class="section-subtitle">Get personalized trading advice and mentorship 24/7</p>
-                </div>
-
-                <div class="chat-container">
-                    <div class="chat-messages" id="chat-messages">
-                        <div class="chat-message assistant">
-                            <strong>AI Mentor:</strong><br>
-                            Hello! I'm your AI trading mentor. I can help you with:<br>
-                            • Technical analysis questions<br>
-                            • Risk management strategies<br>
-                            • Trade psychology<br>
-                            • Market structure<br>
-                            What would you like to discuss today?
-                        </div>
-                    </div>
-                    
-                    <div class="chat-input-container">
-                        <textarea id="chat-input" class="chat-input" rows="1" placeholder="Ask your question..." onkeypress="handleChatKeypress(event)" oninput="autoResizeTextarea(this)"></textarea>
-                        <button class="btn btn-primary" onclick="sendMessage()" id="send-btn">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div style="text-align: center; margin-top: 16px;">
-                    <button class="btn btn-secondary btn-sm" onclick="clearChatHistory()">
-                        <i class="fas fa-trash"></i> Clear History
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Learn Section -->
-        <section id="learn" class="section">
-            <div class="container">
-                <div class="section-header">
-                    <h1 class="section-title">Trading Education</h1>
-                    <p class="section-subtitle">Courses, webinars, and articles to improve your trading</p>
-                </div>
-
-                <div style="display: flex; gap: 16px; margin-bottom: 32px; overflow-x: auto; padding-bottom: 8px;">
-                    <button class="btn btn-primary btn-sm" onclick="switchLearnTab('courses')">Courses</button>
-                    <button class="btn btn-secondary btn-sm" onclick="switchLearnTab('webinars')">Webinars</button>
-                    <button class="btn btn-secondary btn-sm" onclick="switchLearnTab('blog')">Blog</button>
-                </div>
-
-                <div id="learn-courses" class="learn-tab">
-                    <div id="courses-list" class="grid grid-3">
-                        <div class="skeleton skeleton-card"></div>
-                        <div class="skeleton skeleton-card"></div>
-                        <div class="skeleton skeleton-card"></div>
-                    </div>
-                </div>
-
-                <div id="learn-webinars" class="learn-tab hidden">
-                    <div id="webinars-list" class="grid grid-2">
-                        <div class="skeleton skeleton-card"></div>
-                        <div class="skeleton skeleton-card"></div>
-                    </div>
-                </div>
-
-                <div id="learn-blog" class="learn-tab hidden">
-                    <div id="blog-list" class="grid grid-3">
-                        <div class="skeleton skeleton-card"></div>
-                        <div class="skeleton skeleton-card"></div>
-                        <div class="skeleton skeleton-card"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Admin Section -->
-        <section id="admin" class="section">
-            <div class="container">
-                <div class="section-header">
-                    <h1 class="section-title">Admin Dashboard</h1>
-                    <p class="section-subtitle">Manage signals, users, and content</p>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="admin-grid" id="admin-stats">
-                    <div class="admin-card">
-                        <div class="admin-icon" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="stat-value" id="stat-users">-</div>
-                        <div class="stat-label">Total Users</div>
-                    </div>
-                    <div class="admin-card">
-                        <div class="admin-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-                            <i class="fas fa-signal"></i>
-                        </div>
-                        <div class="stat-value" id="stat-signals">-</div>
-                        <div class="stat-label">Active Signals</div>
-                    </div>
-                    <div class="admin-card">
-                        <div class="admin-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                            <i class="fas fa-crown"></i>
-                        </div>
-                        <div class="stat-value" id="stat-premium">-</div>
-                        <div class="stat-label">Premium Users</div>
-                    </div>
-                    <div class="admin-card" onclick="showUserManagement()">
-                        <div class="admin-icon" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
-                            <i class="fas fa-user-cog"></i>
-                        </div>
-                        <h3>User Management</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Manage roles & subscriptions</p>
-                    </div>
-                </div>
-
-                <!-- Create Signal Form -->
-                <div class="card mb-4">
-                    <h3 style="margin-bottom: 20px;"><i class="fas fa-plus-circle"></i> Create New Signal</h3>
-                    <form id="create-signal-form" onsubmit="createSignal(event)">
-                        <div class="grid grid-4">
-                            <div class="form-group">
-                                <label class="form-label">Pair</label>
-                                <input type="text" name="pair" class="form-input" required placeholder="EURUSD">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Direction</label>
-                                <select name="direction" class="form-input" required>
-                                    <option value="buy">Buy</option>
-                                    <option value="sell">Sell</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Entry Price</label>
-                                <input type="number" name="entry_price" class="form-input" step="0.00001" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Timeframe</label>
-                                <select name="timeframe" class="form-input">
-                                    <option value="1H">1H</option>
-                                    <option value="4H">4H</option>
-                                    <option value="D1">Daily</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="grid grid-3 mt-4">
-                            <div class="form-group">
-                                <label class="form-label">Stop Loss</label>
-                                <input type="number" name="stop_loss" class="form-input" step="0.00001">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Take Profit</label>
-                                <input type="number" name="take_profit" class="form-input" step="0.00001">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Type</label>
-                                <select name="is_premium" class="form-input">
-                                    <option value="false">Free</option>
-                                    <option value="true">Premium</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group mt-4">
-                            <label class="form-label">Analysis</label>
-                            <textarea name="analysis" class="form-input" rows="3"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary mt-4">
-                            <i class="fas fa-paper-plane"></i> Publish Signal
-                        </button>
-                    </form>
-                </div>
-
-                <!-- User Management Section -->
-                <div id="user-management" class="hidden">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3><i class="fas fa-users-cog"></i> User Management</h3>
-                        <button class="btn btn-secondary btn-sm" onclick="hideUserManagement()">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </button>
-                    </div>
-                    
-                    <div class="flex gap-4 mb-4" style="flex-wrap: wrap;">
-                        <input type="text" id="user-search" class="form-input" placeholder="Search users..." style="max-width: 300px;" oninput="searchUsers()">
-                        <select id="role-filter" class="form-input" style="width: auto;" onchange="filterUsers()">
-                            <option value="">All Roles</option>
-                            <option value="user">User</option>
-                            <option value="moderator">Moderator</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-
-                    <div class="table-container">
-                        <table id="users-table">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Role</th>
-                                    <th>Subscription</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="auth-modal-title">Login</h3>
-                <button class="btn btn-secondary btn-sm" onclick="closeAuthModal()" style="padding: 8px 12px;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <!-- Login Form -->
-                <form id="login-form" onsubmit="handleLogin(event)">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-input" required autocomplete="email">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" name="password" class="form-input" required autocomplete="current-password">
-                    </div>
-                    <div style="text-align: right; margin-bottom: 16px;">
-                        <a href="#" onclick="showForgotPassword()" style="color: var(--primary); font-size: 0.875rem;">Forgot password?</a>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-full">Login</button>
-                    <div class="auth-footer">
-                        Don't have an account? <a href="#" onclick="switchAuthMode('register')">Register</a>
-                    </div>
-                </form>
-
-                <!-- Register Form -->
-                <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
-                    <div class="form-group">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" name="full_name" class="form-input" required autocomplete="name">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-input" required autocomplete="email">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" name="password" class="form-input" required id="reg-password" oninput="checkPasswordStrength(this.value)">
-                        <div class="password-strength">
-                            <div class="password-strength-bar" id="strength-bar"></div>
-                        </div>
-                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                            Min 8 chars, uppercase, number, symbol
-                        </p>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-full">Create Account</button>
-                    <div class="auth-footer">
-                        Already have an account? <a href="#" onclick="switchAuthMode('login')">Login</a>
-                    </div>
-                </form>
-
-                <!-- Forgot Password Form -->
-                <form id="forgot-form" class="hidden" onsubmit="handleForgotPassword(event)">
-                    <p style="margin-bottom: 16px; color: var(--text-secondary);">
-                        Enter your email to receive a password reset link.
-                    </p>
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-input" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-full">Send Reset Link</button>
-                    <div class="auth-footer">
-                        <a href="#" onclick="switchAuthMode('login')">Back to Login</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Configuration
         const API_URL = 'https://pipways-api-nhem.onrender.com';
-        let currentUser = null;
         let authToken = localStorage.getItem('access_token');
-        let refreshToken = localStorage.getItem('refresh_token');
-        let currentSection = 'home';
+        let currentUser = null;
 
-        // Theme Management
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            updateThemeIcon(savedTheme);
+        // Initialize - Check auth immediately
+        document.addEventListener('DOMContentLoaded', () => {
+            if (authToken) {
+                validateToken();
+            } else {
+                showAuthWall();
+            }
+        });
+
+        function showAuthWall() {
+            document.getElementById('auth-wall').classList.remove('hidden');
+            document.getElementById('main-app').classList.remove('visible');
         }
 
-        function toggleTheme() {
-            const current = document.documentElement.getAttribute('data-theme');
-            const next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-            updateThemeIcon(next);
+        function showMainApp() {
+            document.getElementById('auth-wall').classList.add('hidden');
+            document.getElementById('main-app').classList.add('visible');
+            loadSignals();
         }
 
-        function updateThemeIcon(theme) {
-            const icon = document.getElementById('theme-icon');
-            icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-        }
-
-        // Mobile Menu
-        function toggleMobileMenu() {
-            document.querySelector('.mobile-toggle').classList.toggle('active');
-            document.querySelector('.mobile-sidebar').classList.toggle('active');
-            document.querySelector('.mobile-overlay').classList.toggle('active');
-        }
-
-        // Navigation
-        function showSection(sectionName, element) {
-            // Hide all sections
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            document.querySelectorAll('.mobile-nav-link').forEach(l => l.classList.remove('active'));
-            
-            // Show selected section
-            document.getElementById(sectionName).classList.add('active');
-            
-            // Update nav active states
-            if (element) {
-                element.classList.add('active');
-                if (element.classList.contains('mobile-nav-link')) {
-                    document.querySelectorAll(`.nav-link[onclick*="${sectionName}"]`).forEach(l => l.classList.add('active'));
+        async function validateToken() {
+            try {
+                const response = await fetch(`${API_URL}/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('refresh_token') || authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    localStorage.setItem('access_token', authToken);
+                    
+                    // Decode token to get user info
+                    const payload = JSON.parse(atob(authToken.split('.')[1]));
+                    currentUser = payload;
+                    updateUI();
+                    showMainApp();
                 } else {
-                    document.querySelectorAll(`.mobile-nav-link[onclick*="${sectionName}"]`).forEach(l => l.classList.add('active'));
+                    throw new Error('Invalid token');
                 }
-            }
-            
-            currentSection = sectionName;
-            
-            // Load section data
-            if (sectionName === 'home') loadSignals();
-            if (sectionName === 'learn') {
-                loadCourses();
-                loadWebinars();
-                loadBlog();
-            }
-            if (sectionName === 'admin' && currentUser?.role === 'admin') {
-                loadAdminStats();
-            }
-        }
-
-        // Toast Notifications
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
-            toast.innerHTML = `
-                <i class="fas fa-${icon}"></i>
-                <span>${message}</span>
-            `;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s reverse forwards';
-                setTimeout(() => toast.remove(), 300);
-            }, 5000);
-        }
-
-        // Auth Functions
-        function openAuthModal() {
-            if (currentUser) {
+            } catch (error) {
                 logout();
-                return;
             }
-            document.getElementById('auth-modal').classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeAuthModal() {
-            document.getElementById('auth-modal').classList.remove('active');
-            document.body.style.overflow = '';
-            switchAuthMode('login');
         }
 
         function switchAuthMode(mode) {
@@ -1632,34 +723,16 @@
             document.getElementById('forgot-form').classList.add('hidden');
             
             document.getElementById(`${mode}-form`).classList.remove('hidden');
-            document.getElementById('auth-modal-title').textContent = 
-                mode === 'login' ? 'Login' : mode === 'register' ? 'Create Account' : 'Reset Password';
-        }
-
-        function showForgotPassword() {
-            switchAuthMode('forgot');
-        }
-
-        function checkPasswordStrength(password) {
-            const bar = document.getElementById('strength-bar');
-            let strength = 0;
-            
-            if (password.length >= 8) strength++;
-            if (/[A-Z]/.test(password)) strength++;
-            if (/[0-9]/.test(password)) strength++;
-            if (/[^A-Za-z0-9]/.test(password)) strength++;
-            
-            bar.className = 'password-strength-bar';
-            if (strength >= 2) bar.classList.add('weak');
-            if (strength >= 3) bar.classList.add('medium');
-            if (strength >= 4) bar.classList.add('strong');
         }
 
         async function handleLogin(e) {
             e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
+            const btn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+            
             btn.classList.add('btn-loading');
             btn.innerHTML = '<div class="spinner"></div>';
+            errorDiv.classList.remove('visible');
             
             try {
                 const response = await fetch(`${API_URL}/auth/login`, {
@@ -1674,30 +747,48 @@
                 const data = await response.json();
                 
                 if (response.ok) {
+                    authToken = data.access_token;
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('refresh_token', data.refresh_token);
-                    authToken = data.access_token;
                     currentUser = data.user;
-                    updateAuthUI();
-                    closeAuthModal();
+                    updateUI();
+                    showMainApp();
                     showToast('Welcome back!');
-                    loadSignals();
                 } else {
-                    showToast(data.detail || 'Login failed', 'error');
+                    errorDiv.textContent = data.detail || 'Login failed';
+                    errorDiv.classList.add('visible');
                 }
             } catch (error) {
-                showToast('Network error', 'error');
+                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.classList.add('visible');
             } finally {
                 btn.classList.remove('btn-loading');
-                btn.innerHTML = 'Login';
+                btn.innerHTML = '<span>Login</span>';
             }
         }
 
         async function handleRegister(e) {
             e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
+            const btn = document.getElementById('register-btn');
+            const errorDiv = document.getElementById('register-error');
+            
             btn.classList.add('btn-loading');
             btn.innerHTML = '<div class="spinner"></div>';
+            errorDiv.classList.remove('visible');
+            
+            // Client-side password validation
+            const password = e.target.password.value;
+            if (password.length < 8 || 
+                !/[a-z]/.test(password) || 
+                !/[A-Z]/.test(password) || 
+                !/[0-9]/.test(password) || 
+                !/[@$!%*?&]/.test(password)) {
+                errorDiv.textContent = 'Password does not meet requirements';
+                errorDiv.classList.add('visible');
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '<span>Create Account</span>';
+                return;
+            }
             
             try {
                 const response = await fetch(`${API_URL}/auth/register`, {
@@ -1705,7 +796,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         email: e.target.email.value,
-                        password: e.target.password.value,
+                        password: password,
                         full_name: e.target.full_name.value
                     })
                 });
@@ -1713,30 +804,31 @@
                 const data = await response.json();
                 
                 if (response.ok) {
+                    authToken = data.access_token;
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('refresh_token', data.refresh_token);
-                    authToken = data.access_token;
                     currentUser = data.user;
-                    updateAuthUI();
-                    closeAuthModal();
+                    updateUI();
+                    showMainApp();
                     showToast('Account created successfully!');
-                    loadSignals();
                 } else {
-                    showToast(data.detail || 'Registration failed', 'error');
+                    errorDiv.textContent = data.detail || 'Registration failed';
+                    errorDiv.classList.add('visible');
                 }
             } catch (error) {
-                showToast('Network error', 'error');
+                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.classList.add('visible');
             } finally {
                 btn.classList.remove('btn-loading');
-                btn.innerHTML = 'Create Account';
+                btn.innerHTML = '<span>Create Account</span>';
             }
         }
 
         async function handleForgotPassword(e) {
             e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner"></div> Sending...';
+            const btn = document.getElementById('forgot-btn');
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<div class="spinner"></div>';
             
             try {
                 const response = await fetch(`${API_URL}/auth/forgot-password`, {
@@ -1745,48 +837,50 @@
                     body: JSON.stringify({ email: e.target.email.value })
                 });
                 
-                const data = await response.json();
-                showToast('Check your email for reset link');
+                showToast('Reset link sent to your email');
                 switchAuthMode('login');
             } catch (error) {
                 showToast('Error sending reset link', 'error');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = 'Send Reset Link';
+                btn.classList.remove('btn-loading');
+                btn.innerHTML = '<span>Send Reset Link</span>';
+            }
+        }
+
+        function checkPasswordStrength(password) {
+            const bar = document.getElementById('strength-bar');
+            let strength = 0;
+            
+            if (password.length >= 8) strength++;
+            if (/[A-Z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[@$!%*?&]/.test(password)) strength++;
+            
+            bar.className = 'password-strength-bar';
+            if (strength >= 1) bar.classList.add('strength-weak');
+            if (strength >= 3) bar.classList.add('strength-medium');
+            if (strength >= 4) bar.classList.add('strength-strong');
+        }
+
+        function updateUI() {
+            if (currentUser) {
+                document.getElementById('username').textContent = currentUser.full_name || currentUser.email;
+                
+                if (currentUser.role === 'admin' || currentUser.role === 'moderator') {
+                    document.getElementById('admin-link').classList.remove('hidden');
+                }
             }
         }
 
         function logout() {
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
-            localStorage.removeItem('chat_history');
             authToken = null;
             currentUser = null;
-            updateAuthUI();
-            showToast('Logged out successfully');
-            showSection('home', document.querySelector('.nav-link'));
+            showAuthWall();
+            showToast('Logged out');
         }
 
-        function updateAuthUI() {
-            const btn = document.getElementById('auth-btn');
-            if (currentUser) {
-                btn.innerHTML = `<i class="fas fa-sign-out-alt"></i><span>Logout</span>`;
-                btn.onclick = logout;
-                
-                // Show admin link if admin
-                if (currentUser.role === 'admin' || currentUser.role === 'moderator') {
-                    document.getElementById('admin-nav-link').classList.remove('hidden');
-                    document.getElementById('mobile-admin-link').classList.remove('hidden');
-                }
-            } else {
-                btn.innerHTML = `<i class="fas fa-user"></i><span>Login</span>`;
-                btn.onclick = openAuthModal;
-                document.getElementById('admin-nav-link').classList.add('hidden');
-                document.getElementById('mobile-admin-link').classList.add('hidden');
-            }
-        }
-
-        // API Helper
         async function apiCall(endpoint, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -1804,7 +898,6 @@
                 });
                 
                 if (response.status === 401) {
-                    // Token expired, try to refresh or logout
                     logout();
                     showToast('Session expired. Please login again.', 'error');
                     return null;
@@ -1812,599 +905,152 @@
                 
                 return response;
             } catch (error) {
-                console.error('API Error:', error);
-                showToast('Network error. Please check your connection.', 'error');
+                showToast('Network error', 'error');
                 return null;
             }
         }
 
-        // Signals
+        function showSection(sectionName) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            
+            document.getElementById(sectionName).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (sectionName === 'signals') loadSignals();
+            if (sectionName === 'learn') loadCourses();
+        }
+
         async function loadSignals() {
             const container = document.getElementById('signals-list');
+            container.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
             
-            try {
-                const response = await apiCall('/signals');
-                if (!response) return;
-                
-                const signals = await response.json();
-                
-                if (signals.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No signals available</div>';
-                    return;
-                }
-                
-                container.innerHTML = signals.map(signal => `
-                    <div class="signal-card">
-                        <div class="signal-status"></div>
-                        <div class="signal-header">
-                            <div class="signal-pair">${signal.pair}</div>
-                            <div class="signal-direction ${signal.direction}">${signal.direction}</div>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-                            <div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Entry</div>
-                                <div style="font-family: var(--font-mono); font-weight: 600;">${signal.entry_price}</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary);">SL</div>
-                                <div style="font-family: var(--font-mono); color: var(--danger);">${signal.stop_loss || '-'}</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary);">TP</div>
-                                <div style="font-family: var(--font-mono); color: var(--success);">${signal.take_profit || '-'}</div>
-                            </div>
-                        </div>
-                        
-                        ${signal.pips_gain ? `
-                        <div style="margin-bottom: 12px;">
-                            <span class="performance-badge ${signal.pips_gain >= 0 ? 'positive' : 'negative'}">
-                                <i class="fas fa-${signal.pips_gain >= 0 ? 'arrow-up' : 'arrow-down'}"></i>
-                                ${signal.pips_gain >= 0 ? '+' : ''}${signal.pips_gain} pips
-                            </span>
-                        </div>
-                        ` : ''}
-                        
-                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">
-                            ${signal.analysis || 'Technical setup based on price action and key levels.'}
-                        </p>
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-secondary);">
-                            <span><i class="fas fa-clock"></i> ${signal.timeframe}</span>
-                            <span>${new Date(signal.created_at).toLocaleDateString()}</span>
-                        </div>
-                        
-                        ${signal.is_premium ? '<div style="position: absolute; top: 20px; right: 20px; background: var(--accent); color: #000; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">PREMIUM</div>' : ''}
+            const response = await apiCall('/signals');
+            if (!response) return;
+            
+            const signals = await response.json();
+            
+            if (signals.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No signals available</p>';
+                return;
+            }
+            
+            container.innerHTML = signals.map(signal => `
+                <div class="card">
+                    <div class="signal-header">
+                        <div class="signal-pair">${signal.pair}</div>
+                        <div class="signal-direction ${signal.direction}">${signal.direction}</div>
                     </div>
-                `).join('');
-                
-            } catch (error) {
-                container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">Failed to load signals</div>';
-            }
+                    <div class="signal-metrics">
+                        <div>
+                            <div class="metric-label">Entry</div>
+                            <div class="metric-value">${signal.entry_price}</div>
+                        </div>
+                        <div>
+                            <div class="metric-label">SL</div>
+                            <div class="metric-value" style="color: var(--danger);">${signal.stop_loss || '-'}</div>
+                        </div>
+                        <div>
+                            <div class="metric-label">TP</div>
+                            <div class="metric-value" style="color: var(--success);">${signal.take_profit || '-'}</div>
+                        </div>
+                    </div>
+                    <p style="margin-top: 12px; color: var(--text-secondary); font-size: 0.9rem;">
+                        ${signal.analysis || 'Technical setup based on price action'}
+                    </p>
+                </div>
+            `).join('');
         }
 
-        function filterSignals(type) {
-            // Implementation for filtering
-            loadSignals(); // Reload with filters
-        }
-
-        function sortSignals(sortBy) {
-            // Implementation for sorting
-            loadSignals();
-        }
-
-        // AI Analysis
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.currentTarget.classList.add('dragover');
-        }
-
-        function handleDragLeave(e) {
-            e.currentTarget.classList.remove('dragover');
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length) processFile(files[0]);
-        }
-
-        function handleFileSelect(e) {
-            if (e.target.files.length) processFile(e.target.files[0]);
-        }
-
-        function processFile(file) {
-            if (!file.type.startsWith('image/')) {
-                showToast('Please upload an image file', 'error');
-                return;
-            }
+        async function loadCourses() {
+            const container = document.getElementById('courses-list');
+            const response = await apiCall('/courses');
+            if (!response) return;
             
-            if (file.size > 10 * 1024 * 1024) {
-                showToast('File too large. Max 10MB', 'error');
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const preview = document.getElementById('image-preview');
-                preview.src = e.target.result;
-                preview.classList.add('visible');
-                document.getElementById('analysis-placeholder').classList.add('hidden');
-            };
-            reader.readAsDataURL(file);
-            
-            // Store for upload
-            window.currentChartFile = file;
+            const courses = await response.json();
+            container.innerHTML = courses.map(course => `
+                <div class="card">
+                    <h3>${course.title}</h3>
+                    <p style="color: var(--text-secondary); margin-top: 8px;">${course.description}</p>
+                </div>
+            `).join('');
         }
 
-        async function analyzeChart() {
-            if (!window.currentChartFile) {
-                showToast('Please upload a chart image first', 'error');
-                return;
-            }
-            
-            if (!currentUser) {
-                showToast('Please login to use AI analysis', 'error');
-                openAuthModal();
-                return;
-            }
-            
-            const btn = document.getElementById('analyze-btn');
-            btn.classList.add('btn-loading');
-            btn.innerHTML = '<div class="spinner"></div> Analyzing...';
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
             
             const formData = new FormData();
-            formData.append('file', window.currentChartFile);
-            formData.append('pair', document.getElementById('analysis-pair').value);
-            formData.append('timeframe', document.getElementById('analysis-timeframe').value);
-            formData.append('additional_info', document.getElementById('analysis-context').value);
+            formData.append('file', file);
+            formData.append('pair', 'EURUSD');
             
-            try {
-                const response = await fetch(`${API_URL}/analyze/chart`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('analysis-content').textContent = data.analysis;
-                    document.getElementById('analysis-result-container').classList.remove('hidden');
-                } else {
-                    const error = await response.json();
-                    showToast(error.detail || 'Analysis failed', 'error');
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            } finally {
-                btn.classList.remove('btn-loading');
-                btn.innerHTML = '<i class="fas fa-magic"></i><span>Analyze Chart</span>';
-            }
-        }
-
-        function saveAnalysis() {
-            const analysis = document.getElementById('analysis-content').textContent;
-            const blob = new Blob([analysis], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `analysis-${new Date().toISOString().split('T')[0]}.txt`;
-            a.click();
-            showToast('Analysis saved');
-        }
-
-        // AI Mentor Chat
-        function autoResizeTextarea(textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
-        }
-
-        function handleChatKeypress(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+            showToast('Analyzing chart...');
+            
+            const response = await apiCall('/analyze/chart', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response && response.ok) {
+                const data = await response.json();
+                document.getElementById('analysis-result').textContent = data.analysis;
             }
         }
 
         async function sendMessage() {
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
-            
             if (!message) return;
             
-            if (!currentUser) {
-                showToast('Please login to chat with mentor', 'error');
-                openAuthModal();
-                return;
-            }
-            
-            // Add user message
-            appendMessage(message, 'user');
-            input.value = '';
-            input.style.height = 'auto';
-            
-            const btn = document.getElementById('send-btn');
-            btn.classList.add('btn-loading');
-            
-            try {
-                const response = await apiCall('/mentor/chat', {
-                    method: 'POST',
-                    body: JSON.stringify({ message, context: 'Forex trading' })
-                });
-                
-                if (response && response.ok) {
-                    const data = await response.json();
-                    appendMessage(data.response, 'assistant');
-                    saveChatHistory();
-                } else {
-                    appendMessage('Sorry, I encountered an error. Please try again.', 'assistant');
-                }
-            } catch (error) {
-                appendMessage('Network error. Please check your connection.', 'assistant');
-            } finally {
-                btn.classList.remove('btn-loading');
-            }
-        }
-
-        function appendMessage(text, sender) {
             const container = document.getElementById('chat-messages');
-            const div = document.createElement('div');
-            div.className = `chat-message ${sender}`;
-            div.innerHTML = sender === 'assistant' ? `<strong>AI Mentor:</strong><br>${text}` : text;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function saveChatHistory() {
-            const messages = document.getElementById('chat-messages').innerHTML;
-            localStorage.setItem('chat_history', messages);
-        }
-
-        function loadChatHistory() {
-            const saved = localStorage.getItem('chat_history');
-            if (saved) {
-                document.getElementById('chat-messages').innerHTML = saved;
-            }
-        }
-
-        function clearChatHistory() {
-            localStorage.removeItem('chat_history');
-            document.getElementById('chat-messages').innerHTML = `
-                <div class="chat-message assistant">
-                    <strong>AI Mentor:</strong><br>
-                    Hello! I'm your AI trading mentor. How can I help you today?
-                </div>
-            `;
-            showToast('Chat history cleared');
-        }
-
-        // Learn Section
-        function switchLearnTab(tab) {
-            document.querySelectorAll('.learn-tab').forEach(t => t.classList.add('hidden'));
-            document.getElementById(`learn-${tab}`).classList.remove('hidden');
+            container.innerHTML += `<div style="margin-bottom: 12px; text-align: right;"><strong>You:</strong> ${message}</div>`;
+            input.value = '';
             
-            // Update button states
-            const buttons = document.querySelectorAll('[onclick^="switchLearnTab"]');
-            buttons.forEach(btn => {
-                if (btn.getAttribute('onclick').includes(tab)) {
-                    btn.classList.remove('btn-secondary');
-                    btn.classList.add('btn-primary');
-                } else {
-                    btn.classList.remove('btn-primary');
-                    btn.classList.add('btn-secondary');
-                }
+            const response = await apiCall('/mentor/chat', {
+                method: 'POST',
+                body: JSON.stringify({ message })
             });
-        }
-
-        async function loadCourses() {
-            const container = document.getElementById('courses-list');
             
-            try {
-                const response = await apiCall('/courses');
-                if (!response) return;
-                
-                const courses = await response.json();
-                
-                if (courses.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; padding: 40px;">No courses available yet</div>';
-                    return;
-                }
-                
-                container.innerHTML = courses.map(course => `
-                    <div class="card">
-                        <h3>${course.title}</h3>
-                        <p style="color: var(--text-secondary); margin: 12px 0;">${course.description}</p>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-                            <span style="color: var(--primary); font-weight: 600;">
-                                ${course.is_premium ? '<i class="fas fa-crown"></i> Premium' : '<i class="fas fa-unlock"></i> Free'}
-                            </span>
-                            <button class="btn btn-primary btn-sm">Start Learning</button>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">Failed to load courses</div>';
-            }
-        }
-
-        async function loadWebinars() {
-            const container = document.getElementById('webinars-list');
-            
-            try {
-                const response = await apiCall('/webinars');
-                if (!response) return;
-                
-                const webinars = await response.json();
-                
-                if (webinars.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; padding: 40px;">No upcoming webinars</div>';
-                    return;
-                }
-                
-                container.innerHTML = webinars.map(webinar => `
-                    <div class="card">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
-                            <h3>${webinar.title}</h3>
-                            ${webinar.is_premium ? '<span style="background: var(--accent); color: #000; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">PREMIUM</span>' : ''}
-                        </div>
-                        <p style="color: var(--text-secondary); margin-bottom: 16px;">${webinar.description}</p>
-                        <div style="display: flex; align-items: center; gap: 16px; color: var(--text-secondary); font-size: 0.9rem;">
-                            <span><i class="fas fa-calendar"></i> ${new Date(webinar.scheduled_at).toLocaleString()}</span>
-                            <span><i class="fas fa-clock"></i> ${webinar.duration_minutes} min</span>
-                        </div>
-                        ${webinar.meeting_link ? `<a href="${webinar.meeting_link}" target="_blank" class="btn btn-primary btn-sm mt-4" style="display: inline-flex;"><i class="fas fa-video"></i> Join Meeting</a>` : ''}
-                    </div>
-                `).join('');
-            } catch (error) {
-                container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">Failed to load webinars</div>';
-            }
-        }
-
-        async function loadBlog() {
-            const container = document.getElementById('blog-list');
-            
-            try {
-                const response = await apiCall('/blog/posts');
-                if (!response) return;
-                
-                const posts = await response.json();
-                
-                if (posts.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; padding: 40px;">No blog posts yet</div>';
-                    return;
-                }
-                
-                container.innerHTML = posts.map(post => `
-                    <div class="card">
-                        <h3>${post.title}</h3>
-                        <p style="color: var(--text-secondary); margin: 12px 0; line-height: 1.6;">
-                            ${post.excerpt || post.content.substring(0, 150)}...
-                        </p>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 0.875rem; color: var(--text-secondary);">
-                            <span><i class="fas fa-user"></i> ${post.author_id}</span>
-                            <span>${new Date(post.created_at).toLocaleDateString()}</span>
-                        </div>
-                        ${post.is_premium ? '<div style="margin-top: 12px;"><span style="color: var(--accent); font-size: 0.875rem;"><i class="fas fa-lock"></i> Premium Content</span></div>' : ''}
-                    </div>
-                `).join('');
-            } catch (error) {
-                container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">Failed to load blog posts</div>';
-            }
-        }
-
-        // Admin Functions
-        async function loadAdminStats() {
-            try {
-                const response = await apiCall('/admin/stats');
-                if (!response) return;
-                
-                const stats = await response.json();
-                document.getElementById('stat-users').textContent = stats.total_users;
-                document.getElementById('stat-signals').textContent = stats.active_signals;
-                document.getElementById('stat-premium').textContent = stats.premium_users;
-            } catch (error) {
-                console.error('Failed to load admin stats');
+            if (response && response.ok) {
+                const data = await response.json();
+                container.innerHTML += `<div style="margin-bottom: 12px;"><strong>AI Mentor:</strong> ${data.response}</div>`;
+                container.scrollTop = container.scrollHeight;
             }
         }
 
         async function createSignal(e) {
             e.preventDefault();
             const form = e.target;
-            const btn = form.querySelector('button[type="submit"]');
-            btn.classList.add('btn-loading');
-            btn.innerHTML = '<div class="spinner"></div> Publishing...';
             
-            try {
-                const response = await apiCall('/signals', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        pair: form.pair.value,
-                        direction: form.direction.value,
-                        entry_price: parseFloat(form.entry_price.value),
-                        stop_loss: form.stop_loss.value ? parseFloat(form.stop_loss.value) : null,
-                        take_profit: form.take_profit.value ? parseFloat(form.take_profit.value) : null,
-                        timeframe: form.timeframe.value,
-                        analysis: form.analysis.value,
-                        is_premium: form.is_premium.value === 'true'
-                    })
-                });
-                
-                if (response && response.ok) {
-                    showToast('Signal published successfully!');
-                    form.reset();
-                    loadSignals();
-                } else {
-                    const error = await response.json();
-                    showToast(error.detail || 'Failed to create signal', 'error');
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            } finally {
-                btn.classList.remove('btn-loading');
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Publish Signal';
-            }
-        }
-
-        // User Management
-        function showUserManagement() {
-            document.getElementById('user-management').classList.remove('hidden');
-            document.getElementById('admin-stats').classList.add('hidden');
-            loadUsers();
-        }
-
-        function hideUserManagement() {
-            document.getElementById('user-management').classList.add('hidden');
-            document.getElementById('admin-stats').classList.remove('hidden');
-        }
-
-        async function loadUsers() {
-            const tbody = document.querySelector('#users-table tbody');
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading...</td></tr>';
-            
-            try {
-                const response = await apiCall('/admin/users');
-                if (!response) return;
-                
-                const data = await response.json();
-                
-                if (data.users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No users found</td></tr>';
-                    return;
-                }
-                
-                tbody.innerHTML = data.users.map(user => `
-                    <tr>
-                        <td>
-                            <div style="font-weight: 600;">${user.full_name}</div>
-                            <div style="font-size: 0.875rem; color: var(--text-secondary);">${user.email}</div>
-                        </td>
-                        <td>
-                            <select onchange="updateUserRole(${user.id}, this.value)" class="form-input" style="width: auto; padding: 4px 8px;">
-                                <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
-                                <option value="moderator" ${user.role === 'moderator' ? 'selected' : ''}>Moderator</option>
-                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                            </select>
-                        </td>
-                        <td>
-                            <span class="performance-badge ${user.subscription_status === 'active' ? 'positive' : 'negative'}">
-                                ${user.subscription_tier}
-                            </span>
-                        </td>
-                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
-                        <td>
-                            <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
-            } catch (error) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--danger);">Failed to load users</td></tr>';
-            }
-        }
-
-        async function updateUserRole(userId, role) {
-            try {
-                const response = await apiCall(`/admin/users/${userId}/role?role=${role}`, {
-                    method: 'PUT'
-                });
-                
-                if (response && response.ok) {
-                    showToast('Role updated successfully');
-                } else {
-                    showToast('Failed to update role', 'error');
-                    loadUsers(); // Reload to reset
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        async function deleteUser(userId) {
-            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
-            
-            try {
-                const response = await apiCall(`/admin/users/${userId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (response && response.ok) {
-                    showToast('User deleted successfully');
-                    loadUsers();
-                } else {
-                    showToast('Failed to delete user', 'error');
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        function searchUsers() {
-            // Debounced search implementation
-            loadUsers();
-        }
-
-        function filterUsers() {
-            loadUsers();
-        }
-
-        // Auto-save Drafts
-        function setupAutoSave() {
-            const inputs = document.querySelectorAll('.form-input');
-            inputs.forEach(input => {
-                const saved = localStorage.getItem(`draft_${input.id}`);
-                if (saved) input.value = saved;
-                
-                input.addEventListener('input', (e) => {
-                    localStorage.setItem(`draft_${e.target.id}`, e.target.value);
-                });
+            const response = await apiCall('/signals', {
+                method: 'POST',
+                body: JSON.stringify({
+                    pair: form.pair.value,
+                    direction: form.direction.value,
+                    entry_price: parseFloat(form.entry_price.value),
+                    timeframe: '1H'
+                })
             });
+            
+            if (response && response.ok) {
+                showToast('Signal created!');
+                form.reset();
+                loadSignals();
+            }
         }
 
-        // Initialization
-        document.addEventListener('DOMContentLoaded', () => {
-            initTheme();
-            setupAutoSave();
-            loadChatHistory();
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+            container.appendChild(toast);
             
-            // Check auth status
-            if (authToken) {
-                // Validate token and get user info
-                apiCall('/auth/refresh', { method: 'POST' }).then(response => {
-                    if (response && response.ok) {
-                        return response.json();
-                    } else {
-                        logout();
-                    }
-                }).then(data => {
-                    if (data) {
-                        authToken = data.access_token;
-                        localStorage.setItem('access_token', authToken);
-                        // Load user info from token or separate endpoint
-                        const payload = JSON.parse(atob(authToken.split('.')[1]));
-                        currentUser = payload; // Simplified
-                        updateAuthUI();
-                    }
-                });
-            }
-            
-            loadSignals();
-        });
+            setTimeout(() => toast.remove(), 3000);
+        }
 
-        // Close modal on outside click
-        document.getElementById('auth-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'auth-modal') closeAuthModal();
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeAuthModal();
-            }
-        });
+        // Make switchAuthMode globally accessible
+        window.switchAuthMode = switchAuthMode;
     </script>
 </body>
 </html>

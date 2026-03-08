@@ -34,187 +34,8 @@
             line-height: 1.6;
         }
 
-        /* Auth Container */
-        .auth-container {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-        }
-
-        .auth-box {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            width: 100%;
-            max-width: 420px;
-            animation: slideUp 0.5s ease;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .auth-logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .auth-logo i {
-            font-size: 48px;
-            color: var(--primary);
-            margin-bottom: 15px;
-        }
-
-        .auth-logo h1 {
-            color: #1e293b;
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        .auth-logo p {
-            color: #64748b;
-            margin-top: 5px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #374151;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .auth-box input,
-        #login-form input,
-        #register-form input,
-        #forgot-form input,
-        #reset-form input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 15px;
-            transition: all 0.3s;
-            background: #f9fafb;
-            color: #1e293b !important;
-            -webkit-text-fill-color: #1e293b !important;
-        }
-
-        .auth-box input::placeholder {
-            color: #6b7280 !important;
-        }
-
-        .auth-box input:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: white;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .btn {
-            width: 100%;
-            padding: 14px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn-secondary {
-            background: transparent;
-            color: var(--primary);
-            border: 2px solid var(--primary);
-        }
-
-        .btn-secondary:hover {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-success {
-            background: var(--secondary);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        .auth-footer {
-            text-align: center;
-            margin-top: 25px;
-            color: #6b7280;
-            font-size: 14px;
-        }
-
-        .auth-footer a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .alert {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .alert.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
-            display: block;
-        }
-
-        .alert.success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-            display: block;
-        }
-
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: #6b7280;
-            text-decoration: none;
-            margin-bottom: 20px;
-            cursor: pointer;
-        }
-
-        .back-link:hover {
-            color: var(--primary);
-        }
-
         /* Dashboard Layout */
         .dashboard {
-            display: none;
             min-height: 100vh;
         }
 
@@ -321,27 +142,6 @@
         .user-email {
             font-size: 12px;
             color: var(--text-secondary);
-        }
-
-        .logout-btn {
-            width: 100%;
-            padding: 10px;
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .logout-btn:hover {
-            background: var(--danger);
-            color: white;
-            border-color: var(--danger);
         }
 
         /* Main Content */
@@ -483,6 +283,14 @@
             border-color: var(--primary);
         }
 
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
         /* Trade History */
         .trade-list {
             max-height: 400px;
@@ -533,6 +341,49 @@
         .grade-c { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
         .grade-d { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
         .grade-f { background: rgba(100, 116, 139, 0.2); color: var(--text-secondary); }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--secondary);
+        }
+
+        .btn-small {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
 
         /* AI Analysis Section */
         .upload-area {
@@ -668,11 +519,6 @@
             gap: 15px;
             margin-top: 25px;
             flex-wrap: wrap;
-        }
-
-        .analysis-actions .btn {
-            width: auto;
-            padding: 12px 24px;
         }
 
         /* Chat Interface */
@@ -895,12 +741,6 @@
             font-size: 24px;
             font-weight: 700;
             color: var(--secondary);
-        }
-
-        .btn-small {
-            padding: 10px 24px;
-            font-size: 14px;
-            width: auto;
         }
 
         /* Webinars */
@@ -1334,7 +1174,6 @@
             30% { transform: translateY(-10px); }
         }
     </style>
-<base target="_blank">
 </head>
 <body>
     <!-- Toast Notification -->
@@ -1355,104 +1194,7 @@
         </div>
     </div>
 
-    <!-- Auth Container -->
-    <div class="auth-container" id="auth-container">
-        <div class="auth-box" id="auth-box">
-            <!-- Logo -->
-            <div class="auth-logo">
-                <i class="fas fa-chart-line"></i>
-                <h1>Pipways</h1>
-                <p>Professional Trading Education Platform</p>
-            </div>
-
-            <div id="alert-box" class="alert"></div>
-
-            <!-- Login Form -->
-            <form id="login-form" onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label for="login-email">Email Address</label>
-                    <input type="email" id="login-email" placeholder="Enter your email" required>
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Password</label>
-                    <input type="password" id="login-password" placeholder="Enter your password" required>
-                </div>
-                <button type="submit" class="btn">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Sign In
-                </button>
-                <div class="auth-footer" style="margin-top: 20px;">
-                    <a onclick="showForgotPassword()">Forgot password?</a>
-                </div>
-            </form>
-
-            <!-- Register Form (Hidden) -->
-            <form id="register-form" onsubmit="handleRegister(event)" style="display: none;">
-                <div class="form-group">
-                    <label for="register-name">Full Name</label>
-                    <input type="text" id="register-name" placeholder="Enter your full name">
-                </div>
-                <div class="form-group">
-                    <label for="register-email">Email Address</label>
-                    <input type="email" id="register-email" placeholder="Enter your email" required>
-                </div>
-                <div class="form-group">
-                    <label for="register-password">Password</label>
-                    <input type="password" id="register-password" placeholder="Min 8 characters, 1 uppercase, 1 number" minlength="8" required>
-                </div>
-                <button type="submit" class="btn">
-                    <i class="fas fa-user-plus"></i>
-                    Create Account
-                </button>
-            </form>
-
-            <!-- Forgot Password Form (Hidden) -->
-            <form id="forgot-form" onsubmit="handleForgotPassword(event)" style="display: none;">
-                <a class="back-link" onclick="showLogin()">
-                    <i class="fas fa-arrow-left"></i> Back to login
-                </a>
-                <h3 style="margin-bottom: 20px; color: #1e293b;">Reset Password</h3>
-                <p style="color: #64748b; margin-bottom: 20px; font-size: 14px;">
-                    Enter your email address and we'll send you a link to reset your password.
-                </p>
-                <div class="form-group">
-                    <label for="forgot-email">Email Address</label>
-                    <input type="email" id="forgot-email" placeholder="Enter your email" required>
-                </div>
-                <button type="submit" class="btn">
-                    <i class="fas fa-paper-plane"></i>
-                    Send Reset Link
-                </button>
-            </form>
-
-            <!-- Reset Password Form (Hidden) -->
-            <form id="reset-form" onsubmit="handleResetPassword(event)" style="display: none;">
-                <a class="back-link" onclick="showLogin()">
-                    <i class="fas fa-arrow-left"></i> Back to login
-                </a>
-                <h3 style="margin-bottom: 20px; color: #1e293b;">Create New Password</h3>
-                <div class="form-group">
-                    <label for="reset-token">Reset Token</label>
-                    <input type="text" id="reset-token" placeholder="Paste your reset token" required>
-                </div>
-                <div class="form-group">
-                    <label for="reset-password">New Password</label>
-                    <input type="password" id="reset-password" placeholder="Min 8 characters" minlength="8" required>
-                </div>
-                <button type="submit" class="btn">
-                    <i class="fas fa-lock"></i>
-                    Reset Password
-                </button>
-            </form>
-
-            <div class="auth-footer" id="auth-footer">
-                <span id="auth-toggle-text">Don't have an account?</span>
-                <a onclick="toggleAuthMode()" id="auth-toggle-link">Register</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Dashboard -->
+    <!-- Dashboard Only - No Auth -->
     <div class="dashboard" id="dashboard">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -1510,16 +1252,12 @@
 
             <div class="sidebar-footer">
                 <div class="user-info">
-                    <div class="user-avatar" id="user-avatar">U</div>
+                    <div class="user-avatar">T</div>
                     <div class="user-details">
-                        <div class="user-name" id="user-name">User</div>
-                        <div class="user-email" id="user-email">user@example.com</div>
+                        <div class="user-name">Test User</div>
+                        <div class="user-email">test@pipways.com</div>
                     </div>
                 </div>
-                <button class="logout-btn" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Logout
-                </button>
             </div>
         </aside>
 
@@ -1823,137 +1561,23 @@
 
     <script>
         // ==========================================
-        // CONFIGURATION - NO TRAILING SLASH
+        // CONFIGURATION - NO AUTHENTICATION
         // ==========================================
         const API_URL = 'https://pipways-api-nhem.onrender.com';
-        let currentUser = null;
-        let authMode = 'login';
         let selectedFile = null;
         let chatSessionId = null;
         let currentSection = 'overview';
 
         // ==========================================
-        // INITIALIZATION
+        // INITIALIZATION - LOAD DASHBOARD DIRECTLY
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
-            checkAuthStatus();
-            
-            // Check for password reset token in URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const resetToken = urlParams.get('token');
-            if (resetToken) {
-                document.getElementById('reset-token').value = resetToken;
-                showResetPassword();
-            }
+            loadDashboardData();
         });
 
-        function checkAuthStatus() {
-            const token = localStorage.getItem('pipways_token');
-            const userData = localStorage.getItem('pipways_user');
-            
-            if (token && userData) {
-                try {
-                    currentUser = JSON.parse(userData);
-                    // Verify token is still valid
-                    fetch(`${API_URL}/auth/me`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                    .then(res => {
-                        if (res.ok) {
-                            showDashboard();
-                        } else {
-                            throw new Error('Invalid token');
-                        }
-                    })
-                    .catch(() => {
-                        clearAuthData();
-                        showLogin();
-                    });
-                } catch (e) {
-                    clearAuthData();
-                    showLogin();
-                }
-            } else {
-                showLogin();
-            }
-        }
-
-        function clearAuthData() {
-            localStorage.removeItem('pipways_token');
-            localStorage.removeItem('pipways_user');
-            localStorage.removeItem('pipways_refresh_token');
-            currentUser = null;
-        }
-
         // ==========================================
-        // AUTHENTICATION UI FUNCTIONS
+        // NOTIFICATIONS
         // ==========================================
-        
-        function showLogin() {
-            hideAllAuthForms();
-            document.getElementById('login-form').style.display = 'block';
-            document.getElementById('auth-footer').style.display = 'block';
-            document.getElementById('auth-toggle-text').textContent = "Don't have an account?";
-            document.getElementById('auth-toggle-link').textContent = 'Register';
-            authMode = 'login';
-            clearAlert();
-        }
-
-        function showRegister() {
-            hideAllAuthForms();
-            document.getElementById('register-form').style.display = 'block';
-            document.getElementById('auth-footer').style.display = 'block';
-            document.getElementById('auth-toggle-text').textContent = 'Already have an account?';
-            document.getElementById('auth-toggle-link').textContent = 'Sign In';
-            authMode = 'register';
-            clearAlert();
-        }
-
-        function showForgotPassword() {
-            hideAllAuthForms();
-            document.getElementById('forgot-form').style.display = 'block';
-            document.getElementById('auth-footer').style.display = 'none';
-            clearAlert();
-        }
-
-        function showResetPassword() {
-            hideAllAuthForms();
-            document.getElementById('reset-form').style.display = 'block';
-            document.getElementById('auth-footer').style.display = 'none';
-            clearAlert();
-        }
-
-        function hideAllAuthForms() {
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('register-form').style.display = 'none';
-            document.getElementById('forgot-form').style.display = 'none';
-            document.getElementById('reset-form').style.display = 'none';
-        }
-
-        function toggleAuthMode() {
-            if (authMode === 'login') {
-                showRegister();
-            } else {
-                showLogin();
-            }
-        }
-
-        // ==========================================
-        // ALERTS & NOTIFICATIONS
-        // ==========================================
-
-        function showAlert(message, type = 'error') {
-            const alertBox = document.getElementById('alert-box');
-            alertBox.className = `alert ${type}`;
-            alertBox.textContent = message;
-        }
-
-        function clearAlert() {
-            const alertBox = document.getElementById('alert-box');
-            alertBox.className = 'alert';
-            alertBox.textContent = '';
-        }
-
         function showToast(message, type = 'error') {
             const toast = document.getElementById('toast');
             toast.className = `toast ${type}`;
@@ -1963,202 +1587,8 @@
         }
 
         // ==========================================
-        // AUTHENTICATION API CALLS - FIXED FOR CORS/FORM DATA
+        // NAVIGATION
         // ==========================================
-
-        // FIXED: Use URLSearchParams for form data (OAuth2 style) instead of JSON
-        async function handleLogin(e) {
-            e.preventDefault();
-            clearAlert();
-            
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            
-            try {
-                const formData = new URLSearchParams();
-                formData.append('email', email);
-                formData.append('password', password);
-
-                const response = await fetch(`${API_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    localStorage.setItem('pipways_token', data.access_token);
-                    localStorage.setItem('pipways_refresh_token', data.refresh_token);
-                    localStorage.setItem('pipways_user', JSON.stringify(data.user));
-                    currentUser = data.user;
-                    showDashboard();
-                } else {
-                    showAlert(data.detail || 'Login failed');
-                }
-            } catch (error) {
-                showAlert('Network error. Please check your connection.');
-            }
-        }
-
-        // FIXED: Register also uses form data format
-        async function handleRegister(e) {
-            e.preventDefault();
-            clearAlert();
-            
-            const fullName = document.getElementById('register-name').value;
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
-
-            // Client-side validation
-            if (password.length < 8) {
-                showAlert('Password must be at least 8 characters');
-                return;
-            }
-            if (!/[A-Z]/.test(password)) {
-                showAlert('Password must contain at least one uppercase letter');
-                return;
-            }
-            if (!/[0-9]/.test(password)) {
-                showAlert('Password must contain at least one number');
-                return;
-            }
-            
-            try {
-                const formData = new URLSearchParams();
-                formData.append('email', email);
-                formData.append('password', password);
-                formData.append('full_name', fullName);
-
-                const response = await fetch(`${API_URL}/auth/register`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    localStorage.setItem('pipways_token', data.access_token);
-                    localStorage.setItem('pipways_refresh_token', data.refresh_token);
-                    localStorage.setItem('pipways_user', JSON.stringify(data.user));
-                    currentUser = data.user;
-                    showToast('Account created successfully!', 'success');
-                    showDashboard();
-                } else {
-                    showAlert(data.detail || 'Registration failed');
-                }
-            } catch (error) {
-                showAlert('Network error. Please check your connection.');
-            }
-        }
-
-        // FIXED: Forgot password uses form data
-        async function handleForgotPassword(e) {
-            e.preventDefault();
-            clearAlert();
-            
-            const email = document.getElementById('forgot-email').value;
-            
-            try {
-                const formData = new URLSearchParams();
-                formData.append('email', email);
-
-                const response = await fetch(`${API_URL}/auth/password-reset-request`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showAlert('Password reset link sent! Check your email.', 'success');
-                    setTimeout(showLogin, 3000);
-                } else {
-                    showAlert(data.detail || 'Request failed');
-                }
-            } catch (error) {
-                showAlert('Network error. Please check your connection.');
-            }
-        }
-
-        // FIXED: Reset password uses form data
-        async function handleResetPassword(e) {
-            e.preventDefault();
-            clearAlert();
-            
-            const token = document.getElementById('reset-token').value;
-            const newPassword = document.getElementById('reset-password').value;
-            
-            if (newPassword.length < 8) {
-                showAlert('Password must be at least 8 characters');
-                return;
-            }
-            
-            try {
-                const formData = new URLSearchParams();
-                formData.append('token', token);
-                formData.append('new_password', newPassword);
-
-                const response = await fetch(`${API_URL}/auth/password-reset-confirm`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showAlert('Password reset successful! Please login.', 'success');
-                    setTimeout(showLogin, 2000);
-                } else {
-                    showAlert(data.detail || 'Reset failed');
-                }
-            } catch (error) {
-                showAlert('Network error. Please check your connection.');
-            }
-        }
-
-        function logout() {
-            clearAuthData();
-            showLogin();
-            showToast('Logged out successfully', 'success');
-        }
-
-        // ==========================================
-        // DASHBOARD FUNCTIONS
-        // ==========================================
-
-        function showDashboard() {
-            document.getElementById('auth-container').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
-            
-            // Update user info
-            const displayName = currentUser?.full_name || currentUser?.email?.split('@')[0] || 'Trader';
-            const displayEmail = currentUser?.email || '';
-            const avatar = (displayName[0] || 'U').toUpperCase();
-            
-            document.getElementById('user-name').textContent = displayName;
-            document.getElementById('user-email').textContent = displayEmail;
-            document.getElementById('user-avatar').textContent = avatar;
-            
-            loadDashboardData();
-        }
-
-        function showAuth() {
-            document.getElementById('auth-container').style.display = 'flex';
-            document.getElementById('dashboard').style.display = 'none';
-        }
-
         function showSection(sectionName) {
             currentSection = sectionName;
             
@@ -2203,19 +1633,12 @@
             ]);
         }
 
-        // FIXED: All authenticated requests include "Bearer " prefix
+        // ==========================================
+        // TRADE FUNCTIONS - NO AUTH HEADERS
+        // ==========================================
         async function loadStats() {
             try {
-                const token = localStorage.getItem('pipways_token');
-                
-                const response = await fetch(`${API_URL}/trades/stats?period=all`, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (!response.ok) throw new Error('Failed to load stats');
-                
+                const response = await fetch(`${API_URL}/trades/stats?period=all`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -2230,11 +1653,7 @@
                 }
                 
                 // Load analysis count from history
-                const analysisResponse = await fetch(`${API_URL}/analyze/history?per_page=1`, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                const analysisResponse = await fetch(`${API_URL}/analyze/history?per_page=1`);
                 const analysisData = await analysisResponse.json();
                 document.getElementById('stat-analyses').textContent = analysisData.pagination?.total || 0;
                 
@@ -2243,19 +1662,9 @@
             }
         }
 
-        // ==========================================
-        // TRADE FUNCTIONS - ALL WITH BEARER PREFIX
-        // ==========================================
-
         async function loadRecentTrades() {
             try {
-                const token = localStorage.getItem('pipways_token');
-                const response = await fetch(`${API_URL}/trades?per_page=5`, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
+                const response = await fetch(`${API_URL}/trades?per_page=5`);
                 const data = await response.json();
                 const container = document.getElementById('recent-trades-list');
                 
@@ -2292,13 +1701,7 @@
         async function loadTrades() {
             await loadRecentTrades();
             try {
-                const token = localStorage.getItem('pipways_token');
-                const response = await fetch(`${API_URL}/trades?per_page=50`, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
+                const response = await fetch(`${API_URL}/trades?per_page=50`);
                 const data = await response.json();
                 const container = document.getElementById('trade-history-list');
                 
@@ -2334,7 +1737,6 @@
 
         async function handleTrade(e) {
             e.preventDefault();
-            const token = localStorage.getItem('pipways_token');
             
             const tradeData = {
                 pair: document.getElementById('trade-pair').value,
@@ -2350,7 +1752,6 @@
                 const response = await fetch(`${API_URL}/trades`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(tradeData)
@@ -2372,9 +1773,8 @@
         }
 
         // ==========================================
-        // AI ANALYSIS FUNCTIONS - ALL WITH BEARER PREFIX
+        // AI ANALYSIS FUNCTIONS - NO AUTH HEADERS
         // ==========================================
-
         function handleFileSelect(input) {
             if (input.files && input.files[0]) {
                 selectedFile = input.files[0];
@@ -2410,7 +1810,6 @@
         async function analyzeChart() {
             if (!selectedFile) return;
             
-            const token = localStorage.getItem('pipways_token');
             const formData = new FormData();
             formData.append('image', selectedFile);
             formData.append('save_to_journal', 'true');
@@ -2429,9 +1828,6 @@
             try {
                 const response = await fetch(`${API_URL}/analyze/chart`, {
                     method: 'POST',
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    },
                     body: formData
                 });
 
@@ -2556,13 +1952,7 @@
 
         async function loadAnalysisHistory() {
             try {
-                const token = localStorage.getItem('pipways_token');
-                const response = await fetch(`${API_URL}/analyze/history?per_page=10`, {
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
+                const response = await fetch(`${API_URL}/analyze/history?per_page=10`);
                 const data = await response.json();
                 const container = document.getElementById('analysis-history-list');
                 
@@ -2611,9 +2001,8 @@
         }
 
         // ==========================================
-        // AI MENTOR CHAT - WITH BEARER PREFIX
+        // AI MENTOR CHAT - NO AUTH HEADERS
         // ==========================================
-
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
@@ -2627,7 +2016,6 @@
             showTypingIndicator();
             
             try {
-                const token = localStorage.getItem('pipways_token');
                 const formData = new URLSearchParams();
                 formData.append('message', message);
                 if (chatSessionId) formData.append('session_id', chatSessionId);
@@ -2635,7 +2023,6 @@
                 const response = await fetch(`${API_URL}/mentor/chat`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
                     body: formData
@@ -2694,9 +2081,8 @@
         }
 
         // ==========================================
-        // COURSES, WEBINARS, BLOG - WITH BEARER PREFIX
+        // COURSES, WEBINARS, BLOG - NO AUTH HEADERS
         // ==========================================
-
         async function loadCourses() {
             const container = document.getElementById('courses-grid');
             container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Loading courses...</div>';
@@ -2740,18 +2126,9 @@
         }
 
         async function enrollCourse(courseId) {
-            const token = localStorage.getItem('pipways_token');
-            if (!token) {
-                showToast('Please login first');
-                return;
-            }
-            
             try {
                 const response = await fetch(`${API_URL}/courses/${courseId}/enroll`, {
-                    method: 'POST',
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
+                    method: 'POST'
                 });
                 
                 const data = await response.json();
@@ -2805,18 +2182,9 @@
         }
 
         async function registerWebinar(webinarId) {
-            const token = localStorage.getItem('pipways_token');
-            if (!token) {
-                showToast('Please login first');
-                return;
-            }
-            
             try {
                 const response = await fetch(`${API_URL}/webinars/${webinarId}/register`, {
-                    method: 'POST',
-                    headers: { 
-                        'Authorization': `Bearer ${token}`
-                    }
+                    method: 'POST'
                 });
                 
                 const data = await response.json();

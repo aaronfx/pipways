@@ -4,21 +4,20 @@ Complete implementation with auth, multi-admin, AI integration, and mobile-ready
 """
 
 import os
-import re
 import jwt
 import bcrypt
 import asyncpg
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
-import json
+import base64
 from contextlib import asynccontextmanager
 
 # Load environment variables
@@ -41,7 +40,13 @@ class Settings:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+    CORS_ORIGINS = [
+        "https://pipways-web-nhem.onrender.com",
+        "http://localhost:3000", 
+        "http://localhost:5173",
+        "http://127.0.0.1:5500",
+        "null"  # For local file testing
+    ]
 
 settings = Settings()
 
@@ -58,41 +63,61 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
 
-# CORS - Fixed to handle preflight requests properly
+# CRITICAL: CORS Middleware must be FIRST
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
 
-# Explicit CORS handler for OPTIONS requests (Preflight)
+# Custom middleware to ensure CORS headers on ALL responses (including 401, 403, 500)
 @app.middleware("http")
-async def cors_handler(request, call_next):
+async def cors_debug_handler(request: Request, call_next):
+    origin = request.headers.get("origin")
+    
+    # Handle preflight
     if request.method == "OPTIONS":
+        headers = {
+            "Access-Control-Allow-Origin": origin if origin in settings.CORS_ORIGINS else settings.CORS_ORIGINS[0],
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+        return JSONResponse(content={}, headers=headers)
+    
+    try:
+        response = await call_next(request)
+        
+        # Add CORS headers to response
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        else:
+            response.headers["Access-Control-Allow-Origin"] = settings.CORS_ORIGINS[0]
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+        return response
+        
+    except Exception as exc:
+        # Even on 500 errors, return CORS headers so frontend can see the error
+        logger.error(f"Error processing request: {exc}")
         return JSONResponse(
-            content={},
+            status_code=500,
+            content={"detail": "Internal server error"},
             headers={
-                "Access-Control-Allow-Origin": request.headers.get("Origin", "*"),
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+                "Access-Control-Allow-Origin": origin if origin else settings.CORS_ORIGINS[0],
                 "Access-Control-Allow-Credentials": "true",
-            },
+            }
         )
-    response = await call_next(request)
-    origin = request.headers.get("Origin")
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
 
 # Security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # auto_error=False prevents 403 without CORS headers
 
-# Models - Fixed to remove unsupported regex look-ahead patterns
+# Models - Fixed for Pydantic v2 (no regex lookaheads)
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -101,7 +126,6 @@ class UserRegister(BaseModel):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Validate password complexity without using look-ahead regex"""
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         if not any(c.islower() for c in v):
@@ -152,9 +176,11 @@ class SignalCreate(BaseModel):
     entry_price: float
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    timeframe: str
+    take_profit_2: Optional[float] = None
+    timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
+    risk_percent: float = 1.0
 
 class BlogPostCreate(BaseModel):
     title: str = Field(..., min_length=1)
@@ -211,10 +237,12 @@ async def init_db():
                 entry_price DECIMAL(10,5),
                 stop_loss DECIMAL(10,5),
                 take_profit DECIMAL(10,5),
+                take_profit_2 DECIMAL(10,5),
                 timeframe VARCHAR(20),
                 analysis TEXT,
                 status VARCHAR(20) DEFAULT 'active',
                 pips_gain DECIMAL(10,2),
+                risk_percent DECIMAL(5,2) DEFAULT 1.0,
                 is_premium BOOLEAN DEFAULT FALSE,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -315,6 +343,9 @@ def create_reset_token():
     return secrets.token_urlsafe(32)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
     token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -384,6 +415,9 @@ async def login(credentials: UserLogin):
 
 @app.post("/auth/refresh")
 async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
     token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -590,11 +624,11 @@ async def get_signals(
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         signal_id = await conn.fetchval("""
-            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, timeframe, analysis, is_premium, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, take_profit_2, timeframe, analysis, is_premium, risk_percent, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id
         """, signal.pair, signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, admin["id"])
+             signal.take_profit, signal.take_profit_2, signal.timeframe, signal.analysis, signal.is_premium, signal.risk_percent, admin["id"])
         
         return {"id": signal_id, "message": "Signal created successfully"}
 
@@ -628,7 +662,6 @@ async def analyze_chart(
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File too large")
     
-    import base64
     image_base64 = base64.b64encode(contents).decode()
     
     prompt = f"""Analyze this forex/crypto chart for {pair or 'unknown pair'} on {timeframe or 'unknown timeframe'} timeframe.
@@ -670,6 +703,7 @@ async def analyze_chart(
             analysis = result["choices"][0]["message"]["content"]
             
             return {
+                "success": True,
                 "analysis": analysis,
                 "pair": pair,
                 "timeframe": timeframe,
@@ -733,7 +767,7 @@ async def mentor_chat(
                 VALUES ($1, $2, $3, $4)
             """, current_user["id"], message.message, ai_response, message.context)
             
-            return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
+            return {"success": True, "response": ai_response, "timestamp": datetime.utcnow().isoformat()}
 
 # Content Management
 @app.get("/blog/posts")
@@ -803,10 +837,12 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
         """, course.title, course.description, course.content, course.is_premium, admin["id"])
         return {"id": course_id, "message": "Course created"}
 
-# Config
+# Config & Health
 @app.get("/config")
 async def get_config():
     return {
+        "telegram_free_channel": "https://t.me/pipways_free",
+        "telegram_premium_channel": "https://t.me/pipways_vip",
         "features": {
             "ai_analysis": bool(settings.OPENROUTER_API_KEY),
             "mentor_chat": bool(settings.OPENROUTER_API_KEY),

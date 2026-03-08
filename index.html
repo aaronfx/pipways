@@ -2,10 +2,8 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <meta name="description" content="Pipways - Professional AI-powered forex trading signals">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipways - AI Trading Platform</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -25,17 +23,7 @@
             --text-secondary: #9ca3af;
             --border: #374151;
             --radius: 12px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        [data-theme="light"] {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f3f4f6;
-            --bg-card: #ffffff;
-            --bg-hover: #e5e7eb;
-            --text-primary: #111827;
-            --text-secondary: #6b7280;
-            --border: #e5e7eb;
+            --transition: all 0.3s ease;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -45,10 +33,12 @@
             background-color: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
-            overflow-x: hidden;
         }
 
-        /* Auth Wall - Blocks everything until login */
+        /* CRITICAL: Hidden class for form toggling */
+        .hidden { display: none !important; }
+
+        /* Auth Wall */
         .auth-wall {
             position: fixed;
             top: 0;
@@ -63,10 +53,6 @@
             padding: 20px;
         }
 
-        .auth-wall.hidden {
-            display: none;
-        }
-
         .auth-container {
             width: 100%;
             max-width: 420px;
@@ -75,6 +61,8 @@
             padding: 40px;
             border: 1px solid var(--border);
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .auth-header {
@@ -93,11 +81,6 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-        }
-
-        .auth-subtitle {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
         }
 
         .form-group {
@@ -120,7 +103,7 @@
             border-radius: var(--radius);
             color: var(--text-primary);
             font-size: 1rem;
-            transition: var(--transition);
+            font-family: inherit;
         }
 
         .form-input:focus {
@@ -138,7 +121,7 @@
             cursor: pointer;
             transition: var(--transition);
             border: none;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
@@ -152,13 +135,6 @@
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px -5px rgba(0, 212, 255, 0.3);
-        }
-
-        .btn-secondary {
-            background: transparent;
-            color: var(--primary);
-            border: 1px solid var(--primary);
-            margin-top: 12px;
         }
 
         .btn-loading {
@@ -193,8 +169,9 @@
 
         .error-message {
             color: var(--danger);
-            font-size: 0.85rem;
-            margin-top: 6px;
+            font-size: 0.875rem;
+            margin-top: 8px;
+            margin-bottom: 16px;
             display: none;
         }
 
@@ -220,14 +197,9 @@
         .strength-medium { width: 66%; background: var(--accent); }
         .strength-strong { width: 100%; background: var(--success); }
 
-        /* Main App (Hidden until auth) */
-        .main-app {
-            display: none;
-        }
-
-        .main-app.visible {
-            display: block;
-        }
+        /* Main App */
+        .main-app { display: none; }
+        .main-app.visible { display: block; }
 
         /* Navigation */
         .navbar {
@@ -271,6 +243,10 @@
             font-weight: 500;
             cursor: pointer;
             transition: var(--transition);
+            background: none;
+            border: none;
+            font-size: 1rem;
+            font-family: inherit;
         }
 
         .nav-link:hover, .nav-link.active {
@@ -288,9 +264,6 @@
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
         .logout-btn {
@@ -303,7 +276,6 @@
             font-weight: 600;
         }
 
-        /* Content Sections */
         .main-content {
             margin-top: 64px;
             padding: 24px;
@@ -312,14 +284,8 @@
             margin-right: auto;
         }
 
-        .section {
-            display: none;
-        }
-
-        .section.active {
-            display: block;
-            animation: fadeIn 0.4s ease;
-        }
+        .section { display: none; }
+        .section.active { display: block; animation: fadeIn 0.4s ease; }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -337,7 +303,6 @@
             margin-bottom: 8px;
         }
 
-        /* Cards */
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -354,7 +319,6 @@
 
         .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
             border-color: var(--primary);
         }
 
@@ -362,8 +326,8 @@
             background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
-            border-radius: 4px;
             height: 200px;
+            border-radius: var(--radius);
         }
 
         @keyframes shimmer {
@@ -371,7 +335,6 @@
             100% { background-position: -200% 0; }
         }
 
-        /* Toast */
         .toast-container {
             position: fixed;
             top: 80px;
@@ -399,7 +362,6 @@
             to { transform: translateX(0); }
         }
 
-        /* Signal Cards */
         .signal-header {
             display: flex;
             justify-content: space-between;
@@ -436,35 +398,17 @@
         .metric-label { font-size: 0.75rem; color: var(--text-secondary); }
         .metric-value { font-family: monospace; font-weight: 600; }
 
-        /* Mobile */
-        .mobile-toggle {
-            display: none;
-            flex-direction: column;
-            gap: 4px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
-        }
-
-        .mobile-toggle span {
-            width: 24px;
-            height: 2px;
-            background: var(--text-primary);
-            border-radius: 2px;
-        }
-
         @media (max-width: 768px) {
             .nav-links { display: none; }
-            .mobile-toggle { display: flex; }
             .grid { grid-template-columns: 1fr; }
+            .auth-container { padding: 24px; }
         }
     </style>
 <base target="_blank">
 </head>
 <body>
 
-    <!-- AUTH WALL - Blocks everything until logged in -->
+    <!-- AUTH WALL -->
     <div id="auth-wall" class="auth-wall">
         <div class="auth-container">
             <div class="auth-header">
@@ -472,7 +416,7 @@
                     <i class="fas fa-chart-line"></i>
                     Pipways
                 </div>
-                <p class="auth-subtitle">Professional AI Trading Platform</p>
+                <p style="color: var(--text-secondary);">Professional AI Trading Platform</p>
             </div>
 
             <!-- Login Form -->
@@ -494,7 +438,7 @@
                 </div>
             </form>
 
-            <!-- Register Form -->
+            <!-- Register Form (HIDDEN by default) -->
             <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
                 <div class="form-group">
                     <label class="form-label">Full Name</label>
@@ -511,7 +455,7 @@
                         <div class="password-strength-bar" id="strength-bar"></div>
                     </div>
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                        Min 8 chars, uppercase, lowercase, number, special char
+                        Min 8 chars: uppercase, lowercase, number, special char (@$!%*?&)
                     </p>
                 </div>
                 <div class="error-message" id="register-error"></div>
@@ -523,8 +467,11 @@
                 </div>
             </form>
 
-            <!-- Forgot Password Form -->
+            <!-- Forgot Password Form (HIDDEN by default) -->
             <form id="forgot-form" class="hidden" onsubmit="handleForgotPassword(event)">
+                <p style="margin-bottom: 16px; color: var(--text-secondary);">
+                    Enter your email to receive a password reset link.
+                </p>
                 <div class="form-group">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-input" required>
@@ -540,9 +487,8 @@
         </div>
     </div>
 
-    <!-- MAIN APP (Hidden until authenticated) -->
+    <!-- MAIN APP (Hidden until auth) -->
     <div class="main-app" id="main-app">
-        <!-- Navigation -->
         <nav class="navbar">
             <div class="nav-container">
                 <div class="logo" onclick="showSection('signals')">
@@ -550,11 +496,11 @@
                 </div>
                 
                 <div class="nav-links">
-                    <a class="nav-link active" onclick="showSection('signals')">Signals</a>
-                    <a class="nav-link" onclick="showSection('analysis')">AI Analysis</a>
-                    <a class="nav-link" onclick="showSection('mentor')">Mentor</a>
-                    <a class="nav-link" onclick="showSection('learn')">Learn</a>
-                    <a class="nav-link hidden" id="admin-link" onclick="showSection('admin')">Admin</a>
+                    <button class="nav-link active" onclick="showSection('signals')">Signals</button>
+                    <button class="nav-link" onclick="showSection('analysis')">AI Analysis</button>
+                    <button class="nav-link" onclick="showSection('mentor')">Mentor</button>
+                    <button class="nav-link" onclick="showSection('learn')">Learn</button>
+                    <button class="nav-link hidden" id="admin-link" onclick="showSection('admin')">Admin</button>
                 </div>
 
                 <div class="nav-user">
@@ -563,21 +509,13 @@
                         <span id="username">User</span>
                     </span>
                     <button class="logout-btn" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i>
+                        <i class="fas fa-sign-out-alt"></i> Logout
                     </button>
                 </div>
-
-                <button class="mobile-toggle" onclick="toggleMobileMenu()">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
             </div>
         </nav>
 
-        <!-- Main Content -->
         <main class="main-content">
-            
             <!-- Signals Section -->
             <section id="signals" class="section active">
                 <div class="section-header">
@@ -595,14 +533,13 @@
             <section id="analysis" class="section">
                 <div class="section-header">
                     <h1 class="section-title">AI Chart Analysis</h1>
-                    <p style="color: var(--text-secondary);">Upload charts for instant AI analysis</p>
                 </div>
                 <div class="card">
-                    <input type="file" id="chart-upload" accept="image/*" onchange="handleFileSelect(event)">
+                    <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="analyzeChart()">
                     <button class="btn btn-primary" onclick="document.getElementById('chart-upload').click()">
-                        <i class="fas fa-upload"></i> Select Chart Image
+                        <i class="fas fa-upload"></i> Upload Chart
                     </button>
-                    <div id="analysis-result" style="margin-top: 20px; white-space: pre-wrap; font-family: monospace;"></div>
+                    <div id="analysis-result" style="margin-top: 20px; white-space: pre-wrap;"></div>
                 </div>
             </section>
 
@@ -610,14 +547,13 @@
             <section id="mentor" class="section">
                 <div class="section-header">
                     <h1 class="section-title">AI Mentor</h1>
-                    <p style="color: var(--text-secondary);">Get personalized trading advice</p>
                 </div>
-                <div class="card" style="height: 600px; display: flex; flex-direction: column;">
+                <div class="card" style="height: 500px; display: flex; flex-direction: column;">
                     <div id="chat-messages" style="flex: 1; overflow-y: auto; margin-bottom: 16px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius);">
-                        <div style="margin-bottom: 12px;"><strong>AI Mentor:</strong> Hello! How can I help you today?</div>
+                        <div style="margin-bottom: 12px;"><strong>AI Mentor:</strong> Hello! How can I help?</div>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <input type="text" id="chat-input" class="form-input" placeholder="Ask a question..." onkeypress="if(event.key==='Enter') sendMessage()">
+                        <input type="text" id="chat-input" class="form-input" placeholder="Ask a question..." style="flex: 1;" onkeypress="if(event.key==='Enter') sendMessage()">
                         <button class="btn btn-primary" onclick="sendMessage()" style="width: auto;">
                             <i class="fas fa-paper-plane"></i>
                         </button>
@@ -629,10 +565,8 @@
             <section id="learn" class="section">
                 <div class="section-header">
                     <h1 class="section-title">Education</h1>
-                    <p style="color: var(--text-secondary);">Courses and webinars</p>
                 </div>
                 <div class="grid" id="courses-list">
-                    <div class="skeleton"></div>
                     <div class="skeleton"></div>
                 </div>
             </section>
@@ -645,7 +579,7 @@
                 <div class="grid">
                     <div class="card">
                         <h3>Create Signal</h3>
-                        <form onsubmit="createSignal(event)">
+                        <form onsubmit="createSignal(event)" style="margin-top: 16px;">
                             <input type="text" name="pair" placeholder="Pair (EURUSD)" class="form-input" style="margin-bottom: 12px;" required>
                             <select name="direction" class="form-input" style="margin-bottom: 12px;">
                                 <option value="buy">Buy</option>
@@ -657,11 +591,9 @@
                     </div>
                 </div>
             </section>
-
         </main>
     </div>
 
-    <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
     <script>
@@ -669,7 +601,7 @@
         let authToken = localStorage.getItem('access_token');
         let currentUser = null;
 
-        // Initialize - Check auth immediately
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             if (authToken) {
                 validateToken();
@@ -689,6 +621,19 @@
             loadSignals();
         }
 
+        function switchAuthMode(mode) {
+            // Hide all forms
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('forgot-form').classList.add('hidden');
+            
+            // Show selected form
+            document.getElementById(`${mode}-form`).classList.remove('hidden');
+            
+            // Clear errors
+            document.querySelectorAll('.error-message').forEach(e => e.classList.remove('visible'));
+        }
+
         async function validateToken() {
             try {
                 const response = await fetch(`${API_URL}/auth/refresh`, {
@@ -703,11 +648,6 @@
                     const data = await response.json();
                     authToken = data.access_token;
                     localStorage.setItem('access_token', authToken);
-                    
-                    // Decode token to get user info
-                    const payload = JSON.parse(atob(authToken.split('.')[1]));
-                    currentUser = payload;
-                    updateUI();
                     showMainApp();
                 } else {
                     throw new Error('Invalid token');
@@ -715,14 +655,6 @@
             } catch (error) {
                 logout();
             }
-        }
-
-        function switchAuthMode(mode) {
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('forgot-form').classList.add('hidden');
-            
-            document.getElementById(`${mode}-form`).classList.remove('hidden');
         }
 
         async function handleLogin(e) {
@@ -759,7 +691,7 @@
                     errorDiv.classList.add('visible');
                 }
             } catch (error) {
-                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.textContent = 'Network error. Check CORS configuration.';
                 errorDiv.classList.add('visible');
             } finally {
                 btn.classList.remove('btn-loading');
@@ -776,14 +708,15 @@
             btn.innerHTML = '<div class="spinner"></div>';
             errorDiv.classList.remove('visible');
             
-            // Client-side password validation
             const password = e.target.password.value;
+            
+            // Validate password
             if (password.length < 8 || 
                 !/[a-z]/.test(password) || 
                 !/[A-Z]/.test(password) || 
                 !/[0-9]/.test(password) || 
                 !/[@$!%*?&]/.test(password)) {
-                errorDiv.textContent = 'Password does not meet requirements';
+                errorDiv.textContent = 'Password must be 8+ chars with uppercase, lowercase, number, and special char';
                 errorDiv.classList.add('visible');
                 btn.classList.remove('btn-loading');
                 btn.innerHTML = '<span>Create Account</span>';
@@ -810,13 +743,13 @@
                     currentUser = data.user;
                     updateUI();
                     showMainApp();
-                    showToast('Account created successfully!');
+                    showToast('Account created!');
                 } else {
                     errorDiv.textContent = data.detail || 'Registration failed';
                     errorDiv.classList.add('visible');
                 }
             } catch (error) {
-                errorDiv.textContent = 'Network error. Please try again.';
+                errorDiv.textContent = 'Network error. Check CORS configuration.';
                 errorDiv.classList.add('visible');
             } finally {
                 btn.classList.remove('btn-loading');
@@ -828,22 +761,20 @@
             e.preventDefault();
             const btn = document.getElementById('forgot-btn');
             btn.classList.add('btn-loading');
-            btn.innerHTML = '<div class="spinner"></div>';
             
             try {
-                const response = await fetch(`${API_URL}/auth/forgot-password`, {
+                await fetch(`${API_URL}/auth/forgot-password`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: e.target.email.value })
                 });
                 
-                showToast('Reset link sent to your email');
+                showToast('Reset link sent if email exists');
                 switchAuthMode('login');
             } catch (error) {
                 showToast('Error sending reset link', 'error');
             } finally {
                 btn.classList.remove('btn-loading');
-                btn.innerHTML = '<span>Send Reset Link</span>';
             }
         }
 
@@ -857,7 +788,7 @@
             if (/[@$!%*?&]/.test(password)) strength++;
             
             bar.className = 'password-strength-bar';
-            if (strength >= 1) bar.classList.add('strength-weak');
+            if (strength >= 2) bar.classList.add('strength-weak');
             if (strength >= 3) bar.classList.add('strength-medium');
             if (strength >= 4) bar.classList.add('strength-strong');
         }
@@ -865,7 +796,6 @@
         function updateUI() {
             if (currentUser) {
                 document.getElementById('username').textContent = currentUser.full_name || currentUser.email;
-                
                 if (currentUser.role === 'admin' || currentUser.role === 'moderator') {
                     document.getElementById('admin-link').classList.remove('hidden');
                 }
@@ -899,7 +829,7 @@
                 
                 if (response.status === 401) {
                     logout();
-                    showToast('Session expired. Please login again.', 'error');
+                    showToast('Session expired', 'error');
                     return null;
                 }
                 
@@ -923,7 +853,7 @@
 
         async function loadSignals() {
             const container = document.getElementById('signals-list');
-            container.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+            container.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
             
             const response = await apiCall('/signals');
             if (!response) return;
@@ -935,29 +865,17 @@
                 return;
             }
             
-            container.innerHTML = signals.map(signal => `
+            container.innerHTML = signals.map(s => `
                 <div class="card">
                     <div class="signal-header">
-                        <div class="signal-pair">${signal.pair}</div>
-                        <div class="signal-direction ${signal.direction}">${signal.direction}</div>
+                        <div class="signal-pair">${s.pair}</div>
+                        <div class="signal-direction ${s.direction}">${s.direction}</div>
                     </div>
                     <div class="signal-metrics">
-                        <div>
-                            <div class="metric-label">Entry</div>
-                            <div class="metric-value">${signal.entry_price}</div>
-                        </div>
-                        <div>
-                            <div class="metric-label">SL</div>
-                            <div class="metric-value" style="color: var(--danger);">${signal.stop_loss || '-'}</div>
-                        </div>
-                        <div>
-                            <div class="metric-label">TP</div>
-                            <div class="metric-value" style="color: var(--success);">${signal.take_profit || '-'}</div>
-                        </div>
+                        <div><div class="metric-label">Entry</div><div class="metric-value">${s.entry_price}</div></div>
+                        <div><div class="metric-label">SL</div><div class="metric-value" style="color: var(--danger);">${s.stop_loss || '-'}</div></div>
+                        <div><div class="metric-label">TP</div><div class="metric-value" style="color: var(--success);">${s.take_profit || '-'}</div></div>
                     </div>
-                    <p style="margin-top: 12px; color: var(--text-secondary); font-size: 0.9rem;">
-                        ${signal.analysis || 'Technical setup based on price action'}
-                    </p>
                 </div>
             `).join('');
         }
@@ -968,23 +886,19 @@
             if (!response) return;
             
             const courses = await response.json();
-            container.innerHTML = courses.map(course => `
-                <div class="card">
-                    <h3>${course.title}</h3>
-                    <p style="color: var(--text-secondary); margin-top: 8px;">${course.description}</p>
-                </div>
+            container.innerHTML = courses.map(c => `
+                <div class="card"><h3>${c.title}</h3><p style="color: var(--text-secondary);">${c.description}</p></div>
             `).join('');
         }
 
-        async function handleFileSelect(event) {
-            const file = event.target.files[0];
+        async function analyzeChart() {
+            const file = document.getElementById('chart-upload').files[0];
             if (!file) return;
             
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('pair', 'EURUSD');
             
-            showToast('Analyzing chart...');
+            showToast('Analyzing...');
             
             const response = await apiCall('/analyze/chart', {
                 method: 'POST',
@@ -999,22 +913,20 @@
 
         async function sendMessage() {
             const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (!message) return;
+            const msg = input.value.trim();
+            if (!msg) return;
             
-            const container = document.getElementById('chat-messages');
-            container.innerHTML += `<div style="margin-bottom: 12px; text-align: right;"><strong>You:</strong> ${message}</div>`;
+            document.getElementById('chat-messages').innerHTML += `<div style="text-align: right; margin-bottom: 8px;"><strong>You:</strong> ${msg}</div>`;
             input.value = '';
             
             const response = await apiCall('/mentor/chat', {
                 method: 'POST',
-                body: JSON.stringify({ message })
+                body: JSON.stringify({ message: msg })
             });
             
             if (response && response.ok) {
                 const data = await response.json();
-                container.innerHTML += `<div style="margin-bottom: 12px;"><strong>AI Mentor:</strong> ${data.response}</div>`;
-                container.scrollTop = container.scrollHeight;
+                document.getElementById('chat-messages').innerHTML += `<div style="margin-bottom: 8px;"><strong>AI:</strong> ${data.response}</div>`;
             }
         }
 
@@ -1043,14 +955,10 @@
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+            toast.innerHTML = message;
             container.appendChild(toast);
-            
             setTimeout(() => toast.remove(), 3000);
         }
-
-        // Make switchAuthMode globally accessible
-        window.switchAuthMode = switchAuthMode;
     </script>
 </body>
 </html>

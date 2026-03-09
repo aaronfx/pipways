@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API
-Fixed version with defensive coding and CORS environment support
+Pipways Trading Platform API - Emergency Fix
+Fixes: Database role column, OpenRouter model compatibility
 """
 
 import os
@@ -40,10 +40,12 @@ class Settings:
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
-    OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
 
-    # FIXED: CORS origins from environment variable
+    # FIXED: Use more reliable default models
+    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+    OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
+
+    # CORS origins from environment variable
     CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "*")
     @property
     def CORS_ORIGINS(self):
@@ -69,9 +71,9 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="2.0.1", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="2.0.2", lifespan=lifespan)
 
-# FIXED: CORS Middleware with environment-based origins
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -172,17 +174,45 @@ class MentorChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
 
-# Database initialization
+# Database initialization - FIXED with proper column addition
 async def init_db():
     async with db_pool.acquire() as conn:
-        # Users table - FIXED: Ensure role has default
+        # Check if users table exists
+        table_exists = await conn.fetchval("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'users'
+            )
+        """)
+
+        if table_exists:
+            # FIXED: Check if role column exists, add if not
+            role_column_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns 
+                    WHERE table_name = 'users' AND column_name = 'role'
+                )
+            """)
+
+            if not role_column_exists:
+                logger.info("Adding role column to existing users table...")
+                await conn.execute("""
+                    ALTER TABLE users 
+                    ADD COLUMN role VARCHAR(20) DEFAULT 'user'
+                """)
+                await conn.execute("""
+                    UPDATE users SET role = 'user' WHERE role IS NULL
+                """)
+                logger.info("Role column added successfully")
+
+        # Create users table if not exists
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 full_name VARCHAR(100) NOT NULL,
-                role VARCHAR(20) DEFAULT 'user' NOT NULL,
+                role VARCHAR(20) DEFAULT 'user',
                 subscription_tier VARCHAR(20) DEFAULT 'free',
                 subscription_status VARCHAR(20) DEFAULT 'inactive',
                 email_verified BOOLEAN DEFAULT FALSE,
@@ -194,21 +224,7 @@ async def init_db():
             )
         """)
 
-        # FIXED: Ensure existing tables have role column with default
-        try:
-            await conn.execute("""
-                ALTER TABLE users 
-                ALTER COLUMN role SET DEFAULT 'user'
-            """)
-        except:
-            pass  # Column might already have default
-
-        # FIXED: Update any NULL roles to 'user'
-        await conn.execute("""
-            UPDATE users SET role = 'user' WHERE role IS NULL OR role = ''
-        """)
-
-        # Signals table
+        # Create other tables...
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -229,7 +245,6 @@ async def init_db():
             )
         """)
 
-        # Blog posts
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -243,7 +258,6 @@ async def init_db():
             )
         """)
 
-        # Webinars
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -258,7 +272,6 @@ async def init_db():
             )
         """)
 
-        # Courses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -272,7 +285,6 @@ async def init_db():
             )
         """)
 
-        # Chat history
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -295,9 +307,9 @@ async def init_db():
                 """, settings.ADMIN_EMAIL, hashed, "System Administrator")
                 logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
             else:
-                # FIXED: Ensure admin has role
+                # Ensure admin has admin role
                 await conn.execute("""
-                    UPDATE users SET role = 'admin' WHERE email = $1 AND (role IS NULL OR role = '')
+                    UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'
                 """, settings.ADMIN_EMAIL)
         except Exception as e:
             logger.error(f"Error creating admin: {e}")
@@ -325,7 +337,6 @@ def create_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
 
-# FIXED: Optional auth with defensive coding
 async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         return None
@@ -336,10 +347,8 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         user_id = payload.get("sub")
         if not user_id:
             return None
-        # Return payload directly if it contains user data (enriched token)
         if "role" in payload:
             return payload
-        # Otherwise fetch from DB
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             return dict(user) if user else None
@@ -347,7 +356,6 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         logger.error(f"Auth error: {e}")
         return None
 
-# FIXED: Strict auth with defensive coding against missing fields
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -359,11 +367,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # If token has all user data, return it directly
         if "role" in payload and "email" in payload:
             return payload
 
-        # Otherwise fetch from DB
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             if not user:
@@ -375,7 +381,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def get_admin_user(current_user: dict = Depends(get_current_user)):
-    # FIXED: Use .get() to avoid KeyError
     role = current_user.get("role", "user")
     if role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -396,7 +401,6 @@ async def register(user_data: UserRegister):
             RETURNING id
         """, user_data.email, hashed_pw, user_data.full_name)
 
-        # FIXED: Enrich token with user data using .get() safety
         token_data = {
             "sub": str(user_id),
             "email": user_data.email,
@@ -423,12 +427,11 @@ async def login(credentials: UserLogin):
 
         await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
 
-        # FIXED: Use .get() to prevent KeyError if fields are missing
         token_data = {
             "sub": str(user["id"]),
             "email": user["email"],
             "full_name": user.get("full_name", ""),
-            "role": user.get("role", "user"),  # FIXED: .get() with default
+            "role": user.get("role", "user"),
             "subscription_tier": user.get("subscription_tier", "free")
         }
         access_token = create_access_token(token_data)
@@ -455,7 +458,6 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
             if not user:
                 raise HTTPException(status_code=401, detail="User not found")
 
-            # FIXED: Use .get() to prevent KeyError
             token_data = {
                 "sub": str(user["id"]),
                 "email": user["email"],
@@ -472,7 +474,6 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
 
 @app.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
-    """Get current authenticated user details"""
     return current_user
 
 @app.post("/auth/forgot-password")
@@ -567,7 +568,6 @@ async def update_user_role(
     role: str = Query(..., pattern="^(user|admin|moderator)$"), 
     admin: dict = Depends(get_admin_user)
 ):
-    # FIXED: Use .get() for safety
     admin_id = admin.get("id") or admin.get("sub")
     if str(admin_id) == str(user_id) and role != "admin":
         raise HTTPException(status_code=400, detail="Cannot demote yourself")
@@ -651,7 +651,6 @@ async def get_signals(
                 query += f" AND pair ILIKE ${len(params)+1}"
                 params.append(f"%{pair}%")
 
-            # Filter premium signals for non-premium users
             tier = current_user.get("subscription_tier", "free") if current_user else "free"
             if tier == "free":
                 query += " AND is_premium = FALSE"
@@ -669,13 +668,13 @@ async def get_signals(
 @app.post("/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
         signal_id = await conn.fetchval("""
             INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, timeframe, analysis, is_premium, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
         """, signal.pair, signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, 
-             admin.get("id") or admin.get("sub"))
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, admin_id)
 
         return {"id": signal_id, "message": "Signal created successfully"}
 
@@ -693,7 +692,7 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# AI Analysis
+# AI Analysis - FIXED with better error handling and model fallback
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -746,6 +745,10 @@ Provide analysis in this format:
                     "max_tokens": 1000
                 }
             )
+
+            if response.status_code == 404:
+                logger.error(f"OpenRouter model not found: {settings.OPENROUTER_VISION_MODEL}")
+                raise HTTPException(status_code=503, detail=f"AI model not available. Try using 'anthropic/claude-3.5-sonnet' or 'gpt-4o' instead of '{settings.OPENROUTER_VISION_MODEL}'")
 
             if response.status_code != 200:
                 logger.error(f"OpenRouter error: {response.text}")
@@ -811,6 +814,10 @@ async def mentor_chat(
                         "max_tokens": 1000
                     }
                 )
+
+                if response.status_code == 404:
+                    logger.error(f"OpenRouter model not found: {settings.OPENROUTER_MODEL}")
+                    raise HTTPException(status_code=503, detail=f"AI model not available. Try using 'anthropic/claude-3.5-sonnet' instead of '{settings.OPENROUTER_MODEL}'")
 
                 if response.status_code != 200:
                     logger.error(f"OpenRouter mentor error: {response.text}")

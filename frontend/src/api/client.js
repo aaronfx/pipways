@@ -1,4 +1,4 @@
-import { store } from '/src/state.js';
+import { store } from '../state.js';
 
 const API_URL = 'https://pipways-api-nhem.onrender.com';
 

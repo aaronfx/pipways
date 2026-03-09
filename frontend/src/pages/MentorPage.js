@@ -1,4 +1,3 @@
-
 import { Component } from '../components/Component.js';
 import { Sidebar } from '../components/Sidebar.js';
 import { api } from '../api/client.js';
@@ -14,10 +13,10 @@ export class MentorPage extends Component {
     async render() {
         const container = document.createElement('div');
         container.className = 'main-app';
-
+        
         const sidebar = new Sidebar();
         container.appendChild(sidebar.render());
-
+        
         const main = document.createElement('main');
         main.className = 'main-content';
         main.innerHTML = `
@@ -25,7 +24,7 @@ export class MentorPage extends Component {
                 <h2><i class="fas fa-comments" style="color: var(--premium);"></i> AI Trading Mentor</h2>
                 <p>Get personalized trading advice and psychology coaching</p>
             </div>
-
+            
             <div class="mentor-container">
                 <div class="chat-card card">
                     <div id="chat-messages" class="chat-messages">
@@ -40,118 +39,162 @@ export class MentorPage extends Component {
                                     <li>Risk management techniques</li>
                                     <li>Trading psychology and discipline</li>
                                     <li>Technical analysis questions</li>
-                                    <li>Trade review and feedback</li>
+                                    <li>Market analysis insights</li>
                                 </ul>
                                 <p>What would you like to discuss today?</p>
                             </div>
                         </div>
                     </div>
-
-                    <div class="chat-input-area">
-                        <select id="chat-context" class="form-input context-select">
-                            <option value="general">General</option>
-                            <option value="psychology">Psychology</option>
-                            <option value="risk_management">Risk Management</option>
-                            <option value="technical_analysis">Technical Analysis</option>
-                            <option value="strategy">Strategy</option>
-                        </select>
-                        <input type="text" id="chat-input" class="form-input chat-input" 
-                               placeholder="Ask your question..." autocomplete="off">
-                        <button class="btn btn-primary" id="send-btn">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                    
+                    <div class="chat-input-container">
+                        <div class="context-selector">
+                            <label class="form-label">Context:</label>
+                            <select id="mentor-context" class="form-input">
+                                <option value="trading">General Trading</option>
+                                <option value="psychology">Trading Psychology</option>
+                                <option value="risk">Risk Management</option>
+                                <option value="technical">Technical Analysis</option>
+                            </select>
+                        </div>
+                        
+                        <div class="chat-input-wrapper">
+                            <textarea 
+                                id="chat-input" 
+                                class="chat-input" 
+                                placeholder="Ask your trading question..." 
+                                rows="3"
+                            ></textarea>
+                            <button id="send-message" class="btn btn-primary btn-send">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mentor-sidebar card">
+                    <h3><i class="fas fa-history"></i> Recent Conversations</h3>
+                    <div id="chat-history" class="chat-history">
+                        <p class="text-secondary">No recent conversations</p>
                     </div>
                 </div>
             </div>
         `;
-
+        
         container.appendChild(main);
-
-        // Load history
-        setTimeout(() => this.loadHistory(), 0);
-
+        
+        // Load chat history after render
+        this.loadChatHistory();
+        
         return container;
     }
 
-    async loadHistory() {
-        try {
-            const data = await api.getChatHistory(20);
-            if (data.history && data.history.length > 0) {
-                const container = this.element.querySelector('#chat-messages');
-                container.innerHTML = ''; // Clear welcome message
-
-                // Reverse to show oldest first
-                [...data.history].reverse().forEach(msg => {
-                    this.addMessage(msg.message, 'user');
-                    this.addMessage(msg.response, 'ai');
-                });
-            }
-        } catch (e) {
-            console.log('No history or error loading');
-        }
-    }
-
     bindEvents() {
+        const sendBtn = this.element.querySelector('#send-message');
         const input = this.element.querySelector('#chat-input');
-        const sendBtn = this.element.querySelector('#send-btn');
-
-        const sendMessage = () => {
-            const text = input.value.trim();
-            if (!text) return;
-
-            this.addMessage(text, 'user');
-            input.value = '';
-
-            this.getAIResponse(text);
-        };
-
-        sendBtn.addEventListener('click', sendMessage);
+        
+        sendBtn.addEventListener('click', () => this.sendMessage());
+        
         input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
         });
     }
 
-    addMessage(text, sender) {
+    async sendMessage() {
+        const input = this.element.querySelector('#chat-input');
+        const context = this.element.querySelector('#mentor-context').value;
+        const message = input.value.trim();
+        
+        if (!message) return;
+        
+        // Add user message to UI
+        this.addMessage(message, 'user');
+        input.value = '';
+        
+        showLoading(true, 'AI is thinking...');
+        
+        try {
+            const response = await api.sendChatMessage(message, context);
+            
+            if (response && response.response) {
+                // Fixed: Use string replacement instead of regex to avoid syntax errors
+                const formattedResponse = response.response.split('\n').join('<br>');
+                this.addMessage(formattedResponse, 'assistant', true);
+            } else {
+                this.addMessage('Sorry, I could not process your request. Please try again.', 'assistant');
+            }
+            
+            // Refresh history
+            this.loadChatHistory();
+            
+        } catch (error) {
+            console.error('Chat error:', error);
+            this.addMessage('Sorry, there was an error processing your message. Please try again.', 'assistant');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    addMessage(content, type, isHTML = false) {
         const container = this.element.querySelector('#chat-messages');
-        const div = document.createElement('div');
-        div.className = `message ${sender}`;
-
-        const isUser = sender === 'user';
-        div.innerHTML = `
-            <div class="message-avatar ${isUser ? 'user' : ''}">
-                ${isUser 
-                    ? (store.getState().user?.full_name?.charAt(0) || 'U').toUpperCase()
-                    : '<i class="fas fa-robot"></i>'
-                }
-            </div>
-            <div class="message-content">
-                <p>${this.escapeHtml(text)}</p>
-            </div>
-        `;
-
-        container.appendChild(div);
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        
+        if (type === 'user') {
+            const { user } = store.getState();
+            avatar.textContent = (user?.full_name || user?.email || 'U').charAt(0).toUpperCase();
+        } else {
+            avatar.innerHTML = '<i class="fas fa-robot"></i>';
+        }
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        if (isHTML) {
+            contentDiv.innerHTML = content;
+        } else {
+            // Fixed: Use textContent for plain text to avoid XSS, then convert newlines
+            contentDiv.textContent = content;
+            contentDiv.innerHTML = contentDiv.innerHTML.split('\n').join('<br>');
+        }
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentDiv);
+        container.appendChild(messageDiv);
+        
+        // Scroll to bottom
         container.scrollTop = container.scrollHeight;
     }
 
-    async getAIResponse(message) {
-        const context = this.element.querySelector('#chat-context').value;
-
-        showLoading(true, 'AI is thinking...');
-
+    async loadChatHistory() {
         try {
-            const result = await api.sendChatMessage(message, context);
-            this.addMessage(result.response, 'ai');
+            const history = await api.getChatHistory(10);
+            const historyContainer = this.element.querySelector('#chat-history');
+            
+            if (history && history.history && history.history.length > 0) {
+                historyContainer.innerHTML = history.history.map(item => `
+                    <div class="history-item">
+                        <div class="history-message">${this.escapeHtml(item.message)}</div>
+                        <div class="history-time">${new Date(item.created_at).toLocaleString()}</div>
+                    </div>
+                `).join('');
+            } else {
+                historyContainer.innerHTML = '<p class="text-secondary">No recent conversations</p>';
+            }
         } catch (error) {
-            this.addMessage('Sorry, I encountered an error. Please try again.', 'ai');
-        } finally {
-            showLoading(false);
+            console.error('Failed to load chat history:', error);
         }
     }
 
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML.replace(/
-/g, '<br>');
+        return div.innerHTML;
     }
 }

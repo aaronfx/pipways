@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Production v3.0
-Features: Performance Analyzer, Rich Content, Media Upload, SEO, Enhanced Admin
+Pipways Trading Platform API - Production v3.1
+Fixes: Token refresh, LMS endpoints, Media upload, Enhanced blog editor
 """
 
 import os
@@ -12,6 +12,8 @@ import logging
 import base64
 import json
 import uuid
+import cloudinary
+import cloudinary.uploader
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
@@ -41,6 +43,8 @@ class Settings:
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    
+    # Cloudinary Config
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
     CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
@@ -59,6 +63,14 @@ class Settings:
 
 settings = Settings()
 
+# Configure Cloudinary
+if settings.CLOUDINARY_CLOUD_NAME:
+    cloudinary.config(
+        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+        api_key=settings.CLOUDINARY_API_KEY,
+        api_secret=settings.CLOUDINARY_API_SECRET
+    )
+
 # Database pool
 db_pool: Optional[asyncpg.Pool] = None
 
@@ -76,7 +88,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.1.0", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -137,20 +149,6 @@ class BlogPostCreate(BaseModel):
     tags: Optional[List[str]] = []
     category: Optional[str] = None
 
-class BlogPostUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    excerpt: Optional[str] = None
-    is_premium: Optional[bool] = None
-    status: Optional[str] = None
-    scheduled_at: Optional[datetime] = None
-    meta_title: Optional[str] = None
-    meta_description: Optional[str] = None
-    slug: Optional[str] = None
-    featured_image: Optional[str] = None
-    tags: Optional[List[str]] = None
-    category: Optional[str] = None
-
 class WebinarCreate(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -178,6 +176,7 @@ class CourseCreate(BaseModel):
     level: str = Field(default="beginner", pattern="^(beginner|intermediate|advanced)$")
     duration_hours: Optional[float] = None
     thumbnail: Optional[str] = None
+    modules: Optional[List[Dict]] = None
 
 class PerformanceAnalysisRequest(BaseModel):
     trades: List[Dict[str, Any]]
@@ -270,7 +269,7 @@ async def init_db():
             )
         """)
 
-        # Enhanced courses
+        # Enhanced courses with modules support
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -284,6 +283,20 @@ async def init_db():
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Course modules for LMS
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS course_modules (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                content TEXT,
+                video_url VARCHAR(500),
+                sort_order INTEGER DEFAULT 0,
+                is_premium BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -395,6 +408,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             raise HTTPException(status_code=401, detail="Invalid token")
 
         if "role" in payload and "email" in payload:
+            # Check if token is expired
+            if datetime.utcnow().timestamp() > payload.get("exp", 0):
+                raise HTTPException(status_code=401, detail="Token expired")
             return payload
 
         async with db_pool.acquire() as conn:
@@ -493,7 +509,8 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
                 "subscription_tier": user.get("subscription_tier", "free")
             }
             new_access = create_access_token(token_data)
-            return {"access_token": new_access, "token_type": "bearer"}
+            new_refresh = create_refresh_token({"sub": str(user["id"])})
+            return {"access_token": new_access, "refresh_token": new_refresh, "token_type": "bearer"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except jwt.JWTError:
@@ -514,6 +531,8 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         total_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts") or 0
         draft_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'draft'") or 0
         scheduled_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'scheduled'") or 0
+        total_courses = await conn.fetchval("SELECT COUNT(*) FROM courses") or 0
+        total_webinars = await conn.fetchval("SELECT COUNT(*) FROM webinars") or 0
         
         return {
             "total_users": total_users,
@@ -524,7 +543,9 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "content_stats": {
                 "blog_posts": total_posts,
                 "drafts": draft_posts,
-                "scheduled": scheduled_posts
+                "scheduled": scheduled_posts,
+                "courses": total_courses,
+                "webinars": total_webinars
             }
         }
 
@@ -574,13 +595,26 @@ async def get_all_users(
 async def update_user_role(user_id: int, role: str = Query(...), admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         await conn.execute("UPDATE users SET role = $1 WHERE id = $2", role, user_id)
-        return {"message": "Role updated"}
+        return {"message": f"User role updated to {role}"}
 
 @app.delete("/admin/users/{user_id}")
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return {"message": "User deleted"}
+
+@app.post("/admin/users/{user_id}/toggle-subscription")
+async def toggle_subscription(
+    user_id: int,
+    tier: str = Query(...),
+    status: str = Query(...),
+    admin: dict = Depends(get_admin_user)
+):
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE users SET subscription_tier = $1, subscription_status = $2 WHERE id = $3
+        """, tier, status, user_id)
+        return {"message": "Subscription updated"}
 
 # Blog Management
 @app.get("/blog/posts")
@@ -659,32 +693,131 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
              
         return {"id": post_id, "slug": slug, "message": "Blog post created"}
 
-@app.put("/admin/blog/{post_id}")
-async def update_blog_post(post_id: int, post: BlogPostUpdate, admin: dict = Depends(get_admin_user)):
+@app.delete("/admin/blog/{post_id}")
+async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
-        # Build dynamic update query
-        updates = []
+        await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
+        return {"message": "Post deleted"}
+
+# Media Upload with Cloudinary
+@app.post("/admin/media/upload")
+async def upload_media(
+    file: UploadFile = File(...),
+    admin: dict = Depends(get_admin_user)
+):
+    try:
+        if not settings.CLOUDINARY_CLOUD_NAME:
+            # Local fallback
+            upload_dir = "uploads"
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            file_ext = file.filename.split(".")[-1]
+            unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+            file_path = os.path.join(upload_dir, unique_name)
+            
+            contents = await file.read()
+            with open(file_path, "wb") as f:
+                f.write(contents)
+            
+            admin_id = admin.get("id") or admin.get("sub")
+            async with db_pool.acquire() as conn:
+                media_id = await conn.fetchval("""
+                    INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id
+                """, file.filename, f"/uploads/{unique_name}", file_ext, len(contents), int(admin_id))
+                
+            return {
+                "id": media_id,
+                "url": f"/uploads/{unique_name}",
+                "filename": file.filename,
+                "size": len(contents)
+            }
+        
+        # Cloudinary upload
+        contents = await file.read()
+        result = cloudinary.uploader.upload(
+            contents,
+            folder="pipways",
+            resource_type="auto"
+        )
+        
+        admin_id = admin.get("id") or admin.get("sub")
+        async with db_pool.acquire() as conn:
+            media_id = await conn.fetchval("""
+                INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id
+            """, file.filename, result["secure_url"], result["resource_type"], result["bytes"], int(admin_id))
+            
+        return {
+            "id": media_id,
+            "url": result["secure_url"],
+            "filename": file.filename,
+            "size": result["bytes"]
+        }
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+# LMS - Courses with Modules
+@app.get("/courses")
+async def get_courses(
+    level: Optional[str] = Query(None),
+    limit: int = Query(20),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    async with db_pool.acquire() as conn:
+        query = "SELECT * FROM courses WHERE 1=1"
         params = []
         
-        if post.title is not None:
-            updates.append(f"title = ${len(params)+1}")
-            params.append(post.title)
-        if post.content is not None:
-            updates.append(f"content = ${len(params)+1}")
-            params.append(post.content)
-        if post.status is not None:
-            updates.append(f"status = ${len(params)+1}")
-            params.append(post.status)
-            if post.status == "published":
-                updates.append(f"published_at = NOW()")
-                
-        if not updates:
-            raise HTTPException(status_code=400, detail="No fields to update")
+        if level:
+            query += f" AND level = ${len(params)+1}"
+            params.append(level)
             
-        params.append(post_id)
-        query = f"UPDATE blog_posts SET {', '.join(updates)}, updated_at = NOW() WHERE id = ${len(params)}"
-        await conn.execute(query, *params)
-        return {"message": "Post updated"}
+        tier = current_user.get("subscription_tier", "free") if current_user else "free"
+        if tier == "free":
+            query += " AND is_premium = FALSE"
+            
+        query += " ORDER BY created_at DESC LIMIT ${len(params)+1}"
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
+        
+        # Get modules for each course
+        courses = []
+        for row in rows:
+            course = dict(row)
+            modules = await conn.fetch(
+                "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order",
+                course["id"]
+            )
+            course["modules"] = [dict(m) for m in modules]
+            courses.append(course)
+            
+        return courses
+
+@app.post("/admin/courses")
+async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
+        course_id = await conn.fetchval("""
+            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        """, course.title, course.description, course.content, course.level, 
+             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
+        
+        # Insert modules if provided
+        if course.modules:
+            for idx, module in enumerate(course.modules):
+                await conn.execute("""
+                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, course_id, module.get("title"), module.get("content"), 
+                     module.get("video_url"), idx, module.get("is_premium", False))
+        
+        return {"id": course_id, "message": "Course created"}
 
 # Webinars
 @app.get("/webinars")
@@ -721,43 +854,6 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
         """, webinar.title, webinar.description, webinar.scheduled_at, 
              webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, int(admin_id), webinar.max_participants)
         return {"id": webinar_id, "message": "Webinar created"}
-
-# Courses
-@app.get("/courses")
-async def get_courses(
-    level: Optional[str] = Query(None),
-    limit: int = Query(20),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
-):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM courses WHERE 1=1"
-        params = []
-        
-        if level:
-            query += f" AND level = ${len(params)+1}"
-            params.append(level)
-            
-        tier = current_user.get("subscription_tier", "free") if current_user else "free"
-        if tier == "free":
-            query += " AND is_premium = FALSE"
-            
-        query += " ORDER BY created_at DESC LIMIT ${len(params)+1}"
-        params.append(limit)
-        
-        rows = await conn.fetch(query, *params)
-        return [dict(row) for row in rows]
-
-@app.post("/admin/courses")
-async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        admin_id = admin.get("id") or admin.get("sub")
-        course_id = await conn.fetchval("""
-            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id
-        """, course.title, course.description, course.content, course.level, 
-             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
-        return {"id": course_id, "message": "Course created"}
 
 # Signals
 @app.get("/signals")
@@ -810,18 +906,12 @@ async def analyze_performance(
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
-        # Calculate basic metrics for context
         total_trades = len(request.trades)
         winning_trades = len([t for t in request.trades if t.get("pips", 0) > 0 or t.get("profit", 0) > 0])
         losing_trades = total_trades - winning_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
-        # Prepare comprehensive prompt
-        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology.
-
-Your task is to analyze a trader's performance data and provide a detailed professional evaluation of their trading behavior, strengths, weaknesses, and improvement strategies.
-
-Analyze the provided trade data carefully and return a structured JSON response."""
+        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology."""
 
         user_prompt = f"""Analyze the following trading performance data:
 
@@ -833,71 +923,7 @@ Calculated Win Rate: {win_rate:.1f}%
 Trade History:
 {json.dumps(request.trades, indent=2)}
 
-Provide analysis in this exact JSON structure:
-{{
-  "performance_summary": {{
-    "total_trades": number,
-    "winning_trades": number,
-    "losing_trades": number,
-    "win_rate": "string with %",
-    "net_pips": "string with +/-",
-    "avg_win": number,
-    "avg_loss": number,
-    "risk_reward_ratio": "string like 1:2",
-    "expectancy": "string description",
-    "profit_factor": number,
-    "max_drawdown": "string"
-  }},
-  "trader_score": number (1-100),
-  "strengths": ["list", "of", "strengths"],
-  "weaknesses": ["list", "of", "weaknesses"],
-  "behavior_patterns": [
-    "Pattern 1: description",
-    "Pattern 2: description"
-  ],
-  "strategy_quality": {{
-    "has_clear_strategy": boolean,
-    "entry_quality": "High/Medium/Low",
-    "exit_quality": "High/Medium/Low",
-    "risk_management_adherence": "Good/Fair/Poor",
-    "consistency": "High/Medium/Low"
-  }},
-  "risk_analysis": {{
-    "avg_risk_per_trade": "string",
-    "stop_loss_respect": "Good/Fair/Poor",
-    "position_sizing": "Consistent/Inconsistent/Dangerous",
-    "dangerous_habits": ["list", "or", "empty"]
-  }},
-  "psychological_analysis": {{
-    "fear_of_losing": "High/Medium/Low",
-    "fomo_level": "High/Medium/Low",
-    "discipline_level": "High/Medium/Low",
-    "emotional_trading_signs": ["list"]
-  }},
-  "top_mistakes": [
-    "Mistake 1",
-    "Mistake 2"
-  ],
-  "improvement_plan": {{
-    "immediate_actions": ["list"],
-    "strategy_improvements": ["list"],
-    "risk_management_fixes": ["list"],
-    "psychological_work": ["list"]
-  }},
-  "recommended_courses": [
-    "Specific Course Name 1",
-    "Specific Course Name 2"
-  ],
-  "mentor_advice": "Detailed paragraph of personalized advice"
-}}
-
-Rules:
-1. Be honest but constructive
-2. Base analysis ONLY on provided data
-3. If data is insufficient for a field, use "N/A" or empty array
-4. Trader score should reflect real performance, not encouragement
-5. Specific course recommendations must match actual weaknesses found
-6. Include specific examples from trades when possible"""
+Provide analysis in strict JSON format with fields: performance_summary, trader_score (1-100), strengths, weaknesses, behavior_patterns, top_mistakes, improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes), recommended_courses, mentor_advice."""
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -920,13 +946,11 @@ Rules:
             )
 
             if response.status_code != 200:
-                logger.error(f"OpenRouter error: {response.text}")
                 raise HTTPException(status_code=500, detail="AI analysis failed")
 
             result = response.json()
             ai_content = result["choices"][0]["message"]["content"]
             
-            # Parse JSON
             try:
                 cleaned = ai_content.strip()
                 if cleaned.startswith("```"):
@@ -937,7 +961,6 @@ Rules:
                 
                 analysis_data = json.loads(cleaned)
                 
-                # Save to database
                 user_id = current_user.get("id") or current_user.get("sub")
                 async with db_pool.acquire() as conn:
                     await conn.execute("""
@@ -952,35 +975,14 @@ Rules:
                     "trades_analyzed": total_trades
                 }
                 
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parse error: {e}")
-                return {
-                    "raw_analysis": ai_content,
-                    "error": "Failed to parse structured data",
-                    "timestamp": datetime.utcnow().isoformat()
-                }
+            except json.JSONDecodeError:
+                return {"raw_analysis": ai_content, "error": "Parse error"}
 
     except Exception as e:
         logger.error(f"Performance analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/analyze/performance/history")
-async def get_performance_history(
-    limit: int = Query(10),
-    current_user: dict = Depends(get_current_user)
-):
-    async with db_pool.acquire() as conn:
-        user_id = current_user.get("id") or current_user.get("sub")
-        rows = await conn.fetch("""
-            SELECT id, analysis_data, trader_score, created_at 
-            FROM performance_analyses 
-            WHERE user_id = $1 
-            ORDER BY created_at DESC 
-            LIMIT $2
-        """, int(user_id), limit)
-        return [dict(row) for row in rows]
-
-# Chart Analysis (existing enhanced)
+# Chart Analysis
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -999,26 +1001,8 @@ async def analyze_chart(
 
         image_base64 = base64.b64encode(contents).decode()
 
-        prompt = f"""You are an expert forex/crypto technical analyst. Analyze this {pair} chart on {timeframe} timeframe.
-
-Context: {additional_info}
-
-Provide analysis in this exact JSON structure:
-{{
-  "summary": "Brief technical overview",
-  "signal": "BUY or SELL or NO TRADE",
-  "entry_zone": "Specific price range",
-  "stop_loss": "Exact price level",
-  "take_profit": ["TP1", "TP2"],
-  "risk_reward": "1:3",
-  "confidence": "75%",
-  "market_structure": "Bullish/Bearish explanation",
-  "support_resistance": {{
-    "support": ["S1", "S2"],
-    "resistance": ["R1", "R2"]
-  }},
-  "key_observations": "Specific patterns"
-}}"""
+        prompt = f"""Analyze this {pair} chart on {timeframe}. Context: {additional_info}
+Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance (object with support/resistance arrays), key_observations."""
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -1068,21 +1052,21 @@ Provide analysis in this exact JSON structure:
 
 📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
 🛑 STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
-🎯 TAKE PROFIT 1: {analysis_data.get('take_profit', ['N/A'])[0]}
-🎯 TAKE PROFIT 2: {analysis_data.get('take_profit', ['N/A', 'N/A'])[1] if len(analysis_data.get('take_profit', [])) > 1 else 'N/A'}
+🎯 TAKE PROFITS: {', '.join(analysis_data.get('take_profit', []))}
 ⚖️ RISK/REWARD: {analysis_data.get('risk_reward', 'N/A')}
 🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
 
 📝 SUMMARY:
-{analysis_data.get('summary', 'No summary provided')}
+{analysis_data.get('summary', 'No summary')}
 
 🏗️ MARKET STRUCTURE:
 {analysis_data.get('market_structure', 'N/A')}
 
-📊 SUPPORT LEVELS: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
-📈 RESISTANCE LEVELS: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
+📊 SUPPORT/RESISTANCE:
+Support: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
+Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
 
-🔍 KEY OBSERVATIONS:
+🔍 OBSERVATIONS:
 {analysis_data.get('key_observations', 'None')}"""
 
                 return {
@@ -1098,57 +1082,13 @@ Provide analysis in this exact JSON structure:
                     "analysis": ai_response,
                     "image_base64": image_base64,
                     "pair": pair,
-                    "timeframe": timeframe,
-                    "parse_warning": "AI returned unstructured data"
+                    "timeframe": timeframe
                 }
                 
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Media Upload Endpoint
-@app.post("/admin/media/upload")
-async def upload_media(
-    file: UploadFile = File(...),
-    admin: dict = Depends(get_admin_user)
-):
-    try:
-        # In production, integrate with Cloudinary or AWS S3
-        # For now, save locally and return path
-        upload_dir = "uploads"
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        file_ext = file.filename.split(".")[-1]
-        unique_name = f"{uuid.uuid4().hex}.{file_ext}"
-        file_path = os.path.join(upload_dir, unique_name)
-        
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
-        
-        # Save to database
-        admin_id = admin.get("id") or admin.get("sub")
-        async with db_pool.acquire() as conn:
-            media_id = await conn.fetchval("""
-                INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING id
-            """, file.filename, f"/uploads/{unique_name}", file_ext, len(contents), int(admin_id))
-            
-        return {
-            "id": media_id,
-            "url": f"/uploads/{unique_name}",
-            "filename": file.filename,
-            "size": len(contents)
-        }
-    except Exception as e:
-        logger.error(f"Upload error: {e}")
-        raise HTTPException(status_code=500, detail="Upload failed")
-
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "3.0.0", "timestamp": datetime.utcnow().isoformat()}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=10000)
+    return {"status": "healthy", "version": "3.1.0", "timestamp": datetime.utcnow().isoformat()}

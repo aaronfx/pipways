@@ -83,7 +83,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     full_name: str = Field(..., min_length=2, max_length=100)
-    
+
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
@@ -115,7 +115,7 @@ class PasswordResetRequest(BaseModel):
 class PasswordReset(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
-    
+
     @field_validator('new_password')
     @classmethod
     def validate_password(cls, v: str) -> str:
@@ -186,7 +186,7 @@ async def init_db():
                 reset_token_expires TIMESTAMP
             )
         """)
-        
+
         # Signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
@@ -207,7 +207,7 @@ async def init_db():
                 closed_at TIMESTAMP
             )
         """)
-        
+
         # Blog posts
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
@@ -221,7 +221,7 @@ async def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Webinars
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
@@ -236,7 +236,7 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Courses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
@@ -250,7 +250,7 @@ async def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Chat history
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
@@ -262,7 +262,7 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # Create default admin
         try:
             admin_exists = await conn.fetchval("SELECT id FROM users WHERE email = $1", settings.ADMIN_EMAIL)
@@ -310,6 +310,10 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         user_id = payload.get("sub")
         if not user_id:
             return None
+        # Return payload directly if it contains user data (enriched token)
+        if "role" in payload:
+            return payload
+        # Otherwise fetch from DB
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             return dict(user) if user else None
@@ -328,6 +332,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
+
+        # If token has all user data, return it directly
+        if "role" in payload and "email" in payload:
+            return payload
+
+        # Otherwise fetch from DB
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             if not user:
@@ -350,17 +360,25 @@ async def register(user_data: UserRegister):
         existing = await conn.fetchval("SELECT id FROM users WHERE email = $1", user_data.email)
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
-        
+
         hashed_pw = get_password_hash(user_data.password)
         user_id = await conn.fetchval("""
             INSERT INTO users (email, password_hash, full_name, subscription_tier, subscription_status)
             VALUES ($1, $2, $3, 'free', 'active')
             RETURNING id
         """, user_data.email, hashed_pw, user_data.full_name)
-        
-        access_token = create_access_token({"sub": str(user_id)})
+
+        # FIXED: Enrich token with user data
+        token_data = {
+            "sub": str(user_id),
+            "email": user_data.email,
+            "full_name": user_data.full_name,
+            "role": "user",
+            "subscription_tier": "free"
+        }
+        access_token = create_access_token(token_data)
         refresh_token = create_refresh_token({"sub": str(user_id)})
-        
+
         user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
         return {
             "access_token": access_token,
@@ -374,12 +392,20 @@ async def login(credentials: UserLogin):
         user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", credentials.email)
         if not user or not verify_password(credentials.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid credentials")
-        
+
         await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
-        
-        access_token = create_access_token({"sub": str(user["id"])})
+
+        # FIXED: Enrich token with complete user data
+        token_data = {
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "full_name": user["full_name"],
+            "role": user["role"],
+            "subscription_tier": user["subscription_tier"]
+        }
+        access_token = create_access_token(token_data)
         refresh_token = create_refresh_token({"sub": str(user["id"])})
-        
+
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -394,19 +420,33 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
         payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        
+
         user_id = payload.get("sub")
         async with db_pool.acquire() as conn:
             user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
             if not user:
                 raise HTTPException(status_code=401, detail="User not found")
-            
-            new_access = create_access_token({"sub": str(user_id)})
+
+            # FIXED: Enrich new access token with user data
+            token_data = {
+                "sub": str(user["id"]),
+                "email": user["email"],
+                "full_name": user["full_name"],
+                "role": user["role"],
+                "subscription_tier": user["subscription_tier"]
+            }
+            new_access = create_access_token(token_data)
             return {"access_token": new_access, "token_type": "bearer"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+# NEW: Get current user endpoint
+@app.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user details"""
+    return current_user
 
 @app.post("/auth/forgot-password")
 async def forgot_password(request: PasswordResetRequest):
@@ -414,17 +454,17 @@ async def forgot_password(request: PasswordResetRequest):
         user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", request.email)
         if not user:
             return {"message": "If email exists, reset link sent"}
-        
+
         reset_token = create_reset_token()
         expires = datetime.utcnow() + timedelta(hours=settings.RESET_TOKEN_EXPIRE_HOURS)
-        
+
         await conn.execute("""
             UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3
         """, reset_token, expires, user["id"])
-        
+
         reset_url = f"https://pipways-web-nhem.onrender.com?reset_token={reset_token}"
         logger.info(f"Password reset URL for {request.email}: {reset_url}")
-        
+
         return {"message": "If email exists, reset link sent"}
 
 @app.post("/auth/reset-password")
@@ -434,17 +474,17 @@ async def reset_password(reset_data: PasswordReset):
             SELECT * FROM users 
             WHERE reset_token = $1 AND reset_token_expires > NOW()
         """, reset_data.token)
-        
+
         if not user:
             raise HTTPException(status_code=400, detail="Invalid or expired token")
-        
+
         hashed_pw = get_password_hash(reset_data.new_password)
         await conn.execute("""
             UPDATE users 
             SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL, updated_at = NOW()
             WHERE id = $2
         """, hashed_pw, user["id"])
-        
+
         return {"message": "Password reset successful"}
 
 @app.post("/auth/logout")
@@ -463,18 +503,18 @@ async def get_all_users(
     async with db_pool.acquire() as conn:
         where_clauses = ["1=1"]
         params = []
-        
+
         if search:
             where_clauses.append(f"(email ILIKE ${len(params)+1} OR full_name ILIKE ${len(params)+1})")
             params.append(f"%{search}%")
-        
+
         if role:
             where_clauses.append(f"role = ${len(params)+1}")
             params.append(role)
-        
+
         count_query = f"SELECT COUNT(*) FROM users WHERE {' AND '.join(where_clauses)}"
         total = await conn.fetchval(count_query, *params)
-        
+
         offset = (page - 1) * limit
         query = f"""
             SELECT id, email, full_name, role, subscription_tier, subscription_status,
@@ -485,7 +525,7 @@ async def get_all_users(
             LIMIT ${len(params)+1} OFFSET ${len(params)+2}
         """
         params.extend([limit, offset])
-        
+
         rows = await conn.fetch(query, *params)
         return {
             "users": [dict(row) for row in rows],
@@ -502,12 +542,12 @@ async def update_user_role(
 ):
     if int(admin["id"]) == user_id and role != "admin":
         raise HTTPException(status_code=400, detail="Cannot demote yourself")
-    
+
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         await conn.execute(
             "UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2",
             role, user_id
@@ -518,7 +558,7 @@ async def update_user_role(
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
     if int(admin["id"]) == user_id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
-    
+
     async with db_pool.acquire() as conn:
         result = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         if result == "DELETE 0":
@@ -536,13 +576,13 @@ async def toggle_subscription(
         user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         await conn.execute("""
             UPDATE users 
             SET subscription_tier = $1, subscription_status = $2, updated_at = NOW()
             WHERE id = $3
         """, tier, status, user_id)
-        
+
         return {"message": f"Subscription updated to {tier} ({status})"}
 
 @app.get("/admin/stats")
@@ -552,7 +592,7 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         total_signals = await conn.fetchval("SELECT COUNT(*) FROM signals") or 0
         active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'") or 0
         premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')") or 0
-        
+
         return {
             "total_users": total_users,
             "total_signals": total_signals,
@@ -573,22 +613,22 @@ async def get_signals(
         async with db_pool.acquire() as conn:
             query = "SELECT * FROM signals WHERE 1=1"
             params = []
-            
+
             if status:
                 query += f" AND status = ${len(params)+1}"
                 params.append(status)
             if pair:
                 query += f" AND pair ILIKE ${len(params)+1}"
                 params.append(f"%{pair}%")
-            
+
             # Filter premium signals for non-premium users
             if not current_user or current_user.get("subscription_tier") == "free":
                 query += " AND is_premium = FALSE"
-            
+
             query += " ORDER BY created_at DESC"
             query += f" LIMIT ${len(params)+1}"
             params.append(limit)
-            
+
             rows = await conn.fetch(query, *params)
             return [dict(row) for row in rows]
     except Exception as e:
@@ -604,7 +644,7 @@ async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_us
             RETURNING id
         """, signal.pair, signal.direction, signal.entry_price, signal.stop_loss,
              signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, admin["id"])
-        
+
         return {"id": signal_id, "message": "Signal created successfully"}
 
 @app.put("/signals/{signal_id}/close")
@@ -621,7 +661,7 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# AI Analysis
+# AI Analysis - FIXED: Better error handling and timeout
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -632,14 +672,14 @@ async def analyze_chart(
 ):
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
-    
+
     try:
         contents = await file.read()
         if len(contents) > 10 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="File too large")
-        
+
         image_base64 = base64.b64encode(contents).decode()
-        
+
         prompt = f"""Analyze this forex/crypto chart for {pair} on {timeframe} timeframe.
 Additional context: {additional_info}
 
@@ -650,12 +690,14 @@ Provide analysis in this format:
 - Entry Suggestion (if any)
 - Risk Management advice
 - Confidence Level (1-10)"""
-        
-        async with httpx.AsyncClient() as client:
+
+        # FIXED: Proper timeout handling and error logging
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
                     "HTTP-Referer": "https://pipways.com",
                     "X-Title": "Pipways AI Analysis"
                 },
@@ -669,18 +711,18 @@ Provide analysis in this format:
                                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
                             ]
                         }
-                    ]
-                },
-                timeout=60.0
+                    ],
+                    "max_tokens": 1000
+                }
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"OpenRouter error: {response.text}")
-                raise HTTPException(status_code=500, detail="AI service error")
-            
+                raise HTTPException(status_code=500, detail=f"AI service error: {response.status_code}")
+
             result = response.json()
             analysis = result["choices"][0]["message"]["content"]
-            
+
             return {
                 "analysis": analysis,
                 "pair": pair,
@@ -693,22 +735,16 @@ Provide analysis in this format:
         logger.error(f"AI Analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# AI Mentor - FIXED: Better error handling and request structure
 @app.post("/mentor/chat")
 async def mentor_chat(
-    request: Request,
+    request: MentorChatRequest,
     current_user: dict = Depends(get_current_user)
 ):
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
-    
+
     try:
-        body = await request.json()
-        message = body.get("message", "")
-        context = body.get("context", "Forex trading")
-        
-        if not message:
-            raise HTTPException(status_code=422, detail="Message is required")
-        
         async with db_pool.acquire() as conn:
             history = await conn.fetch("""
                 SELECT message, response FROM chat_history 
@@ -716,45 +752,48 @@ async def mentor_chat(
                 ORDER BY created_at DESC 
                 LIMIT 5
             """, current_user["id"])
-            
-            messages = []
+
+            messages = [{"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."}]
+
+            # Add history in correct order (oldest first)
             for row in reversed(history):
-                messages.extend([
-                    {"role": "user", "content": row["message"]},
-                    {"role": "assistant", "content": row["response"]}
-                ])
-            
+                messages.append({"role": "user", "content": row["message"]})
+                messages.append({"role": "assistant", "content": row["response"]})
+
             messages.append({
                 "role": "user",
-                "content": f"{message}\n\nContext: {context}"
+                "content": f"{request.message}\n\nContext: {request.context}"
             })
-            
-            async with httpx.AsyncClient() as client:
+
+            # FIXED: Proper timeout and error handling
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={
                         "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
                         "HTTP-Referer": "https://pipways.com",
                         "X-Title": "Pipways AI Mentor"
                     },
                     json={
                         "model": settings.OPENROUTER_MODEL,
-                        "messages": [
-                            {"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."},
-                            *messages
-                        ]
-                    },
-                    timeout=30.0
+                        "messages": messages,
+                        "max_tokens": 1000
+                    }
                 )
-                
+
+                if response.status_code != 200:
+                    logger.error(f"OpenRouter mentor error: {response.text}")
+                    raise HTTPException(status_code=500, detail=f"AI service error: {response.status_code}")
+
                 result = response.json()
                 ai_response = result["choices"][0]["message"]["content"]
-                
+
                 await conn.execute("""
                     INSERT INTO chat_history (user_id, message, response, context)
                     VALUES ($1, $2, $3, $4)
-                """, current_user["id"], message, ai_response, context)
-                
+                """, current_user["id"], request.message, ai_response, request.context)
+
                 return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
     except HTTPException:
         raise
@@ -774,7 +813,7 @@ async def get_blog_posts(
             if not current_user or current_user.get("subscription_tier") == "free":
                 query += " WHERE is_premium = FALSE"
             query += " ORDER BY created_at DESC LIMIT $1"
-            
+
             rows = await conn.fetch(query, limit)
             return [dict(row) for row in rows]
     except Exception as e:
@@ -799,7 +838,7 @@ async def get_webinars(current_user: Optional[dict] = Depends(get_current_user_o
             if not current_user or current_user.get("subscription_tier") == "free":
                 query += " AND is_premium = FALSE"
             query += " ORDER BY scheduled_at ASC"
-            
+
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
     except Exception as e:
@@ -825,7 +864,7 @@ async def get_courses(current_user: Optional[dict] = Depends(get_current_user_op
             if not current_user or current_user.get("subscription_tier") == "free":
                 query += " WHERE is_premium = FALSE"
             query += " ORDER BY created_at DESC"
-            
+
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
     except Exception as e:

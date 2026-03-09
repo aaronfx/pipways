@@ -82,8 +82,8 @@ export class MentorPage extends Component {
         
         container.appendChild(main);
         
-        // Load chat history after render
-        this.loadChatHistory();
+        // CRITICAL FIX: Set this.element so other methods can use it
+        this.element = container;
         
         return container;
     }
@@ -100,6 +100,9 @@ export class MentorPage extends Component {
                 this.sendMessage();
             }
         });
+        
+        // CRITICAL FIX: Load history here after element is set, not in render()
+        this.loadChatHistory();
     }
 
     async sendMessage() {
@@ -173,9 +176,17 @@ export class MentorPage extends Component {
     }
 
     async loadChatHistory() {
+        // Safety check - ensure element exists
+        if (!this.element) {
+            console.warn('Cannot load chat history - element not ready');
+            return;
+        }
+        
         try {
             const history = await api.getChatHistory(10);
             const historyContainer = this.element.querySelector('#chat-history');
+            
+            if (!historyContainer) return;
             
             if (history && history.history && history.history.length > 0) {
                 historyContainer.innerHTML = history.history.map(item => `

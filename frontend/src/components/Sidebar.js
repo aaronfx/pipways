@@ -1,7 +1,6 @@
-
-import { Component } from './Component.js';
-import { store } from '../state.js';
-import { router } from '../router.js';
+import { Component } from '/src/components/Component.js';
+import { store } from '/src/state.js';
+import { router } from '/src/router.js';
 
 export class Sidebar extends Component {
     render() {
@@ -16,7 +15,7 @@ export class Sidebar extends Component {
                         <span>Pipways Pro</span>
                     </div>
                 </div>
-
+                
                 <nav class="sidebar-nav">
                     ${this.renderNavItem('/', 'fa-home', 'Dashboard')}
                     ${this.renderNavItem('/signals', 'fa-satellite-dish', 'Signals')}

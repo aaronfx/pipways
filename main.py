@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Emergency Fix
-Fixes: Database role column, OpenRouter model compatibility
+Pipways Trading Platform API - Production Fix
+Fixes: Professional AI prompts, structured analysis, error handling
 """
 
 import os
@@ -41,7 +41,7 @@ class Settings:
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-    # FIXED: Use more reliable default models
+    # FIXED: Use reliable vision-capable models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
@@ -67,11 +67,12 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
+        raise
     yield
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="2.0.2", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="2.1.0", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -87,7 +88,7 @@ app.add_middleware(
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Models
+# Models (unchanged)
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -174,7 +175,7 @@ class MentorChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
 
-# Database initialization - FIXED with proper column addition
+# Database initialization (unchanged)
 async def init_db():
     async with db_pool.acquire() as conn:
         # Check if users table exists
@@ -186,7 +187,7 @@ async def init_db():
         """)
 
         if table_exists:
-            # FIXED: Check if role column exists, add if not
+            # Check if role column exists, add if not
             role_column_exists = await conn.fetchval("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.columns 
@@ -224,7 +225,7 @@ async def init_db():
             )
         """)
 
-        # Create other tables...
+        # Create signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -245,6 +246,7 @@ async def init_db():
             )
         """)
 
+        # Create blog_posts table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -258,6 +260,7 @@ async def init_db():
             )
         """)
 
+        # Create webinars table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -272,6 +275,7 @@ async def init_db():
             )
         """)
 
+        # Create courses table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -285,6 +289,7 @@ async def init_db():
             )
         """)
 
+        # Create chat_history table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -314,7 +319,7 @@ async def init_db():
         except Exception as e:
             logger.error(f"Error creating admin: {e}")
 
-# Auth utilities
+# Auth utilities (unchanged)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
@@ -386,7 +391,7 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
-# Auth endpoints
+# Auth endpoints (unchanged)
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     async with db_pool.acquire() as conn:
@@ -519,7 +524,7 @@ async def reset_password(reset_data: PasswordReset):
 async def logout(current_user: dict = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
 
-# Admin endpoints
+# Admin endpoints (unchanged)
 @app.get("/admin/users")
 async def get_all_users(
     search: Optional[str] = Query(None),
@@ -631,7 +636,7 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
-# Signals
+# Signals (unchanged)
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
@@ -692,7 +697,9 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# AI Analysis - FIXED with better error handling and model fallback
+# ==========================================
+# FIXED: Enhanced AI Analysis with Professional Trading Format
+# ==========================================
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -711,16 +718,34 @@ async def analyze_chart(
 
         image_base64 = base64.b64encode(contents).decode()
 
-        prompt = f"""Analyze this forex/crypto chart for {pair} on {timeframe} timeframe.
-Additional context: {additional_info}
+        # ENHANCED PROMPT: Professional structured analysis format
+        prompt = f"""You are an expert forex/crypto technical analyst. Analyze this {pair} chart on {timeframe} timeframe.
 
-Provide analysis in this format:
-- Trend Direction (Bullish/Bearish/Neutral)
-- Key Support Levels
-- Key Resistance Levels
-- Entry Suggestion (if any)
-- Risk Management advice
-- Confidence Level (1-10)"""
+Context provided by user: {additional_info}
+
+Provide your analysis in this exact JSON structure:
+{{
+  "summary": "Brief technical overview of market structure and key levels",
+  "signal": "BUY or SELL or NO TRADE",
+  "entry_zone": "Specific price range (e.g., 1.0850-1.0860)",
+  "stop_loss": "Exact price level",
+  "take_profit": ["TP1 price", "TP2 price"],
+  "risk_reward": "Ratio like 1:3",
+  "confidence": "Percentage like 75%",
+  "market_structure": "Bullish/Bearish/Consolidation with explanation",
+  "support_resistance": {{
+    "support": ["S1 price", "S2 price"],
+    "resistance": ["R1 price", "R2 price"]
+  }},
+  "key_observations": "Specific patterns, candlestick formations, or indicator signals visible"
+}}
+
+Rules:
+1. Be specific with price levels visible in the chart
+2. Calculate realistic risk/reward based on visible price action
+3. If no clear setup, return signal as "NO TRADE" with explanation
+4. Confidence should reflect chart clarity (don't always say 90%)
+5. Ensure valid JSON format - no markdown, no extra text outside JSON"""
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -742,34 +767,87 @@ Provide analysis in this format:
                             ]
                         }
                     ],
-                    "max_tokens": 1000
+                    "max_tokens": 1500,
+                    "temperature": 0.3  # Lower temperature for more consistent formatting
                 }
             )
 
             if response.status_code == 404:
                 logger.error(f"OpenRouter model not found: {settings.OPENROUTER_VISION_MODEL}")
-                raise HTTPException(status_code=503, detail=f"AI model not available. Try using 'anthropic/claude-3.5-sonnet' or 'gpt-4o' instead of '{settings.OPENROUTER_VISION_MODEL}'")
+                raise HTTPException(status_code=503, detail="AI vision model not available")
 
             if response.status_code != 200:
                 logger.error(f"OpenRouter error: {response.text}")
                 raise HTTPException(status_code=500, detail=f"AI service error: {response.status_code}")
 
             result = response.json()
-            analysis = result["choices"][0]["message"]["content"]
+            ai_response = result["choices"][0]["message"]["content"]
+            
+            # Parse and format the structured response
+            try:
+                # Clean response - remove markdown code blocks
+                cleaned = ai_response.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                    cleaned = cleaned.strip()
+                
+                analysis_data = json.loads(cleaned)
+                
+                # Format as professional text report for frontend display
+                formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 
-            return {
-                "analysis": analysis,
-                "pair": pair,
-                "timeframe": timeframe,
-                "timestamp": datetime.utcnow().isoformat()
-            }
+🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
+🛑 STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
+🎯 TAKE PROFIT 1: {analysis_data.get('take_profit', ['N/A'])[0]}
+🎯 TAKE PROFIT 2: {analysis_data.get('take_profit', ['N/A', 'N/A'])[1] if len(analysis_data.get('take_profit', [])) > 1 else 'N/A'}
+⚖️ RISK/REWARD: {analysis_data.get('risk_reward', 'N/A')}
+🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
+
+📝 SUMMARY:
+{analysis_data.get('summary', 'No summary provided')}
+
+🏗️ MARKET STRUCTURE:
+{analysis_data.get('market_structure', 'N/A')}
+
+📊 SUPPORT LEVELS: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
+📈 RESISTANCE LEVELS: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
+
+🔍 KEY OBSERVATIONS:
+{analysis_data.get('key_observations', 'None')}"""
+
+                return {
+                    "analysis": formatted_report,
+                    "structured_data": analysis_data,  # Include raw data for potential frontend use
+                    "pair": pair,
+                    "timeframe": timeframe,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.error(f"Failed to parse AI JSON response: {e}")
+                # Fallback: return raw response formatted nicely
+                return {
+                    "analysis": ai_response,
+                    "pair": pair,
+                    "timeframe": timeframe,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "parse_warning": "AI returned unstructured data"
+                }
+                
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"AI Analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# AI Mentor
+# ==========================================
+# FIXED: Enhanced AI Mentor with Professional Persona
+# ==========================================
 @app.post("/mentor/chat")
 async def mentor_chat(
     request: MentorChatRequest,
@@ -788,7 +866,36 @@ async def mentor_chat(
                 LIMIT 5
             """, int(user_id))
 
-            messages = [{"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."}]
+            # ENHANCED SYSTEM PROMPT: Professional Trading Mentor
+            system_prompt = """You are a professional forex and crypto trading mentor with 15+ years of experience trading institutional and retail accounts. Your expertise includes technical analysis, risk management, trading psychology, and strategy development.
+
+CORE PRINCIPLES:
+1. RISK MANAGEMENT FIRST: Always emphasize position sizing (1-2% risk per trade), stop losses, and capital preservation
+2. PSYCHOLOGY MATTERS: Address emotional control, discipline, patience, and the mental aspects of trading when relevant
+3. ACTIONABLE ADVICE: Give specific, practical guidance rather than vague suggestions. Include concrete examples.
+4. REALISTIC EXPECTATIONS: Warn against get-rich-quick thinking. Emphasize consistency over big wins.
+5. CONTEXT-AWARE: Adapt advice based on whether the trader is beginner, intermediate, or advanced based on their questions.
+
+WHEN DISCUSSING STRATEGIES:
+- Explain the logic behind the strategy (why it works)
+- Include specific entry/exit rules
+- Warn about market conditions where it fails
+- Suggest optimal timeframes and pairs
+
+WHEN REVIEWING TRADES/IDEAS:
+- Ask for chart context if not provided
+- Point out logical flaws in the setup
+- Suggest improvements to risk management
+- Comment on risk/reward ratio
+
+WHEN DISCUSSING PSYCHOLOGY:
+- Share techniques for managing FOMO, revenge trading, and overtrading
+- Explain the importance of trading plans and journals
+- Discuss drawdown recovery strategies
+
+Tone: Professional, encouraging but firm on risk management, patient with beginners, challenging for experienced traders to think deeper. Never promise profits."""
+
+            messages = [{"role": "system", "content": system_prompt}]
 
             for row in reversed(history):
                 messages.append({"role": "user", "content": row["message"]})
@@ -796,7 +903,7 @@ async def mentor_chat(
 
             messages.append({
                 "role": "user",
-                "content": f"{request.message}\n\nContext: {request.context}"
+                "content": f"Question: {request.message}\nAdditional Context: {request.context}\n\nPlease provide professional trading mentorship on this topic."
             })
 
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -811,13 +918,14 @@ async def mentor_chat(
                     json={
                         "model": settings.OPENROUTER_MODEL,
                         "messages": messages,
-                        "max_tokens": 1000
+                        "max_tokens": 1200,
+                        "temperature": 0.7
                     }
                 )
 
                 if response.status_code == 404:
                     logger.error(f"OpenRouter model not found: {settings.OPENROUTER_MODEL}")
-                    raise HTTPException(status_code=503, detail=f"AI model not available. Try using 'anthropic/claude-3.5-sonnet' instead of '{settings.OPENROUTER_MODEL}'")
+                    raise HTTPException(status_code=503, detail="AI mentor model not available")
 
                 if response.status_code != 200:
                     logger.error(f"OpenRouter mentor error: {response.text}")
@@ -838,25 +946,44 @@ async def mentor_chat(
         logger.error(f"Mentor chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Content Management
+# ==========================================
+# FIXED: Content Endpoints with Enhanced Error Handling
+# ==========================================
 @app.get("/blog/posts")
 async def get_blog_posts(
     limit: int = Query(10, le=50),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     try:
+        if not db_pool:
+            raise HTTPException(status_code=503, detail="Database not initialized")
+            
         async with db_pool.acquire() as conn:
-            query = "SELECT * FROM blog_posts"
+            # Build query based on user tier
+            query_parts = ["SELECT * FROM blog_posts"]
+            params = []
+            
             tier = current_user.get("subscription_tier", "free") if current_user else "free"
             if tier == "free":
-                query += " WHERE is_premium = FALSE"
-            query += " ORDER BY created_at DESC LIMIT $1"
-
-            rows = await conn.fetch(query, limit)
+                query_parts.append("WHERE is_premium = FALSE")
+            
+            query_parts.append("ORDER BY created_at DESC")
+            query_parts.append(f"LIMIT ${len(params)+1}")
+            params.append(limit)
+            
+            query = " ".join(query_parts)
+            rows = await conn.fetch(query, *params)
+            
+            if not rows:
+                return []  # Return empty array instead of error
+                
             return [dict(row) for row in rows]
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error fetching blog: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error fetching blog posts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load blog posts")
 
 @app.post("/blog/posts")
 async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin_user)):
@@ -870,20 +997,36 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
         return {"id": post_id, "message": "Blog post created"}
 
 @app.get("/webinars")
-async def get_webinars(current_user: Optional[dict] = Depends(get_current_user_optional)):
+async def get_webinars(
+    limit: int = Query(20, le=100),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     try:
+        if not db_pool:
+            raise HTTPException(status_code=503, detail="Database not initialized")
+            
         async with db_pool.acquire() as conn:
-            query = "SELECT * FROM webinars WHERE scheduled_at > NOW()"
+            query_parts = ["SELECT * FROM webinars WHERE scheduled_at > NOW()"]
+            params = []
+            
             tier = current_user.get("subscription_tier", "free") if current_user else "free"
             if tier == "free":
-                query += " AND is_premium = FALSE"
-            query += " ORDER BY scheduled_at ASC"
-
-            rows = await conn.fetch(query)
-            return [dict(row) for row in rows]
+                query_parts.append("AND is_premium = FALSE")
+            
+            query_parts.append("ORDER BY scheduled_at ASC")
+            query_parts.append(f"LIMIT ${len(params)+1}")
+            params.append(limit)
+            
+            query = " ".join(query_parts)
+            rows = await conn.fetch(query, *params)
+            
+            return [dict(row) for row in rows] if rows else []
+            
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching webinars: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load webinars")
 
 @app.post("/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
@@ -898,20 +1041,36 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
         return {"id": webinar_id, "message": "Webinar created"}
 
 @app.get("/courses")
-async def get_courses(current_user: Optional[dict] = Depends(get_current_user_optional)):
+async def get_courses(
+    limit: int = Query(20, le=100),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     try:
+        if not db_pool:
+            raise HTTPException(status_code=503, detail="Database not initialized")
+            
         async with db_pool.acquire() as conn:
-            query = "SELECT * FROM courses"
+            query_parts = ["SELECT * FROM courses"]
+            params = []
+            
             tier = current_user.get("subscription_tier", "free") if current_user else "free"
             if tier == "free":
-                query += " WHERE is_premium = FALSE"
-            query += " ORDER BY created_at DESC"
-
-            rows = await conn.fetch(query)
-            return [dict(row) for row in rows]
+                query_parts.append("WHERE is_premium = FALSE")
+            
+            query_parts.append("ORDER BY created_at DESC")
+            query_parts.append(f"LIMIT ${len(params)+1}")
+            params.append(limit)
+            
+            query = " ".join(query_parts)
+            rows = await conn.fetch(query, *params)
+            
+            return [dict(row) for row in rows] if rows else []
+            
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching courses: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to load courses")
 
 @app.post("/courses")
 async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
@@ -936,7 +1095,12 @@ async def get_config():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    db_status = "connected" if db_pool else "disconnected"
+    return {
+        "status": "healthy", 
+        "database": db_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 if __name__ == "__main__":
     import uvicorn

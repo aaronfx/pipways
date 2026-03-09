@@ -19,10 +19,13 @@ export class Sidebar extends Component {
                 <nav class="sidebar-nav">
                     ${this.renderNavItem('/', 'fa-home', 'Dashboard')}
                     ${this.renderNavItem('/signals', 'fa-satellite-dish', 'Signals')}
+                    ${this.renderNavItem('/courses', 'fa-graduation-cap', 'Courses')}
+                    ${this.renderNavItem('/webinars', 'fa-video', 'Webinars')}
                     ${this.renderNavItem('/analysis', 'fa-robot', 'AI Analysis')}
                     ${this.renderNavItem('/performance', 'fa-chart-pie', 'Performance')}
                     ${this.renderNavItem('/mentor', 'fa-comments', 'AI Mentor')}
                     ${this.renderNavItem('/blog', 'fa-newspaper', 'Blog')}
+                    ${this.renderNavItem('/telegram', 'fa-telegram', 'Telegram')}
                     ${isAdmin ? this.renderNavItem('/admin', 'fa-cog', 'Admin', true) : ''}
                 </nav>
 
@@ -30,7 +33,7 @@ export class Sidebar extends Component {
                     <div class="user-card">
                         <div class="user-avatar">${(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}</div>
                         <div class="user-info">
-                            <div class="user-name">${user?.full_name || user?.email}</div>
+                            <div class="user-name">${user?.full_name || user?.email || 'Trader'}</div>
                             <div class="user-tier ${user?.subscription_tier || 'free'}">${user?.subscription_tier || 'Free'}</div>
                         </div>
                     </div>

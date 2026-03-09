@@ -4,52 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipways - Professional Trading Platform v3.1</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         :root {
             --primary: #6366f1;
-            --primary-dark: #4f46e5;
+            --primary-hover: #5558e0;
             --secondary: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
-            --telegram: #0088cc;
+            --premium: #fbbf24;
             --bg-dark: #0f172a;
             --bg-card: #1e293b;
             --bg-hover: #334155;
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --border: #334155;
-            --premium: #fbbf24;
-            --success: #10b981;
+            --telegram: #0088cc;
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: var(--bg-dark);
             color: var(--text-primary);
-            min-height: 100vh;
             line-height: 1.6;
             overflow-x: hidden;
         }
 
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(15, 23, 42, 0.95);
             display: none;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 9999;
-            flex-direction: column;
-            gap: 20px;
         }
 
-        .loading-overlay.show { display: flex; }
+        .loading-overlay.show {
+            display: flex;
+        }
+
         .spinner {
             width: 50px;
             height: 50px;
@@ -57,20 +62,52 @@
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-bottom: 20px;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .auth-wall {
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification */
+        .toast {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-card) 100%);
+            top: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 16px 24px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 10000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            border-color: var(--secondary);
+            color: var(--secondary);
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Auth Wall */
+        .auth-wall {
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 9999;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1f3a 100%);
             padding: 20px;
         }
 
@@ -78,93 +115,151 @@
             width: 100%;
             max-width: 420px;
             background: var(--bg-card);
-            border-radius: 16px;
             padding: 40px;
+            border-radius: 20px;
             border: 1px solid var(--border);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
         }
 
         .auth-logo {
-            font-size: 28px;
-            font-weight: 700;
             text-align: center;
-            margin-bottom: 8px;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
             color: var(--primary);
         }
 
-        .form-group { margin-bottom: 20px; }
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
         .form-label {
             display: block;
             margin-bottom: 8px;
+            font-weight: 500;
             color: var(--text-secondary);
             font-size: 14px;
-            font-weight: 500;
         }
 
-        .form-input, .form-select {
+        .form-input {
             width: 100%;
             padding: 12px 16px;
             background: var(--bg-dark);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             color: var(--text-primary);
-            font-size: 16px;
+            font-size: 15px;
             transition: all 0.3s;
         }
 
-        .form-input:focus, .form-select:focus {
+        .form-input:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
+        /* Buttons */
         .btn {
             width: 100%;
-            padding: 12px 24px;
+            padding: 14px;
             background: var(--primary);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
         }
 
-        .btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-        .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); margin-top: 12px; }
-        .btn-danger { background: var(--danger); }
-        .btn-success { background: var(--success); }
-        .btn-telegram { background: var(--telegram); }
-        .btn-premium { background: var(--premium); color: var(--bg-dark); }
-        .btn-sm { padding: 8px 16px; font-size: 14px; width: auto; }
+        .btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
 
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            margin-top: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            box-shadow: none;
+        }
+
+        .btn-success {
+            background: var(--secondary);
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-sm {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-premium {
+            background: var(--premium);
+            color: var(--bg-dark);
+        }
+
+        .btn-telegram {
+            background: var(--telegram);
+        }
+
+        /* Layout */
+        .main-app {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .main-app.hidden,
+        .auth-wall.hidden,
+        .hidden {
+            display: none !important;
+        }
+
+        /* Sidebar */
         .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
             width: 280px;
-            height: 100vh;
             background: var(--bg-card);
             border-right: 1px solid var(--border);
-            padding: 20px 0;
-            overflow-y: auto;
-            z-index: 100;
-            transition: transform 0.3s ease;
             display: flex;
             flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
         }
 
         .sidebar-header {
-            padding: 0 20px 20px;
+            padding: 30px;
             border-bottom: 1px solid var(--border);
-            margin-bottom: 20px;
-            flex-shrink: 0;
         }
 
         .sidebar-logo {
@@ -173,64 +268,64 @@
             gap: 12px;
             font-size: 24px;
             font-weight: 700;
+            color: var(--primary);
         }
 
         .nav-menu {
             list-style: none;
-            padding: 0 10px;
+            padding: 20px 0;
             flex: 1;
-            overflow-y: auto;
         }
 
-        .nav-item { margin-bottom: 5px; }
+        .nav-item {
+            padding: 0 16px;
+            margin-bottom: 4px;
+        }
 
         .nav-link {
+            width: 100%;
+            padding: 12px 16px;
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px 16px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            border-radius: 10px;
-            transition: all 0.3s;
-            cursor: pointer;
-            position: relative;
-            background: none;
+            background: transparent;
             border: none;
-            width: 100%;
-            font-size: 16px;
+            color: var(--text-secondary);
+            font-size: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
             text-align: left;
+            position: relative;
         }
 
-        .nav-link:hover, .nav-link.active {
-            background: var(--primary);
-            color: white;
+        .nav-link:hover,
+        .nav-link.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .premium-badge {
             position: absolute;
-            right: 10px;
+            right: 12px;
             background: var(--premium);
             color: var(--bg-dark);
             font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 10px;
             font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
         }
 
         .sidebar-footer {
             padding: 20px;
             border-top: 1px solid var(--border);
-            background: var(--bg-card);
-            margin-top: auto;
-            flex-shrink: 0;
         }
 
         .user-info {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
 
         .user-avatar {
@@ -241,33 +336,36 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .admin-badge {
             display: inline-block;
-            padding: 2px 8px;
             background: var(--warning);
             color: var(--bg-dark);
-            border-radius: 12px;
             font-size: 10px;
             font-weight: 700;
-            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 20px;
             margin-top: 4px;
         }
 
+        /* Main Content */
         .main-content {
+            flex: 1;
             margin-left: 280px;
+            padding: 30px;
             min-height: 100vh;
-            transition: margin-left 0.3s ease;
         }
 
         .section {
             display: none;
-            animation: fadeIn 0.3s ease;
+            animation: fadeIn 0.4s ease;
         }
 
-        .section.active { display: block; }
+        .section.active {
+            display: block;
+        }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -275,79 +373,124 @@
         }
 
         .page-header {
-            padding: 40px;
-            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-dark) 100%);
-            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
         }
 
         .page-header h2 {
-            font-size: 36px;
-            margin-bottom: 10px;
+            font-size: 28px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-            padding: 30px;
+        .page-header p {
+            color: var(--text-secondary);
         }
 
-        .stat-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 24px;
-            border: 1px solid var(--border);
-            transition: all 0.3s;
-        }
-
-        .stat-card:hover { transform: translateY(-2px); border-color: var(--primary); }
-
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(99, 102, 241, 0.1);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: var(--primary);
-            margin-bottom: 16px;
-        }
-
-        .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 4px; }
-        .stat-label { color: var(--text-secondary); font-size: 14px; }
-
+        /* Content Grid */
         .content-grid {
-            padding: 30px;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 24px;
         }
 
         .content-card {
             background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 16px;
             padding: 24px;
-            border: 1px solid var(--border);
             transition: all 0.3s;
         }
 
         .content-card:hover {
-            transform: translateY(-5px);
             border-color: var(--primary);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         }
 
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 16px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Admin Tabs */
+        .admin-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: var(--bg-card);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .admin-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .admin-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        /* Data Table */
         .data-table-container {
             background: var(--bg-card);
-            border-radius: 16px;
             border: 1px solid var(--border);
+            border-radius: 16px;
             overflow: hidden;
-            margin: 0 30px 30px;
         }
 
         .data-table-header {
@@ -356,32 +499,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .search-box {
-            position: relative;
-            flex: 1;
-            max-width: 300px;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 10px 16px 10px 40px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 14px;
-        }
-
-        .search-box i {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-secondary);
         }
 
         table {
@@ -396,32 +513,70 @@
         }
 
         th {
-            background: var(--bg-dark);
-            font-weight: 600;
             color: var(--text-secondary);
+            font-weight: 600;
             font-size: 12px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .action-btns { display: flex; gap: 8px; }
+        tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-published {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--secondary);
+        }
+
+        .status-draft {
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .status-scheduled {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 8px;
+        }
 
         .action-btn {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
             border: none;
-            border-radius: 6px;
+            background: var(--bg-hover);
+            color: var(--text-primary);
             cursor: pointer;
+            transition: all 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--bg-hover);
-            color: var(--text-secondary);
-            transition: all 0.2s;
         }
 
-        .action-btn:hover { background: var(--primary); color: white; }
-        .action-btn.delete:hover { background: var(--danger); }
+        .action-btn:hover {
+            background: var(--primary);
+            transform: scale(1.1);
+        }
 
+        .action-btn.delete:hover {
+            background: var(--danger);
+        }
+
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -429,24 +584,27 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 2000;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 1000;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            overflow-y: auto;
         }
 
-        .modal.show { display: flex; }
+        .modal.show {
+            display: flex;
+        }
 
         .modal-content {
             background: var(--bg-card);
-            border-radius: 16px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
             width: 100%;
             max-width: 800px;
             max-height: 90vh;
-            overflow-y: auto;
-            border: 1px solid var(--border);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-header {
@@ -455,194 +613,79 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            position: sticky;
-            top: 0;
-            background: var(--bg-card);
-            z-index: 10;
         }
 
         .modal-close {
-            background: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
             border: none;
-            color: var(--text-secondary);
-            font-size: 24px;
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            font-size: 20px;
             cursor: pointer;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
+            transition: all 0.3s;
         }
 
-        .modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .modal-close:hover {
+            background: var(--danger);
+        }
 
-        .modal-body { padding: 24px; }
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
         .modal-footer {
             padding: 20px 24px;
             border-top: 1px solid var(--border);
             display: flex;
-            gap: 12px;
             justify-content: flex-end;
-            position: sticky;
-            bottom: 0;
-            background: var(--bg-card);
+            gap: 12px;
         }
 
+        /* Editor */
         .editor-toolbar {
-            padding: 10px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-bottom: none;
-            border-radius: 8px 8px 0 0;
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
+            padding: 12px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 10px 10px 0 0;
+            border-bottom: none;
         }
 
         .editor-btn {
-            padding: 8px 12px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
             color: var(--text-secondary);
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            transition: all 0.3s;
         }
 
-        .editor-btn:hover, .editor-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
+        .editor-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .editor-content {
-            padding: 16px;
             min-height: 300px;
+            padding: 20px;
             background: var(--bg-dark);
             border: 1px solid var(--border);
-            border-radius: 0 0 8px 8px;
+            border-radius: 0 0 10px 10px;
             outline: none;
-            color: var(--text-primary);
-            line-height: 1.6;
+            line-height: 1.8;
         }
 
-        .editor-content img { max-width: 100%; border-radius: 8px; margin: 10px 0; }
-        .editor-content iframe { max-width: 100%; border-radius: 8px; margin: 10px 0; }
-
-        .admin-tabs {
-            display: flex;
-            gap: 10px;
-            margin: 0 30px 30px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .admin-tab {
-            padding: 12px 24px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        .admin-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .admin-tab.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        .admin-panel { display: none; }
-        .admin-panel.active { display: block; }
-
+        /* Performance Analyzer */
         .analyzer-container {
             max-width: 1000px;
             margin: 0 auto;
-            padding: 30px;
-        }
-
-        .score-display {
-            text-align: center;
-            padding: 40px;
-            background: var(--bg-card);
-            border-radius: 20px;
-            border: 2px solid var(--border);
-            margin-bottom: 30px;
-        }
-
-        .score-circle {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: conic-gradient(var(--primary) calc(var(--score) * 1%), var(--bg-hover) 0);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            position: relative;
-        }
-
-        .score-circle::before {
-            content: '';
-            position: absolute;
-            width: 120px;
-            height: 120px;
-            background: var(--bg-card);
-            border-radius: 50%;
-        }
-
-        .score-value {
-            position: relative;
-            font-size: 48px;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .analysis-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 24px;
-            border: 1px solid var(--border);
-        }
-
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .improvement-list {
-            list-style: none;
-        }
-
-        .improvement-list li {
-            padding: 10px 0;
-            padding-left: 28px;
-            position: relative;
-        }
-
-        .improvement-list li::before {
-            content: '→';
-            position: absolute;
-            left: 0;
-            color: var(--primary);
-            font-weight: bold;
         }
 
         .trade-entry-grid {
@@ -653,99 +696,125 @@
         }
 
         .trade-list {
-            background: var(--bg-card);
-            border-radius: 12px;
-            border: 1px solid var(--border);
             max-height: 400px;
             overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--bg-dark);
         }
 
         .trade-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 16px;
+            align-items: center;
             padding: 16px;
             border-bottom: 1px solid var(--border);
+        }
+
+        .trade-item:last-child {
+            border-bottom: none;
+        }
+
+        .trade-pnl.positive {
+            color: var(--secondary);
+        }
+
+        .trade-pnl.negative {
+            color: var(--danger);
+        }
+
+        .score-display {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .score-circle {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary) calc(var(--score) * 3.6deg), var(--bg-hover) 0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            background: var(--bg-card);
+            border-radius: 50%;
+        }
+
+        .score-value {
+            position: relative;
+            font-size: 48px;
+            font-weight: 700;
+            z-index: 1;
+        }
+
+        .analysis-grid {
             display: grid;
-            grid-template-columns: 1fr auto auto auto;
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .analysis-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .analysis-card h3 {
+            margin-bottom: 16px;
+            display: flex;
             align-items: center;
+            gap: 8px;
         }
 
-        .trade-pnl.positive { color: var(--success); }
-        .trade-pnl.negative { color: var(--danger); }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
+        .improvement-list {
+            list-style: none;
         }
 
-        .status-published { background: rgba(16, 185, 129, 0.2); color: var(--success); }
-        .status-draft { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
-        .status-scheduled { background: rgba(251, 191, 36, 0.2); color: var(--premium); }
-
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 24px;
-            background: var(--danger);
-            color: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            display: none;
-            align-items: center;
-            gap: 12px;
-            z-index: 10000;
-            animation: slideInRight 0.3s ease;
+        .improvement-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            padding-left: 24px;
+            position: relative;
         }
 
-        .toast.show { display: flex; }
-        .toast.success { background: var(--success); }
-
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+        .improvement-list li:before {
+            content: '•';
+            position: absolute;
+            left: 8px;
+            color: var(--primary);
         }
 
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-                z-index: 101;
-            }
-
-            .sidebar.open { transform: translateX(0); }
-
-            .main-content {
-                margin-left: 0;
-                padding-top: 60px;
-            }
-
-            .mobile-header {
-                display: flex !important;
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 60px;
-                background: var(--bg-card);
-                border-bottom: 1px solid var(--border);
-                z-index: 1000;
-                align-items: center;
-                justify-content: space-between;
-                padding: 0 20px;
-            }
-
-            .stats-grid { grid-template-columns: 1fr; padding: 15px; }
-            .data-table-container { margin: 0 15px 15px; }
-            .admin-tabs { margin: 0 15px 15px; }
+        .improvement-list li:last-child {
+            border-bottom: none;
         }
 
-        .hidden { display: none !important; }
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
 
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        /* Upload Area */
         .upload-area {
             border: 2px dashed var(--border);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 40px;
             text-align: center;
             cursor: pointer;
@@ -755,6 +824,102 @@
         .upload-area:hover {
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.05);
+        }
+
+        /* Search Box */
+        .search-box {
+            position: relative;
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        .search-box input {
+            padding-left: 40px;
+            width: 250px;
+        }
+
+        /* Chat */
+        #chat-messages {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) var(--bg-dark);
+        }
+
+        #chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #chat-messages::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        #chat-messages::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 99;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding-top: 80px;
+            }
+
+            .mobile-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .trade-item {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .admin-tabs {
+                flex-wrap: wrap;
+            }
+
+            .search-box input {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -827,7 +992,7 @@
     <!-- Main App -->
     <div class="main-app hidden" id="main-app">
         <!-- Mobile Header -->
-        <div class="mobile-header" style="display: none;">
+        <div class="mobile-header">
             <div style="display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700;">
                 <i class="fas fa-chart-line" style="color: var(--primary);"></i>
                 <span>Pipways</span>
@@ -1352,10 +1517,8 @@
                                     <button type="button" class="editor-btn" onclick="editorFormat('ul')" title="Bullet List"><i class="fas fa-list-ul"></i></button>
                                     <button type="button" class="editor-btn" onclick="editorFormat('ol')" title="Numbered List"><i class="fas fa-list-ol"></i></button>
                                     <button type="button" class="editor-btn" onclick="editorFormat('link')" title="Insert Link"><i class="fas fa-link"></i></button>
-                                    <button type="button" class="editor-btn" onclick="insertImage()" title="Insert Image"><i class="fas fa-image"></i></button>
-                                    <button type="button" class="editor-btn" onclick="insertVideo()" title="Embed Video"><i class="fas fa-video"></i></button>
                                 </div>
-                                <div class="editor-content" id="editor-content" contenteditable="true" oninput="updateEditorContent()"></div>
+                                <div class="editor-content" id="editor-content" contenteditable="true"></div>
                                 <input type="hidden" name="content" id="blog-content-hidden">
                             </div>
 
@@ -1965,5 +2128,617 @@
 
             const coursesContainer = document.getElementById('recommended-courses');
             if (analysis.recommended_courses && analysis.recommended_courses.length > 0) {
-                coursesContainer.innerHTML = analysis.recommended_courses.map(course => 
-                    `<span style="background: var(--primary); color: white; padding: 6px 12px; border-radius: 20px; font-size: 14px;">${
+                coursesContainer.innerHTML = analysis.recommended_courses.map(course => `
+                    <span style="background: var(--primary); color: white; padding: 6px 12px; border-radius: 20px; font-size: 14px;">${course}</span>
+                `).join('');
+            } else {
+                coursesContainer.innerHTML = '<span style="color: var(--text-secondary);">No specific courses recommended</span>';
+            }
+
+            document.getElementById('mentor-advice').textContent = analysis.mentor_advice || 'No specific advice provided.';
+            
+            document.getElementById('analysis-results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function handleCSVUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    const cols = line.split(',');
+                    if (cols.length >= 6) {
+                        trades.push({
+                            pair: cols[1] || 'UNKNOWN',
+                            direction: cols[2]?.toLowerCase() || 'buy',
+                            entry: parseFloat(cols[3]) || 0,
+                            exit: parseFloat(cols[4]) || 0,
+                            lots: parseFloat(cols[5]) || 0.1,
+                            pips: parseFloat(cols[6]) || 0,
+                            notes: cols[7] || ''
+                        });
+                    }
+                }
+                
+                renderTrades();
+                showToast(`Imported ${trades.length} trades from CSV`, 'success');
+            };
+            reader.readAsText(file);
+        }
+
+        // ==========================================
+        // ADMIN FUNCTIONS
+        // ==========================================
+        async function loadAdminStats() {
+            try {
+                const response = await fetch(`${API_URL}/admin/stats`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('stat-total-users').textContent = data.total_users;
+                    document.getElementById('stat-active-signals').textContent = data.active_signals;
+                    document.getElementById('stat-premium-users').textContent = data.premium_users;
+                    document.getElementById('stat-blog-posts').textContent = data.content_stats?.blog_posts || 0;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadBlogPosts() {
+            try {
+                const response = await fetch(`${API_URL}/blog/posts?limit=50`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const tbody = document.getElementById('blog-table-body');
+                    
+                    if (!data.posts || data.posts.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No posts found</td></tr>';
+                        return;
+                    }
+                    
+                    tbody.innerHTML = data.posts.map(post => `
+                        <tr>
+                            <td>
+                                <strong>${post.title}</strong>
+                                ${post.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}
+                            </td>
+                            <td><span class="status-badge status-${post.status || 'draft'}">${post.status || 'draft'}</span></td>
+                            <td>${post.category || '-'}</td>
+                            <td>${new Date(post.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="action-btn" onclick="editPost(${post.id})" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="action-btn delete" onclick="deletePost(${post.id})" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load blog posts:', error);
+            }
+        }
+
+        async function loadAdminUsers() {
+            try {
+                const response = await fetch(`${API_URL}/admin/users?limit=50`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const tbody = document.getElementById('users-table-body');
+                    
+                    if (!data.users || data.users.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No users found</td></tr>';
+                        return;
+                    }
+                    
+                    tbody.innerHTML = data.users.map(user => `
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">${user.full_name || 'N/A'}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${user.email}</div>
+                            </td>
+                            <td><span class="status-badge" style="text-transform: uppercase; font-size: 10px;">${user.role}</span></td>
+                            <td>
+                                <div>${user.subscription_tier}</div>
+                                <div style="font-size: 11px; color: var(--text-secondary);">${user.subscription_status}</div>
+                            </td>
+                            <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="action-btn" onclick="changeUserRole(${user.id})" title="Change Role">
+                                        <i class="fas fa-user-shield"></i>
+                                    </button>
+                                    <button class="action-btn delete" onclick="deleteUser(${user.id})" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        }
+
+        async function createCourse(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                content: formData.get('description'),
+                level: formData.get('level'),
+                duration_hours: parseFloat(formData.get('duration_hours')) || null,
+                is_premium: formData.has('is_premium')
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/admin/courses`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showToast('Course created successfully!', 'success');
+                    e.target.reset();
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || 'Failed to create course', 'error');
+                }
+            } catch (error) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function createWebinar(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                scheduled_at: new Date(formData.get('scheduled_at')).toISOString(),
+                meeting_link: formData.get('meeting_link'),
+                is_premium: formData.has('is_premium')
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/admin/webinars`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showToast('Webinar created successfully!', 'success');
+                    e.target.reset();
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || 'Failed to create webinar', 'error');
+                }
+            } catch (error) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function createSignal(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                pair: formData.get('pair').toUpperCase(),
+                direction: formData.get('direction'),
+                entry_price: parseFloat(formData.get('entry_price')),
+                stop_loss: parseFloat(formData.get('stop_loss')) || null,
+                take_profit: parseFloat(formData.get('take_profit')) || null,
+                timeframe: formData.get('timeframe'),
+                analysis: formData.get('analysis')
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/admin/signals`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showToast('Signal published successfully!', 'success');
+                    e.target.reset();
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || 'Failed to create signal', 'error');
+                }
+            } catch (error) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function deletePost(id) {
+            if (!confirm('Are you sure you want to delete this post?')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/blog/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    showToast('Post deleted', 'success');
+                    loadBlogPosts();
+                }
+            } catch (error) {
+                showToast('Failed to delete post', 'error');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    showToast('User deleted', 'success');
+                    loadAdminUsers();
+                }
+            } catch (error) {
+                showToast('Failed to delete user', 'error');
+            }
+        }
+
+        function searchUsers() {
+            const search = document.getElementById('user-search').value;
+            loadAdminUsers();
+        }
+
+        // ==========================================
+        // PUBLIC DATA LOADING
+        // ==========================================
+        async function loadSignals() {
+            try {
+                const response = await fetch(`${API_URL}/signals?limit=20`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                const container = document.getElementById('signals-container');
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No active signals</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = data.map(signal => `
+                    <div class="content-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="margin: 0;">${signal.pair} <span style="color: ${signal.direction === 'buy' ? 'var(--success)' : 'var(--danger)'}">${signal.direction.toUpperCase()}</span></h3>
+                            <span class="status-badge status-published">${signal.timeframe}</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                            <div><strong>Entry:</strong> ${signal.entry_price}</div>
+                            <div><strong>SL:</strong> ${signal.stop_loss || 'N/A'}</div>
+                            <div><strong>TP:</strong> ${signal.take_profit || 'N/A'}</div>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 14px;">${signal.analysis || 'No analysis provided'}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load signals:', error);
+            }
+        }
+
+        async function loadCourses() {
+            try {
+                const response = await fetch(`${API_URL}/courses`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                const container = document.getElementById('courses-container');
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No courses available</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = data.map(course => `
+                    <div class="content-card">
+                        <h3>${course.title} ${course.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}</h3>
+                        <p style="color: var(--text-secondary); margin: 12px 0;">${course.description}</p>
+                        <div style="display: flex; gap: 8px; margin-top: 16px;">
+                            <span class="status-badge status-published">${course.level}</span>
+                            ${course.duration_hours ? `<span class="status-badge status-draft">${course.duration_hours}h</span>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load courses:', error);
+            }
+        }
+
+        async function loadWebinars() {
+            try {
+                const response = await fetch(`${API_URL}/webinars`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                const container = document.getElementById('webinars-container');
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No upcoming webinars</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = data.map(webinar => `
+                    <div class="content-card">
+                        <h3>${webinar.title} ${webinar.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}</h3>
+                        <p style="color: var(--text-secondary); margin: 12px 0;">${webinar.description}</p>
+                        <div style="margin-top: 16px;">
+                            <div style="color: var(--text-secondary); font-size: 14px; margin-bottom: 8px;">
+                                <i class="fas fa-calendar"></i> ${new Date(webinar.scheduled_at).toLocaleString()}
+                            </div>
+                            ${webinar.meeting_link ? `<a href="${webinar.meeting_link}" target="_blank" class="btn btn-sm btn-success" style="width: 100%;">Join Meeting</a>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load webinars:', error);
+            }
+        }
+
+        async function loadBlogPostsPublic() {
+            try {
+                const response = await fetch(`${API_URL}/blog/posts?limit=20`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                const container = document.getElementById('blog-container');
+                
+                if (!data.posts || data.posts.length === 0) {
+                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No posts available</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = data.posts.map(post => `
+                    <div class="content-card">
+                        ${post.featured_image ? `<img src="${post.featured_image}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 16px;">` : ''}
+                        <h3>${post.title} ${post.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}</h3>
+                        <p style="color: var(--text-secondary); margin: 12px 0;">${post.excerpt || post.content.substring(0, 150)}...</p>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+                            <span class="status-badge status-published">${post.category || 'General'}</span>
+                            <span style="color: var(--text-secondary); font-size: 12px;">${new Date(post.created_at).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load blog posts:', error);
+            }
+        }
+
+        // ==========================================
+        // CHART ANALYSIS
+        // ==========================================
+        async function analyzeChart(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            showLoading(true, 'Analyzing chart with AI...');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('pair', document.getElementById('chart-pair').value);
+            formData.append('timeframe', document.getElementById('chart-timeframe').value);
+
+            try {
+                const response = await fetch(`${API_URL}/analyze/chart`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Analysis failed');
+                }
+
+                const data = await response.json();
+                document.getElementById('chart-analysis-result').style.display = 'block';
+                document.getElementById('chart-result-content').textContent = data.analysis;
+                
+            } catch (error) {
+                console.error('Chart analysis error:', error);
+                showToast('Failed to analyze chart', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ==========================================
+        // BLOG MODAL & EDITOR
+        // ==========================================
+        function openBlogModal() {
+            document.getElementById('blog-modal').classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        function toggleSchedule(value) {
+            const field = document.getElementById('schedule-field');
+            if (value === 'scheduled') {
+                field.classList.remove('hidden');
+            } else {
+                field.classList.add('hidden');
+            }
+        }
+
+        function editorFormat(command) {
+            const editor = document.getElementById('editor-content');
+            editor.focus();
+            
+            if (command === 'h2' || command === 'h3') {
+                document.execCommand('formatBlock', false, command.toUpperCase());
+            } else if (command === 'link') {
+                const url = prompt('Enter URL:');
+                if (url) document.execCommand('createLink', false, url);
+            } else {
+                document.execCommand(command, false, null);
+            }
+        }
+
+        function updateEditorContent() {
+            const content = document.getElementById('editor-content').innerHTML;
+            document.getElementById('blog-content-hidden').value = content;
+        }
+
+        async function submitBlogPost() {
+            const form = document.getElementById('blog-form');
+            const formData = new FormData(form);
+            
+            const data = {
+                title: formData.get('title'),
+                content: document.getElementById('editor-content').innerHTML,
+                excerpt: formData.get('meta_description') || document.getElementById('editor-content').innerText.substring(0, 150),
+                category: formData.get('category'),
+                status: formData.get('status'),
+                scheduled_at: formData.get('scheduled_at') || null,
+                featured_image: formData.get('featured_image') || null,
+                meta_title: formData.get('meta_title') || null,
+                meta_description: formData.get('meta_description') || null,
+                tags: formData.get('tags') ? formData.get('tags').split(',').map(t => t.trim()) : [],
+                is_premium: formData.has('is_premium')
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/admin/blog`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showToast('Blog post created successfully!', 'success');
+                    closeModal('blog-modal');
+                    form.reset();
+                    document.getElementById('editor-content').innerHTML = '';
+                    loadBlogPosts();
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || 'Failed to create post', 'error');
+                }
+            } catch (error) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        function editPost(id) {
+            showToast('Edit functionality coming soon', 'success');
+        }
+
+        // ==========================================
+        // AI MENTOR CHAT
+        // ==========================================
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Add user message
+            const chatContainer = document.getElementById('chat-messages');
+            const userDiv = document.createElement('div');
+            userDiv.style.cssText = 'background: var(--primary); color: white; padding: 16px; border-radius: 12px; margin-bottom: 12px; max-width: 80%; margin-left: auto;';
+            userDiv.innerHTML = `<strong>You:</strong><br>${message}`;
+            chatContainer.appendChild(userDiv);
+            
+            input.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            showLoading(true, 'AI is thinking...');
+
+            try {
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                showLoading(false);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const aiDiv = document.createElement('div');
+                    aiDiv.style.cssText = 'background: var(--bg-hover); padding: 16px; border-radius: 12px; margin-bottom: 12px; max-width: 80%;';
+                    aiDiv.innerHTML = `<strong style="color: var(--premium);">AI Mentor:</strong><br>${data.response}`;
+                    chatContainer.appendChild(aiDiv);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                } else {
+                    throw new Error('Failed to get response');
+                }
+            } catch (error) {
+                showLoading(false);
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'background: rgba(239, 68, 68, 0.2); color: var(--danger); padding: 16px; border-radius: 12px; margin-bottom: 12px;';
+                errorDiv.textContent = 'Sorry, I could not process your message. Please try again.';
+                chatContainer.appendChild(errorDiv);
+            }
+        }
+
+        function changeUserRole(userId) {
+            const newRole = prompt('Enter new role (user, moderator, admin):');
+            if (!newRole) return;
+            
+            fetch(`${API_URL}/admin/users/${userId}/role?role=${newRole}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            })
+            .then(response => {
+                if (response.ok) {
+                    showToast('Role updated', 'success');
+                    loadAdminUsers();
+                } else {
+                    showToast('Failed to update role', 'error');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

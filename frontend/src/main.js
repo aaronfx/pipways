@@ -7,6 +7,8 @@ import { AnalysisPage } from './pages/AnalysisPage.js';
 import { PerformancePage } from './pages/PerformancePage.js';
 import { MentorPage } from './pages/MentorPage.js';
 import { BlogPage } from './pages/BlogPage.js';
+import { CoursesPage } from './pages/CoursesPage.js';
+import { WebinarsPage } from './pages/WebinarsPage.js';
 
 router.register('/login', LoginPage);
 router.register('/', DashboardPage);
@@ -15,6 +17,8 @@ router.register('/analysis', AnalysisPage);
 router.register('/performance', PerformancePage);
 router.register('/mentor', MentorPage);
 router.register('/blog', BlogPage);
+router.register('/courses', CoursesPage);
+router.register('/webinars', WebinarsPage);
 
 const init = () => {
     const token = localStorage.getItem('access_token');

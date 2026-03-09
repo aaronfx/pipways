@@ -45,13 +45,14 @@ class Settings:
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # CORS origins from environment variable
-    CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "*")
+    # CORS origins - CRITICAL FIX: Cannot use * with credentials=True
+    CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "https://pipways-web-nhem.onrender.com,http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500")
+    
     @property
     def CORS_ORIGINS(self):
-        if self.CORS_ORIGINS_STR == "*":
-            return ["*"]
-        return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
+        if self.CORS_ORIGINS_STR:
+            return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
+        return ["https://pipways-web-nhem.onrender.com"]  # Default to your frontend
 
 settings = Settings()
 
@@ -74,12 +75,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="3.1.0", lifespan=lifespan)
 
-# CORS Middleware
+# CORS Middleware - FIXED CONFIGURATION
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.CORS_ORIGINS,  # Must be specific domains, not ["*"]
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
@@ -856,7 +857,7 @@ async def analyze_performance(
         losing_trades = total_trades - winning_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
-        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology."""
+        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology. Analyze trading data and provide structured feedback."""
 
         user_prompt = f"""Analyze the following trading performance data:
 
@@ -868,7 +869,7 @@ Calculated Win Rate: {win_rate:.1f}%
 Trade History:
 {json.dumps(request.trades, indent=2)}
 
-Provide analysis in strict JSON format with fields: performance_summary, trader_score (1-100), strengths, weaknesses, behavior_patterns, top_mistakes, improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes), recommended_courses, mentor_advice."""
+Provide analysis in strict JSON format with fields: performance_summary (object with total_trades, win_rate, net_pips, risk_reward_ratio, profit_factor), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes), recommended_courses (array), mentor_advice (string)."""
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -993,10 +994,10 @@ Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, t
                 formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 
 🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
-🛑 STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
+🛡️ STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
 🎯 TAKE PROFITS: {', '.join(analysis_data.get('take_profit', []))}
 ⚖️ RISK/REWARD: {analysis_data.get('risk_reward', 'N/A')}
 🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
@@ -1032,6 +1033,56 @@ Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistan
                 
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Simple chat endpoint for AI Mentor
+@app.post("/chat")
+async def chat_endpoint(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    try:
+        system_prompt = """You are an expert trading mentor and financial advisor. Provide concise, actionable advice about trading strategies, risk management, trading psychology, and market analysis. Be encouraging but realistic about risks."""
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": settings.OPENROUTER_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": request.message}
+                    ],
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI service error")
+            
+            result = response.json()
+            ai_response = result["choices"][0]["message"]["content"]
+            
+            # Save to history
+            user_id = current_user.get("id") or current_user.get("sub")
+            async with db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO chat_history (user_id, message, response, context)
+                    VALUES ($1, $2, $3, $4)
+                """, int(user_id), request.message, ai_response, request.context)
+            
+            return {"response": ai_response}
+            
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")

@@ -1,2744 +1,1043 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways - Professional Trading Platform v3.1</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --primary: #6366f1;
-            --primary-hover: #5558e0;
-            --secondary: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --premium: #fbbf24;
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --bg-hover: #334155;
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --border: #334155;
-            --telegram: #0088cc;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: var(--bg-dark);
-            color: var(--text-primary);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        /* Loading Overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(15, 23, 42, 0.95);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-
-        .loading-overlay.show {
-            display: flex;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Toast Notification */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            padding: 16px 24px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 10000;
-            transform: translateX(150%);
-            transition: transform 0.3s ease;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.success {
-            border-color: var(--secondary);
-            color: var(--secondary);
-        }
-
-        .toast.error {
-            border-color: var(--danger);
-            color: var(--danger);
-        }
-
-        /* Auth Wall */
-        .auth-wall {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1f3a 100%);
-            padding: 20px;
-        }
-
-        .auth-container {
-            width: 100%;
-            max-width: 420px;
-            background: var(--bg-card);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        }
-
-        .auth-logo {
-            text-align: center;
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            color: var(--primary);
-        }
-
-        /* Form Elements */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 12px 16px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text-primary);
-            font-size: 15px;
-            transition: all 0.3s;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        /* Buttons */
-        .btn {
-            width: 100%;
-            padding: 14px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn:hover {
-            background: var(--primary-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-secondary {
-            background: transparent;
-            border: 1px solid var(--border);
-            margin-top: 12px;
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-hover);
-            box-shadow: none;
-        }
-
-        .btn-success {
-            background: var(--secondary);
-        }
-
-        .btn-success:hover {
-            background: #059669;
-            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
-        .btn-sm {
-            width: auto;
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-
-        .btn-premium {
-            background: var(--premium);
-            color: var(--bg-dark);
-        }
-
-        .btn-telegram {
-            background: var(--telegram);
-        }
-
-        /* Layout */
-        .main-app {
-            display: flex;
-            min-height: 100vh;
-        }
-
-        .main-app.hidden,
-        .auth-wall.hidden,
-        .hidden {
-            display: none !important;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: 280px;
-            background: var(--bg-card);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
-            z-index: 100;
-        }
-
-        .sidebar-header {
-            padding: 30px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .nav-menu {
-            list-style: none;
-            padding: 20px 0;
-            flex: 1;
-        }
-
-        .nav-item {
-            padding: 0 16px;
-            margin-bottom: 4px;
-        }
-
-        .nav-link {
-            width: 100%;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 15px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-align: left;
-            position: relative;
-        }
-
-        .nav-link:hover,
-        .nav-link.active {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .premium-badge {
-            position: absolute;
-            right: 12px;
-            background: var(--premium);
-            color: var(--bg-dark);
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 20px;
-        }
-
-        .sidebar-footer {
-            padding: 20px;
-            border-top: 1px solid var(--border);
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: var(--primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-        }
-
-        .admin-badge {
-            display: inline-block;
-            background: var(--warning);
-            color: var(--bg-dark);
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 20px;
-            margin-top: 4px;
-        }
-
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            padding: 30px;
-            min-height: 100vh;
-        }
-
-        .section {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
-
-        .section.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .page-header {
-            margin-bottom: 30px;
-        }
-
-        .page-header h2 {
-            font-size: 28px;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .page-header p {
-            color: var(--text-secondary);
-        }
-
-        /* Content Grid */
-        .content-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 24px;
-        }
-
-        .content-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            transition: all 0.3s;
-        }
-
-        .content-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-        }
-
-        /* Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--primary);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            margin: 0 auto 16px;
-        }
-
-        .stat-value {
-            font-size: 36px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        /* Admin Tabs */
-        .admin-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 24px;
-            background: var(--bg-card);
-            padding: 8px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-        }
-
-        .admin-tab {
-            padding: 10px 20px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }
-
-        .admin-tab.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .admin-panel {
-            display: none;
-        }
-
-        .admin-panel.active {
-            display: block;
-        }
-
-        /* Data Table */
-        .data-table-container {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            overflow: hidden;
-        }
-
-        .data-table-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 16px 24px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-
-        th {
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        tr:hover {
-            background: var(--bg-hover);
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: capitalize;
-        }
-
-        .status-published {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--secondary);
-        }
-
-        .status-draft {
-            background: rgba(148, 163, 184, 0.1);
-            color: var(--text-secondary);
-        }
-
-        .status-scheduled {
-            background: rgba(245, 158, 11, 0.1);
-            color: var(--warning);
-        }
-
-        .action-btns {
-            display: flex;
-            gap: 8px;
-        }
-
-        .action-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            border: none;
-            background: var(--bg-hover);
-            color: var(--text-primary);
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .action-btn:hover {
-            background: var(--primary);
-            transform: scale(1.1);
-        }
-
-        .action-btn.delete:hover {
-            background: var(--danger);
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(15, 23, 42, 0.9);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal.show {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            width: 100%;
-            max-width: 800px;
-            max-height: 90vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .modal-header {
-            padding: 24px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-close {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: none;
-            background: var(--bg-hover);
-            color: var(--text-primary);
-            font-size: 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .modal-close:hover {
-            background: var(--danger);
-        }
-
-        .modal-body {
-            padding: 24px;
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        .modal-footer {
-            padding: 20px 24px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-        }
-
-        /* Editor */
-        .editor-toolbar {
-            display: flex;
-            gap: 8px;
-            padding: 12px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            border-radius: 10px 10px 0 0;
-            border-bottom: none;
-        }
-
-        .editor-btn {
-            width: 36px;
-            height: 36px;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .editor-btn:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .editor-content {
-            min-height: 300px;
-            padding: 20px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            border-radius: 0 0 10px 10px;
-            outline: none;
-            line-height: 1.8;
-        }
-
-        /* Performance Analyzer */
-        .analyzer-container {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-
-        .trade-entry-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .trade-list {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            background: var(--bg-dark);
-        }
-
-        .trade-item {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr auto;
-            gap: 16px;
-            align-items: center;
-            padding: 16px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .trade-item:last-child {
-            border-bottom: none;
-        }
-
-        .trade-pnl.positive {
-            color: var(--secondary);
-        }
-
-        .trade-pnl.negative {
-            color: var(--danger);
-        }
-
-        .score-display {
-            text-align: center;
-            margin: 40px 0;
-        }
-
-        .score-circle {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            background: conic-gradient(var(--primary) calc(var(--score) * 3.6deg), var(--bg-hover) 0);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            position: relative;
-        }
-
-        .score-circle::before {
-            content: '';
-            position: absolute;
-            width: 160px;
-            height: 160px;
-            background: var(--bg-card);
-            border-radius: 50%;
-        }
-
-        .score-value {
-            position: relative;
-            font-size: 48px;
-            font-weight: 700;
-            z-index: 1;
-        }
-
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 30px;
-        }
-
-        .analysis-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-        }
-
-        .analysis-card h3 {
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .improvement-list {
-            list-style: none;
-        }
-
-        .improvement-list li {
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
-            padding-left: 24px;
-            position: relative;
-        }
-
-        .improvement-list li:before {
-            content: '•';
-            position: absolute;
-            left: 8px;
-            color: var(--primary);
-        }
-
-        .improvement-list li:last-child {
-            border-bottom: none;
-        }
-
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .metric-row:last-child {
-            border-bottom: none;
-        }
-
-        /* Upload Area */
-        .upload-area {
-            border: 2px dashed var(--border);
-            border-radius: 16px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        /* Search Box */
-        .search-box {
-            position: relative;
-        }
-
-        .search-box i {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-secondary);
-        }
-
-        .search-box input {
-            padding-left: 40px;
-            width: 250px;
-        }
-
-        /* Chat */
-        #chat-messages {
-            scrollbar-width: thin;
-            scrollbar-color: var(--border) var(--bg-dark);
-        }
-
-        #chat-messages::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        #chat-messages::-webkit-scrollbar-track {
-            background: var(--bg-dark);
-        }
-
-        #chat-messages::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 4px;
-        }
-
-        /* Mobile Header */
-        .mobile-header {
-            display: none;
-            padding: 16px 20px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 99;
-        }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-                transition: transform 0.3s;
+"""
+Pipways Trading Platform API - Production v3.1
+Complete implementation with LMS, Media Upload, Performance Analyzer
+"""
+import os
+import re
+import jwt
+import bcrypt
+import asyncpg
+import logging
+import base64
+import json
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from dotenv import load_dotenv
+import httpx
+from contextlib import asynccontextmanager
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Configuration
+class Settings:
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    ALGORITHM = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES = 60
+    REFRESH_TOKEN_EXPIRE_DAYS = 7
+    RESET_TOKEN_EXPIRE_HOURS = 1
+    ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    
+    # Use reliable vision-capable models
+    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+    OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
+
+    # CORS origins from environment variable
+    CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "*")
+    @property
+    def CORS_ORIGINS(self):
+        if self.CORS_ORIGINS_STR == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
+
+settings = Settings()
+
+# Database pool
+db_pool: Optional[asyncpg.Pool] = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global db_pool
+    try:
+        db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        raise
+    yield
+    if db_pool:
+        await db_pool.close()
+
+app = FastAPI(title="Pipways API", version="3.1.0", lifespan=lifespan)
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+
+# Security
+security = HTTPBearer(auto_error=False)
+
+# Enhanced Models
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: str = Field(..., min_length=2, max_length=100)
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain a lowercase letter')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain an uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain a number')
+        if not any(c in '@$!%*?&' for c in v):
+            raise ValueError('Password must contain a special character (@$!%*?&)')
+        return v
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: Dict[str, Any]
+
+class BlogPostCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
+    excerpt: Optional[str] = None
+    is_premium: bool = False
+    status: str = Field(default="published", pattern="^(draft|published|scheduled)$")
+    scheduled_at: Optional[datetime] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    slug: Optional[str] = None
+    featured_image: Optional[str] = None
+    tags: Optional[List[str]] = []
+    category: Optional[str] = None
+
+class WebinarCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    scheduled_at: datetime
+    duration_minutes: int = Field(default=60, ge=1)
+    is_premium: bool = False
+    meeting_link: Optional[str] = None
+    max_participants: Optional[int] = 100
+
+class SignalCreate(BaseModel):
+    pair: str = Field(..., min_length=1)
+    direction: str = Field(..., pattern="^(buy|sell)$")
+    entry_price: float
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    timeframe: str = "1H"
+    analysis: Optional[str] = None
+    is_premium: bool = False
+
+class CourseCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
+    is_premium: bool = False
+    level: str = Field(default="beginner", pattern="^(beginner|intermediate|advanced)$")
+    duration_hours: Optional[float] = None
+    thumbnail: Optional[str] = None
+
+class PerformanceAnalysisRequest(BaseModel):
+    trades: List[Dict[str, Any]]
+    account_balance: Optional[float] = None
+    trading_period_days: Optional[int] = None
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    context: Optional[str] = ""
+
+# Database initialization
+async def init_db():
+    async with db_pool.acquire() as conn:
+        # Users table with enhanced fields
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                full_name VARCHAR(100) NOT NULL,
+                role VARCHAR(20) DEFAULT 'user',
+                subscription_tier VARCHAR(20) DEFAULT 'free',
+                subscription_status VARCHAR(20) DEFAULT 'inactive',
+                email_verified BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                reset_token VARCHAR(255),
+                reset_token_expires TIMESTAMP
+            )
+        """)
+
+        # Enhanced blog posts with SEO and scheduling
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS blog_posts (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                content TEXT NOT NULL,
+                excerpt TEXT,
+                author_id INTEGER REFERENCES users(id),
+                is_premium BOOLEAN DEFAULT FALSE,
+                status VARCHAR(20) DEFAULT 'published',
+                scheduled_at TIMESTAMP,
+                meta_title VARCHAR(255),
+                meta_description TEXT,
+                slug VARCHAR(255) UNIQUE,
+                featured_image VARCHAR(500),
+                tags TEXT[],
+                category VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                published_at TIMESTAMP
+            )
+        """)
+
+        # Signals table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS signals (
+                id SERIAL PRIMARY KEY,
+                pair VARCHAR(20) NOT NULL,
+                direction VARCHAR(10) NOT NULL,
+                entry_price DECIMAL(10,5),
+                stop_loss DECIMAL(10,5),
+                take_profit DECIMAL(10,5),
+                timeframe VARCHAR(20),
+                analysis TEXT,
+                status VARCHAR(20) DEFAULT 'active',
+                pips_gain DECIMAL(10,2),
+                is_premium BOOLEAN DEFAULT FALSE,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                closed_at TIMESTAMP
+            )
+        """)
+
+        # Enhanced webinars
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS webinars (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                scheduled_at TIMESTAMP NOT NULL,
+                duration_minutes INTEGER DEFAULT 60,
+                meeting_link VARCHAR(500),
+                is_premium BOOLEAN DEFAULT FALSE,
+                max_participants INTEGER DEFAULT 100,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Enhanced courses
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS courses (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                content TEXT,
+                level VARCHAR(20) DEFAULT 'beginner',
+                duration_hours DECIMAL(5,2),
+                thumbnail VARCHAR(500),
+                is_premium BOOLEAN DEFAULT FALSE,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Course modules for LMS
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS course_modules (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                content TEXT,
+                video_url VARCHAR(500),
+                sort_order INTEGER DEFAULT 0,
+                is_premium BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Chat history
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                message TEXT NOT NULL,
+                response TEXT NOT NULL,
+                context TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Media files
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS media_files (
+                id SERIAL PRIMARY KEY,
+                filename VARCHAR(255) NOT NULL,
+                url VARCHAR(500) NOT NULL,
+                file_type VARCHAR(50),
+                size_bytes INTEGER,
+                uploaded_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Performance analyses
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS performance_analyses (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                analysis_data JSONB NOT NULL,
+                raw_trades JSONB,
+                trader_score INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Create default admin
+        try:
+            admin_exists = await conn.fetchval("SELECT id FROM users WHERE email = $1", settings.ADMIN_EMAIL)
+            if not admin_exists:
+                hashed = bcrypt.hashpw(settings.ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
+                await conn.execute("""
+                    INSERT INTO users (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified)
+                    VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
+                """, settings.ADMIN_EMAIL, hashed, "System Administrator")
+                logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
+            else:
+                await conn.execute("""
+                    UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'
+                """, settings.ADMIN_EMAIL)
+        except Exception as e:
+            logger.error(f"Error creating admin: {e}")
+
+# Auth utilities
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+
+def get_password_hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def create_refresh_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        if "role" in payload:
+            return payload
+        async with db_pool.acquire() as conn:
+            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
+            return dict(user) if user else None
+    except Exception as e:
+        logger.error(f"Auth error: {e}")
+        return None
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        if "role" in payload and "email" in payload:
+            if datetime.utcnow().timestamp() > payload.get("exp", 0):
+                raise HTTPException(status_code=401, detail="Token expired")
+            return payload
+
+        async with db_pool.acquire() as conn:
+            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
+            if not user:
+                raise HTTPException(status_code=401, detail="User not found")
+            return dict(user)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_admin_user(current_user: dict = Depends(get_current_user)):
+    role = current_user.get("role", "user")
+    if role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+# Auth endpoints
+@app.post("/auth/register", response_model=Token)
+async def register(user_data: UserRegister):
+    async with db_pool.acquire() as conn:
+        existing = await conn.fetchval("SELECT id FROM users WHERE email = $1", user_data.email)
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        hashed_pw = get_password_hash(user_data.password)
+        user_id = await conn.fetchval("""
+            INSERT INTO users (email, password_hash, full_name, subscription_tier, subscription_status, role)
+            VALUES ($1, $2, $3, 'free', 'active', 'user')
+            RETURNING id
+        """, user_data.email, hashed_pw, user_data.full_name)
+
+        token_data = {
+            "sub": str(user_id),
+            "email": user_data.email,
+            "full_name": user_data.full_name,
+            "role": "user",
+            "subscription_tier": "free"
+        }
+        access_token = create_access_token(token_data)
+        refresh_token = create_refresh_token({"sub": str(user_id)})
+
+        user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": dict(user) if user else {"id": user_id, "email": user_data.email, "role": "user"}
+        }
+
+@app.post("/auth/login", response_model=Token)
+async def login(credentials: UserLogin):
+    async with db_pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", credentials.email)
+        if not user or not verify_password(credentials.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
+
+        token_data = {
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "full_name": user.get("full_name", ""),
+            "role": user.get("role", "user"),
+            "subscription_tier": user.get("subscription_tier", "free")
+        }
+        access_token = create_access_token(token_data)
+        refresh_token = create_refresh_token({"sub": str(user["id"])})
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": dict(user)
+        }
+
+@app.post("/auth/refresh")
+async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+
+        user_id = payload.get("sub")
+        async with db_pool.acquire() as conn:
+            user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
+            if not user:
+                raise HTTPException(status_code=401, detail="User not found")
+
+            token_data = {
+                "sub": str(user["id"]),
+                "email": user["email"],
+                "full_name": user.get("full_name", ""),
+                "role": user.get("role", "user"),
+                "subscription_tier": user.get("subscription_tier", "free")
             }
+            new_access = create_access_token(token_data)
+            new_refresh = create_refresh_token({"sub": str(user["id"])})
+            return {"access_token": new_access, "refresh_token": new_refresh, "token_type": "bearer"}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-            .sidebar.open {
-                transform: translateX(0);
-            }
+@app.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return current_user
 
-            .main-content {
-                margin-left: 0;
-                padding-top: 80px;
-            }
-
-            .mobile-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            .content-grid {
-                grid-template-columns: 1fr;
+# Admin endpoints
+@app.get("/admin/stats")
+async def get_admin_stats(admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        total_users = await conn.fetchval("SELECT COUNT(*) FROM users") or 0
+        total_signals = await conn.fetchval("SELECT COUNT(*) FROM signals") or 0
+        active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'") or 0
+        premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')") or 0
+        total_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts") or 0
+        draft_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'draft'") or 0
+        scheduled_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'scheduled'") or 0
+        total_courses = await conn.fetchval("SELECT COUNT(*) FROM courses") or 0
+        total_webinars = await conn.fetchval("SELECT COUNT(*) FROM webinars") or 0
+        
+        return {
+            "total_users": total_users,
+            "total_signals": total_signals,
+            "active_signals": active_signals,
+            "premium_users": premium_users,
+            "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0,
+            "content_stats": {
+                "blog_posts": total_posts,
+                "drafts": draft_posts,
+                "scheduled": scheduled_posts,
+                "courses": total_courses,
+                "webinars": total_webinars
             }
         }
 
-        @media (max-width: 640px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+@app.get("/admin/users")
+async def get_all_users(
+    search: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    admin: dict = Depends(get_admin_user)
+):
+    async with db_pool.acquire() as conn:
+        where_clauses = ["1=1"]
+        params = []
 
-            .trade-item {
-                grid-template-columns: 1fr;
-                gap: 8px;
-            }
+        if search:
+            where_clauses.append(f"(email ILIKE ${len(params)+1} OR full_name ILIKE ${len(params)+1})")
+            params.append(f"%{search}%")
 
-            .admin-tabs {
-                flex-wrap: wrap;
-            }
+        if role:
+            where_clauses.append(f"role = ${len(params)+1}")
+            params.append(role)
 
-            .search-box input {
-                width: 100%;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loading-overlay">
-        <div class="spinner"></div>
-        <p>Processing...</p>
-    </div>
+        count_query = f"SELECT COUNT(*) FROM users WHERE {' AND '.join(where_clauses)}"
+        total = await conn.fetchval(count_query, *params)
 
-    <!-- Toast Notification -->
-    <div class="toast" id="toast">
-        <i class="fas fa-exclamation-circle"></i>
-        <span id="toast-message">Error message</span>
-    </div>
+        offset = (page - 1) * limit
+        query = f"""
+            SELECT id, email, full_name, role, subscription_tier, subscription_status,
+                   email_verified, created_at, last_login
+            FROM users
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY created_at DESC
+            LIMIT ${len(params)+1} OFFSET ${len(params)+2}
+        """
+        params.extend([limit, offset])
 
-    <!-- Auth Wall -->
-    <div class="auth-wall" id="auth-wall">
-        <div class="auth-container">
-            <div class="auth-logo">
-                <i class="fas fa-chart-line"></i> Pipways v3.1
-            </div>
-            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">Professional Trading Platform</p>
-
-            <form id="login-form" onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-input" required placeholder="admin@pipways.com">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" name="password" class="form-input" required placeholder="••••••••">
-                </div>
-                <div id="login-error" style="color: var(--danger); margin-bottom: 16px; display: none;"></div>
-                <button type="submit" class="btn" id="login-btn">
-                    <span>Login</span>
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="showRegister()">
-                    Create Account
-                </button>
-            </form>
-
-            <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
-                <div class="form-group">
-                    <label class="form-label">Full Name</label>
-                    <input type="text" name="full_name" class="form-input" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-input" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" name="password" class="form-input" required minlength="8">
-                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
-                        Min 8 chars, uppercase, lowercase, number, special char
-                    </small>
-                </div>
-                <div id="register-error" style="color: var(--danger); margin-bottom: 16px; display: none;"></div>
-                <button type="submit" class="btn" id="register-btn">
-                    <span>Create Account</span>
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="showLogin()">
-                    Back to Login
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Main App -->
-    <div class="main-app hidden" id="main-app">
-        <!-- Mobile Header -->
-        <div class="mobile-header">
-            <div style="display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700;">
-                <i class="fas fa-chart-line" style="color: var(--primary);"></i>
-                <span>Pipways</span>
-            </div>
-            <button onclick="toggleSidebar()" style="width: 40px; height: 40px; background: var(--bg-hover); border: none; border-radius: 10px; color: var(--text-primary); font-size: 20px; cursor: pointer;">
-                <i class="fas fa-bars"></i>
-            </button>
-        </div>
-
-        <!-- Sidebar Overlay -->
-        <div class="sidebar-overlay" onclick="toggleSidebar()" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 99;"></div>
-
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Pipways</span>
-                </div>
-            </div>
-
-            <ul class="nav-menu">
-                <li class="nav-item">
-                    <button class="nav-link active" onclick="showSection('home', this)">
-                        <i class="fas fa-home"></i>
-                        <span>Overview</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('telegram', this)">
-                        <i class="fab fa-telegram"></i>
-                        <span>Telegram Signals</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('signals', this)">
-                        <i class="fas fa-satellite-dish"></i>
-                        <span>Trading Signals</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('analysis', this)">
-                        <i class="fas fa-robot"></i>
-                        <span>AI Analysis</span>
-                        <span class="premium-badge">PRO</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('performance', this)">
-                        <i class="fas fa-chart-pie"></i>
-                        <span>Performance AI</span>
-                        <span class="premium-badge">NEW</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('mentor', this)">
-                        <i class="fas fa-comments"></i>
-                        <span>AI Mentor</span>
-                        <span class="premium-badge">PRO</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('courses', this)">
-                        <i class="fas fa-graduation-cap"></i>
-                        <span>Courses</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('webinars', this)">
-                        <i class="fas fa-video"></i>
-                        <span>Webinars</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" onclick="showSection('blog', this)">
-                        <i class="fas fa-newspaper"></i>
-                        <span>Blog</span>
-                    </button>
-                </li>
-                <li class="nav-item hidden" id="admin-nav-item">
-                    <button class="nav-link" onclick="showSection('admin', this)" style="color: var(--warning);">
-                        <i class="fas fa-cog"></i>
-                        <span>Admin Dashboard</span>
-                    </button>
-                </li>
-            </ul>
-
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <div class="user-avatar" id="user-avatar">A</div>
-                    <div>
-                        <div style="font-weight: 600;" id="user-name">Admin User</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);" id="user-email">admin@pipways.com</div>
-                        <span class="admin-badge hidden" id="admin-badge">ADMIN</span>
-                    </div>
-                </div>
-                <button class="btn btn-danger" onclick="logout()" style="width: 100%;">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </button>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Home Section -->
-            <div class="section active" id="home-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-home"></i> Dashboard Overview</h2>
-                    <p>Welcome back to your professional trading environment</p>
-                </div>
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3><i class="fas fa-signal" style="color: var(--primary);"></i> Latest Signals</h3>
-                        <p>View the most recent trading signals generated by our AI and expert analysts.</p>
-                        <button class="btn btn-sm" onclick="showSection('signals', document.querySelectorAll('.nav-link')[2])" style="margin-top: 12px;">View Signals</button>
-                    </div>
-                    <div class="content-card">
-                        <h3><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> Performance Analysis</h3>
-                        <p>Upload your trading history for comprehensive AI-powered performance evaluation.</p>
-                        <button class="btn btn-sm btn-success" onclick="showSection('performance', document.querySelectorAll('.nav-link')[4])" style="margin-top: 12px;">Analyze Now</button>
-                    </div>
-                    <div class="content-card">
-                        <h3><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h3>
-                        <p>Get instant technical analysis on your chart screenshots.</p>
-                        <button class="btn btn-sm" onclick="showSection('analysis', document.querySelectorAll('.nav-link')[3])" style="margin-top: 12px; background: var(--warning); color: var(--bg-dark);">Analyze Chart</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Performance Analyzer Section -->
-            <div class="section" id="performance-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> AI Performance Analyzer</h2>
-                    <p>Get professional trading performance evaluation and improvement strategies</p>
-                </div>
-                
-                <div class="analyzer-container">
-                    <div class="content-card" style="margin-bottom: 30px;">
-                        <h3 style="margin-bottom: 20px;">Select Input Method</h3>
-                        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-                            <button class="btn btn-sm" onclick="showTradeInput('manual')" id="btn-manual" style="background: var(--primary);">Manual Entry</button>
-                            <button class="btn btn-sm btn-secondary" onclick="showTradeInput('csv')" id="btn-csv">Upload CSV</button>
-                        </div>
-
-                        <div id="manual-input">
-                            <div class="trade-entry-grid">
-                                <div class="form-group">
-                                    <label class="form-label">Pair (e.g., EURUSD)</label>
-                                    <input type="text" id="trade-pair" class="form-input" placeholder="EURUSD">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Direction</label>
-                                    <select id="trade-direction" class="form-input">
-                                        <option value="buy">BUY</option>
-                                        <option value="sell">SELL</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Entry Price</label>
-                                    <input type="number" id="trade-entry" class="form-input" step="0.00001" placeholder="1.0850">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Exit Price</label>
-                                    <input type="number" id="trade-exit" class="form-input" step="0.00001" placeholder="1.0900">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Lot Size</label>
-                                    <input type="number" id="trade-lots" class="form-input" step="0.01" placeholder="0.1">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Pips (+/-)</label>
-                                    <input type="number" id="trade-pips" class="form-input" step="0.1" placeholder="+50">
-                                </div>
-                                <div class="form-group" style="grid-column: 1 / -1;">
-                                    <label class="form-label">Notes (Optional)</label>
-                                    <input type="text" id="trade-notes" class="form-input" placeholder="Breakout trade, FOMC news...">
-                                </div>
-                            </div>
-                            <button class="btn" onclick="addTrade()" style="width: auto;">
-                                <i class="fas fa-plus"></i> Add Trade
-                            </button>
-                        </div>
-
-                        <div id="csv-input" class="hidden">
-                            <div class="upload-area" onclick="document.getElementById('csv-file').click()">
-                                <i class="fas fa-file-csv" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
-                                <h3>Upload Trading History CSV</h3>
-                                <p style="color: var(--text-secondary); margin-top: 8px;">Format: Date, Pair, Direction, Entry, Exit, Lots, Pips, Notes</p>
-                                <input type="file" id="csv-file" class="hidden" accept=".csv" onchange="handleCSVUpload(this)">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card hidden" id="trades-list-card" style="margin-bottom: 30px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <h3>Trades (<span id="trade-count">0</span>)</h3>
-                            <button class="btn btn-sm btn-danger" onclick="clearTrades()">Clear All</button>
-                        </div>
-                        <div class="trade-list" id="trades-container"></div>
-                        <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center;">
-                            <div class="form-group" style="flex: 1; margin: 0;">
-                                <label class="form-label">Account Balance (Optional)</label>
-                                <input type="number" id="account-balance" class="form-input" placeholder="10000">
-                            </div>
-                            <button class="btn btn-success" onclick="analyzePerformance()" style="margin-top: 20px;">
-                                <i class="fas fa-brain"></i> Analyze Performance
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="analysis-results" class="hidden">
-                        <div class="score-display">
-                            <div class="score-circle" id="score-circle" style="--score: 0;">
-                                <div class="score-value" id="trader-score">0</div>
-                            </div>
-                            <h2>Trading Performance Score</h2>
-                            <p style="color: var(--text-secondary); margin-top: 8px;" id="score-interpretation">Analysis complete</p>
-                        </div>
-
-                        <div class="analysis-grid">
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-chart-bar" style="color: var(--primary);"></i> Performance Summary</h3>
-                                <div id="performance-summary"></div>
-                            </div>
-
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i> Key Issues</h3>
-                                <ul class="improvement-list" id="top-mistakes"></ul>
-                            </div>
-
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-check-circle" style="color: var(--success);"></i> Strengths</h3>
-                                <ul class="improvement-list" id="strengths-list"></ul>
-                            </div>
-
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-arrow-up" style="color: var(--warning);"></i> Improvement Plan</h3>
-                                <ul class="improvement-list" id="improvement-plan"></ul>
-                            </div>
-                        </div>
-
-                        <div class="analysis-card" style="margin-top: 20px;">
-                            <h3><i class="fas fa-graduation-cap" style="color: var(--premium);"></i> Recommended Courses</h3>
-                            <div id="recommended-courses" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
-                        </div>
-
-                        <div class="analysis-card" style="margin-top: 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);">
-                            <h3><i class="fas fa-user-tie" style="color: var(--primary);"></i> Mentor Advice</h3>
-                            <p id="mentor-advice" style="margin-top: 12px; line-height: 1.8; font-style: italic;"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Admin Section -->
-            <div class="section" id="admin-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-cog" style="color: var(--warning);"></i> Admin Dashboard</h2>
-                    <p>Manage content, users, and platform settings</p>
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-users"></i></div>
-                        <div class="stat-value" id="stat-total-users">-</div>
-                        <div class="stat-label">Total Users</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);"><i class="fas fa-signal"></i></div>
-                        <div class="stat-value" id="stat-active-signals">-</div>
-                        <div class="stat-label">Active Signals</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(251, 191, 36, 0.1); color: var(--premium);"><i class="fas fa-crown"></i></div>
-                        <div class="stat-value" id="stat-premium-users">-</div>
-                        <div class="stat-label">Premium Users</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);"><i class="fas fa-newspaper"></i></div>
-                        <div class="stat-value" id="stat-blog-posts">-</div>
-                        <div class="stat-label">Blog Posts</div>
-                    </div>
-                </div>
-
-                <div class="admin-tabs">
-                    <button class="admin-tab active" onclick="showAdminTab('content', this)" id="tab-content">Content</button>
-                    <button class="admin-tab" onclick="showAdminTab('users', this)" id="tab-users">Users</button>
-                    <button class="admin-tab" onclick="showAdminTab('lms', this)" id="tab-lms">LMS</button>
-                    <button class="admin-tab" onclick="showAdminTab('signals', this)" id="tab-signals">Signals</button>
-                </div>
-
-                <!-- Content Panel -->
-                <div class="admin-panel active" id="panel-content">
-                    <div class="data-table-container">
-                        <div class="data-table-header">
-                            <h3>Blog Posts</h3>
-                            <button class="btn btn-sm btn-success" onclick="openBlogModal()">
-                                <i class="fas fa-plus"></i> New Post
-                            </button>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Title</th>
-                                    <th>Status</th>
-                                    <th>Category</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="blog-table-body">
-                                <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Users Panel -->
-                <div class="admin-panel" id="panel-users">
-                    <div class="data-table-container">
-                        <div class="data-table-header">
-                            <h3>User Management</h3>
-                            <div class="search-box">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="user-search" placeholder="Search users..." oninput="searchUsers()">
-                            </div>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Role</th>
-                                    <th>Subscription</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body">
-                                <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- LMS Panel -->
-                <div class="admin-panel" id="panel-lms">
-                    <div class="content-grid" style="padding: 0 30px;">
-                        <div class="content-card">
-                            <h3><i class="fas fa-graduation-cap" style="color: var(--warning);"></i> Create Course</h3>
-                            <form id="course-form" onsubmit="createCourse(event)">
-                                <div class="form-group">
-                                    <input type="text" name="title" class="form-input" placeholder="Course Title" required>
-                                </div>
-                                <div class="form-group">
-                                    <textarea name="description" class="form-input" placeholder="Description" rows="3" required></textarea>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                    <div class="form-group">
-                                        <select name="level" class="form-input">
-                                            <option value="beginner">Beginner</option>
-                                            <option value="intermediate">Intermediate</option>
-                                            <option value="advanced">Advanced</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <input type="number" name="duration_hours" class="form-input" placeholder="Duration (hours)" step="0.5">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <input type="checkbox" name="is_premium" style="margin-right: 8px;">
-                                        Premium Course
-                                    </label>
-                                </div>
-                                <button type="submit" class="btn btn-sm" style="background: var(--warning); color: var(--bg-dark);">Create Course</button>
-                            </form>
-                        </div>
-
-                        <div class="content-card">
-                            <h3><i class="fas fa-video" style="color: var(--secondary);"></i> Create Webinar</h3>
-                            <form id="webinar-form" onsubmit="createWebinar(event)">
-                                <div class="form-group">
-                                    <input type="text" name="title" class="form-input" placeholder="Webinar Title" required>
-                                </div>
-                                <div class="form-group">
-                                    <textarea name="description" class="form-input" placeholder="Description" rows="3" required></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <input type="datetime-local" name="scheduled_at" class="form-input" required>
-                                </div>
-                                <div class="form-group">
-                                    <input type="text" name="meeting_link" class="form-input" placeholder="Zoom/Meet Link">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <input type="checkbox" name="is_premium" style="margin-right: 8px;">
-                                        Premium Webinar
-                                    </label>
-                                </div>
-                                <button type="submit" class="btn btn-sm btn-success">Create Webinar</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Signals Panel -->
-                <div class="admin-panel" id="panel-signals">
-                    <div style="max-width: 800px; margin: 0 auto; background: var(--bg-card); padding: 30px; border-radius: 16px; border: 1px solid var(--border);">
-                        <h3 style="margin-bottom: 24px;"><i class="fas fa-plus-circle"></i> Create New Signal</h3>
-                        <form onsubmit="createSignal(event)">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                                <div class="form-group">
-                                    <label class="form-label">Currency Pair</label>
-                                    <input type="text" name="pair" class="form-input" placeholder="EURUSD" required style="text-transform: uppercase;">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Direction</label>
-                                    <select name="direction" class="form-input">
-                                        <option value="buy">BUY</option>
-                                        <option value="sell">SELL</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Entry Price</label>
-                                    <input type="number" name="entry_price" class="form-input" step="0.00001" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Stop Loss</label>
-                                    <input type="number" name="stop_loss" class="form-input" step="0.00001">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Take Profit</label>
-                                    <input type="number" name="take_profit" class="form-input" step="0.00001">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Timeframe</label>
-                                    <select name="timeframe" class="form-input">
-                                        <option value="1H">1 Hour</option>
-                                        <option value="4H">4 Hours</option>
-                                        <option value="D1">Daily</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Analysis</label>
-                                <textarea name="analysis" class="form-input" rows="4" placeholder="Technical analysis..."></textarea>
-                            </div>
-                            <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Publish Signal</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Blog Modal with Enhanced Editor -->
-            <div class="modal" id="blog-modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Create Blog Post</h3>
-                        <button class="modal-close" onclick="closeModal('blog-modal')">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="blog-form">
-                            <div class="form-group">
-                                <label class="form-label">Title</label>
-                                <input type="text" name="title" class="form-input" required>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                                <div class="form-group">
-                                    <label class="form-label">Category</label>
-                                    <select name="category" class="form-input">
-                                        <option value="Trading">Trading</option>
-                                        <option value="Analysis">Analysis</option>
-                                        <option value="Psychology">Psychology</option>
-                                        <option value="Strategy">Strategy</option>
-                                        <option value="News">News</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Status</label>
-                                    <select name="status" class="form-input" onchange="toggleSchedule(this.value)">
-                                        <option value="draft">Draft</option>
-                                        <option value="published">Published</option>
-                                        <option value="scheduled">Scheduled</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="form-group hidden" id="schedule-field">
-                                <label class="form-label">Schedule Date</label>
-                                <input type="datetime-local" name="scheduled_at" class="form-input">
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Featured Image URL</label>
-                                <input type="text" name="featured_image" class="form-input" placeholder="https://...">
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                                <div class="form-group">
-                                    <label class="form-label">Meta Title (SEO)</label>
-                                    <input type="text" name="meta_title" class="form-input">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Meta Description (SEO)</label>
-                                    <input type="text" name="meta_description" class="form-input">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Tags (comma separated)</label>
-                                <input type="text" name="tags" class="form-input" placeholder="forex, trading, gold">
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Content</label>
-                                <div class="editor-toolbar">
-                                    <button type="button" class="editor-btn" onclick="editorFormat('bold')" title="Bold"><i class="fas fa-bold"></i></button>
-                                    <button type="button" class="editor-btn" onclick="editorFormat('italic')" title="Italic"><i class="fas fa-italic"></i></button>
-                                    <button type="button" class="editor-btn" onclick="editorFormat('h2')" title="Heading 2">H2</button>
-                                    <button type="button" class="editor-btn" onclick="editorFormat('h3')" title="Heading 3">H3</button>
-                                    <button type="button" class="editor-btn" onclick="editorFormat('ul')" title="Bullet List"><i class="fas fa-list-ul"></i></button>
-                                    <button type="button" class="editor-btn" onclick="editorFormat('ol')" title="Numbered List"><i class="fas fa-list-ol"></i></button>
-                                    <button type="button" class="editor-btn" onclick="editorFormat('link')" title="Insert Link"><i class="fas fa-link"></i></button>
-                                </div>
-                                <div class="editor-content" id="editor-content" contenteditable="true"></div>
-                                <input type="hidden" name="content" id="blog-content-hidden">
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <input type="checkbox" name="is_premium" style="margin-right: 8px;">
-                                    Premium Content
-                                </label>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" onclick="closeModal('blog-modal')" style="width: auto;">Cancel</button>
-                        <button class="btn" onclick="submitBlogPost()" style="width: auto;">Publish</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Telegram Section -->
-            <div class="section" id="telegram-section">
-                <div class="page-header">
-                    <h2><i class="fab fa-telegram" style="color: var(--telegram);"></i> Telegram Signals</h2>
-                </div>
-                <div class="content-grid">
-                    <div class="content-card">
-                        <div style="width: 80px; height: 80px; background: var(--telegram); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px; color: white;">
-                            <i class="fab fa-telegram"></i>
-                        </div>
-                        <h3 style="text-align: center;">Free Channel</h3>
-                        <div style="text-align: center; font-size: 48px; font-weight: 700; margin: 20px 0;">FREE</div>
-                        <button class="btn btn-telegram" onclick="window.open('https://t.me/pipways_free', '_blank')">
-                            <i class="fab fa-telegram"></i> Join Free Channel
-                        </button>
-                    </div>
-                    <div class="content-card">
-                        <div style="width: 80px; height: 80px; background: var(--premium); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px; color: var(--bg-dark);">
-                            <i class="fas fa-crown"></i>
-                        </div>
-                        <h3 style="text-align: center;">VIP Channel</h3>
-                        <div style="text-align: center; font-size: 48px; font-weight: 700; margin: 20px 0; color: var(--premium);">$99/mo</div>
-                        <button class="btn btn-premium" onclick="showToast('Contact admin for upgrade', 'success')">
-                            <i class="fas fa-crown"></i> Upgrade to VIP
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Signals Section -->
-            <div class="section" id="signals-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-satellite-dish" style="color: var(--primary);"></i> Trading Signals</h2>
-                    <p>Live trading signals from our expert analysts</p>
-                </div>
-                <div class="content-grid" id="signals-container">
-                    <div class="content-card">
-                        <p style="text-align: center; color: var(--text-secondary);">Loading signals...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Analysis Section -->
-            <div class="section" id="analysis-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h2>
-                    <p>Upload your chart screenshots for instant AI-powered technical analysis</p>
-                </div>
-                <div style="max-width: 800px; margin: 30px auto; padding: 0 30px;">
-                    <div class="content-card">
-                        <div class="upload-area" onclick="document.getElementById('chart-file').click()">
-                            <i class="fas fa-cloud-upload-alt" style="font-size: 64px; color: var(--primary); margin-bottom: 20px;"></i>
-                            <h3>Upload Chart Image</h3>
-                            <p style="color: var(--text-secondary); margin-top: 8px;">Click to select or drag and drop</p>
-                            <input type="file" id="chart-file" class="hidden" accept="image/*" onchange="analyzeChart(this)">
-                        </div>
-                        <div style="margin-top: 20px;">
-                            <div class="form-group">
-                                <label class="form-label">Currency Pair</label>
-                                <input type="text" id="chart-pair" class="form-input" placeholder="EURUSD" value="EURUSD">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Timeframe</label>
-                                <select id="chart-timeframe" class="form-input">
-                                    <option value="1H">1 Hour</option>
-                                    <option value="4H">4 Hours</option>
-                                    <option value="D1">Daily</option>
-                                    <option value="W1">Weekly</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="chart-analysis-result" style="margin-top: 30px; display: none;">
-                            <h3 style="margin-bottom: 16px;">Analysis Result</h3>
-                            <div id="chart-result-content" style="background: var(--bg-dark); padding: 20px; border-radius: 8px; white-space: pre-wrap; font-family: monospace;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Courses Section -->
-            <div class="section" id="courses-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-graduation-cap" style="color: var(--warning);"></i> Trading Courses</h2>
-                    <p>Professional trading education for all levels</p>
-                </div>
-                <div class="content-grid" id="courses-container">
-                    <div class="content-card">
-                        <p style="text-align: center; color: var(--text-secondary);">Loading courses...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Webinars Section -->
-            <div class="section" id="webinars-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-video" style="color: var(--secondary);"></i> Upcoming Webinars</h2>
-                    <p>Live training sessions with expert traders</p>
-                </div>
-                <div class="content-grid" id="webinars-container">
-                    <div class="content-card">
-                        <p style="text-align: center; color: var(--text-secondary);">Loading webinars...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Blog Section -->
-            <div class="section" id="blog-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-newspaper" style="color: var(--primary);"></i> Trading Blog</h2>
-                    <p>Latest news, analysis, and educational content</p>
-                </div>
-                <div class="content-grid" id="blog-container">
-                    <div class="content-card">
-                        <p style="text-align: center; color: var(--text-secondary);">Loading posts...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Mentor Section -->
-            <div class="section" id="mentor-section">
-                <div class="page-header">
-                    <h2><i class="fas fa-comments" style="color: var(--premium);"></i> AI Trading Mentor</h2>
-                    <p>Get personalized trading advice and answers to your questions</p>
-                </div>
-                <div style="max-width: 900px; margin: 30px auto; padding: 0 30px;">
-                    <div class="content-card" style="height: 600px; display: flex; flex-direction: column;">
-                        <div id="chat-messages" style="flex: 1; overflow-y: auto; margin-bottom: 20px; padding: 20px; background: var(--bg-dark); border-radius: 8px;">
-                            <div style="background: var(--bg-hover); padding: 16px; border-radius: 12px; margin-bottom: 12px; max-width: 80%;">
-                                <strong style="color: var(--premium);">AI Mentor:</strong><br>
-                                Hello! I'm your AI Trading Mentor. Ask me anything about trading strategies, risk management, psychology, or market analysis.
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 12px;">
-                            <input type="text" id="chat-input" class="form-input" placeholder="Type your question..." style="flex: 1;" onkeypress="if(event.key==='Enter') sendChatMessage()">
-                            <button class="btn btn-sm" onclick="sendChatMessage()" style="width: auto;"><i class="fas fa-paper-plane"></i></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </main>
-    </div>
-
-    <script>
-        // ==========================================
-        // CONFIGURATION
-        // ==========================================
-        const API_URL = 'https://pipways-api-nhem.onrender.com';
-        let authToken = localStorage.getItem('access_token');
-        let refreshToken = localStorage.getItem('refresh_token');
-        let currentUser = null;
-        let trades = [];
-        let currentPage = 1;
-
-        // ==========================================
-        // INITIALIZATION
-        // ==========================================
-        document.addEventListener('DOMContentLoaded', function() {
-            if (authToken) {
-                validateToken();
-            } else {
-                showAuthWall();
-            }
-        });
-
-        function showLoading(show = true, text = 'Processing...') {
-            const overlay = document.getElementById('loading-overlay');
-            overlay.querySelector('p').textContent = text;
-            overlay.classList.toggle('show', show);
+        rows = await conn.fetch(query, *params)
+        return {
+            "users": [dict(row) for row in rows],
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit
         }
 
-        function showToast(message, type = 'error') {
-            const toast = document.getElementById('toast');
-            toast.className = `toast ${type}`;
-            document.getElementById('toast-message').textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 5000);
-        }
+@app.put("/admin/users/{user_id}/role")
+async def update_user_role(user_id: int, role: str = Query(...), admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        await conn.execute("UPDATE users SET role = $1 WHERE id = $2", role, user_id)
+        return {"message": f"User role updated to {role}"}
 
-        // ==========================================
-        // TOKEN MANAGEMENT
-        // ==========================================
-        async function validateToken() {
-            try {
-                const payload = JSON.parse(atob(authToken.split('.')[1]));
-                
-                if (payload.exp * 1000 < Date.now()) {
-                    console.log('Token expired, attempting refresh...');
-                    await refreshAccessToken();
-                } else {
-                    currentUser = payload;
-                    showMainApp();
-                }
-            } catch (error) {
-                console.error('Token validation error:', error);
-                showAuthWall();
-            }
-        }
+@app.delete("/admin/users/{user_id}")
+async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        return {"message": "User deleted"}
 
-        async function refreshAccessToken() {
-            try {
-                if (!refreshToken) {
-                    throw new Error('No refresh token');
-                }
+@app.post("/admin/users/{user_id}/toggle-subscription")
+async def toggle_subscription(
+    user_id: int,
+    tier: str = Query(...),
+    status: str = Query(...),
+    admin: dict = Depends(get_admin_user)
+):
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE users SET subscription_tier = $1, subscription_status = $2 WHERE id = $3
+        """, tier, status, user_id)
+        return {"message": "Subscription updated"}
 
-                const response = await fetch(`${API_URL}/auth/refresh`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${refreshToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    authToken = data.access_token;
-                    localStorage.setItem('access_token', authToken);
-                    currentUser = JSON.parse(atob(authToken.split('.')[1]));
-                    showMainApp();
-                } else {
-                    throw new Error('Refresh failed');
-                }
-            } catch (error) {
-                console.error('Refresh error:', error);
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
-                showAuthWall();
-            }
-        }
-
-        // ==========================================
-        // AUTH FUNCTIONS
-        // ==========================================
-        function showAuthWall() {
-            document.getElementById('auth-wall').classList.remove('hidden');
-            document.getElementById('main-app').classList.add('hidden');
-        }
-
-        function showMainApp() {
-            document.getElementById('auth-wall').classList.add('hidden');
-            document.getElementById('main-app').classList.remove('hidden');
+# Blog Management
+@app.get("/blog/posts")
+async def get_blog_posts(
+    status: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    limit: int = Query(10, le=50),
+    page: int = Query(1, ge=1),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    async with db_pool.acquire() as conn:
+        where_clauses = ["1=1"]
+        params = []
+        
+        # Filter by status (admin sees all, users see only published)
+        if not current_user or current_user.get("role") not in ["admin", "moderator"]:
+            where_clauses.append("(status = 'published' OR status IS NULL)")
+            where_clauses.append("(scheduled_at IS NULL OR scheduled_at <= NOW())")
+        elif status:
+            where_clauses.append(f"status = ${len(params)+1}")
+            params.append(status)
             
-            if (currentUser) {
-                console.log("User:", currentUser.email, "Role:", currentUser.role);
-                
-                const isAdmin = currentUser.role === 'admin' || currentUser.role === 'moderator';
-                
-                if (isAdmin) {
-                    const adminNav = document.getElementById('admin-nav-item');
-                    const adminBadge = document.getElementById('admin-badge');
-                    
-                    if (adminNav) adminNav.classList.remove('hidden');
-                    if (adminBadge) adminBadge.classList.remove('hidden');
-                }
-                
-                document.getElementById('user-name').textContent = currentUser.full_name || currentUser.email;
-                document.getElementById('user-email').textContent = currentUser.email;
-                document.getElementById('user-avatar').textContent = (currentUser.full_name || currentUser.email).charAt(0).toUpperCase();
-            }
-        }
-
-        function showRegister() {
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.remove('hidden');
-        }
-
-        function showLogin() {
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('login-form').classList.remove('hidden');
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const btn = document.getElementById('login-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
-
-            try {
-                const response = await fetch(`${API_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: e.target.email.value,
-                        password: e.target.password.value
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    authToken = data.access_token;
-                    refreshToken = data.refresh_token;
-                    localStorage.setItem('access_token', authToken);
-                    localStorage.setItem('refresh_token', refreshToken);
-                    currentUser = data.user;
-                    showMainApp();
-                    showToast('Welcome back!', 'success');
-                } else {
-                    document.getElementById('login-error').textContent = data.detail || 'Login failed';
-                    document.getElementById('login-error').style.display = 'block';
-                }
-            } catch (error) {
-                showToast('Network error. Please try again.', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<span>Login</span>';
-            }
-        }
-
-        async function handleRegister(e) {
-            e.preventDefault();
-            const btn = document.getElementById('register-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
-
-            try {
-                const response = await fetch(`${API_URL}/auth/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: e.target.email.value,
-                        password: e.target.password.value,
-                        full_name: e.target.full_name.value
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    authToken = data.access_token;
-                    refreshToken = data.refresh_token;
-                    localStorage.setItem('access_token', authToken);
-                    localStorage.setItem('refresh_token', refreshToken);
-                    currentUser = data.user;
-                    showMainApp();
-                    showToast('Account created successfully!', 'success');
-                } else {
-                    document.getElementById('register-error').textContent = data.detail || 'Registration failed';
-                    document.getElementById('register-error').style.display = 'block';
-                }
-            } catch (error) {
-                showToast('Network error. Please try again.', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<span>Create Account</span>';
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            authToken = null;
-            refreshToken = null;
-            currentUser = null;
-            showAuthWall();
-            showToast('Logged out successfully', 'success');
-        }
-
-        // ==========================================
-        // NAVIGATION
-        // ==========================================
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            sidebar.classList.toggle('open');
-            overlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
-        }
-
-        function showSection(sectionName, element) {
-            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            if (element) element.classList.add('active');
-
-            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            document.getElementById(`${sectionName}-section`).classList.add('active');
-
-            if (sectionName === 'admin') {
-                loadAdminStats();
-                loadBlogPosts();
-            } else if (sectionName === 'signals') {
-                loadSignals();
-            } else if (sectionName === 'courses') {
-                loadCourses();
-            } else if (sectionName === 'webinars') {
-                loadWebinars();
-            } else if (sectionName === 'blog') {
-                loadBlogPostsPublic();
-            }
-
-            if (window.innerWidth <= 768) {
-                toggleSidebar();
-            }
-        }
-
-        function showAdminTab(tabName, element) {
-            document.querySelectorAll('.admin-tab').forEach(tab => {
-                tab.classList.remove('active');
-                tab.style.background = '';
-                tab.style.color = '';
-            });
+        if category:
+            where_clauses.append(f"category = ${len(params)+1}")
+            params.append(category)
             
-            element.classList.add('active');
-            element.style.background = 'var(--primary)';
-            element.style.color = 'white';
+        if tag:
+            where_clauses.append(f"${len(params)+1} = ANY(tags)")
+            params.append(tag)
+
+        count_query = f"SELECT COUNT(*) FROM blog_posts WHERE {' AND '.join(where_clauses)}"
+        total = await conn.fetchval(count_query, *params)
+        
+        offset = (page - 1) * limit
+        query = f"""
+            SELECT bp.*, u.full_name as author_name 
+            FROM blog_posts bp
+            LEFT JOIN users u ON bp.author_id = u.id
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY bp.created_at DESC
+            LIMIT ${len(params)+1} OFFSET ${len(params)+2}
+        """
+        params.extend([limit, offset])
+        
+        rows = await conn.fetch(query, *params)
+        return {"posts": [dict(row) for row in rows], "total": total, "page": page}
+
+@app.post("/admin/blog")
+async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
+        
+        # Generate slug if not provided
+        slug = post.slug or post.title.lower().replace(" ", "-")[:50]
+        
+        # Check slug uniqueness
+        existing = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug)
+        if existing:
+            slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+        
+        published_at = None
+        if post.status == "published" and not post.scheduled_at:
+            published_at = datetime.utcnow()
+        
+        post_id = await conn.fetchval("""
+            INSERT INTO blog_posts (
+                title, content, excerpt, author_id, is_premium, status, 
+                scheduled_at, meta_title, meta_description, slug, featured_image, tags, category,
+                published_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id
+        """, post.title, post.content, post.excerpt, int(admin_id), post.is_premium, 
+             post.status, post.scheduled_at, post.meta_title, post.meta_description,
+             slug, post.featured_image, post.tags, post.category, published_at)
+             
+        return {"id": post_id, "slug": slug, "message": "Blog post created"}
+
+@app.delete("/admin/blog/{post_id}")
+async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
+        return {"message": "Post deleted"}
+
+# Media Upload
+@app.post("/admin/media/upload")
+async def upload_media(
+    file: UploadFile = File(...),
+    admin: dict = Depends(get_admin_user)
+):
+    try:
+        # Local fallback
+        upload_dir = "uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        file_ext = file.filename.split(".")[-1]
+        unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+        file_path = os.path.join(upload_dir, unique_name)
+        
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        admin_id = admin.get("id") or admin.get("sub")
+        async with db_pool.acquire() as conn:
+            media_id = await conn.fetchval("""
+                INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id
+            """, file.filename, f"/uploads/{unique_name}", file_ext, len(contents), int(admin_id))
             
-            document.querySelectorAll('.admin-panel').forEach(panel => panel.classList.remove('active'));
-            document.getElementById(`panel-${tabName}`).classList.add('active');
+        return {
+            "id": media_id,
+            "url": f"/uploads/{unique_name}",
+            "filename": file.filename,
+            "size": len(contents)
+        }
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+# LMS - Courses with Modules
+@app.get("/courses")
+async def get_courses(
+    level: Optional[str] = Query(None),
+    limit: int = Query(20),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    async with db_pool.acquire() as conn:
+        query = "SELECT * FROM courses WHERE 1=1"
+        params = []
+        
+        if level:
+            query += f" AND level = ${len(params)+1}"
+            params.append(level)
             
-            if (tabName === 'users') {
-                loadAdminUsers();
-            } else if (tabName === 'content') {
-                loadBlogPosts();
-            }
-        }
-
-        // ==========================================
-        // PERFORMANCE ANALYZER
-        // ==========================================
-        function showTradeInput(method) {
-            document.getElementById('manual-input').classList.toggle('hidden', method !== 'manual');
-            document.getElementById('csv-input').classList.toggle('hidden', method !== 'csv');
+        tier = current_user.get("subscription_tier", "free") if current_user else "free"
+        if tier == "free":
+            query += " AND is_premium = FALSE"
             
-            document.getElementById('btn-manual').style.background = method === 'manual' ? 'var(--primary)' : 'transparent';
-            document.getElementById('btn-csv').style.background = method === 'csv' ? 'var(--primary)' : 'transparent';
-        }
-
-        function addTrade() {
-            const trade = {
-                pair: document.getElementById('trade-pair').value.toUpperCase(),
-                direction: document.getElementById('trade-direction').value,
-                entry: parseFloat(document.getElementById('trade-entry').value),
-                exit: parseFloat(document.getElementById('trade-exit').value),
-                lots: parseFloat(document.getElementById('trade-lots').value),
-                pips: parseFloat(document.getElementById('trade-pips').value),
-                notes: document.getElementById('trade-notes').value
-            };
-
-            if (!trade.pair || !trade.entry || !trade.exit) {
-                showToast('Please fill in required fields (Pair, Entry, Exit)', 'error');
-                return;
-            }
-
-            trades.push(trade);
-            renderTrades();
-            clearTradeInputs();
-        }
-
-        function clearTradeInputs() {
-            document.getElementById('trade-pair').value = '';
-            document.getElementById('trade-entry').value = '';
-            document.getElementById('trade-exit').value = '';
-            document.getElementById('trade-pips').value = '';
-            document.getElementById('trade-notes').value = '';
-        }
-
-        function renderTrades() {
-            const container = document.getElementById('trades-container');
-            const count = document.getElementById('trade-count');
+        query += " ORDER BY created_at DESC LIMIT ${len(params)+1}"
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
+        
+        # Get modules for each course
+        courses = []
+        for row in rows:
+            course = dict(row)
+            modules = await conn.fetch(
+                "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order",
+                course["id"]
+            )
+            course["modules"] = [dict(m) for m in modules]
+            courses.append(course)
             
-            count.textContent = trades.length;
-            document.getElementById('trades-list-card').classList.remove('hidden');
+        return courses
+
+@app.post("/admin/courses")
+async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
+        course_id = await conn.fetchval("""
+            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        """, course.title, course.description, course.content, course.level, 
+             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
+        
+        return {"id": course_id, "message": "Course created"}
+
+# Webinars
+@app.get("/webinars")
+async def get_webinars(
+    upcoming: bool = Query(True),
+    limit: int = Query(20),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    async with db_pool.acquire() as conn:
+        query = "SELECT * FROM webinars WHERE 1=1"
+        params = []
+        
+        if upcoming:
+            query += " AND scheduled_at > NOW()"
             
-            container.innerHTML = trades.map((trade, index) => `
-                <div class="trade-item">
-                    <div>
-                        <strong>${trade.pair}</strong> ${trade.direction.toUpperCase()}
-                        <div style="font-size: 12px; color: var(--text-secondary);">${trade.notes || ''}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div>${trade.entry} → ${trade.exit}</div>
-                        <div style="font-size: 12px;">${trade.lots || 0.1} lots</div>
-                    </div>
-                    <div class="trade-pnl ${trade.pips >= 0 ? 'positive' : 'negative'}" style="font-weight: bold;">
-                        ${trade.pips >= 0 ? '+' : ''}${trade.pips} pips
-                    </div>
-                    <button class="action-btn delete" onclick="removeTrade(${index})" title="Remove">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `).join('');
-        }
-
-        function removeTrade(index) {
-            trades.splice(index, 1);
-            renderTrades();
-            if (trades.length === 0) {
-                document.getElementById('trades-list-card').classList.add('hidden');
-            }
-        }
-
-        function clearTrades() {
-            trades = [];
-            renderTrades();
-            document.getElementById('trades-list-card').classList.add('hidden');
-        }
-
-        async function analyzePerformance() {
-            if (trades.length === 0) {
-                showToast('Please add at least one trade', 'error');
-                return;
-            }
-
-            showLoading(true, 'Analyzing with AI...');
+        tier = current_user.get("subscription_tier", "free") if current_user else "free"
+        if tier == "free":
+            query += " AND is_premium = FALSE"
             
-            try {
-                const response = await fetch(`${API_URL}/analyze/performance`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        trades: trades,
-                        account_balance: parseFloat(document.getElementById('account-balance').value) || null,
-                        trading_period_days: 30
-                    })
-                });
+        query += " ORDER BY scheduled_at ASC LIMIT $1"
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
+        return [dict(row) for row in rows]
 
-                if (!response.ok) {
-                    throw new Error('Analysis failed');
+@app.post("/admin/webinars")
+async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
+        webinar_id = await conn.fetchval("""
+            INSERT INTO webinars (title, description, scheduled_at, duration_minutes, meeting_link, is_premium, created_by, max_participants)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        """, webinar.title, webinar.description, webinar.scheduled_at, 
+             webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, int(admin_id), webinar.max_participants)
+        return {"id": webinar_id, "message": "Webinar created"}
+
+# Signals
+@app.get("/signals")
+async def get_signals(
+    status: Optional[str] = Query(None),
+    pair: Optional[str] = Query(None),
+    limit: int = Query(50),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    async with db_pool.acquire() as conn:
+        query = "SELECT * FROM signals WHERE 1=1"
+        params = []
+        
+        if status:
+            query += f" AND status = ${len(params)+1}"
+            params.append(status)
+        if pair:
+            query += f" AND pair ILIKE ${len(params)+1}"
+            params.append(f"%{pair}%")
+            
+        tier = current_user.get("subscription_tier", "free") if current_user else "free"
+        if tier == "free":
+            query += " AND is_premium = FALSE"
+            
+        query += f" ORDER BY created_at DESC LIMIT ${len(params)+1}"
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
+        return [dict(row) for row in rows]
+
+@app.post("/admin/signals")
+async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
+    async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
+        signal_id = await conn.fetchval("""
+            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, timeframe, analysis, is_premium, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id
+        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
+        return {"id": signal_id, "message": "Signal created"}
+
+# AI Performance Analyzer
+@app.post("/analyze/performance")
+async def analyze_performance(
+    request: PerformanceAnalysisRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    try:
+        total_trades = len(request.trades)
+        winning_trades = len([t for t in request.trades if t.get("pips", 0) > 0 or t.get("profit", 0) > 0])
+        losing_trades = total_trades - winning_trades
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology."""
+
+        user_prompt = f"""Analyze the following trading performance data:
+
+Account Balance: {request.account_balance or 'Not provided'}
+Trading Period: {request.trading_period_days or 'Not provided'} days
+Total Trades Provided: {total_trades}
+Calculated Win Rate: {win_rate:.1f}%
+
+Trade History:
+{json.dumps(request.trades, indent=2)}
+
+Provide analysis in strict JSON format with fields: performance_summary, trader_score (1-100), strengths, weaknesses, behavior_patterns, top_mistakes, improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes), recommended_courses, mentor_advice."""
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways Performance Analyzer"
+                },
+                json={
+                    "model": settings.OPENROUTER_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "max_tokens": 2500,
+                    "temperature": 0.4
                 }
+            )
 
-                const data = await response.json();
-                displayAnalysis(data.analysis);
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI analysis failed")
+
+            result = response.json()
+            ai_content = result["choices"][0]["message"]["content"]
+            
+            try:
+                cleaned = ai_content.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                    cleaned = cleaned.strip()
                 
-            } catch (error) {
-                console.error('Analysis error:', error);
-                showToast('Failed to analyze performance. Please try again.', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function displayAnalysis(analysis) {
-            document.getElementById('analysis-results').classList.remove('hidden');
-            
-            const score = analysis.trader_score || 0;
-            document.getElementById('trader-score').textContent = score;
-            document.getElementById('score-circle').style.setProperty('--score', score);
-            
-            let interpretation = 'Needs significant improvement';
-            if (score >= 80) interpretation = 'Excellent trading performance';
-            else if (score >= 60) interpretation = 'Good performance with room for improvement';
-            else if (score >= 40) interpretation = 'Average performance, focus on discipline';
-            document.getElementById('score-interpretation').textContent = interpretation;
-
-            const summary = analysis.performance_summary || {};
-            document.getElementById('performance-summary').innerHTML = `
-                <div class="metric-row">
-                    <span>Total Trades</span>
-                    <strong>${summary.total_trades || 0}</strong>
-                </div>
-                <div class="metric-row">
-                    <span>Win Rate</span>
-                    <strong style="color: ${parseInt(summary.win_rate) >= 50 ? 'var(--success)' : 'var(--danger)'}">${summary.win_rate || '0%'}</strong>
-                </div>
-                <div class="metric-row">
-                    <span>Net Pips</span>
-                    <strong style="color: ${String(summary.net_pips).startsWith('+') ? 'var(--success)' : 'var(--danger)'}">${summary.net_pips || 0}</strong>
-                </div>
-                <div class="metric-row">
-                    <span>Risk/Reward</span>
-                    <strong>${summary.risk_reward_ratio || 'N/A'}</strong>
-                </div>
-                <div class="metric-row">
-                    <span>Profit Factor</span>
-                    <strong>${summary.profit_factor || 'N/A'}</strong>
-                </div>
-            `;
-
-            const createList = (items, containerId) => {
-                const container = document.getElementById(containerId);
-                if (items && items.length > 0) {
-                    container.innerHTML = items.map(item => `<li>${item}</li>`).join('');
-                } else {
-                    container.innerHTML = '<li style="opacity: 0.6;">None identified</li>';
-                }
-            };
-
-            createList(analysis.top_mistakes, 'top-mistakes');
-            createList(analysis.strengths, 'strengths-list');
-            
-            const plan = analysis.improvement_plan || {};
-            const allImprovements = [
-                ...(plan.immediate_actions || []),
-                ...(plan.strategy_improvements || []),
-                ...(plan.risk_management_fixes || [])
-            ];
-            createList(allImprovements, 'improvement-plan');
-
-            const coursesContainer = document.getElementById('recommended-courses');
-            if (analysis.recommended_courses && analysis.recommended_courses.length > 0) {
-                coursesContainer.innerHTML = analysis.recommended_courses.map(course => `
-                    <span style="background: var(--primary); color: white; padding: 6px 12px; border-radius: 20px; font-size: 14px;">${course}</span>
-                `).join('');
-            } else {
-                coursesContainer.innerHTML = '<span style="color: var(--text-secondary);">No specific courses recommended</span>';
-            }
-
-            document.getElementById('mentor-advice').textContent = analysis.mentor_advice || 'No specific advice provided.';
-            
-            document.getElementById('analysis-results').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function handleCSVUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                const lines = text.split('\n');
+                analysis_data = json.loads(cleaned)
                 
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!line) continue;
-                    
-                    const cols = line.split(',');
-                    if (cols.length >= 6) {
-                        trades.push({
-                            pair: cols[1] || 'UNKNOWN',
-                            direction: cols[2]?.toLowerCase() || 'buy',
-                            entry: parseFloat(cols[3]) || 0,
-                            exit: parseFloat(cols[4]) || 0,
-                            lots: parseFloat(cols[5]) || 0.1,
-                            pips: parseFloat(cols[6]) || 0,
-                            notes: cols[7] || ''
-                        });
-                    }
-                }
+                user_id = current_user.get("id") or current_user.get("sub")
+                async with db_pool.acquire() as conn:
+                    await conn.execute("""
+                        INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
+                        VALUES ($1, $2, $3, $4)
+                    """, int(user_id), json.dumps(analysis_data), json.dumps(request.trades),
+                         analysis_data.get("trader_score", 0))
                 
-                renderTrades();
-                showToast(`Imported ${trades.length} trades from CSV`, 'success');
-            };
-            reader.readAsText(file);
-        }
-
-        // ==========================================
-        // ADMIN FUNCTIONS
-        // ==========================================
-        async function loadAdminStats() {
-            try {
-                const response = await fetch(`${API_URL}/admin/stats`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('stat-total-users').textContent = data.total_users;
-                    document.getElementById('stat-active-signals').textContent = data.active_signals;
-                    document.getElementById('stat-premium-users').textContent = data.premium_users;
-                    document.getElementById('stat-blog-posts').textContent = data.content_stats?.blog_posts || 0;
-                }
-            } catch (error) {
-                console.error('Failed to load stats:', error);
-            }
-        }
-
-        async function loadBlogPosts() {
-            try {
-                const response = await fetch(`${API_URL}/blog/posts?limit=50`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const tbody = document.getElementById('blog-table-body');
-                    
-                    if (!data.posts || data.posts.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No posts found</td></tr>';
-                        return;
-                    }
-                    
-                    tbody.innerHTML = data.posts.map(post => `
-                        <tr>
-                            <td>
-                                <strong>${post.title}</strong>
-                                ${post.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}
-                            </td>
-                            <td><span class="status-badge status-${post.status || 'draft'}">${post.status || 'draft'}</span></td>
-                            <td>${post.category || '-'}</td>
-                            <td>${new Date(post.created_at).toLocaleDateString()}</td>
-                            <td>
-                                <div class="action-btns">
-                                    <button class="action-btn" onclick="editPost(${post.id})" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete" onclick="deletePost(${post.id})" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Failed to load blog posts:', error);
-            }
-        }
-
-        async function loadAdminUsers() {
-            try {
-                const response = await fetch(`${API_URL}/admin/users?limit=50`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const tbody = document.getElementById('users-table-body');
-                    
-                    if (!data.users || data.users.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No users found</td></tr>';
-                        return;
-                    }
-                    
-                    tbody.innerHTML = data.users.map(user => `
-                        <tr>
-                            <td>
-                                <div style="font-weight: 600;">${user.full_name || 'N/A'}</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">${user.email}</div>
-                            </td>
-                            <td><span class="status-badge" style="text-transform: uppercase; font-size: 10px;">${user.role}</span></td>
-                            <td>
-                                <div>${user.subscription_tier}</div>
-                                <div style="font-size: 11px; color: var(--text-secondary);">${user.subscription_status}</div>
-                            </td>
-                            <td>${new Date(user.created_at).toLocaleDateString()}</td>
-                            <td>
-                                <div class="action-btns">
-                                    <button class="action-btn" onclick="changeUserRole(${user.id})" title="Change Role">
-                                        <i class="fas fa-user-shield"></i>
-                                    </button>
-                                    <button class="action-btn delete" onclick="deleteUser(${user.id})" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Failed to load users:', error);
-            }
-        }
-
-        async function createCourse(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = {
-                title: formData.get('title'),
-                description: formData.get('description'),
-                content: formData.get('description'),
-                level: formData.get('level'),
-                duration_hours: parseFloat(formData.get('duration_hours')) || null,
-                is_premium: formData.has('is_premium')
-            };
-
-            try {
-                const response = await fetch(`${API_URL}/admin/courses`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    showToast('Course created successfully!', 'success');
-                    e.target.reset();
-                } else {
-                    const err = await response.json();
-                    showToast(err.detail || 'Failed to create course', 'error');
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        async function createWebinar(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = {
-                title: formData.get('title'),
-                description: formData.get('description'),
-                scheduled_at: new Date(formData.get('scheduled_at')).toISOString(),
-                meeting_link: formData.get('meeting_link'),
-                is_premium: formData.has('is_premium')
-            };
-
-            try {
-                const response = await fetch(`${API_URL}/admin/webinars`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    showToast('Webinar created successfully!', 'success');
-                    e.target.reset();
-                } else {
-                    const err = await response.json();
-                    showToast(err.detail || 'Failed to create webinar', 'error');
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        async function createSignal(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = {
-                pair: formData.get('pair').toUpperCase(),
-                direction: formData.get('direction'),
-                entry_price: parseFloat(formData.get('entry_price')),
-                stop_loss: parseFloat(formData.get('stop_loss')) || null,
-                take_profit: parseFloat(formData.get('take_profit')) || null,
-                timeframe: formData.get('timeframe'),
-                analysis: formData.get('analysis')
-            };
-
-            try {
-                const response = await fetch(`${API_URL}/admin/signals`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    showToast('Signal published successfully!', 'success');
-                    e.target.reset();
-                } else {
-                    const err = await response.json();
-                    showToast(err.detail || 'Failed to create signal', 'error');
-                }
-            } catch (error) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        async function deletePost(id) {
-            if (!confirm('Are you sure you want to delete this post?')) return;
-            
-            try {
-                const response = await fetch(`${API_URL}/admin/blog/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                
-                if (response.ok) {
-                    showToast('Post deleted', 'success');
-                    loadBlogPosts();
-                }
-            } catch (error) {
-                showToast('Failed to delete post', 'error');
-            }
-        }
-
-        async function deleteUser(id) {
-            if (!confirm('Are you sure you want to delete this user?')) return;
-            
-            try {
-                const response = await fetch(`${API_URL}/admin/users/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                
-                if (response.ok) {
-                    showToast('User deleted', 'success');
-                    loadAdminUsers();
-                }
-            } catch (error) {
-                showToast('Failed to delete user', 'error');
-            }
-        }
-
-        function searchUsers() {
-            const search = document.getElementById('user-search').value;
-            loadAdminUsers();
-        }
-
-        // ==========================================
-        // PUBLIC DATA LOADING
-        // ==========================================
-        async function loadSignals() {
-            try {
-                const response = await fetch(`${API_URL}/signals?limit=20`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await response.json();
-                const container = document.getElementById('signals-container');
-                
-                if (data.length === 0) {
-                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No active signals</p></div>';
-                    return;
+                return {
+                    "analysis": analysis_data,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "trades_analyzed": total_trades
                 }
                 
-                container.innerHTML = data.map(signal => `
-                    <div class="content-card">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <h3 style="margin: 0;">${signal.pair} <span style="color: ${signal.direction === 'buy' ? 'var(--success)' : 'var(--danger)'}">${signal.direction.toUpperCase()}</span></h3>
-                            <span class="status-badge status-published">${signal.timeframe}</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-                            <div><strong>Entry:</strong> ${signal.entry_price}</div>
-                            <div><strong>SL:</strong> ${signal.stop_loss || 'N/A'}</div>
-                            <div><strong>TP:</strong> ${signal.take_profit || 'N/A'}</div>
-                        </div>
-                        <p style="color: var(--text-secondary); font-size: 14px;">${signal.analysis || 'No analysis provided'}</p>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Failed to load signals:', error);
-            }
-        }
+            except json.JSONDecodeError:
+                return {"raw_analysis": ai_content, "error": "Parse error"}
 
-        async function loadCourses() {
-            try {
-                const response = await fetch(`${API_URL}/courses`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await response.json();
-                const container = document.getElementById('courses-container');
-                
-                if (data.length === 0) {
-                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No courses available</p></div>';
-                    return;
+    except Exception as e:
+        logger.error(f"Performance analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Chart Analysis
+@app.post("/analyze/chart")
+async def analyze_chart(
+    file: UploadFile = File(...),
+    pair: Optional[str] = Form("EURUSD"),
+    timeframe: Optional[str] = Form("1H"),
+    additional_info: Optional[str] = Form(""),
+    current_user: dict = Depends(get_current_user)
+):
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+
+    try:
+        contents = await file.read()
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large")
+
+        image_base64 = base64.b64encode(contents).decode()
+
+        prompt = f"""Analyze this {pair} chart on {timeframe}. Context: {additional_info}
+Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance (object with support/resistance arrays), key_observations."""
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways AI Analysis"
+                },
+                json={
+                    "model": settings.OPENROUTER_VISION_MODEL,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                            ]
+                        }
+                    ],
+                    "max_tokens": 1500,
+                    "temperature": 0.3
                 }
-                
-                container.innerHTML = data.map(course => `
-                    <div class="content-card">
-                        <h3>${course.title} ${course.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}</h3>
-                        <p style="color: var(--text-secondary); margin: 12px 0;">${course.description}</p>
-                        <div style="display: flex; gap: 8px; margin-top: 16px;">
-                            <span class="status-badge status-published">${course.level}</span>
-                            ${course.duration_hours ? `<span class="status-badge status-draft">${course.duration_hours}h</span>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Failed to load courses:', error);
-            }
-        }
+            )
 
-        async function loadWebinars() {
-            try {
-                const response = await fetch(`${API_URL}/webinars`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await response.json();
-                const container = document.getElementById('webinars-container');
-                
-                if (data.length === 0) {
-                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No upcoming webinars</p></div>';
-                    return;
-                }
-                
-                container.innerHTML = data.map(webinar => `
-                    <div class="content-card">
-                        <h3>${webinar.title} ${webinar.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}</h3>
-                        <p style="color: var(--text-secondary); margin: 12px 0;">${webinar.description}</p>
-                        <div style="margin-top: 16px;">
-                            <div style="color: var(--text-secondary); font-size: 14px; margin-bottom: 8px;">
-                                <i class="fas fa-calendar"></i> ${new Date(webinar.scheduled_at).toLocaleString()}
-                            </div>
-                            ${webinar.meeting_link ? `<a href="${webinar.meeting_link}" target="_blank" class="btn btn-sm btn-success" style="width: 100%;">Join Meeting</a>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Failed to load webinars:', error);
-            }
-        }
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI service error")
 
-        async function loadBlogPostsPublic() {
-            try {
-                const response = await fetch(`${API_URL}/blog/posts?limit=20`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await response.json();
-                const container = document.getElementById('blog-container');
-                
-                if (!data.posts || data.posts.length === 0) {
-                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No posts available</p></div>';
-                    return;
-                }
-                
-                container.innerHTML = data.posts.map(post => `
-                    <div class="content-card">
-                        ${post.featured_image ? `<img src="${post.featured_image}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 16px;">` : ''}
-                        <h3>${post.title} ${post.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}</h3>
-                        <p style="color: var(--text-secondary); margin: 12px 0;">${post.excerpt || post.content.substring(0, 150)}...</p>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-                            <span class="status-badge status-published">${post.category || 'General'}</span>
-                            <span style="color: var(--text-secondary); font-size: 12px;">${new Date(post.created_at).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (error) {
-                console.error('Failed to load blog posts:', error);
-            }
-        }
-
-        // ==========================================
-        // CHART ANALYSIS
-        // ==========================================
-        async function analyzeChart(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            showLoading(true, 'Analyzing chart with AI...');
+            result = response.json()
+            ai_response = result["choices"][0]["message"]["content"]
             
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('pair', document.getElementById('chart-pair').value);
-            formData.append('timeframe', document.getElementById('chart-timeframe').value);
-
-            try {
-                const response = await fetch(`${API_URL}/analyze/chart`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error('Analysis failed');
-                }
-
-                const data = await response.json();
-                document.getElementById('chart-analysis-result').style.display = 'block';
-                document.getElementById('chart-result-content').textContent = data.analysis;
+            try:
+                cleaned = ai_response.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                    cleaned = cleaned.strip()
                 
-            } catch (error) {
-                console.error('Chart analysis error:', error);
-                showToast('Failed to analyze chart', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
+                analysis_data = json.loads(cleaned)
+                
+                formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 
-        // ==========================================
-        // BLOG MODAL & EDITOR
-        // ==========================================
-        function openBlogModal() {
-            document.getElementById('blog-modal').classList.add('show');
-        }
+🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('show');
-        }
+📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
+🛑 STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
+🎯 TAKE PROFITS: {', '.join(analysis_data.get('take_profit', []))}
+⚖️ RISK/REWARD: {analysis_data.get('risk_reward', 'N/A')}
+🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
 
-        function toggleSchedule(value) {
-            const field = document.getElementById('schedule-field');
-            if (value === 'scheduled') {
-                field.classList.remove('hidden');
-            } else {
-                field.classList.add('hidden');
-            }
-        }
+📝 SUMMARY:
+{analysis_data.get('summary', 'No summary')}
 
-        function editorFormat(command) {
-            const editor = document.getElementById('editor-content');
-            editor.focus();
-            
-            if (command === 'h2' || command === 'h3') {
-                document.execCommand('formatBlock', false, command.toUpperCase());
-            } else if (command === 'link') {
-                const url = prompt('Enter URL:');
-                if (url) document.execCommand('createLink', false, url);
-            } else {
-                document.execCommand(command, false, null);
-            }
-        }
+🏗️ MARKET STRUCTURE:
+{analysis_data.get('market_structure', 'N/A')}
 
-        function updateEditorContent() {
-            const content = document.getElementById('editor-content').innerHTML;
-            document.getElementById('blog-content-hidden').value = content;
-        }
+📊 SUPPORT/RESISTANCE:
+Support: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
+Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
 
-        async function submitBlogPost() {
-            const form = document.getElementById('blog-form');
-            const formData = new FormData(form);
-            
-            const data = {
-                title: formData.get('title'),
-                content: document.getElementById('editor-content').innerHTML,
-                excerpt: formData.get('meta_description') || document.getElementById('editor-content').innerText.substring(0, 150),
-                category: formData.get('category'),
-                status: formData.get('status'),
-                scheduled_at: formData.get('scheduled_at') || null,
-                featured_image: formData.get('featured_image') || null,
-                meta_title: formData.get('meta_title') || null,
-                meta_description: formData.get('meta_description') || null,
-                tags: formData.get('tags') ? formData.get('tags').split(',').map(t => t.trim()) : [],
-                is_premium: formData.has('is_premium')
-            };
+🔍 OBSERVATIONS:
+{analysis_data.get('key_observations', 'None')}"""
 
-            try {
-                const response = await fetch(`${API_URL}/admin/blog`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    showToast('Blog post created successfully!', 'success');
-                    closeModal('blog-modal');
-                    form.reset();
-                    document.getElementById('editor-content').innerHTML = '';
-                    loadBlogPosts();
-                } else {
-                    const err = await response.json();
-                    showToast(err.detail || 'Failed to create post', 'error');
+                return {
+                    "analysis": formatted_report,
+                    "structured_data": analysis_data,
+                    "image_base64": image_base64,
+                    "pair": pair,
+                    "timeframe": timeframe
                 }
-            } catch (error) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        function editPost(id) {
-            showToast('Edit functionality coming soon', 'success');
-        }
-
-        // ==========================================
-        // AI MENTOR CHAT
-        // ==========================================
-        async function sendChatMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (!message) return;
-
-            // Add user message
-            const chatContainer = document.getElementById('chat-messages');
-            const userDiv = document.createElement('div');
-            userDiv.style.cssText = 'background: var(--primary); color: white; padding: 16px; border-radius: 12px; margin-bottom: 12px; max-width: 80%; margin-left: auto;';
-            userDiv.innerHTML = `<strong>You:</strong><br>${message}`;
-            chatContainer.appendChild(userDiv);
-            
-            input.value = '';
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            showLoading(true, 'AI is thinking...');
-
-            try {
-                const response = await fetch(`${API_URL}/chat`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message: message })
-                });
-
-                showLoading(false);
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const aiDiv = document.createElement('div');
-                    aiDiv.style.cssText = 'background: var(--bg-hover); padding: 16px; border-radius: 12px; margin-bottom: 12px; max-width: 80%;';
-                    aiDiv.innerHTML = `<strong style="color: var(--premium);">AI Mentor:</strong><br>${data.response}`;
-                    chatContainer.appendChild(aiDiv);
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                } else {
-                    throw new Error('Failed to get response');
+                
+            except json.JSONDecodeError:
+                return {
+                    "analysis": ai_response,
+                    "image_base64": image_base64,
+                    "pair": pair,
+                    "timeframe": timeframe
                 }
-            } catch (error) {
-                showLoading(false);
-                const errorDiv = document.createElement('div');
-                errorDiv.style.cssText = 'background: rgba(239, 68, 68, 0.2); color: var(--danger); padding: 16px; border-radius: 12px; margin-bottom: 12px;';
-                errorDiv.textContent = 'Sorry, I could not process your message. Please try again.';
-                chatContainer.appendChild(errorDiv);
-            }
-        }
+                
+    except Exception as e:
+        logger.error(f"Chart analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-        function changeUserRole(userId) {
-            const newRole = prompt('Enter new role (user, moderator, admin):');
-            if (!newRole) return;
-            
-            fetch(`${API_URL}/admin/users/${userId}/role?role=${newRole}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            })
-            .then(response => {
-                if (response.ok) {
-                    showToast('Role updated', 'success');
-                    loadAdminUsers();
-                } else {
-                    showToast('Failed to update role', 'error');
-                }
-            });
-        }
-    </script>
-</body>
-</html>
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "version": "3.1.0", "timestamp": datetime.utcnow().isoformat()}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)

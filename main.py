@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Production Fix v2.1
-Fixes: Professional AI prompts, image handling, admin visibility, error handling
+Pipways Trading Platform API - Enterprise v3.0
+Features: Redis caching, rate limiting, trade journal, analytics, course lessons, media library
 """
 
 import os
@@ -11,16 +11,23 @@ import asyncpg
 import logging
 import base64
 import json
+import csv
+import io
+import uuid
+import redis
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +39,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 class Settings:
     DATABASE_URL = os.getenv("DATABASE_URL")
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -40,13 +48,14 @@ class Settings:
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-    # Use reliable vision-capable models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
-
-    # CORS origins from environment variable
     CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "*")
+    MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+    RATE_LIMIT_CHART = "5 per minute"
+    RATE_LIMIT_MENTOR = "10 per minute"
+    RATE_LIMIT_GENERAL = "100 per minute"
+    
     @property
     def CORS_ORIGINS(self):
         if self.CORS_ORIGINS_STR == "*":
@@ -55,26 +64,41 @@ class Settings:
 
 settings = Settings()
 
+# Initialize Redis
+redis_client = None
+
 # Database pool
 db_pool: Optional[asyncpg.Pool] = None
 
+# Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db_pool
+    global db_pool, redis_client
     try:
+        # Initialize PostgreSQL
         db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+        
+        # Initialize Redis
+        redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        
         await init_db()
-        logger.info("Database initialized successfully")
+        logger.info("Database and Redis initialized successfully")
     except Exception as e:
-        logger.error(f"Database initialization error: {e}")
+        logger.error(f"Initialization error: {e}")
         raise
     yield
     if db_pool:
         await db_pool.close()
+    if redis_client:
+        redis_client.close()
 
-app = FastAPI(title="Pipways API", version="2.1.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.0.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS Middleware
+# CORS Middleware - Keeping existing permissive settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -88,7 +112,7 @@ app.add_middleware(
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Models
+# Pydantic Models
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -113,33 +137,33 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-class Token(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    user: Dict[str, Any]
+class TradeEntry(BaseModel):
+    pair: str = Field(..., min_length=1, max_length=20, pattern=r'^[A-Za-z0-9]+$')
+    direction: str = Field(..., pattern="^(buy|sell)$")
+    entry_price: float = Field(..., gt=0)
+    exit_price: Optional[float] = Field(None, gt=0)
+    stop_loss: Optional[float] = Field(None, gt=0)
+    take_profit: Optional[float] = Field(None, gt=0)
+    result_pips: Optional[float] = None
+    result_profit: Optional[float] = None
+    rr_ratio: Optional[float] = Field(None, ge=0)
+    emotion: Optional[str] = Field(None, max_length=50)
+    strategy: Optional[str] = Field(None, max_length=100)
+    session: Optional[str] = Field(None, pattern="^(London|NY|Asian|Other)$")
+    notes: Optional[str] = Field(None, max_length=2000)
 
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
+class LessonCreate(BaseModel):
+    course_id: int
+    title: str = Field(..., min_length=1, max_length=255)
+    video_url: Optional[str] = Field(None, max_length=500)
+    content: str = Field(..., min_length=1)
+    order_index: int = Field(0, ge=0)
+    duration_minutes: Optional[int] = Field(None, ge=1)
 
-class PasswordReset(BaseModel):
-    token: str
-    new_password: str = Field(..., min_length=8)
-
-    @field_validator('new_password')
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain a lowercase letter')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain an uppercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain a number')
-        if not any(c in '@$!%*?&' for c in v):
-            raise ValueError('Password must contain a special character (@$!%*?&)')
-        return v
+class ProgressUpdate(BaseModel):
+    lesson_id: int
+    completed: bool = False
+    progress_percent: int = Field(0, ge=0, le=100)
 
 class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=1)
@@ -172,41 +196,13 @@ class CourseCreate(BaseModel):
     is_premium: bool = False
 
 class MentorChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
-    context: Optional[str] = ""
+    message: str = Field(..., min_length=1, max_length=1000)
+    context: Optional[str] = Field("", max_length=500)
 
 # Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
-        # Check if users table exists
-        table_exists = await conn.fetchval("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'users'
-            )
-        """)
-
-        if table_exists:
-            # Check if role column exists, add if not
-            role_column_exists = await conn.fetchval("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.columns 
-                    WHERE table_name = 'users' AND column_name = 'role'
-                )
-            """)
-
-            if not role_column_exists:
-                logger.info("Adding role column to existing users table...")
-                await conn.execute("""
-                    ALTER TABLE users 
-                    ADD COLUMN role VARCHAR(20) DEFAULT 'user'
-                """)
-                await conn.execute("""
-                    UPDATE users SET role = 'user' WHERE role IS NULL
-                """)
-                logger.info("Role column added successfully")
-
-        # Create users table if not exists
+        # Existing tables check/creation with new additions
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -225,7 +221,6 @@ async def init_db():
             )
         """)
 
-        # Create signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -246,7 +241,6 @@ async def init_db():
             )
         """)
 
-        # Create blog_posts table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -260,7 +254,6 @@ async def init_db():
             )
         """)
 
-        # Create webinars table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -275,7 +268,6 @@ async def init_db():
             )
         """)
 
-        # Create courses table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -289,7 +281,6 @@ async def init_db():
             )
         """)
 
-        # Create chat_history table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -297,6 +288,72 @@ async def init_db():
                 message TEXT NOT NULL,
                 response TEXT NOT NULL,
                 context TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # NEW: Trade Journal Table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS trade_journal (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                pair VARCHAR(20) NOT NULL,
+                direction VARCHAR(10) CHECK (direction IN ('buy', 'sell')),
+                entry_price DECIMAL(10,5) NOT NULL,
+                exit_price DECIMAL(10,5),
+                stop_loss DECIMAL(10,5),
+                take_profit DECIMAL(10,5),
+                result_pips DECIMAL(10,2),
+                result_profit DECIMAL(10,2),
+                rr_ratio DECIMAL(4,2),
+                emotion VARCHAR(50),
+                strategy VARCHAR(100),
+                session VARCHAR(20),
+                screenshot_url VARCHAR(500),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                exit_date TIMESTAMP
+            )
+        """)
+
+        # NEW: Course Lessons Table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS course_lessons (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                video_url VARCHAR(500),
+                content TEXT,
+                order_index INTEGER DEFAULT 0,
+                duration_minutes INTEGER,
+                is_premium BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # NEW: Course Progress Table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS course_progress (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                lesson_id INTEGER REFERENCES course_lessons(id) ON DELETE CASCADE,
+                completed BOOLEAN DEFAULT FALSE,
+                progress_percent INTEGER DEFAULT 0,
+                completed_at TIMESTAMP,
+                UNIQUE(user_id, lesson_id)
+            )
+        """)
+
+        # NEW: Media Library Table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS media_files (
+                id SERIAL PRIMARY KEY,
+                file_url VARCHAR(500) NOT NULL,
+                file_type VARCHAR(50),
+                file_name VARCHAR(255),
+                uploaded_by INTEGER REFERENCES users(id),
+                file_size INTEGER,
+                used_in VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -312,7 +369,6 @@ async def init_db():
                 """, settings.ADMIN_EMAIL, hashed, "System Administrator")
                 logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
             else:
-                # Ensure admin has admin role
                 await conn.execute("""
                     UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'
                 """, settings.ADMIN_EMAIL)
@@ -391,9 +447,22 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
+# Rate limiting key function for authenticated users
+def get_user_id(request: Request):
+    auth = request.headers.get("authorization")
+    if auth and auth.startswith("Bearer "):
+        try:
+            token = auth.split(" ")[1]
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            return payload.get("sub", get_remote_address(request))
+        except:
+            return get_remote_address(request)
+    return get_remote_address(request)
+
 # Auth endpoints
-@app.post("/auth/register", response_model=Token)
-async def register(user_data: UserRegister):
+@app.post("/auth/register")
+@limiter.limit(settings.RATE_LIMIT_GENERAL)
+async def register(request: Request, user_data: UserRegister):
     async with db_pool.acquire() as conn:
         existing = await conn.fetchval("SELECT id FROM users WHERE email = $1", user_data.email)
         if existing:
@@ -423,8 +492,9 @@ async def register(user_data: UserRegister):
             "user": dict(user) if user else {"id": user_id, "email": user_data.email, "role": "user"}
         }
 
-@app.post("/auth/login", response_model=Token)
-async def login(credentials: UserLogin):
+@app.post("/auth/login")
+@limiter.limit(settings.RATE_LIMIT_GENERAL)
+async def login(request: Request, credentials: UserLogin):
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", credentials.email)
         if not user or not verify_password(credentials.password, user["password_hash"]):
@@ -449,7 +519,8 @@ async def login(credentials: UserLogin):
         }
 
 @app.post("/auth/refresh")
-async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+@limiter.limit(settings.RATE_LIMIT_GENERAL)
+async def refresh_token(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -481,48 +552,440 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
-@app.post("/auth/forgot-password")
-async def forgot_password(request: PasswordResetRequest):
+# Trade Journal Endpoints
+@app.post("/journal/trades")
+async def create_trade(
+    trade: TradeEntry,
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
     async with db_pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", request.email)
-        if not user:
-            return {"message": "If email exists, reset link sent"}
+        # Validate pair format (alphanumeric only)
+        if not re.match(r'^[A-Za-z0-9]+$', trade.pair):
+            raise HTTPException(status_code=400, detail="Invalid pair format")
+            
+        trade_id = await conn.fetchval("""
+            INSERT INTO trade_journal 
+            (user_id, pair, direction, entry_price, exit_price, stop_loss, take_profit, 
+             result_pips, result_profit, rr_ratio, emotion, strategy, session, notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id
+        """, user_id, trade.pair.upper(), trade.direction, trade.entry_price, 
+             trade.exit_price, trade.stop_loss, trade.take_profit,
+             trade.result_pips, trade.result_profit, trade.rr_ratio,
+             trade.emotion, trade.strategy, trade.session, trade.notes)
+        
+        return {"id": trade_id, "message": "Trade recorded successfully"}
 
-        reset_token = create_reset_token()
-        expires = datetime.utcnow() + timedelta(hours=settings.RESET_TOKEN_EXPIRE_HOURS)
-
-        await conn.execute("""
-            UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3
-        """, reset_token, expires, user["id"])
-
-        reset_url = f"https://pipways-web-nhem.onrender.com?reset_token={reset_token}"
-        logger.info(f"Password reset URL for {request.email}: {reset_url}")
-
-        return {"message": "If email exists, reset link sent"}
-
-@app.post("/auth/reset-password")
-async def reset_password(reset_data: PasswordReset):
+@app.get("/journal/trades")
+async def get_trades(
+    limit: int = Query(50, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
     async with db_pool.acquire() as conn:
-        user = await conn.fetchrow("""
-            SELECT * FROM users 
-            WHERE reset_token = $1 AND reset_token_expires > NOW()
-        """, reset_data.token)
+        rows = await conn.fetch("""
+            SELECT * FROM trade_journal 
+            WHERE user_id = $1 
+            ORDER BY created_at DESC 
+            LIMIT $2 OFFSET $3
+        """, user_id, limit, offset)
+        
+        total = await conn.fetchval("""
+            SELECT COUNT(*) FROM trade_journal WHERE user_id = $1
+        """, user_id)
+        
+        return {"trades": [dict(row) for row in rows], "total": total}
 
-        if not user:
-            raise HTTPException(status_code=400, detail="Invalid or expired token")
+@app.post("/journal/upload-csv")
+async def upload_trade_csv(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files allowed")
+    
+    contents = await file.read()
+    if len(contents) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large")
+    
+    try:
+        csv_content = contents.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(csv_content))
+        
+        required_fields = ['pair', 'direction', 'entry_price']
+        inserted = 0
+        errors = []
+        
+        async with db_pool.acquire() as conn:
+            for idx, row in enumerate(csv_reader, 1):
+                try:
+                    # Validate required fields
+                    if not all(field in row and row[field] for field in required_fields):
+                        errors.append(f"Row {idx}: Missing required fields")
+                        continue
+                    
+                    # Sanitize and validate
+                    pair = re.sub(r'[^A-Za-z0-9]', '', row['pair']).upper()
+                    direction = row['direction'].lower()
+                    if direction not in ['buy', 'sell']:
+                        errors.append(f"Row {idx}: Invalid direction")
+                        continue
+                    
+                    entry_price = float(row['entry_price'])
+                    
+                    await conn.execute("""
+                        INSERT INTO trade_journal 
+                        (user_id, pair, direction, entry_price, exit_price, stop_loss, 
+                         take_profit, result_pips, emotion, strategy, session)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    """, user_id, pair, direction, entry_price,
+                         float(row.get('exit_price', 0)) if row.get('exit_price') else None,
+                         float(row.get('stop_loss', 0)) if row.get('stop_loss') else None,
+                         float(row.get('take_profit', 0)) if row.get('take_profit') else None,
+                         float(row.get('result_pips', 0)) if row.get('result_pips') else None,
+                         row.get('emotion', '')[:50],
+                         row.get('strategy', '')[:100],
+                         row.get('session', 'Other'))
+                    
+                    inserted += 1
+                except Exception as e:
+                    errors.append(f"Row {idx}: {str(e)}")
+        
+        return {"inserted": inserted, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"CSV parsing error: {str(e)}")
 
-        hashed_pw = get_password_hash(reset_data.new_password)
+@app.get("/journal/analytics")
+async def get_trade_analytics(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
+    # Check Redis cache first
+    cache_key = f"analytics:{user_id}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+    
+    async with db_pool.acquire() as conn:
+        # Overall stats
+        stats = await conn.fetchrow("""
+            SELECT 
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN result_pips > 0 THEN 1 ELSE 0 END) as winning_trades,
+                SUM(CASE WHEN result_pips < 0 THEN 1 ELSE 0 END) as losing_trades,
+                AVG(result_pips) as avg_pips,
+                AVG(rr_ratio) as avg_rr,
+                SUM(result_profit) as total_profit
+            FROM trade_journal 
+            WHERE user_id = $1
+        """, user_id)
+        
+        # Emotion analysis
+        emotion_stats = await conn.fetch("""
+            SELECT emotion, COUNT(*) as count, AVG(result_pips) as avg_pips
+            FROM trade_journal 
+            WHERE user_id = $1 AND emotion IS NOT NULL AND emotion != ''
+            GROUP BY emotion
+            ORDER BY count DESC
+        """, user_id)
+        
+        # Strategy performance
+        strategy_stats = await conn.fetch("""
+            SELECT strategy, COUNT(*) as count, 
+                   SUM(CASE WHEN result_pips > 0 THEN 1 ELSE 0 END) as wins
+            FROM trade_journal 
+            WHERE user_id = $1 AND strategy IS NOT NULL AND strategy != ''
+            GROUP BY strategy
+            ORDER BY count DESC
+            LIMIT 5
+        """, user_id)
+        
+        # Monthly performance
+        monthly = await conn.fetch("""
+            SELECT 
+                DATE_TRUNC('month', created_at) as month,
+                COUNT(*) as trades,
+                SUM(result_pips) as net_pips
+            FROM trade_journal 
+            WHERE user_id = $1 AND created_at > NOW() - INTERVAL '6 months'
+            GROUP BY DATE_TRUNC('month', created_at)
+            ORDER BY month DESC
+        """, user_id)
+        
+        result = {
+            "overall": dict(stats) if stats else {},
+            "emotions": [dict(row) for row in emotion_stats],
+            "strategies": [dict(row) for row in strategy_stats],
+            "monthly_performance": [dict(row) for row in monthly]
+        }
+        
+        # Cache for 5 minutes
+        redis_client.setex(cache_key, 300, json.dumps(result))
+        return result
+
+@app.post("/journal/analyze-performance")
+@limiter.limit(settings.RATE_LIMIT_MENTOR)
+async def analyze_performance(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """AI-powered trade performance analysis"""
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
+    async with db_pool.acquire() as conn:
+        # Get recent trades for analysis
+        trades = await conn.fetch("""
+            SELECT pair, direction, result_pips, emotion, strategy, session, created_at
+            FROM trade_journal 
+            WHERE user_id = $1 
+            ORDER BY created_at DESC 
+            LIMIT 30
+        """, user_id)
+        
+        if len(trades) < 5:
+            return {"analysis": "Insufficient trade history. Please log at least 5 trades for meaningful analysis.", "trades_count": len(trades)}
+        
+        # Calculate metrics for AI context
+        wins = sum(1 for t in trades if t['result_pips'] and t['result_pips'] > 0)
+        losses = len(trades) - wins
+        win_rate = (wins / len(trades)) * 100
+        
+        emotions = {}
+        strategies = {}
+        for t in trades:
+            if t['emotion']:
+                emotions[t['emotion']] = emotions.get(t['emotion'], 0) + 1
+            if t['strategy']:
+                strategies[t['strategy']] = strategies.get(t['strategy'], 0) + 1
+        
+        trade_data = {
+            "total_trades": len(trades),
+            "win_rate": round(win_rate, 2),
+            "emotions": emotions,
+            "strategies": strategies,
+            "recent_trades": [dict(t) for t in trades[:10]]
+        }
+        
+        prompt = f"""Analyze this trader's performance data and provide professional feedback:
+        
+Trade Statistics:
+- Total Recent Trades: {trade_data['total_trades']}
+- Win Rate: {trade_data['win_rate']}%
+- Emotional States: {json.dumps(trade_data['emotions'])}
+- Strategies Used: {json.dumps(trade_data['strategies'])}
+
+Provide analysis in this exact format:
+
+TRADER PROFILE: [e.g., Impulsive Trader, Disciplined Trader, Overtrader]
+WIN RATE: {trade_data['win_rate']}%
+RISK DISCIPLINE SCORE: [High/Medium/Low with brief justification]
+CONSISTENCY SCORE: [Estimate percentage based on strategy variety and emotion stability]
+
+BEHAVIORAL PATTERNS:
+- [Pattern 1 with evidence]
+- [Pattern 2 with evidence]
+- [Pattern 3 if applicable]
+
+STRENGTHS:
+- [Strength 1]
+- [Strength 2]
+
+AREAS FOR IMPROVEMENT:
+- [Specific actionable advice 1]
+- [Specific actionable advice 2]
+- [Specific actionable advice 3]
+
+RECOMMENDATION:
+[2-3 sentence actionable trading plan adjustment]"""
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways Performance Analysis"
+                },
+                json={
+                    "model": settings.OPENROUTER_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI analysis failed")
+            
+            result = response.json()
+            analysis = result["choices"][0]["message"]["content"]
+            
+            return {
+                "analysis": analysis,
+                "statistics": trade_data,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+# Course Lessons Endpoints
+@app.get("/courses/{course_id}/lessons")
+async def get_course_lessons(
+    course_id: int,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    async with db_pool.acquire() as conn:
+        # Check course exists and access
+        course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        tier = current_user.get("subscription_tier", "free") if current_user else "free"
+        if course['is_premium'] and tier == "free":
+            raise HTTPException(status_code=403, detail="Premium content requires subscription")
+        
+        lessons = await conn.fetch("""
+            SELECT * FROM course_lessons 
+            WHERE course_id = $1 
+            ORDER BY order_index ASC
+        """, course_id)
+        
+        # Get progress if authenticated
+        if current_user:
+            user_id = int(current_user.get("id") or current_user.get("sub"))
+            progress = await conn.fetch("""
+                SELECT lesson_id, completed, progress_percent 
+                FROM course_progress 
+                WHERE user_id = $1 AND lesson_id = ANY($2)
+            """, user_id, [l['id'] for l in lessons])
+            
+            progress_map = {p['lesson_id']: p for p in progress}
+            
+            lessons_with_progress = []
+            for lesson in lessons:
+                lesson_dict = dict(lesson)
+                if lesson['id'] in progress_map:
+                    lesson_dict['progress'] = dict(progress_map[lesson['id']])
+                else:
+                    lesson_dict['progress'] = {"completed": False, "progress_percent": 0}
+                lessons_with_progress.append(lesson_dict)
+            
+            return {"lessons": lessons_with_progress}
+        
+        return {"lessons": [dict(l) for l in lessons]}
+
+@app.post("/courses/lessons/progress")
+async def update_lesson_progress(
+    progress: ProgressUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
+    async with db_pool.acquire() as conn:
+        # Verify lesson exists
+        lesson = await conn.fetchrow("SELECT id FROM course_lessons WHERE id = $1", progress.lesson_id)
+        if not lesson:
+            raise HTTPException(status_code=404, detail="Lesson not found")
+        
+        completed_at = datetime.utcnow() if progress.completed else None
+        
         await conn.execute("""
-            UPDATE users 
-            SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL, updated_at = NOW()
-            WHERE id = $2
-        """, hashed_pw, user["id"])
+            INSERT INTO course_progress (user_id, lesson_id, completed, progress_percent, completed_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (user_id, lesson_id) 
+            DO UPDATE SET completed = $3, progress_percent = $4, completed_at = $5
+        """, user_id, progress.lesson_id, progress.completed, progress.progress_percent, completed_at)
+        
+        # Clear analytics cache when progress updates
+        redis_client.delete(f"analytics:{user_id}")
+        
+        return {"message": "Progress updated"}
 
-        return {"message": "Password reset successful"}
+@app.post("/admin/lessons")
+async def create_lesson(
+    lesson: LessonCreate,
+    admin: dict = Depends(get_admin_user)
+):
+    async with db_pool.acquire() as conn:
+        lesson_id = await conn.fetchval("""
+            INSERT INTO course_lessons (course_id, title, video_url, content, order_index, duration_minutes, is_premium)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+        """, lesson.course_id, lesson.title, lesson.video_url, lesson.content, 
+             lesson.order_index, lesson.duration_minutes, True)
+        
+        return {"id": lesson_id, "message": "Lesson created"}
 
-@app.post("/auth/logout")
-async def logout(current_user: dict = Depends(get_current_user)):
-    return {"message": "Logged out successfully"}
+# Media Library Endpoints
+@app.post("/media/upload")
+async def upload_media(
+    file: UploadFile = File(...),
+    used_in: str = Form("general"),
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = int(current_user.get("id") or current_user.get("sub"))
+    
+    # Validate file type
+    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'application/pdf']
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"File type {file.content_type} not allowed")
+    
+    contents = await file.read()
+    if len(contents) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 10MB)")
+    
+    # Generate unique filename
+    ext = file.filename.split('.')[-1]
+    unique_name = f"{uuid.uuid4()}.{ext}"
+    
+    # In production, upload to S3/Cloudinary here
+    # For now, save to local storage and return path
+    upload_dir = "/tmp/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, unique_name)
+    
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    file_url = f"/media/{unique_name}"
+    
+    async with db_pool.acquire() as conn:
+        media_id = await conn.fetchval("""
+            INSERT INTO media_files (file_url, file_type, file_name, uploaded_by, file_size, used_in)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+        """, file_url, file.content_type, file.filename, user_id, len(contents), used_in)
+        
+        return {
+            "id": media_id,
+            "url": file_url,
+            "filename": file.filename,
+            "size": len(contents)
+        }
+
+@app.get("/media")
+async def list_media(
+    limit: int = Query(20, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user)
+):
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT m.*, u.full_name as uploaded_by_name
+            FROM media_files m
+            JOIN users u ON m.uploaded_by = u.id
+            ORDER BY m.created_at DESC
+            LIMIT $1 OFFSET $2
+        """, limit, offset)
+        
+        return {"media": [dict(row) for row in rows]}
 
 # Admin endpoints
 @app.get("/admin/users")
@@ -627,12 +1090,16 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         total_signals = await conn.fetchval("SELECT COUNT(*) FROM signals") or 0
         active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'") or 0
         premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')") or 0
+        total_trades = await conn.fetchval("SELECT COUNT(*) FROM trade_journal") or 0
+        total_courses = await conn.fetchval("SELECT COUNT(*) FROM courses") or 0
 
         return {
             "total_users": total_users,
             "total_signals": total_signals,
             "active_signals": active_signals,
             "premium_users": premium_users,
+            "total_trades": total_trades,
+            "total_courses": total_courses,
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
@@ -697,9 +1164,11 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# Enhanced AI Analysis with Professional Trading Format
+# Enhanced AI Analysis with Rate Limiting
 @app.post("/analyze/chart")
+@limiter.limit(settings.RATE_LIMIT_CHART)
 async def analyze_chart(
+    request: Request,
     file: UploadFile = File(...),
     pair: Optional[str] = Form("EURUSD"),
     timeframe: Optional[str] = Form("1H"),
@@ -711,12 +1180,11 @@ async def analyze_chart(
 
     try:
         contents = await file.read()
-        if len(contents) > 10 * 1024 * 1024:
+        if len(contents) > settings.MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=413, detail="File too large")
 
         image_base64 = base64.b64encode(contents).decode()
 
-        # ENHANCED PROMPT: Professional structured analysis format
         prompt = f"""You are an expert forex/crypto technical analyst. Analyze this {pair} chart on {timeframe} timeframe.
 
 Context provided by user: {additional_info}
@@ -781,7 +1249,6 @@ Rules:
             result = response.json()
             ai_response = result["choices"][0]["message"]["content"]
             
-            # Parse and format the structured response
             try:
                 cleaned = ai_response.strip()
                 if cleaned.startswith("```"):
@@ -792,7 +1259,6 @@ Rules:
                 
                 analysis_data = json.loads(cleaned)
                 
-                # Format as professional text report
                 formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 
 🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
@@ -820,7 +1286,7 @@ Rules:
                 return {
                     "analysis": formatted_report,
                     "structured_data": analysis_data,
-                    "image_base64": image_base64,  # Return image for frontend display
+                    "image_base64": image_base64,
                     "pair": pair,
                     "timeframe": timeframe,
                     "timestamp": datetime.utcnow().isoformat()
@@ -843,52 +1309,87 @@ Rules:
         logger.error(f"AI Analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Enhanced AI Mentor with Professional Persona
+# Enhanced AI Mentor with Trade History Context and Rate Limiting
 @app.post("/mentor/chat")
+@limiter.limit(settings.RATE_LIMIT_MENTOR)
 async def mentor_chat(
-    request: MentorChatRequest,
+    request: Request,
+    mentor_request: MentorChatRequest,
     current_user: dict = Depends(get_current_user)
 ):
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
 
     try:
-        user_id = current_user.get("id") or current_user.get("sub")
+        user_id = int(current_user.get("id") or current_user.get("sub"))
+        
         async with db_pool.acquire() as conn:
+            # Get user's recent trade history for context
+            trades = await conn.fetch("""
+                SELECT pair, direction, result_pips, emotion, strategy, created_at
+                FROM trade_journal 
+                WHERE user_id = $1 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            """, user_id)
+            
+            # Get course progress
+            progress = await conn.fetch("""
+                SELECT c.title, COUNT(l.id) as total_lessons,
+                       COUNT(p.id) as completed_lessons
+                FROM courses c
+                JOIN course_lessons l ON c.id = l.course_id
+                LEFT JOIN course_progress p ON l.id = p.lesson_id AND p.user_id = $1 AND p.completed = TRUE
+                GROUP BY c.id, c.title
+                LIMIT 3
+            """, user_id)
+            
+            # Build context
+            trade_context = ""
+            if trades:
+                wins = sum(1 for t in trades if t['result_pips'] and t['result_pips'] > 0)
+                recent_emotions = list(set([t['emotion'] for t in trades if t['emotion']]))[:3]
+                trade_context = f"""
+User's Recent Trading History:
+- Recent Win Rate: {(wins/len(trades)*100):.1f}% ({wins}/{len(trades)})
+- Recent Emotions: {', '.join(recent_emotions) if recent_emotions else 'Not logged'}
+- Recent Activity: {len(trades)} trades logged
+"""
+            
+            course_context = ""
+            if progress:
+                course_context = "Course Progress:\n" + "\n".join([
+                    f"- {p['title']}: {p['completed_lessons']}/{p['total_lessons']} lessons" 
+                    for p in progress
+                ])
+
+            system_prompt = f"""You are a professional forex and crypto trading mentor with 15+ years of experience. 
+
+CURRENT USER CONTEXT:
+{trade_context}
+{course_context}
+
+CORE PRINCIPLES:
+1. RISK MANAGEMENT FIRST: Always emphasize position sizing (1-2% risk per trade), stop losses
+2. PSYCHOLOGY MATTERS: Address emotional control based on user's logged emotions
+3. ACTIONABLE ADVICE: Give specific, practical guidance with concrete examples
+4. CONTEXT-AWARE: Reference their trade history and course progress when relevant
+5. NON-JUDGMENTAL: Encourage learning from losses, celebrate wins appropriately
+
+When discussing their specific trades:
+- Reference patterns you see in their history (e.g., "I notice you tend to...")
+- Suggest specific improvements based on their actual performance
+- If they show emotional trading patterns, address them gently
+
+Tone: Professional, encouraging but firm on risk management, personalized based on their history."""
+
+            # Get chat history
             history = await conn.fetch("""
                 SELECT message, response FROM chat_history 
                 WHERE user_id = $1 
                 ORDER BY created_at DESC 
                 LIMIT 5
-            """, int(user_id))
-
-            system_prompt = """You are a professional forex and crypto trading mentor with 15+ years of experience trading institutional and retail accounts. Your expertise includes technical analysis, risk management, trading psychology, and strategy development.
-
-CORE PRINCIPLES:
-1. RISK MANAGEMENT FIRST: Always emphasize position sizing (1-2% risk per trade), stop losses, and capital preservation
-2. PSYCHOLOGY MATTERS: Address emotional control, discipline, patience, and the mental aspects of trading when relevant
-3. ACTIONABLE ADVICE: Give specific, practical guidance rather than vague suggestions. Include concrete examples.
-4. REALISTIC EXPECTATIONS: Warn against get-rich-quick thinking. Emphasize consistency over big wins.
-5. CONTEXT-AWARE: Adapt advice based on whether the trader is beginner, intermediate, or advanced based on their questions.
-
-WHEN DISCUSSING STRATEGIES:
-- Explain the logic behind the strategy (why it works)
-- Include specific entry/exit rules
-- Warn about market conditions where it fails
-- Suggest optimal timeframes and pairs
-
-WHEN REVIEWING TRADES/IDEAS:
-- Ask for chart context if not provided
-- Point out logical flaws in the setup
-- Suggest improvements to risk management
-- Comment on risk/reward ratio
-
-WHEN DISCUSSING PSYCHOLOGY:
-- Share techniques for managing FOMO, revenge trading, and overtrading
-- Explain the importance of trading plans and journals
-- Discuss drawdown recovery strategies
-
-Tone: Professional, encouraging but firm on risk management, patient with beginners, challenging for experienced traders to think deeper. Never promise profits."""
+            """, user_id)
 
             messages = [{"role": "system", "content": system_prompt}]
 
@@ -898,7 +1399,7 @@ Tone: Professional, encouraging but firm on risk management, patient with beginn
 
             messages.append({
                 "role": "user",
-                "content": f"Question: {request.message}\nAdditional Context: {request.context}\n\nPlease provide professional trading mentorship on this topic."
+                "content": f"Question: {mentor_request.message}\nAdditional Context: {mentor_request.context}"
             })
 
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -919,11 +1420,9 @@ Tone: Professional, encouraging but firm on risk management, patient with beginn
                 )
 
                 if response.status_code == 404:
-                    logger.error(f"OpenRouter model not found: {settings.OPENROUTER_MODEL}")
                     raise HTTPException(status_code=503, detail="AI mentor model not available")
 
                 if response.status_code != 200:
-                    logger.error(f"OpenRouter mentor error: {response.text}")
                     raise HTTPException(status_code=500, detail=f"AI service error: {response.status_code}")
 
                 result = response.json()
@@ -932,7 +1431,7 @@ Tone: Professional, encouraging but firm on risk management, patient with beginn
                 await conn.execute("""
                     INSERT INTO chat_history (user_id, message, response, context)
                     VALUES ($1, $2, $3, $4)
-                """, int(user_id), request.message, ai_response, request.context)
+                """, user_id, mentor_request.message, ai_response, mentor_request.context)
 
                 return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
     except HTTPException:
@@ -1088,9 +1587,11 @@ async def get_config():
 @app.get("/health")
 async def health_check():
     db_status = "connected" if db_pool else "disconnected"
+    redis_status = "connected" if redis_client and redis_client.ping() else "disconnected"
     return {
         "status": "healthy", 
         "database": db_status,
+        "redis": redis_status,
         "timestamp": datetime.utcnow().isoformat()
     }
 

@@ -1,11 +1,10 @@
-
-import { store } from '../state.js';
+import { store } from '/src/state.js';
 
 class Router {
     constructor() {
         this.routes = {};
         this.currentRoute = null;
-
+        
         window.addEventListener('popstate', () => this.render());
         document.addEventListener('click', (e) => {
             if (e.target.matches('[data-link]') || e.target.closest('[data-link]')) {
@@ -28,8 +27,7 @@ class Router {
     async render() {
         const path = window.location.pathname;
         const route = this.routes[path] || this.routes['/'];
-
-        // Auth check
+        
         if (path !== '/login' && !store.isAuthenticated()) {
             this.navigate('/login');
             return;
@@ -49,7 +47,7 @@ class Router {
                 app.appendChild(element);
             }
         }
-
+        
         this.currentRoute = path;
     }
 }

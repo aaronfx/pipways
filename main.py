@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Production v3.1
-Fixes: Token refresh, LMS endpoints, Media upload, Enhanced blog editor
+Pipways Trading Platform API - Production v3.1.1
+Fixes: Optional Cloudinary, Token refresh, Media upload
 """
 
 import os
@@ -12,18 +12,25 @@ import logging
 import base64
 import json
 import uuid
-import cloudinary
-import cloudinary.uploader
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
 from contextlib import asynccontextmanager
+
+# Optional Cloudinary import
+try:
+    import cloudinary
+    import cloudinary.uploader
+    CLOUDINARY_AVAILABLE = True
+except ImportError:
+    CLOUDINARY_AVAILABLE = False
+    logging.warning("Cloudinary not installed. Using local storage for uploads.")
 
 # Load environment variables
 load_dotenv()
@@ -44,7 +51,7 @@ class Settings:
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
-    # Cloudinary Config
+    # Cloudinary Config (Optional)
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
     CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
@@ -63,8 +70,8 @@ class Settings:
 
 settings = Settings()
 
-# Configure Cloudinary
-if settings.CLOUDINARY_CLOUD_NAME:
+# Configure Cloudinary only if available and configured
+if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
     cloudinary.config(
         cloud_name=settings.CLOUDINARY_CLOUD_NAME,
         api_key=settings.CLOUDINARY_API_KEY,
@@ -88,7 +95,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.1.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.1.1", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -699,66 +706,79 @@ async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
         return {"message": "Post deleted"}
 
-# Media Upload with Cloudinary
+# Media Upload - Works with or without Cloudinary
 @app.post("/admin/media/upload")
 async def upload_media(
     file: UploadFile = File(...),
     admin: dict = Depends(get_admin_user)
 ):
     try:
-        if not settings.CLOUDINARY_CLOUD_NAME:
-            # Local fallback
-            upload_dir = "uploads"
-            os.makedirs(upload_dir, exist_ok=True)
-            
-            file_ext = file.filename.split(".")[-1]
-            unique_name = f"{uuid.uuid4().hex}.{file_ext}"
-            file_path = os.path.join(upload_dir, unique_name)
-            
-            contents = await file.read()
-            with open(file_path, "wb") as f:
-                f.write(contents)
-            
-            admin_id = admin.get("id") or admin.get("sub")
-            async with db_pool.acquire() as conn:
-                media_id = await conn.fetchval("""
-                    INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
-                    VALUES ($1, $2, $3, $4, $5)
-                    RETURNING id
-                """, file.filename, f"/uploads/{unique_name}", file_ext, len(contents), int(admin_id))
-                
-            return {
-                "id": media_id,
-                "url": f"/uploads/{unique_name}",
-                "filename": file.filename,
-                "size": len(contents)
-            }
-        
-        # Cloudinary upload
         contents = await file.read()
-        result = cloudinary.uploader.upload(
-            contents,
-            folder="pipways",
-            resource_type="auto"
-        )
+        file_ext = file.filename.split(".")[-1].lower()
+        unique_name = f"{uuid.uuid4().hex}.{file_ext}"
         
+        # Try Cloudinary first if available and configured
+        if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
+            try:
+                result = cloudinary.uploader.upload(
+                    contents,
+                    folder="pipways",
+                    resource_type="auto",
+                    public_id=unique_name.split('.')[0]
+                )
+                
+                admin_id = admin.get("id") or admin.get("sub")
+                async with db_pool.acquire() as conn:
+                    media_id = await conn.fetchval("""
+                        INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
+                        VALUES ($1, $2, $3, $4, $5)
+                        RETURNING id
+                    """, file.filename, result["secure_url"], result["resource_type"], result["bytes"], int(admin_id))
+                    
+                return {
+                    "id": media_id,
+                    "url": result["secure_url"],
+                    "filename": file.filename,
+                    "size": result["bytes"],
+                    "source": "cloudinary"
+                }
+            except Exception as cloud_err:
+                logger.warning(f"Cloudinary upload failed, falling back to local: {cloud_err}")
+        
+        # Local storage fallback
+        upload_dir = "uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, unique_name)
+        
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        # Save to database
         admin_id = admin.get("id") or admin.get("sub")
         async with db_pool.acquire() as conn:
             media_id = await conn.fetchval("""
                 INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
-            """, file.filename, result["secure_url"], result["resource_type"], result["bytes"], int(admin_id))
+            """, file.filename, f"/uploads/{unique_name}", file_ext, len(contents), int(admin_id))
             
         return {
             "id": media_id,
-            "url": result["secure_url"],
+            "url": f"/uploads/{unique_name}",
             "filename": file.filename,
-            "size": result["bytes"]
+            "size": len(contents),
+            "source": "local"
         }
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.get("/uploads/{filename}")
+async def serve_upload(filename: str):
+    file_path = os.path.join("uploads", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="File not found")
 
 # LMS - Courses with Modules
 @app.get("/courses")
@@ -917,13 +937,13 @@ async def analyze_performance(
 
 Account Balance: {request.account_balance or 'Not provided'}
 Trading Period: {request.trading_period_days or 'Not provided'} days
-Total Trades Provided: {total_trades}
-Calculated Win Rate: {win_rate:.1f}%
+Total Trades: {total_trades}
+Win Rate: {win_rate:.1f}%
 
 Trade History:
 {json.dumps(request.trades, indent=2)}
 
-Provide analysis in strict JSON format with fields: performance_summary, trader_score (1-100), strengths, weaknesses, behavior_patterns, top_mistakes, improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes), recommended_courses, mentor_advice."""
+Provide analysis in strict JSON format with fields: performance_summary (with total_trades, win_rate, net_pips, avg_win, avg_loss, risk_reward_ratio, expectancy, profit_factor, max_drawdown), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes arrays), recommended_courses (array), mentor_advice (string)."""
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -1091,4 +1111,13 @@ Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistan
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "3.1.0", "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "status": "healthy",
+        "version": "3.1.1",
+        "cloudinary_enabled": CLOUDINARY_AVAILABLE and bool(settings.CLOUDINARY_CLOUD_NAME),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)

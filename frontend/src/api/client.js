@@ -1,5 +1,5 @@
-import { store } from './state.js';
-import { router } from './router.js';  // Import router directly
+import { store } from '../state.js';        // FIXED: Changed from './state.js'
+import { router } from '../router.js';      // FIXED: Changed from './router.js'
 
 const API_URL = 'https://pipways-api-nhem.onrender.com';
 
@@ -16,14 +16,17 @@ class ApiClient {
             ...options
         };
 
-        if (config.body && !(config.body instanceof FormData)) {
+        // Don't set Content-Type for FormData (browser sets it with boundary)
+        if (config.body instanceof FormData) {
+            delete config.headers['Content-Type'];
+        } else if (config.body) {
             config.body = JSON.stringify(config.body);
         }
 
         try {
             const response = await fetch(`${API_URL}${endpoint}`, config);
 
-            // Handle 401 Unauthorized
+            // Handle 401 Unauthorized - Try to refresh token
             if (response.status === 401) {
                 console.log('Token expired, attempting refresh...');
                 const refreshed = await this.refreshToken();
@@ -34,7 +37,7 @@ class ApiClient {
                     // Refresh failed, logout and redirect
                     console.log('Refresh failed, logging out...');
                     store.logout();
-                    router.navigate('/login');  // Use imported router, not window.router
+                    router.navigate('/login');
                     throw new Error('Session expired. Please login again.');
                 }
             }
@@ -62,12 +65,13 @@ class ApiClient {
         }
 
         try {
+            // FIXED: Send refresh_token in JSON body, not Authorization header
             const response = await fetch(`${API_URL}/auth/refresh`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ refresh_token: refreshToken })  // Send in body, not header
+                body: JSON.stringify({ refresh_token: refreshToken })
             });
 
             if (response.ok) {
@@ -111,6 +115,20 @@ class ApiClient {
             max-width: 400px;
             word-wrap: break-word;
         `;
+        
+        // Add animation styles if not present
+        if (!document.getElementById('toast-styles')) {
+            const style = document.createElement('style');
+            style.id = 'toast-styles';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
         document.body.appendChild(toast);
         setTimeout(() => {
             toast.style.opacity = '0';
@@ -148,7 +166,7 @@ class ApiClient {
     analyzeChart = (formData) => this.request('/ai/analyze/chart', { 
         method: 'POST', 
         body: formData,
-        headers: {} // Let browser set for FormData
+        headers: {} // Let browser set Content-Type for FormData
     });
     sendChatMessage = (msg, context = 'trading') => this.request('/ai/chat', { 
         method: 'POST', 

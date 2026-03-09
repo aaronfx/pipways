@@ -1,4 +1,4 @@
-import { store } from '/src/state.js';
+import { store } from './state.js';
 
 class Router {
     constructor() {

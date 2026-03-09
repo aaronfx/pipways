@@ -1,6 +1,6 @@
 """
 Pipways Trading Platform API - Production v3.1
-Complete implementation with LMS, Media Upload, Performance Analyzer
+CORS Fixed Version - Explicit Origins Required
 """
 import os
 import re
@@ -41,18 +41,30 @@ class Settings:
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
-    # Use reliable vision-capable models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # CORS origins - CRITICAL FIX: Cannot use * with credentials=True
-    CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "https://pipways-web-nhem.onrender.com,http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500")
-    
+    # CRITICAL FIX: Explicitly define allowed origins
+    # Add your frontend URL here and in Render Environment Variables
     @property
     def CORS_ORIGINS(self):
-        if self.CORS_ORIGINS_STR:
-            return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
-        return ["https://pipways-web-nhem.onrender.com"]  # Default to your frontend
+        # Hardcoded for safety - add your specific frontend URL
+        default_origins = [
+            "https://pipways-web-nhem.onrender.com",  # Your production frontend
+            "http://localhost:3000",
+            "http://localhost:5500",
+            "http://127.0.0.1:5500",
+            "http://localhost:8000"
+        ]
+        
+        # Also check env var for additional origins
+        env_origins = os.getenv("CORS_ORIGINS", "")
+        if env_origins:
+            additional = [o.strip() for o in env_origins.split(",") if o.strip()]
+            # Merge and remove duplicates
+            return list(set(default_origins + additional))
+        
+        return default_origins
 
 settings = Settings()
 
@@ -65,7 +77,7 @@ async def lifespan(app: FastAPI):
     try:
         db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
         await init_db()
-        logger.info("Database initialized successfully")
+        logger.info(f"Database initialized. CORS Origins: {settings.CORS_ORIGINS}")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         raise
@@ -75,13 +87,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pipways API", version="3.1.0", lifespan=lifespan)
 
-# CORS Middleware - FIXED CONFIGURATION
+# CRITICAL: CORS Middleware must be added BEFORE other middleware/routes
+# and must include the specific frontend origin, not ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,  # Must be specific domains, not ["*"]
+    allow_origins=settings.CORS_ORIGINS,  # Specific domains only
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
     expose_headers=["*"],
     max_age=3600,
 )
@@ -89,7 +102,7 @@ app.add_middleware(
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Enhanced Models
+# Models
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -174,7 +187,6 @@ class ChatRequest(BaseModel):
 # Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
-        # Users table with enhanced fields
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -193,7 +205,6 @@ async def init_db():
             )
         """)
 
-        # Enhanced blog posts with SEO and scheduling
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -216,7 +227,6 @@ async def init_db():
             )
         """)
 
-        # Signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -237,7 +247,6 @@ async def init_db():
             )
         """)
 
-        # Enhanced webinars
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -253,7 +262,6 @@ async def init_db():
             )
         """)
 
-        # Enhanced courses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -270,7 +278,6 @@ async def init_db():
             )
         """)
 
-        # Course modules for LMS
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_modules (
                 id SERIAL PRIMARY KEY,
@@ -284,7 +291,6 @@ async def init_db():
             )
         """)
 
-        # Chat history
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -296,7 +302,6 @@ async def init_db():
             )
         """)
 
-        # Media files
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS media_files (
                 id SERIAL PRIMARY KEY,
@@ -309,7 +314,6 @@ async def init_db():
             )
         """)
 
-        # Performance analyses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS performance_analyses (
                 id SERIAL PRIMARY KEY,
@@ -609,7 +613,6 @@ async def get_blog_posts(
         where_clauses = ["1=1"]
         params = []
         
-        # Filter by status (admin sees all, users see only published)
         if not current_user or current_user.get("role") not in ["admin", "moderator"]:
             where_clauses.append("(status = 'published' OR status IS NULL)")
             where_clauses.append("(scheduled_at IS NULL OR scheduled_at <= NOW())")
@@ -647,10 +650,8 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         
-        # Generate slug if not provided
         slug = post.slug or post.title.lower().replace(" ", "-")[:50]
         
-        # Check slug uniqueness
         existing = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug)
         if existing:
             slug = f"{slug}-{uuid.uuid4().hex[:6]}"
@@ -685,7 +686,6 @@ async def upload_media(
     admin: dict = Depends(get_admin_user)
 ):
     try:
-        # Local fallback
         upload_dir = "uploads"
         os.makedirs(upload_dir, exist_ok=True)
         
@@ -715,7 +715,7 @@ async def upload_media(
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-# LMS - Courses with Modules
+# LMS - Courses
 @app.get("/courses")
 async def get_courses(
     level: Optional[str] = Query(None),
@@ -734,12 +734,11 @@ async def get_courses(
         if tier == "free":
             query += " AND is_premium = FALSE"
             
-        query += " ORDER BY created_at DESC LIMIT ${len(params)+1}"
+        query += f" ORDER BY created_at DESC LIMIT ${len(params)+1}"
         params.append(limit)
         
         rows = await conn.fetch(query, *params)
         
-        # Get modules for each course
         courses = []
         for row in rows:
             course = dict(row)
@@ -857,19 +856,17 @@ async def analyze_performance(
         losing_trades = total_trades - winning_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
-        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology. Analyze trading data and provide structured feedback."""
+        system_prompt = """You are a professional trading performance analyst."""
 
-        user_prompt = f"""Analyze the following trading performance data:
-
+        user_prompt = f"""Analyze trading data:
 Account Balance: {request.account_balance or 'Not provided'}
 Trading Period: {request.trading_period_days or 'Not provided'} days
-Total Trades Provided: {total_trades}
-Calculated Win Rate: {win_rate:.1f}%
+Total Trades: {total_trades}
+Win Rate: {win_rate:.1f}%
 
-Trade History:
-{json.dumps(request.trades, indent=2)}
+Trades: {json.dumps(request.trades)}
 
-Provide analysis in strict JSON format with fields: performance_summary (object with total_trades, win_rate, net_pips, risk_reward_ratio, profit_factor), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes), recommended_courses (array), mentor_advice (string)."""
+Provide JSON: performance_summary, trader_score, strengths, weaknesses, top_mistakes, improvement_plan, recommended_courses, mentor_advice"""
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -948,7 +945,7 @@ async def analyze_chart(
         image_base64 = base64.b64encode(contents).decode()
 
         prompt = f"""Analyze this {pair} chart on {timeframe}. Context: {additional_info}
-Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance (object with support/resistance arrays), key_observations."""
+Provide JSON: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance, key_observations."""
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -992,50 +989,29 @@ Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, t
                 analysis_data = json.loads(cleaned)
                 
                 formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
+🎯 SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
+📈 ENTRY: {analysis_data.get('entry_zone', 'N/A')}
+🛡️ SL: {analysis_data.get('stop_loss', 'N/A')}
+🎯 TP: {', '.join(analysis_data.get('take_profit', []))}
+⚖️ R/R: {analysis_data.get('risk_reward', 'N/A')}
 
-🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
-🛡️ STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
-🎯 TAKE PROFITS: {', '.join(analysis_data.get('take_profit', []))}
-⚖️ RISK/REWARD: {analysis_data.get('risk_reward', 'N/A')}
-🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
-
-📝 SUMMARY:
-{analysis_data.get('summary', 'No summary')}
-
-🏗️ MARKET STRUCTURE:
-{analysis_data.get('market_structure', 'N/A')}
-
-📊 SUPPORT/RESISTANCE:
-Support: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
-Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
-
-🔍 OBSERVATIONS:
-{analysis_data.get('key_observations', 'None')}"""
+Summary: {analysis_data.get('summary', 'N/A')}"""
 
                 return {
                     "analysis": formatted_report,
                     "structured_data": analysis_data,
-                    "image_base64": image_base64,
                     "pair": pair,
                     "timeframe": timeframe
                 }
                 
             except json.JSONDecodeError:
-                return {
-                    "analysis": ai_response,
-                    "image_base64": image_base64,
-                    "pair": pair,
-                    "timeframe": timeframe
-                }
+                return {"analysis": ai_response, "pair": pair, "timeframe": timeframe}
                 
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Simple chat endpoint for AI Mentor
+# Chat endpoint
 @app.post("/chat")
 async def chat_endpoint(
     request: ChatRequest,
@@ -1045,15 +1021,12 @@ async def chat_endpoint(
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
-        system_prompt = """You are an expert trading mentor and financial advisor. Provide concise, actionable advice about trading strategies, risk management, trading psychology, and market analysis. Be encouraging but realistic about risks."""
+        system_prompt = """You are an expert trading mentor. Provide concise, actionable advice."""
         
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
+                headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
                 json={
                     "model": settings.OPENROUTER_MODEL,
                     "messages": [
@@ -1071,7 +1044,6 @@ async def chat_endpoint(
             result = response.json()
             ai_response = result["choices"][0]["message"]["content"]
             
-            # Save to history
             user_id = current_user.get("id") or current_user.get("sub")
             async with db_pool.acquire() as conn:
                 await conn.execute("""
@@ -1087,7 +1059,12 @@ async def chat_endpoint(
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "3.1.0", "timestamp": datetime.utcnow().isoformat()}
+    return {
+        "status": "healthy", 
+        "version": "3.1.0", 
+        "cors_origins": settings.CORS_ORIGINS,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,6 +1,6 @@
 """
 Pipways Trading Platform API
-Complete implementation with auth, multi-admin, AI integration
+Fixed version with defensive coding and CORS environment support
 """
 
 import os
@@ -42,7 +42,14 @@ class Settings:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus-20240229")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3-opus-20240229")
-    CORS_ORIGINS = ["*"]  # Allow all for debugging
+
+    # FIXED: CORS origins from environment variable
+    CORS_ORIGINS_STR = os.getenv("CORS_ORIGINS", "*")
+    @property
+    def CORS_ORIGINS(self):
+        if self.CORS_ORIGINS_STR == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
 
 settings = Settings()
 
@@ -62,9 +69,9 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="2.0.1", lifespan=lifespan)
 
-# CORS Middleware
+# FIXED: CORS Middleware with environment-based origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -168,14 +175,14 @@ class MentorChatRequest(BaseModel):
 # Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
-        # Users table
+        # Users table - FIXED: Ensure role has default
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 full_name VARCHAR(100) NOT NULL,
-                role VARCHAR(20) DEFAULT 'user',
+                role VARCHAR(20) DEFAULT 'user' NOT NULL,
                 subscription_tier VARCHAR(20) DEFAULT 'free',
                 subscription_status VARCHAR(20) DEFAULT 'inactive',
                 email_verified BOOLEAN DEFAULT FALSE,
@@ -185,6 +192,20 @@ async def init_db():
                 reset_token VARCHAR(255),
                 reset_token_expires TIMESTAMP
             )
+        """)
+
+        # FIXED: Ensure existing tables have role column with default
+        try:
+            await conn.execute("""
+                ALTER TABLE users 
+                ALTER COLUMN role SET DEFAULT 'user'
+            """)
+        except:
+            pass  # Column might already have default
+
+        # FIXED: Update any NULL roles to 'user'
+        await conn.execute("""
+            UPDATE users SET role = 'user' WHERE role IS NULL OR role = ''
         """)
 
         # Signals table
@@ -273,6 +294,11 @@ async def init_db():
                     VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
                 """, settings.ADMIN_EMAIL, hashed, "System Administrator")
                 logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
+            else:
+                # FIXED: Ensure admin has role
+                await conn.execute("""
+                    UPDATE users SET role = 'admin' WHERE email = $1 AND (role IS NULL OR role = '')
+                """, settings.ADMIN_EMAIL)
         except Exception as e:
             logger.error(f"Error creating admin: {e}")
 
@@ -299,7 +325,7 @@ def create_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
 
-# FIXED: Optional auth that returns None instead of raising exception
+# FIXED: Optional auth with defensive coding
 async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         return None
@@ -321,7 +347,7 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         logger.error(f"Auth error: {e}")
         return None
 
-# Strict auth that raises exception
+# FIXED: Strict auth with defensive coding against missing fields
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -349,7 +375,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def get_admin_user(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["admin", "moderator"]:
+    # FIXED: Use .get() to avoid KeyError
+    role = current_user.get("role", "user")
+    if role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
@@ -363,12 +391,12 @@ async def register(user_data: UserRegister):
 
         hashed_pw = get_password_hash(user_data.password)
         user_id = await conn.fetchval("""
-            INSERT INTO users (email, password_hash, full_name, subscription_tier, subscription_status)
-            VALUES ($1, $2, $3, 'free', 'active')
+            INSERT INTO users (email, password_hash, full_name, subscription_tier, subscription_status, role)
+            VALUES ($1, $2, $3, 'free', 'active', 'user')
             RETURNING id
         """, user_data.email, hashed_pw, user_data.full_name)
 
-        # FIXED: Enrich token with user data
+        # FIXED: Enrich token with user data using .get() safety
         token_data = {
             "sub": str(user_id),
             "email": user_data.email,
@@ -383,7 +411,7 @@ async def register(user_data: UserRegister):
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "user": dict(user)
+            "user": dict(user) if user else {"id": user_id, "email": user_data.email, "role": "user"}
         }
 
 @app.post("/auth/login", response_model=Token)
@@ -395,13 +423,13 @@ async def login(credentials: UserLogin):
 
         await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
 
-        # FIXED: Enrich token with complete user data
+        # FIXED: Use .get() to prevent KeyError if fields are missing
         token_data = {
             "sub": str(user["id"]),
             "email": user["email"],
-            "full_name": user["full_name"],
-            "role": user["role"],
-            "subscription_tier": user["subscription_tier"]
+            "full_name": user.get("full_name", ""),
+            "role": user.get("role", "user"),  # FIXED: .get() with default
+            "subscription_tier": user.get("subscription_tier", "free")
         }
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token({"sub": str(user["id"])})
@@ -427,13 +455,13 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
             if not user:
                 raise HTTPException(status_code=401, detail="User not found")
 
-            # FIXED: Enrich new access token with user data
+            # FIXED: Use .get() to prevent KeyError
             token_data = {
                 "sub": str(user["id"]),
                 "email": user["email"],
-                "full_name": user["full_name"],
-                "role": user["role"],
-                "subscription_tier": user["subscription_tier"]
+                "full_name": user.get("full_name", ""),
+                "role": user.get("role", "user"),
+                "subscription_tier": user.get("subscription_tier", "free")
             }
             new_access = create_access_token(token_data)
             return {"access_token": new_access, "token_type": "bearer"}
@@ -442,7 +470,6 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# NEW: Get current user endpoint
 @app.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Get current authenticated user details"""
@@ -540,7 +567,9 @@ async def update_user_role(
     role: str = Query(..., pattern="^(user|admin|moderator)$"), 
     admin: dict = Depends(get_admin_user)
 ):
-    if int(admin["id"]) == user_id and role != "admin":
+    # FIXED: Use .get() for safety
+    admin_id = admin.get("id") or admin.get("sub")
+    if str(admin_id) == str(user_id) and role != "admin":
         raise HTTPException(status_code=400, detail="Cannot demote yourself")
 
     async with db_pool.acquire() as conn:
@@ -556,7 +585,8 @@ async def update_user_role(
 
 @app.delete("/admin/users/{user_id}")
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
-    if int(admin["id"]) == user_id:
+    admin_id = admin.get("id") or admin.get("sub")
+    if str(admin_id) == str(user_id):
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
     async with db_pool.acquire() as conn:
@@ -601,7 +631,7 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
-# Signals - FIXED: Use optional auth
+# Signals
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
@@ -622,7 +652,8 @@ async def get_signals(
                 params.append(f"%{pair}%")
 
             # Filter premium signals for non-premium users
-            if not current_user or current_user.get("subscription_tier") == "free":
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free":
                 query += " AND is_premium = FALSE"
 
             query += " ORDER BY created_at DESC"
@@ -643,7 +674,8 @@ async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_us
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id
         """, signal.pair, signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, admin["id"])
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, 
+             admin.get("id") or admin.get("sub"))
 
         return {"id": signal_id, "message": "Signal created successfully"}
 
@@ -661,7 +693,7 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# AI Analysis - FIXED: Better error handling and timeout
+# AI Analysis
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -691,7 +723,6 @@ Provide analysis in this format:
 - Risk Management advice
 - Confidence Level (1-10)"""
 
-        # FIXED: Proper timeout handling and error logging
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -735,7 +766,7 @@ Provide analysis in this format:
         logger.error(f"AI Analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# AI Mentor - FIXED: Better error handling and request structure
+# AI Mentor
 @app.post("/mentor/chat")
 async def mentor_chat(
     request: MentorChatRequest,
@@ -745,17 +776,17 @@ async def mentor_chat(
         raise HTTPException(status_code=503, detail="AI service not configured")
 
     try:
+        user_id = current_user.get("id") or current_user.get("sub")
         async with db_pool.acquire() as conn:
             history = await conn.fetch("""
                 SELECT message, response FROM chat_history 
                 WHERE user_id = $1 
                 ORDER BY created_at DESC 
                 LIMIT 5
-            """, current_user["id"])
+            """, int(user_id))
 
             messages = [{"role": "system", "content": "You are an expert forex trading mentor. Provide clear, actionable advice. Be encouraging but realistic about risks."}]
 
-            # Add history in correct order (oldest first)
             for row in reversed(history):
                 messages.append({"role": "user", "content": row["message"]})
                 messages.append({"role": "assistant", "content": row["response"]})
@@ -765,7 +796,6 @@ async def mentor_chat(
                 "content": f"{request.message}\n\nContext: {request.context}"
             })
 
-            # FIXED: Proper timeout and error handling
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
@@ -792,7 +822,7 @@ async def mentor_chat(
                 await conn.execute("""
                     INSERT INTO chat_history (user_id, message, response, context)
                     VALUES ($1, $2, $3, $4)
-                """, current_user["id"], request.message, ai_response, request.context)
+                """, int(user_id), request.message, ai_response, request.context)
 
                 return {"response": ai_response, "timestamp": datetime.utcnow().isoformat()}
     except HTTPException:
@@ -810,7 +840,8 @@ async def get_blog_posts(
     try:
         async with db_pool.acquire() as conn:
             query = "SELECT * FROM blog_posts"
-            if not current_user or current_user.get("subscription_tier") == "free":
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free":
                 query += " WHERE is_premium = FALSE"
             query += " ORDER BY created_at DESC LIMIT $1"
 
@@ -823,11 +854,12 @@ async def get_blog_posts(
 @app.post("/blog/posts")
 async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
         post_id = await conn.fetchval("""
             INSERT INTO blog_posts (title, content, excerpt, author_id, is_premium)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
-        """, post.title, post.content, post.excerpt or post.content[:200], admin["id"], post.is_premium)
+        """, post.title, post.content, post.excerpt or post.content[:200], admin_id, post.is_premium)
         return {"id": post_id, "message": "Blog post created"}
 
 @app.get("/webinars")
@@ -835,7 +867,8 @@ async def get_webinars(current_user: Optional[dict] = Depends(get_current_user_o
     try:
         async with db_pool.acquire() as conn:
             query = "SELECT * FROM webinars WHERE scheduled_at > NOW()"
-            if not current_user or current_user.get("subscription_tier") == "free":
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free":
                 query += " AND is_premium = FALSE"
             query += " ORDER BY scheduled_at ASC"
 
@@ -848,12 +881,13 @@ async def get_webinars(current_user: Optional[dict] = Depends(get_current_user_o
 @app.post("/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
         webinar_id = await conn.fetchval("""
             INSERT INTO webinars (title, description, scheduled_at, duration_minutes, meeting_link, is_premium, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
         """, webinar.title, webinar.description, webinar.scheduled_at, 
-             webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, admin["id"])
+             webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, admin_id)
         return {"id": webinar_id, "message": "Webinar created"}
 
 @app.get("/courses")
@@ -861,7 +895,8 @@ async def get_courses(current_user: Optional[dict] = Depends(get_current_user_op
     try:
         async with db_pool.acquire() as conn:
             query = "SELECT * FROM courses"
-            if not current_user or current_user.get("subscription_tier") == "free":
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free":
                 query += " WHERE is_premium = FALSE"
             query += " ORDER BY created_at DESC"
 
@@ -874,11 +909,12 @@ async def get_courses(current_user: Optional[dict] = Depends(get_current_user_op
 @app.post("/courses")
 async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
         course_id = await conn.fetchval("""
             INSERT INTO courses (title, description, content, is_premium, created_by)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
-        """, course.title, course.description, course.content, course.is_premium, admin["id"])
+        """, course.title, course.description, course.content, course.is_premium, admin_id)
         return {"id": course_id, "message": "Course created"}
 
 @app.get("/config")

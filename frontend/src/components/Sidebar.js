@@ -1,6 +1,6 @@
-import { Component } from '/src/components/Component.js';
-import { store } from '/src/state.js';
-import { router } from '/src/router.js';
+import { Component } from './Component.js';
+import { store } from '../state.js';
+import { router } from '../router.js';
 
 export class Sidebar extends Component {
     render() {

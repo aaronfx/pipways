@@ -1837,7 +1837,8 @@
                     headers: {
                         'Authorization': `Bearer ${refreshToken || authToken}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    credentials: 'include'
                 });
 
                 if (response.ok) {
@@ -1869,6 +1870,7 @@
                 const response = await fetch(`${API_URL}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
                         email: e.target.email.value,
                         password: e.target.password.value
@@ -1906,6 +1908,7 @@
                 const response = await fetch(`${API_URL}/auth/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
                         email: e.target.email.value,
                         password: e.target.password.value,
@@ -2011,7 +2014,8 @@
         async function loadAdminStats() {
             try {
                 const response = await fetch(`${API_URL}/admin/stats`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
 
                 if (!response.ok) throw new Error('Failed to load stats');
@@ -2031,7 +2035,8 @@
             currentPage = page;
             try {
                 const response = await fetch(`${API_URL}/admin/users?page=${page}&limit=10&search=${search}`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
 
                 if (!response.ok) throw new Error('Failed to load users');
@@ -2114,13 +2119,15 @@
                 // Update role
                 await fetch(`${API_URL}/admin/users/${userId}/role?role=${role}`, {
                     method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
 
                 // Update subscription
                 await fetch(`${API_URL}/admin/users/${userId}/toggle-subscription?tier=${tier}&status=${status}`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
 
                 closeModal('edit-user-modal');
@@ -2137,7 +2144,8 @@
             try {
                 const response = await fetch(`${API_URL}/admin/users/${userId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
 
                 if (response.ok) {
@@ -2270,7 +2278,8 @@
         async function loadSignals() {
             try {
                 const response = await fetch(`${API_URL}/signals?limit=10`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
 
                 if (!response.ok) throw new Error('Failed to load');
@@ -2337,6 +2346,7 @@
                 const response = await fetch(`${API_URL}/analyze/chart`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include',
                     body: formData
                 });
 
@@ -2441,7 +2451,8 @@
         async function loadCourses() {
             try {
                 const response = await fetch(`${API_URL}/courses`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
                 const courses = await response.json();
                 const container = document.getElementById('courses-list');
@@ -2466,7 +2477,8 @@
         async function loadWebinars() {
             try {
                 const response = await fetch(`${API_URL}/webinars`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
                 const webinars = await response.json();
                 const container = document.getElementById('webinars-list');
@@ -2494,7 +2506,8 @@
         async function loadBlog() {
             try {
                 const response = await fetch(`${API_URL}/blog/posts`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    credentials: 'include'
                 });
                 const posts = await response.json();
                 const container = document.getElementById('blog-list');

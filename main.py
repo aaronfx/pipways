@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Production Fix
-Fixes: Professional AI prompts, structured analysis, error handling
+Pipways Trading Platform API - Production Fix v2.1
+Fixes: Professional AI prompts, image handling, admin visibility, error handling
 """
 
 import os
@@ -41,7 +41,7 @@ class Settings:
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-    # FIXED: Use reliable vision-capable models
+    # Use reliable vision-capable models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
@@ -88,7 +88,7 @@ app.add_middleware(
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Models (unchanged)
+# Models
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -175,7 +175,7 @@ class MentorChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
 
-# Database initialization (unchanged)
+# Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
         # Check if users table exists
@@ -319,7 +319,7 @@ async def init_db():
         except Exception as e:
             logger.error(f"Error creating admin: {e}")
 
-# Auth utilities (unchanged)
+# Auth utilities
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
@@ -391,7 +391,7 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
-# Auth endpoints (unchanged)
+# Auth endpoints
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     async with db_pool.acquire() as conn:
@@ -524,7 +524,7 @@ async def reset_password(reset_data: PasswordReset):
 async def logout(current_user: dict = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
 
-# Admin endpoints (unchanged)
+# Admin endpoints
 @app.get("/admin/users")
 async def get_all_users(
     search: Optional[str] = Query(None),
@@ -636,7 +636,7 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
-# Signals (unchanged)
+# Signals
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
@@ -697,9 +697,7 @@ async def close_signal(
         """, pips_gain, signal_id)
         return {"message": "Signal closed"}
 
-# ==========================================
-# FIXED: Enhanced AI Analysis with Professional Trading Format
-# ==========================================
+# Enhanced AI Analysis with Professional Trading Format
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -768,7 +766,7 @@ Rules:
                         }
                     ],
                     "max_tokens": 1500,
-                    "temperature": 0.3  # Lower temperature for more consistent formatting
+                    "temperature": 0.3
                 }
             )
 
@@ -785,7 +783,6 @@ Rules:
             
             # Parse and format the structured response
             try:
-                # Clean response - remove markdown code blocks
                 cleaned = ai_response.strip()
                 if cleaned.startswith("```"):
                     cleaned = cleaned.split("```")[1]
@@ -795,7 +792,7 @@ Rules:
                 
                 analysis_data = json.loads(cleaned)
                 
-                # Format as professional text report for frontend display
+                # Format as professional text report
                 formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 
 🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
@@ -822,7 +819,8 @@ Rules:
 
                 return {
                     "analysis": formatted_report,
-                    "structured_data": analysis_data,  # Include raw data for potential frontend use
+                    "structured_data": analysis_data,
+                    "image_base64": image_base64,  # Return image for frontend display
                     "pair": pair,
                     "timeframe": timeframe,
                     "timestamp": datetime.utcnow().isoformat()
@@ -830,9 +828,9 @@ Rules:
                 
             except (json.JSONDecodeError, KeyError) as e:
                 logger.error(f"Failed to parse AI JSON response: {e}")
-                # Fallback: return raw response formatted nicely
                 return {
                     "analysis": ai_response,
+                    "image_base64": image_base64,
                     "pair": pair,
                     "timeframe": timeframe,
                     "timestamp": datetime.utcnow().isoformat(),
@@ -845,9 +843,7 @@ Rules:
         logger.error(f"AI Analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ==========================================
-# FIXED: Enhanced AI Mentor with Professional Persona
-# ==========================================
+# Enhanced AI Mentor with Professional Persona
 @app.post("/mentor/chat")
 async def mentor_chat(
     request: MentorChatRequest,
@@ -866,7 +862,6 @@ async def mentor_chat(
                 LIMIT 5
             """, int(user_id))
 
-            # ENHANCED SYSTEM PROMPT: Professional Trading Mentor
             system_prompt = """You are a professional forex and crypto trading mentor with 15+ years of experience trading institutional and retail accounts. Your expertise includes technical analysis, risk management, trading psychology, and strategy development.
 
 CORE PRINCIPLES:
@@ -946,9 +941,7 @@ Tone: Professional, encouraging but firm on risk management, patient with beginn
         logger.error(f"Mentor chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ==========================================
-# FIXED: Content Endpoints with Enhanced Error Handling
-# ==========================================
+# Content Management
 @app.get("/blog/posts")
 async def get_blog_posts(
     limit: int = Query(10, le=50),
@@ -959,7 +952,6 @@ async def get_blog_posts(
             raise HTTPException(status_code=503, detail="Database not initialized")
             
         async with db_pool.acquire() as conn:
-            # Build query based on user tier
             query_parts = ["SELECT * FROM blog_posts"]
             params = []
             
@@ -975,7 +967,7 @@ async def get_blog_posts(
             rows = await conn.fetch(query, *params)
             
             if not rows:
-                return []  # Return empty array instead of error
+                return []
                 
             return [dict(row) for row in rows]
             

@@ -1,7 +1,8 @@
 """
-Pipways Trading Platform API - Production v3.1
-CORS Fixed Version - Explicit Origins Required
+Pipways Trading Platform API - Production v3.1.2
+Fixes: CORS, Database SSL, Media endpoints, Error handling
 """
+
 import os
 import re
 import jwt
@@ -16,11 +17,20 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
 from contextlib import asynccontextmanager
+
+# Optional Cloudinary import
+try:
+    import cloudinary
+    import cloudinary.uploader
+    CLOUDINARY_AVAILABLE = True
+except ImportError:
+    CLOUDINARY_AVAILABLE = False
+    logging.warning("Cloudinary not installed. Using local storage for uploads.")
 
 # Load environment variables
 load_dotenv()
@@ -41,32 +51,47 @@ class Settings:
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
+    # Cloudinary Config (Optional)
+    CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
+    CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+    CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+
+    # Use reliable vision-capable models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # CRITICAL FIX: Explicitly define allowed origins
-    # Add your frontend URL here and in Render Environment Variables
+    # CORS origins - CRITICAL FIX
     @property
     def CORS_ORIGINS(self):
-        # Hardcoded for safety - add your specific frontend URL
-        default_origins = [
-            "https://pipways-web-nhem.onrender.com",  # Your production frontend
+        # Default origins including your deployed frontend
+        origins = [
+            "https://pipways-web-nhem.onrender.com",
+            "https://pipways.com",
+            "https://www.pipways.com",
             "http://localhost:3000",
+            "http://localhost:8080",
             "http://localhost:5500",
             "http://127.0.0.1:5500",
-            "http://localhost:8000"
+            "http://localhost:8000",
+            "null"  # For local file:// testing
         ]
         
-        # Also check env var for additional origins
+        # Add from environment variable
         env_origins = os.getenv("CORS_ORIGINS", "")
         if env_origins:
-            additional = [o.strip() for o in env_origins.split(",") if o.strip()]
-            # Merge and remove duplicates
-            return list(set(default_origins + additional))
+            origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
         
-        return default_origins
+        return list(set(origins))  # Remove duplicates
 
 settings = Settings()
+
+# Configure Cloudinary only if available and configured
+if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
+    cloudinary.config(
+        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+        api_key=settings.CLOUDINARY_API_KEY,
+        api_secret=settings.CLOUDINARY_API_SECRET
+    )
 
 # Database pool
 db_pool: Optional[asyncpg.Pool] = None
@@ -75,9 +100,26 @@ db_pool: Optional[asyncpg.Pool] = None
 async def lifespan(app: FastAPI):
     global db_pool
     try:
-        db_pool = await asyncpg.create_pool(settings.DATABASE_URL, min_size=2, max_size=10)
+        # CRITICAL FIX: Handle Render's PostgreSQL SSL requirement
+        dsn = settings.DATABASE_URL
+        if dsn and "render.com" in dsn and "sslmode" not in dsn:
+            dsn += "?sslmode=require"
+        
+        if not dsn:
+            logger.error("DATABASE_URL not set!")
+            raise ValueError("DATABASE_URL environment variable is required")
+            
+        db_pool = await asyncpg.create_pool(
+            dsn, 
+            min_size=2, 
+            max_size=10,
+            command_timeout=60,
+            server_settings={
+                'jit': 'off'  # Disable JIT for compatibility
+            }
+        )
         await init_db()
-        logger.info(f"Database initialized. CORS Origins: {settings.CORS_ORIGINS}")
+        logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         raise
@@ -85,16 +127,15 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.1.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.1.2", lifespan=lifespan)
 
-# CRITICAL: CORS Middleware must be added BEFORE other middleware/routes
-# and must include the specific frontend origin, not ["*"]
+# CRITICAL FIX: CORS Middleware - Must be before other middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,  # Specific domains only
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["*"],
     max_age=3600,
 )
@@ -102,7 +143,7 @@ app.add_middleware(
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Models
+# Enhanced Models
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -174,6 +215,7 @@ class CourseCreate(BaseModel):
     level: str = Field(default="beginner", pattern="^(beginner|intermediate|advanced)$")
     duration_hours: Optional[float] = None
     thumbnail: Optional[str] = None
+    modules: Optional[List[Dict]] = None
 
 class PerformanceAnalysisRequest(BaseModel):
     trades: List[Dict[str, Any]]
@@ -187,6 +229,7 @@ class ChatRequest(BaseModel):
 # Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
+        # Users table with enhanced fields
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -205,6 +248,7 @@ async def init_db():
             )
         """)
 
+        # Enhanced blog posts with SEO and scheduling
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -227,6 +271,7 @@ async def init_db():
             )
         """)
 
+        # Signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -247,6 +292,7 @@ async def init_db():
             )
         """)
 
+        # Enhanced webinars
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -262,6 +308,7 @@ async def init_db():
             )
         """)
 
+        # Enhanced courses with modules support
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -278,6 +325,7 @@ async def init_db():
             )
         """)
 
+        # Course modules for LMS
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_modules (
                 id SERIAL PRIMARY KEY,
@@ -291,6 +339,7 @@ async def init_db():
             )
         """)
 
+        # Chat history
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -302,6 +351,7 @@ async def init_db():
             )
         """)
 
+        # Media files
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS media_files (
                 id SERIAL PRIMARY KEY,
@@ -314,6 +364,7 @@ async def init_db():
             )
         """)
 
+        # Performance analyses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS performance_analyses (
                 id SERIAL PRIMARY KEY,
@@ -361,6 +412,10 @@ def create_refresh_token(data: dict):
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
+def create_reset_token():
+    import secrets
+    return secrets.token_urlsafe(32)
+
 async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         return None
@@ -392,6 +447,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             raise HTTPException(status_code=401, detail="Invalid token")
 
         if "role" in payload and "email" in payload:
+            # Check if token is expired
             if datetime.utcnow().timestamp() > payload.get("exp", 0):
                 raise HTTPException(status_code=401, detail="Token expired")
             return payload
@@ -583,6 +639,11 @@ async def update_user_role(user_id: int, role: str = Query(...), admin: dict = D
 @app.delete("/admin/users/{user_id}")
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
+        # Prevent self-deletion
+        admin_id = admin.get("id") or admin.get("sub")
+        if int(user_id) == int(admin_id):
+            raise HTTPException(status_code=400, detail="Cannot delete yourself")
+            
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return {"message": "User deleted"}
 
@@ -613,6 +674,7 @@ async def get_blog_posts(
         where_clauses = ["1=1"]
         params = []
         
+        # Filter by status (admin sees all, users see only published)
         if not current_user or current_user.get("role") not in ["admin", "moderator"]:
             where_clauses.append("(status = 'published' OR status IS NULL)")
             where_clauses.append("(scheduled_at IS NULL OR scheduled_at <= NOW())")
@@ -650,11 +712,15 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         
-        slug = post.slug or post.title.lower().replace(" ", "-")[:50]
+        # Generate slug if not provided
+        base_slug = post.slug or re.sub(r'[^\w\s-]', '', post.title.lower().replace(" ", "-"))[:50]
+        slug = base_slug
         
-        existing = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug)
-        if existing:
-            slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+        # Check slug uniqueness
+        counter = 1
+        while await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug):
+            slug = f"{base_slug}-{counter}"
+            counter += 1
         
         published_at = None
         if post.status == "published" and not post.scheduled_at:
@@ -679,43 +745,108 @@ async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
         return {"message": "Post deleted"}
 
-# Media Upload
+# Media Upload - Works with or without Cloudinary
 @app.post("/admin/media/upload")
 async def upload_media(
     file: UploadFile = File(...),
     admin: dict = Depends(get_admin_user)
 ):
     try:
+        contents = await file.read()
+        file_ext = file.filename.split(".")[-1].lower()
+        unique_name = f"{uuid.uuid4().hex}.{file_ext}"
+        
+        # Validate file size (50MB max)
+        if len(contents) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large (max 50MB)")
+        
+        # Try Cloudinary first if available and configured
+        if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
+            try:
+                result = cloudinary.uploader.upload(
+                    contents,
+                    folder="pipways",
+                    resource_type="auto",
+                    public_id=unique_name.split('.')[0]
+                )
+                
+                admin_id = admin.get("id") or admin.get("sub")
+                async with db_pool.acquire() as conn:
+                    media_id = await conn.fetchval("""
+                        INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
+                        VALUES ($1, $2, $3, $4, $5)
+                        RETURNING id
+                    """, file.filename, result["secure_url"], result["resource_type"], result["bytes"], int(admin_id))
+                    
+                return {
+                    "id": media_id,
+                    "url": result["secure_url"],
+                    "filename": file.filename,
+                    "size": result["bytes"],
+                    "source": "cloudinary"
+                }
+            except Exception as cloud_err:
+                logger.warning(f"Cloudinary upload failed, falling back to local: {cloud_err}")
+        
+        # Local storage fallback
         upload_dir = "uploads"
         os.makedirs(upload_dir, exist_ok=True)
-        
-        file_ext = file.filename.split(".")[-1]
-        unique_name = f"{uuid.uuid4().hex}.{file_ext}"
         file_path = os.path.join(upload_dir, unique_name)
         
-        contents = await file.read()
         with open(file_path, "wb") as f:
             f.write(contents)
         
+        # Determine file type
+        file_type = "image" if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] else \
+                   "video" if file_ext in ['mp4', 'webm', 'mov'] else "document"
+        
+        # Save to database
         admin_id = admin.get("id") or admin.get("sub")
         async with db_pool.acquire() as conn:
             media_id = await conn.fetchval("""
                 INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
-            """, file.filename, f"/uploads/{unique_name}", file_ext, len(contents), int(admin_id))
+            """, file.filename, f"/uploads/{unique_name}", file_type, len(contents), int(admin_id))
             
         return {
             "id": media_id,
             "url": f"/uploads/{unique_name}",
             "filename": file.filename,
-            "size": len(contents)
+            "size": len(contents),
+            "source": "local"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-# LMS - Courses
+# NEW: Media list endpoint for frontend
+@app.get("/admin/media/list")
+async def list_media(
+    limit: int = Query(50, le=100),
+    admin: dict = Depends(get_admin_user)
+):
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT m.*, u.full_name as uploader_name 
+               FROM media_files m 
+               LEFT JOIN users u ON m.uploaded_by = u.id 
+               ORDER BY m.created_at DESC 
+               LIMIT $1""",
+            limit
+        )
+        return {"files": [dict(row) for row in rows]}
+
+@app.get("/uploads/{filename}")
+async def serve_upload(filename: str):
+    file_path = os.path.join("uploads", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="File not found")
+
+# LMS - Courses with Modules
 @app.get("/courses")
 async def get_courses(
     level: Optional[str] = Query(None),
@@ -739,6 +870,7 @@ async def get_courses(
         
         rows = await conn.fetch(query, *params)
         
+        # Get modules for each course
         courses = []
         for row in rows:
             course = dict(row)
@@ -761,6 +893,15 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
             RETURNING id
         """, course.title, course.description, course.content, course.level, 
              course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
+        
+        # Insert modules if provided
+        if course.modules:
+            for idx, module in enumerate(course.modules):
+                await conn.execute("""
+                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, course_id, module.get("title"), module.get("content"), 
+                     module.get("video_url"), idx, module.get("is_premium", False))
         
         return {"id": course_id, "message": "Course created"}
 
@@ -856,17 +997,19 @@ async def analyze_performance(
         losing_trades = total_trades - winning_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
-        system_prompt = """You are a professional trading performance analyst."""
+        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology."""
 
-        user_prompt = f"""Analyze trading data:
+        user_prompt = f"""Analyze the following trading performance data:
+
 Account Balance: {request.account_balance or 'Not provided'}
 Trading Period: {request.trading_period_days or 'Not provided'} days
 Total Trades: {total_trades}
 Win Rate: {win_rate:.1f}%
 
-Trades: {json.dumps(request.trades)}
+Trade History:
+{json.dumps(request.trades, indent=2)}
 
-Provide JSON: performance_summary, trader_score, strengths, weaknesses, top_mistakes, improvement_plan, recommended_courses, mentor_advice"""
+Provide analysis in strict JSON format with fields: performance_summary (with total_trades, win_rate, net_pips, avg_win, avg_loss, risk_reward_ratio, expectancy, profit_factor, max_drawdown), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes arrays), recommended_courses (array), mentor_advice (string)."""
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -945,7 +1088,7 @@ async def analyze_chart(
         image_base64 = base64.b64encode(contents).decode()
 
         prompt = f"""Analyze this {pair} chart on {timeframe}. Context: {additional_info}
-Provide JSON: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance, key_observations."""
+Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance (object with support/resistance arrays), key_observations."""
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -989,82 +1132,77 @@ Provide JSON: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_p
                 analysis_data = json.loads(cleaned)
                 
                 formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
-🎯 SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
-📈 ENTRY: {analysis_data.get('entry_zone', 'N/A')}
-🛡️ SL: {analysis_data.get('stop_loss', 'N/A')}
-🎯 TP: {', '.join(analysis_data.get('take_profit', []))}
-⚖️ R/R: {analysis_data.get('risk_reward', 'N/A')}
 
-Summary: {analysis_data.get('summary', 'N/A')}"""
+🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
+🛑 STOP LOSS: {analysis_data.get('stop_loss', 'N/A')}
+🎯 TAKE PROFITS: {', '.join(analysis_data.get('take_profit', []))}
+⚖️ RISK/REWARD: {analysis_data.get('risk_reward', 'N/A')}
+🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
+
+📝 SUMMARY:
+{analysis_data.get('summary', 'No summary')}
+
+🏗️ MARKET STRUCTURE:
+{analysis_data.get('market_structure', 'N/A')}
+
+📊 SUPPORT/RESISTANCE:
+Support: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
+Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
+
+🔍 OBSERVATIONS:
+{analysis_data.get('key_observations', 'None')}"""
 
                 return {
                     "analysis": formatted_report,
                     "structured_data": analysis_data,
+                    "image_base64": image_base64,
                     "pair": pair,
                     "timeframe": timeframe
                 }
                 
             except json.JSONDecodeError:
-                return {"analysis": ai_response, "pair": pair, "timeframe": timeframe}
+                return {
+                    "analysis": ai_response,
+                    "image_base64": image_base64,
+                    "pair": pair,
+                    "timeframe": timeframe
+                }
                 
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Chat endpoint
-@app.post("/chat")
-async def chat_endpoint(
-    request: ChatRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    if not settings.OPENROUTER_API_KEY:
-        raise HTTPException(status_code=503, detail="AI service not configured")
-    
-    try:
-        system_prompt = """You are an expert trading mentor. Provide concise, actionable advice."""
-        
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-                json={
-                    "model": settings.OPENROUTER_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": request.message}
-                    ],
-                    "max_tokens": 1000,
-                    "temperature": 0.7
-                }
-            )
-            
-            if response.status_code != 200:
-                raise HTTPException(status_code=500, detail="AI service error")
-            
-            result = response.json()
-            ai_response = result["choices"][0]["message"]["content"]
-            
-            user_id = current_user.get("id") or current_user.get("sub")
-            async with db_pool.acquire() as conn:
-                await conn.execute("""
-                    INSERT INTO chat_history (user_id, message, response, context)
-                    VALUES ($1, $2, $3, $4)
-                """, int(user_id), request.message, ai_response, request.context)
-            
-            return {"response": ai_response}
-            
-    except Exception as e:
-        logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/health")
 async def health_check():
+    db_status = "unknown"
+    try:
+        if db_pool:
+            async with db_pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+                db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
     return {
-        "status": "healthy", 
-        "version": "3.1.0", 
-        "cors_origins": settings.CORS_ORIGINS,
+        "status": "healthy" if db_status == "connected" else "unhealthy",
+        "version": "3.1.2",
+        "database": db_status,
+        "cloudinary_enabled": CLOUDINARY_AVAILABLE and bool(settings.CLOUDINARY_CLOUD_NAME),
+        "cors_origins": len(settings.CORS_ORIGINS),
         "timestamp": datetime.utcnow().isoformat()
     }
+
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global error: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "message": str(exc)}
+    )
 
 if __name__ == "__main__":
     import uvicorn

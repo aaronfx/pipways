@@ -18,10 +18,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CRITICAL FIX: Hardcode your frontend URL
+# CORS MUST be added before routers
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://pipways-web-nhem.onrender.com"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

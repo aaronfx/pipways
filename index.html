@@ -1061,6 +1061,35 @@
             margin-bottom: 20px;
         }
 
+        /* Chart Display */
+        .chart-display {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto 30px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .chart-display img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .analysis-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid var(--border);
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            font-size: 15px;
+        }
+
         /* Responsive */
         @media (max-width: 1024px) {
             .form-grid { grid-template-columns: 1fr; }
@@ -1108,6 +1137,10 @@
             .content-grid { grid-template-columns: 1fr; }
 
             .telegram-cards { grid-template-columns: 1fr; }
+            
+            .chart-display {
+                margin: 0 15px 20px;
+            }
         }
 
         .loading {
@@ -1239,7 +1272,7 @@
                         <span>Overview</span>
                     </button>
                 </li>
-                <!-- NEW: Telegram Signals Nav Item -->
+                <!-- Telegram Signals Nav Item -->
                 <li class="nav-item">
                     <button class="nav-link" onclick="showSection('telegram', this)">
                         <i class="fab fa-telegram"></i>
@@ -1284,6 +1317,7 @@
                         <span>Blog</span>
                     </button>
                 </li>
+                <!-- Admin Dashboard - Fixed visibility -->
                 <li class="nav-item hidden" id="admin-nav-item">
                     <button class="nav-link" onclick="showSection('admin', this)" style="color: var(--warning);">
                         <i class="fas fa-cog"></i>
@@ -1376,10 +1410,9 @@
                         <div class="swiper-button-prev"></div>
                     </div>
                 </div>
-                <!-- Telegram cards moved to dedicated section -->
             </div>
 
-            <!-- NEW: Telegram Signals Section (Moved from Home) -->
+            <!-- Telegram Signals Section -->
             <div class="section" id="telegram-section">
                 <div class="page-header">
                     <h2><i class="fab fa-telegram" style="color: var(--telegram);"></i> Telegram Signals</h2>
@@ -1431,20 +1464,42 @@
                 </div>
             </div>
 
-            <!-- AI Analysis Section -->
+            <!-- AI Analysis Section - FIXED with Chart Display -->
             <div class="section" id="analysis-section">
                 <div class="page-header">
                     <h2><i class="fas fa-robot" style="color: var(--primary);"></i> AI Chart Analysis</h2>
                     <p>Upload your charts for professional AI-powered technical analysis</p>
                 </div>
-                <div style="padding: 30px; max-width: 800px; margin: 0 auto;">
-                    <div class="upload-area" onclick="document.getElementById('chart-upload').click()">
+                <div style="padding: 30px; max-width: 900px; margin: 0 auto;">
+                    <div class="upload-area" onclick="document.getElementById('chart-upload').click()" id="upload-area">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <h3>Upload Chart for Analysis</h3>
                         <p style="color: var(--text-secondary); margin-top: 10px;">Supported formats: PNG, JPG (Max 10MB)</p>
                         <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="handleChartUpload(this)">
                     </div>
-                    <div id="analysis-result" class="hidden" style="margin-top: 30px;"></div>
+                    
+                    <!-- Chart Display Container -->
+                    <div id="chart-display-container" class="hidden">
+                        <h3 style="margin-bottom: 15px; color: var(--text-secondary);">
+                            <i class="fas fa-image"></i> Uploaded Chart
+                        </h3>
+                        <div class="chart-display">
+                            <img id="uploaded-chart-img" src="" alt="Uploaded Chart">
+                        </div>
+                    </div>
+                    
+                    <!-- Analysis Result -->
+                    <div id="analysis-result" class="hidden">
+                        <div style="background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); overflow: hidden;">
+                            <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); padding: 20px; color: white;">
+                                <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-robot"></i>
+                                    AI Analysis Result
+                                </h3>
+                            </div>
+                            <div class="analysis-content" id="analysis-text"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1756,6 +1811,7 @@
         let currentUser = null;
         let swiper;
         let currentPage = 1;
+        let currentChartImage = null; // Store current chart image
 
         // ==========================================
         // INITIALIZATION
@@ -1793,10 +1849,28 @@
             document.getElementById('main-app').classList.remove('hidden');
             initSwiper();
 
-            // FIXED: Check if user is admin/moderator and show admin link
-            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'moderator')) {
-                document.getElementById('admin-nav-item').classList.remove('hidden');
-                document.getElementById('admin-badge').classList.remove('hidden');
+            // FIXED: Robust admin check with logging
+            if (currentUser) {
+                console.log("Current user:", currentUser);
+                console.log("User role:", currentUser.role);
+                
+                const isAdmin = currentUser.role === 'admin' || currentUser.role === 'moderator';
+                
+                if (isAdmin) {
+                    const adminNav = document.getElementById('admin-nav-item');
+                    const adminBadge = document.getElementById('admin-badge');
+                    
+                    if (adminNav) {
+                        adminNav.classList.remove('hidden');
+                        console.log("Admin nav item revealed");
+                    } else {
+                        console.error("Admin nav element not found");
+                    }
+                    
+                    if (adminBadge) {
+                        adminBadge.classList.remove('hidden');
+                    }
+                }
             }
 
             // Update UI with user info
@@ -1817,20 +1891,15 @@
             document.getElementById('login-form').classList.remove('hidden');
         }
 
-        // FIXED: Updated validateToken to handle enriched JWT tokens
         async function validateToken() {
             try {
-                // First try to decode the token locally (enriched token contains user data)
                 const payload = JSON.parse(atob(authToken.split('.')[1]));
-
-                // If token has all user data, use it directly
                 if (payload.role && payload.email && payload.full_name) {
                     currentUser = payload;
                     showMainApp();
                     return;
                 }
 
-                // Otherwise, try to refresh or fetch from /auth/me
                 const refreshToken = localStorage.getItem('refresh_token');
                 const response = await fetch(`${API_URL}/auth/refresh`, {
                     method: 'POST',
@@ -1845,8 +1914,6 @@
                     const data = await response.json();
                     authToken = data.access_token;
                     localStorage.setItem('access_token', authToken);
-
-                    // Decode the new enriched token
                     const newPayload = JSON.parse(atob(authToken.split('.')[1]));
                     currentUser = newPayload;
                     showMainApp();
@@ -1883,8 +1950,6 @@
                     authToken = data.access_token;
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('refresh_token', data.refresh_token);
-
-                    // FIXED: Use enriched token data or user object from response
                     currentUser = data.user || JSON.parse(atob(authToken.split('.')[1]));
                     showMainApp();
                     showToast('Welcome back!', 'success');
@@ -1922,8 +1987,6 @@
                     authToken = data.access_token;
                     localStorage.setItem('access_token', data.access_token);
                     localStorage.setItem('refresh_token', data.refresh_token);
-
-                    // FIXED: Use enriched token data or user object from response
                     currentUser = data.user || JSON.parse(atob(authToken.split('.')[1]));
                     showMainApp();
                     showToast('Account created!', 'success');
@@ -1958,15 +2021,12 @@
         }
 
         function showSection(sectionName, element) {
-            // Update nav active state
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             if (element) element.classList.add('active');
 
-            // Show section
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
             document.getElementById(`${sectionName}-section`).classList.add('active');
 
-            // Load section data
             if (sectionName === 'admin') {
                 loadAdminStats();
                 loadUsers();
@@ -1979,7 +2039,6 @@
             } else if (sectionName === 'blog') {
                 loadBlog();
             }
-            // Note: telegram section doesn't need to load dynamic data
 
             if (window.innerWidth <= 768) {
                 toggleSidebar();
@@ -2079,7 +2138,6 @@
                     `).join('');
                 }
 
-                // Pagination
                 const pagination = document.getElementById('users-pagination');
                 let pagesHtml = '';
                 for (let i = 1; i <= data.pages; i++) {
@@ -2116,14 +2174,12 @@
             const status = document.getElementById('edit-user-status').value;
 
             try {
-                // Update role
                 await fetch(`${API_URL}/admin/users/${userId}/role?role=${role}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `Bearer ${authToken}` },
                     credentials: 'include'
                 });
 
-                // Update subscription
                 await fetch(`${API_URL}/admin/users/${userId}/toggle-subscription?tier=${tier}&status=${status}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${authToken}` },
@@ -2323,7 +2379,9 @@
             }
         }
 
-        // FIXED: Updated handleChartUpload with better error handling for 503 vs 500
+        // ==========================================
+        // FIXED: Chart Upload with Image Display
+        // ==========================================
         async function handleChartUpload(input) {
             if (!input.files || !input.files[0]) return;
             const file = input.files[0];
@@ -2333,14 +2391,25 @@
                 return;
             }
 
+            // Show preview immediately
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentChartImage = e.target.result;
+                document.getElementById('uploaded-chart-img').src = currentChartImage;
+                document.getElementById('chart-display-container').classList.remove('hidden');
+                document.getElementById('upload-area').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+
             const formData = new FormData();
             formData.append('file', file);
             formData.append('pair', 'EURUSD');
             formData.append('timeframe', '1H');
 
             const resultDiv = document.getElementById('analysis-result');
+            const analysisText = document.getElementById('analysis-text');
             resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Analyzing chart...</div>';
+            analysisText.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Analyzing chart with AI...</div>';
 
             try {
                 const response = await fetch(`${API_URL}/analyze/chart`, {
@@ -2351,11 +2420,12 @@
                 });
 
                 if (response.status === 503) {
-                    // AI service not configured
-                    resultDiv.innerHTML = `
-                        <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; border: 1px solid var(--danger);">
-                            <h3 style="color: var(--danger); margin-bottom: 16px;"><i class="fas fa-exclamation-triangle"></i> AI Service Not Configured</h3>
-                            <p style="color: var(--text-secondary);">The AI analysis service is not configured on the server. Please contact the administrator to set up the OpenRouter API key.</p>
+                    analysisText.innerHTML = `
+                        <div style="color: var(--danger);">
+                            <i class="fas fa-exclamation-triangle"></i> AI Service Not Configured<br>
+                            <span style="color: var(--text-secondary); font-size: 14px;">
+                                Please contact administrator to configure OpenRouter API key.
+                            </span>
                         </div>
                     `;
                     return;
@@ -2367,27 +2437,28 @@
                 }
 
                 const data = await response.json();
-                resultDiv.innerHTML = `
-                    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; border: 1px solid var(--border);">
-                        <h3 style="color: var(--primary); margin-bottom: 16px;"><i class="fas fa-robot"></i> Analysis Result</h3>
-                        <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6; color: var(--text-primary);">${data.analysis}</pre>
-                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-secondary);">
-                            <i class="fas fa-clock"></i> ${new Date(data.timestamp).toLocaleString()}
-                        </div>
-                    </div>
-                `;
+                
+                // Display formatted analysis
+                analysisText.textContent = data.analysis;
+                
+                // If we got structured data, could add visual elements here
+                if (data.structured_data) {
+                    console.log("Structured analysis:", data.structured_data);
+                }
+
             } catch (error) {
                 console.error('Chart analysis error:', error);
-                resultDiv.innerHTML = `
-                    <div style="background: var(--bg-card); border-radius: 12px; padding: 24px; border: 1px solid var(--danger);">
-                        <h3 style="color: var(--danger); margin-bottom: 16px;"><i class="fas fa-exclamation-circle"></i> Analysis Failed</h3>
-                        <p style="color: var(--text-secondary);">${error.message || 'An unexpected error occurred. Please try again.'}</p>
+                analysisText.innerHTML = `
+                    <div style="color: var(--danger);">
+                        <i class="fas fa-exclamation-circle"></i> Analysis Failed<br>
+                        <span style="color: var(--text-secondary); font-size: 14px;">
+                            ${error.message || 'Please try again.'}
+                        </span>
                     </div>
                 `;
             }
         }
 
-        // FIXED: Updated sendChatMessage with better error handling
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
@@ -2416,7 +2487,7 @@
                     container.innerHTML += `
                         <div class="chat-message bot">
                             <div class="chat-message-content" style="color: var(--danger);">
-                                <i class="fas fa-exclamation-triangle"></i> AI Mentor service is not configured. Please contact the administrator.
+                                <i class="fas fa-exclamation-triangle"></i> AI Mentor service is not configured.
                             </div>
                         </div>
                     `;

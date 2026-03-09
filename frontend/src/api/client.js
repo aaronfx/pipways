@@ -1,12 +1,11 @@
+import { store } from '/src/state.js';
 
-import { store } from './state.js';
-
-const API_URL = 'https://pipways-api-nhem.onrender.com'; // Change to your Render URL
+const API_URL = 'https://pipways-api-nhem.onrender.com';
 
 class ApiClient {
     async request(endpoint, options = {}) {
         const token = store.getState().token;
-
+        
         const config = {
             headers: {
                 'Content-Type': 'application/json',
@@ -22,9 +21,8 @@ class ApiClient {
 
         try {
             const response = await fetch(`${API_URL}${endpoint}`, config);
-
+            
             if (response.status === 401) {
-                // Try refresh
                 const refreshed = await this.refreshToken();
                 if (refreshed) {
                     return this.request(endpoint, options);
@@ -95,37 +93,29 @@ class ApiClient {
         setTimeout(() => toast.remove(), 3000);
     }
 
-    // Auth
     login = (creds) => this.request('/auth/login', { method: 'POST', body: creds });
     register = (data) => this.request('/auth/register', { method: 'POST', body: data });
-
-    // Admin
+    
     getStats = () => this.request('/admin/stats');
     getUsers = (page = 1) => this.request(`/admin/users?page=${page}&limit=10`);
     deleteUser = (id) => this.request(`/admin/users/${id}`, { method: 'DELETE' });
-
-    // Blog
+    
     getPosts = () => this.request('/blog/posts?limit=50');
     createPost = (data) => this.request('/admin/blog', { method: 'POST', body: data });
-    deletePost = (id) => this.request(`/admin/blog/${id}`, { method: 'DELETE' });
-
-    // Courses
+    
     getCourses = () => this.request('/courses?limit=50');
     createCourse = (data) => this.request('/admin/courses', { method: 'POST', body: data });
-
-    // Webinars
+    
     getWebinars = () => this.request('/webinars?limit=50');
     createWebinar = (data) => this.request('/admin/webinars', { method: 'POST', body: data });
-
-    // Signals
+    
     createSignal = (data) => this.request('/admin/signals', { method: 'POST', body: data });
-
-    // AI
+    
     analyzePerformance = (data) => this.request('/ai/analyze/performance', { method: 'POST', body: data });
     analyzeChart = (formData) => this.request('/ai/analyze/chart', { 
         method: 'POST', 
         body: formData,
-        headers: {} // Let browser set for FormData
+        headers: {}
     });
     sendChatMessage = (msg, context = 'trading') => this.request('/ai/chat', { 
         method: 'POST', 

@@ -1,5 +1,5 @@
-
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from datetime import datetime, timedelta
 from jose import jwt
 from passlib.context import CryptContext
@@ -10,7 +10,10 @@ import asyncpg
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Database connection (in production, use dependency injection)
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+# Database connection
 async def get_db():
     return await asyncpg.create_pool(settings.DATABASE_URL)
 
@@ -24,21 +27,16 @@ def create_token(data: dict, expires_delta: timedelta):
 async def register(user: UserCreate):
     pool = await get_db()
     async with pool.acquire() as conn:
-        # Check if user exists
         existing = await conn.fetchrow("SELECT id FROM users WHERE email = $1", user.email)
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Hash password
         hashed = pwd_context.hash(user.password)
-
-        # Insert user
         user_id = await conn.fetchval("""
             INSERT INTO users (email, password_hash, full_name, role, subscription_tier)
             VALUES ($1, $2, $3, $4, $5) RETURNING id
         """, user.email, hashed, user.full_name, "user", "free")
 
-        # Create tokens
         access_token = create_token(
             {"sub": str(user_id), "email": user.email, "role": "user"},
             timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -84,11 +82,14 @@ async def login(credentials: UserLogin):
         }
 
 @router.post("/refresh")
-async def refresh_token(credentials: dict):
-    token = credentials.get("refresh_token")
+async def refresh_token(request: RefreshRequest):  # Changed to accept JSON body
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(request.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("sub")
+        token_type = payload.get("type")
+
+        if token_type != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
 
         pool = await get_db()
         async with pool.acquire() as conn:
@@ -106,5 +107,5 @@ async def refresh_token(credentials: dict):
             )
 
             return {"access_token": new_access, "refresh_token": new_refresh}
-    except:
+    except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid refresh token")

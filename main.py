@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Same-Origin Architecture v3.3.0
+Pipways Trading Platform API - Same-Origin Architecture v3.3.1
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -12,14 +12,13 @@ import logging
 import base64
 import json
 import uuid
-import shutil
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Union
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles  # ADDED
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
@@ -51,26 +50,25 @@ class Settings:
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60
     REFRESH_TOKEN_EXPIRE_DAYS = 7
-    RESET_TOKEN_EXPIRE_HOURS = 1
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
-    # Cloudinary Config (Optional)
+    # Cloudinary Config
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
     CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 
-    # Use reliable vision-capable models
+    # Models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # Simplified CORS - single origin doesn't need restrictions but kept for safety
+    # CORS - simplified for same-origin
     CORS_ORIGINS = ["*"]
 
 settings = Settings()
 
-# Configure Cloudinary only if available and configured
+# Configure Cloudinary
 if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
     cloudinary.config(
         cloud_name=settings.CLOUDINARY_CLOUD_NAME,
@@ -113,9 +111,9 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.3.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.3.1", lifespan=lifespan)
 
-# CORS Middleware - Simplified for same-origin (kept for flexibility)
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -125,17 +123,17 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
-# Create uploads directory immediately (before StaticFiles mount)
-os.makedirs("uploads", exist_ok=True)
 
-# Mount uploads folder as static files
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-# MOUNT UPLOADS FOLDER AS STATIC FILES
+# CRITICAL: Create uploads directory BEFORE mounting StaticFiles
+os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 security = HTTPBearer(auto_error=False)
 
-# Enhanced Models
+# ============================================================================
+# Pydantic Models
+# ============================================================================
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -219,13 +217,13 @@ class ChatRequest(BaseModel):
     context: Optional[str] = ""
     history: Optional[List[Dict[str, str]]] = []
 
-class ChatMessage(BaseModel):
-    role: str = Field(..., pattern="^(user|assistant|system)$")
-    content: str
+# ============================================================================
+# Database Initialization
+# ============================================================================
 
-# Database initialization
 async def init_db():
     async with db_pool.acquire() as conn:
+        # Users table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -244,6 +242,7 @@ async def init_db():
             )
         """)
 
+        # Blog posts table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -266,6 +265,7 @@ async def init_db():
             )
         """)
 
+        # Signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -286,6 +286,7 @@ async def init_db():
             )
         """)
 
+        # Webinars table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -301,6 +302,7 @@ async def init_db():
             )
         """)
 
+        # Courses table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -317,6 +319,7 @@ async def init_db():
             )
         """)
 
+        # Course modules table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_modules (
                 id SERIAL PRIMARY KEY,
@@ -330,6 +333,7 @@ async def init_db():
             )
         """)
 
+        # Chat history table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
@@ -341,6 +345,7 @@ async def init_db():
             )
         """)
 
+        # Media files table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS media_files (
                 id SERIAL PRIMARY KEY,
@@ -353,6 +358,7 @@ async def init_db():
             )
         """)
 
+        # Performance analyses table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS performance_analyses (
                 id SERIAL PRIMARY KEY,
@@ -374,14 +380,13 @@ async def init_db():
                     VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
                 """, settings.ADMIN_EMAIL, hashed, "System Administrator")
                 logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
-            else:
-                await conn.execute("""
-                    UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'
-                """, settings.ADMIN_EMAIL)
         except Exception as e:
             logger.error(f"Error creating admin: {e}")
 
-# Auth utilities
+# ============================================================================
+# Auth Utilities
+# ============================================================================
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
@@ -437,7 +442,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             return dict(user)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.JWTError as e:
+    except jwt.InvalidTokenError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 async def get_admin_user(current_user: dict = Depends(get_current_user)):
@@ -446,7 +451,10 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
-# Auth endpoints
+# ============================================================================
+# Auth Endpoints
+# ============================================================================
+
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     async with db_pool.acquire() as conn:
@@ -530,14 +538,17 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
             return {"access_token": new_access, "refresh_token": new_refresh, "token_type": "bearer"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
-# Admin endpoints
+# ============================================================================
+# Admin Endpoints
+# ============================================================================
+
 @app.get("/admin/stats")
 async def get_admin_stats(admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -546,8 +557,6 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
         active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'") or 0
         premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')") or 0
         total_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts") or 0
-        draft_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'draft'") or 0
-        scheduled_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'scheduled'") or 0
         total_courses = await conn.fetchval("SELECT COUNT(*) FROM courses") or 0
         total_webinars = await conn.fetchval("SELECT COUNT(*) FROM webinars") or 0
         
@@ -559,8 +568,6 @@ async def get_admin_stats(admin: dict = Depends(get_admin_user)):
             "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0,
             "content_stats": {
                 "blog_posts": total_posts,
-                "drafts": draft_posts,
-                "scheduled": scheduled_posts,
                 "courses": total_courses,
                 "webinars": total_webinars
             }
@@ -608,36 +615,19 @@ async def get_all_users(
             "pages": (total + limit - 1) // limit
         }
 
-@app.put("/admin/users/{user_id}/role")
-async def update_user_role(user_id: int, role: str = Query(...), admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        await conn.execute("UPDATE users SET role = $1 WHERE id = $2", role, user_id)
-        return {"message": f"User role updated to {role}"}
-
 @app.delete("/admin/users/{user_id}")
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         if int(user_id) == int(admin_id):
             raise HTTPException(status_code=400, detail="Cannot delete yourself")
-            
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return {"message": "User deleted"}
 
-@app.post("/admin/users/{user_id}/toggle-subscription")
-async def toggle_subscription(
-    user_id: int,
-    tier: str = Query(...),
-    status: str = Query(...),
-    admin: dict = Depends(get_admin_user)
-):
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-            UPDATE users SET subscription_tier = $1, subscription_status = $2 WHERE id = $3
-        """, tier, status, user_id)
-        return {"message": "Subscription updated"}
-
+# ============================================================================
 # Blog Management
+# ============================================================================
+
 @app.get("/blog/posts")
 async def get_blog_posts(
     status: Optional[str] = Query(None),
@@ -696,15 +686,12 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
             slug = f"{base_slug}-{counter}"
             counter += 1
         
-        published_at = None
-        if post.status == "published" and not post.scheduled_at:
-            published_at = datetime.utcnow()
+        published_at = datetime.utcnow() if post.status == "published" and not post.scheduled_at else None
         
         post_id = await conn.fetchval("""
             INSERT INTO blog_posts (
                 title, content, excerpt, author_id, is_premium, status, 
-                scheduled_at, meta_title, meta_description, slug, featured_image, tags, category,
-                published_at
+                scheduled_at, meta_title, meta_description, slug, featured_image, tags, category, published_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING id
         """, post.title, post.content, post.excerpt, int(admin_id), post.is_premium, 
@@ -713,21 +700,16 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
              
         return {"id": post_id, "slug": slug, "message": "Blog post created"}
 
-@app.get("/admin/blog/{post_id}")
-async def get_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT * FROM blog_posts WHERE id = $1", post_id)
-        if not row:
-            raise HTTPException(status_code=404, detail="Post not found")
-        return dict(row)
-
 @app.delete("/admin/blog/{post_id}")
 async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
         return {"message": "Post deleted"}
 
+# ============================================================================
 # Media Upload
+# ============================================================================
+
 @app.post("/admin/media/upload")
 async def upload_media(
     file: UploadFile = File(...),
@@ -741,6 +723,7 @@ async def upload_media(
         if len(contents) > 50 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="File too large (max 50MB)")
         
+        # Try Cloudinary first if available
         if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
             try:
                 result = cloudinary.uploader.upload(
@@ -762,16 +745,13 @@ async def upload_media(
                     "id": media_id,
                     "url": result["secure_url"],
                     "filename": file.filename,
-                    "size": result["bytes"],
                     "source": "cloudinary"
                 }
             except Exception as cloud_err:
-                logger.warning(f"Cloudinary upload failed, falling back to local: {cloud_err}")
+                logger.warning(f"Cloudinary failed, using local: {cloud_err}")
         
         # Local storage fallback
-        upload_dir = "uploads"
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = os.path.join(upload_dir, unique_name)
+        file_path = os.path.join("uploads", unique_name)
         
         with open(file_path, "wb") as f:
             f.write(contents)
@@ -791,7 +771,6 @@ async def upload_media(
             "id": media_id,
             "url": f"/uploads/{unique_name}",
             "filename": file.filename,
-            "size": len(contents),
             "source": "local"
         }
     except HTTPException:
@@ -817,23 +796,10 @@ async def list_media(
         )
         return {"files": [dict(row) for row in rows]}
 
-@app.delete("/admin/media/{media_id}")
-async def delete_media(media_id: int, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        media = await conn.fetchrow("SELECT * FROM media_files WHERE id = $1", media_id)
-        if not media:
-            raise HTTPException(status_code=404, detail="Media not found")
-        
-        # Delete local file if exists
-        if media["url"].startswith("/uploads/"):
-            file_path = os.path.join("uploads", os.path.basename(media["url"]))
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        
-        await conn.execute("DELETE FROM media_files WHERE id = $1", media_id)
-        return {"message": "Media deleted"}
+# ============================================================================
+# Courses
+# ============================================================================
 
-# LMS - Courses with Modules
 @app.get("/courses")
 async def get_courses(
     level: Optional[str] = Query(None),
@@ -896,7 +862,10 @@ async def delete_course(course_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM courses WHERE id = $1", course_id)
         return {"message": "Course deleted"}
 
+# ============================================================================
 # Webinars
+# ============================================================================
+
 @app.get("/webinars")
 async def get_webinars(
     upcoming: bool = Query(True),
@@ -938,7 +907,10 @@ async def delete_webinar(webinar_id: int, admin: dict = Depends(get_admin_user))
         await conn.execute("DELETE FROM webinars WHERE id = $1", webinar_id)
         return {"message": "Webinar deleted"}
 
+# ============================================================================
 # Signals
+# ============================================================================
+
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
@@ -985,7 +957,10 @@ async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM signals WHERE id = $1", signal_id)
         return {"message": "Signal deleted"}
 
-# AI Chat Endpoint (Mentor)
+# ============================================================================
+# AI Chat (Mentor)
+# ============================================================================
+
 @app.post("/chat")
 async def chat_with_ai(
     request: ChatRequest,
@@ -999,9 +974,8 @@ async def chat_with_ai(
             {"role": "system", "content": """You are an expert trading mentor with 20+ years of experience in forex, stocks, and crypto trading. You provide personalized, actionable advice on trading strategies, risk management, trading psychology, and market analysis. Keep responses concise but informative (max 3 paragraphs). Always emphasize risk management and discipline."""},
         ]
         
-        # Add history if provided
         if request.history:
-            messages.extend(request.history[-5:])  # Keep last 5 messages for context
+            messages.extend(request.history[-5:])
             
         messages.append({"role": "user", "content": request.message})
         
@@ -1028,7 +1002,6 @@ async def chat_with_ai(
             result = response.json()
             ai_message = result["choices"][0]["message"]["content"]
             
-            # Save to history
             user_id = current_user.get("id") or current_user.get("sub")
             async with db_pool.acquire() as conn:
                 await conn.execute("""
@@ -1036,10 +1009,7 @@ async def chat_with_ai(
                     VALUES ($1, $2, $3, $4)
                 """, int(user_id), request.message, ai_message, request.context)
             
-            return {
-                "response": ai_message,
-                "timestamp": datetime.utcnow().isoformat()
-            }
+            return {"response": ai_message, "timestamp": datetime.utcnow().isoformat()}
             
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
@@ -1061,7 +1031,10 @@ async def get_chat_history(
         """, int(user_id), limit)
         return {"history": [dict(row) for row in rows]}
 
+# ============================================================================
 # AI Performance Analyzer
+# ============================================================================
+
 @app.post("/analyze/performance")
 async def analyze_performance(
     request: PerformanceAnalysisRequest,
@@ -1076,7 +1049,7 @@ async def analyze_performance(
         losing_trades = total_trades - winning_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
-        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology."""
+        system_prompt = """You are a professional trading performance analyst with over 20 years of experience in institutional trading, risk management, and trader psychology."""
 
         user_prompt = f"""Analyze the following trading performance data:
 
@@ -1147,7 +1120,10 @@ Provide analysis in strict JSON format with fields: performance_summary (with to
         logger.error(f"Performance analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Chart Analysis
+# ============================================================================
+# AI Chart Analysis
+# ============================================================================
+
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -1201,18 +1177,6 @@ Provide a detailed technical analysis including trend direction, key support/res
             result = response.json()
             ai_response = result["choices"][0]["message"]["content"]
             
-            # Try to extract structured data from response
-            try:
-                # Look for JSON in the response
-                json_match = re.search(r'\{[\s\S]*\}', ai_response)
-                if json_match:
-                    json_str = json_match.group()
-                    analysis_data = json.loads(json_str)
-                else:
-                    analysis_data = {}
-            except:
-                analysis_data = {}
-            
             formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1222,8 +1186,6 @@ Provide a detailed technical analysis including trend direction, key support/res
 
             return {
                 "analysis": formatted_report,
-                "structured_data": analysis_data,
-                "image_base64": image_base64,
                 "pair": pair,
                 "timeframe": timeframe
             }
@@ -1231,6 +1193,10 @@ Provide a detailed technical analysis including trend direction, key support/res
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# Health Check & Frontend Serving
+# ============================================================================
 
 @app.get("/health")
 async def health_check():
@@ -1245,28 +1211,28 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.3.0",
+        "version": "3.3.1",
         "database": db_status,
-        "cloudinary_enabled": CLOUDINARY_AVAILABLE and bool(settings.CLOUDINARY_CLOUD_NAME),
-        "cors_origins": len(settings.CORS_ORIGINS),
         "timestamp": datetime.utcnow().isoformat()
     }
 
-# SERVE FRONTEND - ROOT ROUTE
+# Serve frontend at root
 @app.get("/")
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.3.0 - Frontend not deployed. Place index.html in root directory."}
+    return {"message": "Pipways API v3.3.1 - Place index.html in root directory"}
 
-# SPA CATCH-ALL ROUTE - Must be last
+# SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
 async def spa_catch_all(path: str):
-    # Serve index.html for any non-API route (handles client-side routing)
-    # API routes defined above take precedence
+    # Skip API routes
+    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health")):
+        raise HTTPException(status_code=404, detail="Not found")
+    
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.3.0"}
+    return {"message": "Pipways API v3.3.1"}
 
 # Global exception handler
 @app.exception_handler(Exception)

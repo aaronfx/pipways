@@ -192,7 +192,6 @@ class BlogPostUpdate(BaseModel):
     tags: Optional[List[str]] = None
     category: Optional[str] = None
 
-# BUG FIX 1: Removed thumbnail field from Webinar models
 class WebinarCreate(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -201,8 +200,6 @@ class WebinarCreate(BaseModel):
     is_premium: bool = False
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = 100
-    # REMOVED: thumbnail field
-    recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
 class WebinarUpdate(BaseModel):
@@ -213,25 +210,22 @@ class WebinarUpdate(BaseModel):
     is_premium: Optional[bool] = None
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = None
-    # REMOVED: thumbnail field
-    recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
-# BUG FIX 2: Added missing signal fields
 class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=1)
     direction: str = Field(..., pattern="^(buy|sell)$")
     entry_price: float
     stop_loss: Optional[float] = None
-    tp1: Optional[float] = None  # NEW FIELD
-    tp2: Optional[float] = None  # NEW FIELD
-    risk_reward_ratio: Optional[str] = None  # NEW FIELD
-    expires_at: Optional[datetime] = None  # NEW FIELD
+    tp1: Optional[float] = None
+    tp2: Optional[float] = None
+    risk_reward_ratio: Optional[str] = None
+    expires_at: Optional[datetime] = None
     timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
 
-class SignalUpdate(BaseModel):  # NEW MODEL for updates
+class SignalUpdate(BaseModel):
     pair: Optional[str] = None
     direction: Optional[str] = None
     entry_price: Optional[float] = None
@@ -244,7 +238,7 @@ class SignalUpdate(BaseModel):  # NEW MODEL for updates
     analysis: Optional[str] = None
     is_premium: Optional[bool] = None
 
-class SignalResultUpdate(BaseModel):  # NEW MODEL for result updates
+class SignalResultUpdate(BaseModel):
     result: str = Field(..., pattern="^(WIN|LOSS|PARTIAL|EXPIRED)$")
     pips_gain_loss: Optional[float] = None
 
@@ -381,7 +375,7 @@ async def init_db():
             )
         """)
 
-        # BUG FIX 2: Added tp1, tp2, risk_reward_ratio, expires_at, result columns to signals table
+        # Signals table with all required columns
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -407,7 +401,7 @@ async def init_db():
             )
         """)
 
-        # BUG FIX 1: Removed thumbnail column from webinars table
+        # Webinars table - NO recording_link, NO thumbnail
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -418,12 +412,15 @@ async def init_db():
                 meeting_link VARCHAR(500),
                 is_premium BOOLEAN DEFAULT FALSE,
                 max_participants INTEGER DEFAULT 100,
-                recording_link VARCHAR(500),
                 reminder_message TEXT,
-                created_by INTEGER REFERENCES users(id),
+                created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Drop columns if they exist (for migration)
+        await conn.execute("ALTER TABLE webinars DROP COLUMN IF EXISTS recording_link")
+        await conn.execute("ALTER TABLE webinars DROP COLUMN IF EXISTS thumbnail")
 
         # Courses table
         await conn.execute("""
@@ -550,7 +547,7 @@ async def init_db():
             )
         """)
 
-        # Site settings table (NEW)
+        # Site settings table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS site_settings (
                 id SERIAL PRIMARY KEY,
@@ -871,7 +868,29 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "User deleted"}
 
 # ============================================================================
-# Site Settings Endpoints (NEW)
+# NEW: Admin Signals Endpoint
+# ============================================================================
+
+@app.get("/admin/signals")
+async def get_admin_signals(
+    limit: int = Query(50),
+    offset: int = Query(0),
+    admin: dict = Depends(get_admin_user)
+):
+    """Get all signals for admin management panel"""
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT id, pair, direction, entry_price, stop_loss, tp1, tp2, 
+               risk_reward_ratio, timeframe, status, result, is_premium, created_at 
+               FROM signals 
+               ORDER BY created_at DESC 
+               LIMIT $1 OFFSET $2""",
+            limit, offset
+        )
+        return [dict(row) for row in rows]
+
+# ============================================================================
+# Site Settings Endpoints
 # ============================================================================
 
 @app.get("/admin/settings")
@@ -1261,28 +1280,28 @@ async def list_media(
         return {"files": [dict(row) for row in rows]}
 
 # ============================================================================
-# Courses - Admin Management (FIXED)
+# NEW: Courses - Admin Management with Pagination
 # ============================================================================
 
 @app.get("/admin/courses")
-async def get_admin_courses(
+async def get_admin_courses_list(
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=100),
     admin: dict = Depends(get_admin_user)
 ):
-    """Get all courses for admin with pagination and search"""
+    """Get paginated course list for admin panel with module count"""
     async with db_pool.acquire() as conn:
         where_clauses = ["1=1"]
         params = []
-
+        
         if search:
             where_clauses.append(f"(title ILIKE ${len(params)+1} OR description ILIKE ${len(params)+1})")
             params.append(f"%{search}%")
-
+        
         count_query = f"SELECT COUNT(*) FROM courses WHERE {' AND '.join(where_clauses)}"
         total = await conn.fetchval(count_query, *params)
-
+        
         offset = (page - 1) * limit
         query = f"""
             SELECT c.*, u.full_name as creator_name,
@@ -1295,7 +1314,7 @@ async def get_admin_courses(
             LIMIT ${len(params)+1} OFFSET ${len(params)+2}
         """
         params.extend([limit, offset])
-
+        
         rows = await conn.fetch(query, *params)
         return {
             "courses": [dict(row) for row in rows],
@@ -1797,7 +1816,7 @@ async def get_my_quiz_results(current_user: dict = Depends(get_current_user)):
         return {"results": [dict(row) for row in rows]}
 
 # ============================================================================
-# Webinars (Fixed and Enhanced)
+# Webinars (Fixed - No recording_link)
 # ============================================================================
 
 @app.get("/webinars")
@@ -1842,7 +1861,6 @@ async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depe
         
         return webinar
 
-# BUG FIX 1: Removed thumbnail from webinar creation
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -1851,20 +1869,18 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
             webinar_id = await conn.fetchval("""
                 INSERT INTO webinars (
                     title, description, scheduled_at, duration_minutes, meeting_link, 
-                    is_premium, max_participants, recording_link, reminder_message, created_by
+                    is_premium, max_participants, reminder_message, created_by
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING id
             """, webinar.title, webinar.description, webinar.scheduled_at, 
                  webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
-                 webinar.max_participants, webinar.recording_link,
-                 webinar.reminder_message, int(admin_id))
+                 webinar.max_participants, webinar.reminder_message, int(admin_id))
             return {"id": webinar_id, "message": "Webinar created successfully"}
         except Exception as e:
             logger.error(f"Error creating webinar: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to create webinar: {str(e)}")
 
-# BUG FIX 1: Removed thumbnail from webinar update
 @app.put("/admin/webinars/{webinar_id}")
 async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = Depends(get_admin_user)):
     """Update webinar"""
@@ -1903,12 +1919,6 @@ async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = 
         if webinar.max_participants is not None:
             update_fields.append(f"max_participants = ${len(params)+1}")
             params.append(webinar.max_participants)
-            
-        # REMOVED: thumbnail handling
-        
-        if webinar.recording_link is not None:
-            update_fields.append(f"recording_link = ${len(params)+1}")
-            params.append(webinar.recording_link)
             
         if webinar.reminder_message is not None:
             update_fields.append(f"reminder_message = ${len(params)+1}")
@@ -1964,7 +1974,6 @@ async def get_signals(
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
 
-# BUG FIX 5: Ensure signal detail returns all fields including new ones
 @app.get("/signals/{signal_id}")
 async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
     """Get single signal by ID"""
@@ -1984,7 +1993,6 @@ async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depend
         
         return signal
 
-# BUG FIX 2: Updated to include tp1, tp2, risk_reward_ratio, expires_at
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -2001,7 +2009,6 @@ async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_us
              signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
         return {"id": signal_id, "message": "Signal created"}
 
-# BUG FIX 3: Fixed PUT endpoint with proper fields
 @app.put("/admin/signals/{signal_id}")
 async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depends(get_admin_user)):
     """Update signal"""
@@ -2068,7 +2075,6 @@ async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depe
             
         return {"message": "Signal updated successfully", "id": signal_id}
 
-# BUG FIX 4: New endpoint for updating signal results
 @app.put("/admin/signals/{signal_id}/result")
 async def update_signal_result(
     signal_id: int, 
@@ -2256,7 +2262,7 @@ async def get_chat_history(
         return {"history": [dict(row) for row in rows]}
 
 # ============================================================================
-# AI Performance Analyzer with Vision (UPDATED)
+# AI Performance Analyzer with Vision
 # ============================================================================
 
 @app.post("/analyze/performance")

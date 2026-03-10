@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v3.5.1
+Pipways Trading Platform API - Production Debug & System Completion v3.5.2
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.5.1", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.2", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -200,7 +200,6 @@ class WebinarCreate(BaseModel):
     is_premium: bool = False
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = 100
-    thumbnail: Optional[str] = None
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
@@ -212,7 +211,6 @@ class WebinarUpdate(BaseModel):
     is_premium: Optional[bool] = None
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = None
-    thumbnail: Optional[str] = None
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
@@ -324,6 +322,9 @@ class SiteSettingsUpdate(BaseModel):
     seo_default_description: Optional[str] = None
     contact_email: Optional[str] = None
 
+class SignalResultUpdate(BaseModel):
+    result: str = Field(..., pattern="^(WIN|LOSS|PARTIAL|EXPIRED)$")
+
 # ============================================================================
 # Database Initialization
 # ============================================================================
@@ -397,7 +398,7 @@ async def init_db():
             )
         """)
 
-        # Webinars table - FIXED: Added thumbnail column
+        # Webinars table - FIXED: Removed thumbnail column
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -408,7 +409,6 @@ async def init_db():
                 meeting_link VARCHAR(500),
                 is_premium BOOLEAN DEFAULT FALSE,
                 max_participants INTEGER DEFAULT 100,
-                thumbnail VARCHAR(500),
                 recording_link VARCHAR(500),
                 reminder_message TEXT,
                 created_by INTEGER REFERENCES users(id),
@@ -1909,7 +1909,7 @@ async def get_my_quiz_results(current_user: dict = Depends(get_current_user)):
         return {"results": [dict(row) for row in rows]}
 
 # ============================================================================
-# Webinars (Fixed and Enhanced)
+# Webinars (Fixed - Removed thumbnail)
 # ============================================================================
 
 @app.get("/webinars")
@@ -1956,19 +1956,20 @@ async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depe
 
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
+    """Create webinar - Fixed: removed thumbnail"""
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         try:
             webinar_id = await conn.fetchval("""
                 INSERT INTO webinars (
                     title, description, scheduled_at, duration_minutes, meeting_link, 
-                    is_premium, max_participants, thumbnail, recording_link, reminder_message, created_by
+                    is_premium, max_participants, recording_link, reminder_message, created_by
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id
             """, webinar.title, webinar.description, webinar.scheduled_at, 
                  webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
-                 webinar.max_participants, webinar.thumbnail, webinar.recording_link,
+                 webinar.max_participants, webinar.recording_link,
                  webinar.reminder_message, int(admin_id))
             return {"id": webinar_id, "message": "Webinar created successfully"}
         except Exception as e:
@@ -1977,7 +1978,7 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
 
 @app.put("/admin/webinars/{webinar_id}")
 async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = Depends(get_admin_user)):
-    """Update webinar"""
+    """Update webinar - Fixed: removed thumbnail"""
     async with db_pool.acquire() as conn:
         existing = await conn.fetchval("SELECT id FROM webinars WHERE id = $1", webinar_id)
         if not existing:
@@ -2014,10 +2015,6 @@ async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = 
             update_fields.append(f"max_participants = ${len(params)+1}")
             params.append(webinar.max_participants)
             
-        if webinar.thumbnail is not None:
-            update_fields.append(f"thumbnail = ${len(params)+1}")
-            params.append(webinar.thumbnail)
-            
         if webinar.recording_link is not None:
             update_fields.append(f"recording_link = ${len(params)+1}")
             params.append(webinar.recording_link)
@@ -2045,7 +2042,7 @@ async def delete_webinar(webinar_id: int, admin: dict = Depends(get_admin_user))
         return {"message": "Webinar deleted successfully"}
 
 # ============================================================================
-# Signals (Enhanced)
+# Signals (Fixed and Enhanced)
 # ============================================================================
 
 @app.get("/signals")
@@ -2097,22 +2094,31 @@ async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depend
 
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
+    """Create signal - Fixed: ensured all columns match"""
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
-        signal_id = await conn.fetchval("""
-            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit_1, take_profit_2, 
-                risk_reward_ratio, timeframe, analysis, is_premium, expires_at, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING id
-        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit_1, signal.take_profit_2, signal.risk_reward_ratio, 
-             signal.timeframe, signal.analysis, signal.is_premium, signal.expires_at, int(admin_id))
-        return {"id": signal_id, "message": "Signal created"}
+        try:
+            signal_id = await conn.fetchval("""
+                INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit_1, take_profit_2, 
+                    risk_reward_ratio, timeframe, analysis, is_premium, expires_at, created_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id
+            """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
+                 signal.take_profit_1, signal.take_profit_2, signal.risk_reward_ratio, 
+                 signal.timeframe, signal.analysis, signal.is_premium, signal.expires_at, int(admin_id))
+            return {"id": signal_id, "message": "Signal created successfully"}
+        except Exception as e:
+            logger.error(f"Error creating signal: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to create signal: {str(e)}")
 
 @app.put("/admin/signals/{signal_id}")
 async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depends(get_admin_user)):
-    """Update signal including result"""
+    """Update signal including result - Fixed: ensures 405 error is resolved"""
     async with db_pool.acquire() as conn:
+        existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Signal not found")
+            
         update_fields = []
         params = []
         
@@ -2171,6 +2177,34 @@ async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depe
             raise HTTPException(status_code=404, detail="Signal not found")
             
         return {"message": "Signal updated successfully", "id": signal_id}
+
+@app.put("/admin/signals/{signal_id}/result")
+async def update_signal_result(
+    signal_id: int, 
+    result_update: SignalResultUpdate, 
+    admin: dict = Depends(get_admin_user)
+):
+    """Dedicated endpoint for updating signal result only"""
+    async with db_pool.acquire() as conn:
+        existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Signal not found")
+        
+        # Update result and closed_at
+        await conn.execute("""
+            UPDATE signals 
+            SET result = $1, 
+                status = 'closed',
+                closed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $2
+        """, result_update.result, signal_id)
+        
+        return {
+            "message": "Signal result updated successfully", 
+            "id": signal_id,
+            "result": result_update.result
+        }
 
 @app.delete("/admin/signals/{signal_id}")
 async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
@@ -2687,7 +2721,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.5.1",
+        "version": "3.5.2",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -2697,7 +2731,7 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.1 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.2 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
@@ -2714,7 +2748,7 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.1"}
+    return {"message": "Pipways API v3.5.2"}
 
 # Global exception handler
 @app.exception_handler(Exception)

@@ -391,7 +391,13 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+# Create uploads directory BEFORE mounting
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("uploads/images", exist_ok=True)
+os.makedirs("uploads/videos", exist_ok=True)
+os.makedirs("uploads/documents", exist_ok=True)
 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # Mount uploads
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

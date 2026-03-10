@@ -693,6 +693,10 @@
         .status-published { background: rgba(16, 185, 129, 0.2); color: var(--success); }
         .status-draft { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
         .status-scheduled { background: rgba(251, 191, 36, 0.2); color: var(--premium); }
+        .status-win { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .status-loss { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .status-partial { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .status-expired { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
 
         .toast {
             position: fixed;
@@ -996,7 +1000,6 @@
             color: var(--text-secondary);
         }
 
-        /* Blog Post Reader Styles */
         .blog-reader {
             max-width: 800px;
             margin: 0 auto;
@@ -1050,18 +1053,15 @@
             border-top: 1px solid var(--border);
         }
 
-        /* User Edit Modal */
         .user-edit-form {
             display: grid;
             gap: 16px;
         }
 
-        /* Settings Form */
         .settings-form {
             max-width: 600px;
         }
 
-        /* Media Picker Modal */
         .media-picker-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1109,7 +1109,6 @@
             background: rgba(99, 102, 241, 0.1);
         }
 
-        /* Quiz Styles */
         .quiz-container {
             max-width: 800px;
             margin: 0 auto;
@@ -1159,7 +1158,6 @@
             color: var(--primary);
         }
 
-        /* Course Admin List */
         .course-list-item {
             display: flex;
             justify-content: space-between;
@@ -1198,7 +1196,6 @@
             font-weight: 600;
         }
 
-        /* Knowledge toggle */
         .knowledge-toggle {
             display: flex;
             align-items: center;
@@ -1216,7 +1213,6 @@
             cursor: pointer;
         }
 
-        /* File upload progress */
         .upload-progress {
             width: 100%;
             height: 4px;
@@ -1232,7 +1228,6 @@
             transition: width 0.3s;
         }
 
-        /* Empty state */
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -1243,6 +1238,99 @@
             font-size: 48px;
             margin-bottom: 16px;
             opacity: 0.5;
+        }
+
+        .history-item {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            padding: 30px;
+        }
+
+        .overview-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .overview-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .overview-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        .overview-card h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .overview-card p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .usage-info {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .signal-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 30px;
+        }
+
+        .signal-detail-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .signal-detail-card h4 {
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .signal-detail-card .value {
+            font-size: 24px;
+            font-weight: 700;
         }
     </style>
 <base target="_blank">
@@ -1357,7 +1445,7 @@
                 <li class="nav-item">
                     <button class="nav-link" onclick="showSection('analysis', this)">
                         <i class="fas fa-robot"></i>
-                        <span>AI Analysis</span>
+                        <span>AI Screenshot Analysis</span>
                         <span class="premium-badge">PRO</span>
                     </button>
                 </li>
@@ -1421,24 +1509,62 @@
             <!-- Home Section -->
             <div class="section active" id="home-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-home"></i> Dashboard Overview</h2>
-                    <p>Welcome back to your professional trading environment</p>
+                    <h2><i class="fas fa-home"></i> Welcome to Pipways</h2>
+                    <p>Your professional trading companion. Choose a feature below to get started.</p>
                 </div>
-                <div class="content-grid">
-                    <div class="content-card">
-                        <h3><i class="fas fa-signal" style="color: var(--primary);"></i> Latest Signals</h3>
-                        <p>View the most recent trading signals generated by our AI and expert analysts.</p>
-                        <button class="btn btn-sm" onclick="showSection('signals', document.querySelectorAll('.nav-link')[2])" style="margin-top: 12px;">View Signals</button>
+                <div class="overview-grid">
+                    <div class="overview-card" onclick="showSection('analysis', document.querySelectorAll('.nav-link')[3])">
+                        <div class="overview-icon" style="background: rgba(245, 158, 11, 0.2); color: var(--warning);">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <h3>AI Screenshot Analysis</h3>
+                        <p>Upload a chart screenshot and get instant AI-powered technical analysis, support/resistance levels, and trading recommendations.</p>
+                        <span class="btn btn-sm" style="width: auto; background: var(--warning); color: var(--bg-dark);">Analyze Chart <i class="fas fa-arrow-right"></i></span>
                     </div>
-                    <div class="content-card">
-                        <h3><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> Performance Analysis</h3>
-                        <p>Upload your trading history screenshots for comprehensive AI-powered evaluation.</p>
-                        <button class="btn btn-sm btn-success" onclick="showSection('performance', document.querySelectorAll('.nav-link')[4])" style="margin-top: 12px;">Analyze Now</button>
+
+                    <div class="overview-card" onclick="showSection('performance', document.querySelectorAll('.nav-link')[4])">
+                        <div class="overview-icon" style="background: rgba(16, 185, 129, 0.2); color: var(--success);">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <h3>AI Performance Review</h3>
+                        <p>Upload screenshots of your trading results or statements. Our AI extracts trade data and provides detailed performance analysis.</p>
+                        <span class="btn btn-sm btn-success" style="width: auto;">Review Performance <i class="fas fa-arrow-right"></i></span>
                     </div>
-                    <div class="content-card">
-                        <h3><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h3>
-                        <p>Get instant technical analysis on your chart screenshots.</p>
-                        <button class="btn btn-sm" onclick="showSection('analysis', document.querySelectorAll('.nav-link')[3])" style="margin-top: 12px; background: var(--warning); color: var(--bg-dark);">Analyze Chart</button>
+
+                    <div class="overview-card" onclick="showSection('signals', document.querySelectorAll('.nav-link')[2])">
+                        <div class="overview-icon" style="background: rgba(99, 102, 241, 0.2); color: var(--primary);">
+                            <i class="fas fa-satellite-dish"></i>
+                        </div>
+                        <h3>Trading Signals</h3>
+                        <p>Access professional trading signals with detailed analysis, entry points, stop loss, and take profit levels.</p>
+                        <span class="btn btn-sm" style="width: auto;">View Signals <i class="fas fa-arrow-right"></i></span>
+                    </div>
+
+                    <div class="overview-card" onclick="showSection('webinars', document.querySelectorAll('.nav-link')[7])">
+                        <div class="overview-icon" style="background: rgba(239, 68, 68, 0.2); color: var(--danger);">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <h3>Live Webinars</h3>
+                        <p>Join expert-led live trading sessions, ask questions in real-time, and access recorded replays.</p>
+                        <span class="btn btn-sm btn-danger" style="width: auto;">Join Webinars <i class="fas fa-arrow-right"></i></span>
+                    </div>
+
+                    <div class="overview-card" onclick="showSection('courses', document.querySelectorAll('.nav-link')[6])">
+                        <div class="overview-icon" style="background: rgba(139, 92, 246, 0.2); color: #8b5cf6;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <h3>Trading Courses</h3>
+                        <p>Master the markets with our comprehensive curriculum. Track progress with quizzes and earn certifications.</p>
+                        <span class="btn btn-sm" style="width: auto; background: #8b5cf6;">Start Learning <i class="fas fa-arrow-right"></i></span>
+                    </div>
+
+                    <div class="overview-card" onclick="showSection('mentor', document.querySelectorAll('.nav-link')[5])">
+                        <div class="overview-icon" style="background: rgba(236, 72, 153, 0.2); color: #ec4899;">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <h3>AI Mentor</h3>
+                        <p>Get personalized trading advice from our AI mentor. Ask about strategies, psychology, risk management, and more.</p>
+                        <span class="btn btn-sm" style="width: auto; background: #ec4899;">Chat with AI <i class="fas fa-arrow-right"></i></span>
                     </div>
                 </div>
             </div>
@@ -1525,13 +1651,39 @@
                 </div>
             </div>
 
+            <!-- Signal Detail Section -->
+            <div class="section" id="signal-detail-section">
+                <div class="page-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <div>
+                            <button class="btn btn-sm btn-secondary" onclick="showSection('signals', document.querySelectorAll('.nav-link')[2])" style="width: auto; margin-bottom: 12px;">
+                                <i class="fas fa-arrow-left"></i> Back to Signals
+                            </button>
+                            <h2 id="signal-detail-title">Signal Details</h2>
+                        </div>
+                        <span class="status-badge" id="signal-detail-status">ACTIVE</span>
+                    </div>
+                </div>
+                <div class="signal-detail-grid" id="signal-detail-grid">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="content-card" style="margin: 0 30px;">
+                    <h3 style="margin-bottom: 16px;">Technical Analysis</h3>
+                    <p id="signal-detail-analysis" style="line-height: 1.8; color: var(--text-secondary);"></p>
+                </div>
+            </div>
+
             <!-- AI Chart Analysis Section -->
             <div class="section" id="analysis-section">
                 <div class="page-header">
-                    <h2><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h2>
+                    <h2><i class="fas fa-robot" style="color: var(--warning);"></i> AI Screenshot Analysis</h2>
                     <p>Upload your chart screenshot for instant AI-powered technical analysis</p>
                 </div>
                 <div class="analyzer-container">
+                    <div id="chart-usage-info" class="usage-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Free users: 3 analyses total | Premium: 3 per day</span>
+                    </div>
                     <div class="content-card" style="margin-bottom: 30px;">
                         <h3 style="margin-bottom: 20px;">Upload Chart Image</h3>
                         <div class="upload-area" id="chart-upload-area" onclick="document.getElementById('chart-file').click()">
@@ -1567,12 +1719,18 @@
                         </div>
                     </div>
                     <div id="chart-analysis-result" class="hidden">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin: 0 30px 20px;">
+                            <h3>Analysis Result</h3>
+                            <button class="btn btn-sm btn-danger" onclick="deleteCurrentAnalysis()">
+                                <i class="fas fa-trash"></i> Delete Analysis
+                            </button>
+                        </div>
                         <div class="analysis-result" id="chart-analysis-content"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Performance Analyzer Section (UPDATED - Vision Based) -->
+            <!-- Performance Analyzer Section -->
             <div class="section" id="performance-section">
                 <div class="page-header">
                     <h2><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> AI Performance Analyzer</h2>
@@ -1580,6 +1738,10 @@
                 </div>
                 
                 <div class="analyzer-container">
+                    <div id="performance-usage-info" class="usage-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Free users: 1 analysis total | Premium: 1 per week</span>
+                    </div>
                     <div class="content-card" style="margin-bottom: 30px;">
                         <h3 style="margin-bottom: 20px;"><i class="fas fa-camera"></i> Upload Trading Statement</h3>
                         <p style="color: var(--text-secondary); margin-bottom: 20px;">
@@ -1589,12 +1751,12 @@
                         
                         <div class="upload-area" id="performance-upload-area" onclick="document.getElementById('performance-file').click()">
                             <i class="fas fa-file-image" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
-                            <h3>Drop image/PDF here or click to upload</h3>
+                            <h3>Drop image here or click to upload</h3>
                             <p style="color: var(--text-secondary); margin-top: 8px;">
-                                Supports: JPG, PNG, WEBP (PDF coming soon)<br>
+                                Supports: JPG, PNG, WEBP<br>
                                 Max 10MB
                             </p>
-                            <input type="file" id="performance-file" class="hidden" accept="image/*,.pdf" onchange="handlePerformanceUpload(this)">
+                            <input type="file" id="performance-file" class="hidden" accept="image/*" onchange="handlePerformanceUpload(this)">
                         </div>
                         
                         <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
@@ -1654,6 +1816,12 @@
                         <div class="analysis-card" style="margin-top: 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);">
                             <h3><i class="fas fa-user-tie" style="color: var(--primary);"></i> Mentor Advice</h3>
                             <p id="mentor-advice" style="margin-top: 12px; line-height: 1.8; font-style: italic;"></p>
+                        </div>
+
+                        <div style="text-align: center; margin-top: 30px;">
+                            <button class="btn btn-danger" onclick="deleteCurrentPerformance()">
+                                <i class="fas fa-trash"></i> Delete This Analysis
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1716,7 +1884,7 @@
                 </div>
             </div>
 
-            <!-- Course Detail Section (NEW) -->
+            <!-- Course Detail Section -->
             <div class="section" id="course-detail-section">
                 <div class="page-header">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
@@ -1773,14 +1941,14 @@
                 </div>
             </div>
 
-            <!-- Blog Reader Section (for viewing individual posts) -->
+            <!-- Blog Reader Section -->
             <div class="section" id="blog-reader-section">
                 <div class="blog-reader" id="blog-reader-content">
                     <!-- Content populated dynamically -->
                 </div>
             </div>
 
-            <!-- Quiz Taking Section (NEW) -->
+            <!-- Quiz Taking Section -->
             <div class="section" id="quiz-section">
                 <div class="page-header">
                     <h2><i class="fas fa-question-circle"></i> Course Quiz</h2>
@@ -1890,7 +2058,7 @@
                     </div>
                 </div>
 
-                <!-- Courses Panel (NEW) -->
+                <!-- Courses Panel -->
                 <div class="admin-panel" id="panel-courses">
                     <div class="data-table-container">
                         <div class="data-table-header">
@@ -1912,7 +2080,7 @@
                     </div>
                 </div>
 
-                <!-- Quizzes Panel (NEW) -->
+                <!-- Quizzes Panel -->
                 <div class="admin-panel" id="panel-quizzes">
                     <div class="data-table-container">
                         <div class="data-table-header">
@@ -1927,7 +2095,7 @@
                     </div>
                 </div>
 
-                <!-- Webinars Panel (NEW) -->
+                <!-- Webinars Panel -->
                 <div class="admin-panel" id="panel-webinars">
                     <div class="data-table-container">
                         <div class="data-table-header">
@@ -1944,55 +2112,89 @@
 
                 <!-- Signals Panel -->
                 <div class="admin-panel" id="panel-signals">
-                    <div style="max-width: 800px; margin: 0 auto; background: var(--bg-card); padding: 30px; border-radius: 16px; border: 1px solid var(--border);">
-                        <h3 style="margin-bottom: 24px;"><i class="fas fa-plus-circle"></i> Create New Signal</h3>
-                        <form onsubmit="createSignal(event)">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                                <div class="form-group">
-                                    <label class="form-label">Currency Pair</label>
-                                    <input type="text" name="pair" class="form-input" placeholder="EURUSD" required style="text-transform: uppercase;">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Create New Signal</h3>
+                        </div>
+                        <div style="padding: 30px; max-width: 800px; margin: 0 auto;">
+                            <form onsubmit="createSignal(event)">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Currency Pair *</label>
+                                        <input type="text" name="pair" class="form-input" placeholder="EURUSD" required style="text-transform: uppercase;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Direction *</label>
+                                        <select name="direction" class="form-input">
+                                            <option value="buy">BUY</option>
+                                            <option value="sell">SELL</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Entry Price *</label>
+                                        <input type="number" name="entry_price" class="form-input" step="0.00001" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Stop Loss</label>
+                                        <input type="number" name="stop_loss" class="form-input" step="0.00001">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Take Profit 1 (TP1)</label>
+                                        <input type="number" name="tp1" class="form-input" step="0.00001">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Take Profit 2 (TP2)</label>
+                                        <input type="number" name="tp2" class="form-input" step="0.00001">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Timeframe</label>
+                                        <select name="timeframe" class="form-input">
+                                            <option value="15M">15 Minutes</option>
+                                            <option value="1H">1 Hour</option>
+                                            <option value="4H">4 Hours</option>
+                                            <option value="D1">Daily</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Expires At</label>
+                                        <input type="datetime-local" name="expires_at" class="form-input">
+                                    </div>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Direction</label>
-                                    <select name="direction" class="form-input">
-                                        <option value="buy">BUY</option>
-                                        <option value="sell">SELL</option>
-                                    </select>
+                                    <label class="form-label">Technical Analysis</label>
+                                    <textarea name="analysis" class="form-textarea" rows="4" placeholder="Enter your technical analysis, key levels, and reasoning..."></textarea>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">Entry Price</label>
-                                    <input type="number" name="entry_price" class="form-input" step="0.00001" required>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                    <div class="form-group">
+                                        <label class="form-label">
+                                            <input type="checkbox" name="is_premium" style="margin-right: 8px;">
+                                            Premium Signal (VIP only)
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">Stop Loss</label>
-                                    <input type="number" name="stop_loss" class="form-input" step="0.00001">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Take Profit</label>
-                                    <input type="number" name="take_profit" class="form-input" step="0.00001">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Timeframe</label>
-                                    <select name="timeframe" class="form-input">
-                                        <option value="15M">15 Minutes</option>
-                                        <option value="1H">1 Hour</option>
-                                        <option value="4H">4 Hours</option>
-                                        <option value="D1">Daily</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Technical Analysis</label>
-                                <textarea name="analysis" class="form-textarea" rows="4" placeholder="Enter your technical analysis, key levels, and reasoning..."></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <input type="checkbox" name="is_premium" style="margin-right: 8px;">
-                                    Premium Signal (VIP only)
-                                </label>
-                            </div>
-                            <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Publish Signal</button>
-                        </form>
+                                <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Publish Signal</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <div class="data-table-container" style="margin-top: 30px;">
+                        <div class="data-table-header">
+                            <h3>Signal Management</h3>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pair</th>
+                                    <th>Direction</th>
+                                    <th>Entry</th>
+                                    <th>Result</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-signals-table">
+                                <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -2173,7 +2375,7 @@
                 </div>
             </div>
 
-            <!-- Course Modal (NEW) -->
+            <!-- Course Modal -->
             <div class="modal" id="course-modal">
                 <div class="modal-content" style="max-width: 800px;">
                     <div class="modal-header">
@@ -2243,7 +2445,7 @@
                 </div>
             </div>
 
-            <!-- Quiz Modal (NEW) -->
+            <!-- Quiz Modal -->
             <div class="modal" id="quiz-modal">
                 <div class="modal-content" style="max-width: 900px;">
                     <div class="modal-header">
@@ -2289,7 +2491,7 @@
                 </div>
             </div>
 
-            <!-- Webinar Modal (UPDATED) -->
+            <!-- Webinar Modal -->
             <div class="modal" id="webinar-modal">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -2323,7 +2525,12 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Thumbnail URL</label>
-                                <input type="url" name="thumbnail" class="form-input" id="webinar-thumbnail" placeholder="https://...">
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="url" name="thumbnail" class="form-input" id="webinar-thumbnail" placeholder="https://...">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="openMediaPicker('webinar-thumbnail')" style="width: auto;">
+                                        <i class="fas fa-image"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Recording Link (optional)</label>
@@ -2425,6 +2632,37 @@
                 </div>
             </div>
 
+            <!-- Signal Result Modal -->
+            <div class="modal" id="signal-result-modal">
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h3>Update Signal Result</h3>
+                        <button class="modal-close" onclick="closeModal('signal-result-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="result-signal-id">
+                        <div class="form-group">
+                            <label class="form-label">Result</label>
+                            <select id="signal-result-select" class="form-input">
+                                <option value="active">Active</option>
+                                <option value="win">WIN</option>
+                                <option value="loss">LOSS</option>
+                                <option value="partial">PARTIAL</option>
+                                <option value="expired">EXPIRED</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pips Gain/Loss (optional)</label>
+                            <input type="number" id="signal-pips" class="form-input" step="0.1" placeholder="e.g., 50 or -30">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeModal('signal-result-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="updateSignalResult()" style="width: auto;">Update</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -2432,7 +2670,7 @@
         // ==========================================
         // CONFIGURATION & STATE
         // ==========================================
-        const API_URL = '';  // Same-origin: empty string uses current domain
+        const API_URL = '';
         let authToken = localStorage.getItem('access_token');
         let refreshToken = localStorage.getItem('refresh_token');
         let currentUser = null;
@@ -2447,6 +2685,9 @@
         let adminCoursesPage = 1;
         let editingCourseId = null;
         let editingWebinarId = null;
+        let currentAnalysisId = null;
+        let currentPerformanceId = null;
+        let currentSignalId = null;
 
         // ==========================================
         // API SERVICE LAYER
@@ -2759,6 +3000,12 @@
         }
 
         function logout() {
+            // Clear active sessions
+            chartFile = null;
+            performanceFile = null;
+            currentAnalysisId = null;
+            currentPerformanceId = null;
+            
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             authToken = null;
@@ -2799,6 +3046,13 @@
                 return;
             }
 
+            if (sectionName === 'signal-detail') {
+                document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+                document.getElementById('signal-detail-section').classList.add('active');
+                window.scrollTo(0, 0);
+                return;
+            }
+
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             if (element) element.classList.add('active');
 
@@ -2812,6 +3066,7 @@
                 loadAdminCourses();
                 loadAdminWebinars();
                 loadQuizCourses();
+                loadAdminSignals();
             } else if (sectionName === 'signals') {
                 loadSignals();
             } else if (sectionName === 'courses') {
@@ -2822,6 +3077,10 @@
                 loadBlogPostsPublic();
             } else if (sectionName === 'mentor') {
                 loadChatHistory();
+            } else if (sectionName === 'analysis') {
+                loadChartUsageInfo();
+            } else if (sectionName === 'performance') {
+                loadPerformanceUsageInfo();
             }
 
             if (window.innerWidth <= 768) {
@@ -2852,6 +3111,8 @@
                 loadAdminWebinars();
             } else if (tabName === 'quizzes') {
                 loadQuizCourses();
+            } else if (tabName === 'signals') {
+                loadAdminSignals();
             }
         }
 
@@ -3457,7 +3718,7 @@
         }
 
         // ==========================================
-        // ADMIN COURSE MANAGEMENT (NEW)
+        // ADMIN COURSE MANAGEMENT
         // ==========================================
         async function loadAdminCourses(page = 1) {
             adminCoursesPage = page;
@@ -3546,7 +3807,6 @@
                 document.getElementById('course-thumbnail-input').value = course.thumbnail || '';
                 document.getElementById('course-is-premium').checked = course.is_premium || false;
                 
-                // Load modules
                 document.getElementById('modules-container').innerHTML = '';
                 if (data.modules && data.modules.length > 0) {
                     data.modules.forEach((module, index) => {
@@ -3662,7 +3922,7 @@
         }
 
         // ==========================================
-        // QUIZ MANAGEMENT (NEW)
+        // QUIZ MANAGEMENT
         // ==========================================
         async function loadQuizCourses() {
             try {
@@ -3787,7 +4047,7 @@
         }
 
         // ==========================================
-        // WEBINAR MANAGEMENT (UPDATED)
+        // WEBINAR MANAGEMENT
         // ==========================================
         async function loadAdminWebinars() {
             try {
@@ -3849,7 +4109,6 @@
                 document.getElementById('webinar-title').value = webinar.title;
                 document.getElementById('webinar-description').value = webinar.description || '';
                 
-                // Format datetime for input
                 const date = new Date(webinar.scheduled_at);
                 date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
                 document.getElementById('webinar-scheduled-at').value = date.toISOString().slice(0, 16);
@@ -3984,6 +4243,8 @@
                 document.getElementById('blog-image').value = selectedMediaUrl;
             } else if (currentMediaTarget === 'course-thumbnail') {
                 document.getElementById('course-thumbnail-input').value = selectedMediaUrl;
+            } else if (currentMediaTarget === 'webinar-thumbnail') {
+                document.getElementById('webinar-thumbnail').value = selectedMediaUrl;
             } else if (currentMediaTarget === 'editor') {
                 insertImage(selectedMediaUrl);
             }
@@ -4058,7 +4319,7 @@
                 container.innerHTML = '<div class="media-grid">' + data.files.map(file => {
                     const isImage = file.file_type === 'image';
                     return `
-                    <div class="media-item" onclick="copyMediaUrl('${file.url}')" title="Click to copy URL">
+                    <div class="media-item" title="Click to copy, delete button below">
                         ${isImage 
                             ? `<img src="${file.url}" alt="${file.filename}">` 
                             : `<div class="file-icon"><i class="fas fa-file"></i></div>`
@@ -4066,11 +4327,32 @@
                         <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 4px; font-size: 12px; text-align: center;">
                             ${file.filename.substring(0, 20)}...
                         </div>
+                        <button onclick="deleteMedia(${file.id}, event)" style="position: absolute; top: 5px; right: 5px; background: var(--danger); color: white; border: none; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; z-index: 10;">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </div>
                     `;
                 }).join('') + '</div>';
             } catch (error) {
                 console.error('Error loading media:', error);
+            }
+        }
+
+        async function deleteMedia(mediaId, event) {
+            event.stopPropagation();
+            if (!confirm('Are you sure you want to delete this media?')) return;
+            
+            try {
+                const response = await api.delete(`/admin/media/${mediaId}`);
+                if (response.ok) {
+                    showToast('Media deleted', 'success');
+                    loadMediaList();
+                } else {
+                    const error = await response.json();
+                    showToast(error.detail || 'Failed to delete media', 'error');
+                }
+            } catch (error) {
+                showToast('Error deleting media', 'error');
             }
         }
 
@@ -4203,7 +4485,7 @@
         }
 
         // ==========================================
-        // QUIZ TAKING (NEW)
+        // QUIZ TAKING
         // ==========================================
         let currentQuiz = null;
         let currentQuizAnswers = {};
@@ -4284,7 +4566,6 @@
         function selectAnswer(questionId, answer) {
             currentQuizAnswers[questionId] = answer;
             
-            // Visual feedback for radio buttons
             const questionCard = document.getElementById(`question-${questionId}`);
             if (questionCard) {
                 questionCard.querySelectorAll('.quiz-option').forEach(opt => {
@@ -4381,41 +4662,8 @@
         }
 
         // ==========================================
-        // SIGNALS
+        // SIGNALS SYSTEM
         // ==========================================
-        async function createSignal(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            
-            const data = {
-                pair: formData.get('pair').toUpperCase(),
-                direction: formData.get('direction'),
-                entry_price: parseFloat(formData.get('entry_price')),
-                stop_loss: formData.get('stop_loss') ? parseFloat(formData.get('stop_loss')) : null,
-                take_profit: formData.get('take_profit') ? parseFloat(formData.get('take_profit')) : null,
-                timeframe: formData.get('timeframe'),
-                analysis: formData.get('analysis'),
-                is_premium: formData.has('is_premium')
-            };
-
-            try {
-                showLoading(true, 'Publishing signal...');
-                const response = await api.post('/admin/signals', data);
-                
-                if (response.ok) {
-                    showToast('Signal published!', 'success');
-                    e.target.reset();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to create signal');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
         async function loadSignals() {
             try {
                 const filter = document.getElementById('signal-filter')?.value || '';
@@ -4436,10 +4684,10 @@
                         <td><strong>${signal.pair}</strong></td>
                         <td><span class="status-badge" style="background: ${signal.direction === 'buy' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${signal.direction === 'buy' ? 'var(--success)' : 'var(--danger)'};">${signal.direction.toUpperCase()}</span></td>
                         <td>${signal.entry_price}</td>
-                        <td>SL: ${signal.stop_loss || '-'}<br>TP: ${signal.take_profit || '-'}</td>
+                        <td>SL: ${signal.stop_loss || '-'}<br>TP1: ${signal.tp1 || '-'}<br>TP2: ${signal.tp2 || '-'}</td>
                         <td>${signal.timeframe}</td>
-                        <td><span class="status-badge status-${signal.status}">${signal.status}</span></td>
-                        <td><button class="btn btn-sm">View</button></td>
+                        <td><span class="status-badge status-${signal.result || signal.status}">${signal.result || signal.status}</span></td>
+                        <td><button class="btn btn-sm" onclick="viewSignalDetail(${signal.id})">View</button></td>
                     </tr>
                 `).join('');
             } catch (error) {
@@ -4447,9 +4695,205 @@
             }
         }
 
+        async function viewSignalDetail(signalId) {
+            try {
+                showLoading(true, 'Loading signal...');
+                const response = await api.get(`/signals/${signalId}`);
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        showToast('Please login to view this signal', 'error');
+                        return;
+                    }
+                    if (response.status === 403) {
+                        showToast('Premium subscription required', 'error');
+                        return;
+                    }
+                    throw new Error('Failed to load signal');
+                }
+                
+                const signal = await response.json();
+                currentSignalId = signal.id;
+                
+                document.getElementById('signal-detail-title').textContent = `${signal.pair} ${signal.direction.toUpperCase()} Signal`;
+                document.getElementById('signal-detail-status').textContent = signal.result || signal.status;
+                document.getElementById('signal-detail-status').className = `status-badge status-${signal.result || signal.status}`;
+                
+                const expiry = signal.expires_at ? new Date(signal.expires_at).toLocaleString() : 'No expiration';
+                
+                document.getElementById('signal-detail-grid').innerHTML = `
+                    <div class="signal-detail-card">
+                        <h4>Entry Price</h4>
+                        <div class="value">${signal.entry_price}</div>
+                    </div>
+                    <div class="signal-detail-card">
+                        <h4>Stop Loss</h4>
+                        <div class="value" style="color: var(--danger);">${signal.stop_loss || '-'}</div>
+                    </div>
+                    <div class="signal-detail-card">
+                        <h4>Take Profit 1</h4>
+                        <div class="value" style="color: var(--success);">${signal.tp1 || '-'}</div>
+                    </div>
+                    <div class="signal-detail-card">
+                        <h4>Take Profit 2</h4>
+                        <div class="value" style="color: var(--success);">${signal.tp2 || '-'}</div>
+                    </div>
+                    <div class="signal-detail-card">
+                        <h4>Risk/Reward</h4>
+                        <div class="value">${signal.risk_reward_ratio || '-'}</div>
+                    </div>
+                    <div class="signal-detail-card">
+                        <h4>Expires</h4>
+                        <div class="value" style="font-size: 16px;">${expiry}</div>
+                    </div>
+                `;
+                
+                document.getElementById('signal-detail-analysis').textContent = signal.analysis || 'No analysis provided.';
+                
+                showSection('signal-detail', null);
+            } catch (error) {
+                console.error('Error loading signal detail:', error);
+                showToast('Failed to load signal details', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createSignal(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            const data = {
+                pair: formData.get('pair').toUpperCase(),
+                direction: formData.get('direction'),
+                entry_price: parseFloat(formData.get('entry_price')),
+                stop_loss: formData.get('stop_loss') ? parseFloat(formData.get('stop_loss')) : null,
+                tp1: formData.get('tp1') ? parseFloat(formData.get('tp1')) : null,
+                tp2: formData.get('tp2') ? parseFloat(formData.get('tp2')) : null,
+                timeframe: formData.get('timeframe'),
+                expires_at: formData.get('expires_at') || null,
+                analysis: formData.get('analysis'),
+                is_premium: formData.has('is_premium')
+            };
+
+            try {
+                showLoading(true, 'Publishing signal...');
+                const response = await api.post('/admin/signals', data);
+                
+                if (response.ok) {
+                    showToast('Signal published!', 'success');
+                    e.target.reset();
+                    loadAdminSignals();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create signal');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadAdminSignals() {
+            try {
+                const response = await api.get('/signals?limit=50');
+                if (!response.ok) throw new Error('Failed to load signals');
+                
+                const data = await response.json();
+                const tbody = document.getElementById('admin-signals-table');
+                
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">No signals found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(signal => `
+                    <tr>
+                        <td><strong>${signal.pair}</strong></td>
+                        <td><span class="status-badge" style="background: ${signal.direction === 'buy' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${signal.direction === 'buy' ? 'var(--success)' : 'var(--danger)'};">${signal.direction.toUpperCase()}</span></td>
+                        <td>${signal.entry_price}</td>
+                        <td><span class="status-badge status-${signal.result || signal.status}">${signal.result || signal.status}</span></td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="action-btn" onclick="openSignalResultModal(${signal.id}, '${signal.result || 'active'}')" title="Update Result">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading admin signals:', error);
+            }
+        }
+
+        function openSignalResultModal(signalId, currentResult) {
+            document.getElementById('result-signal-id').value = signalId;
+            document.getElementById('signal-result-select').value = currentResult;
+            document.getElementById('signal-result-modal').classList.add('show');
+        }
+
+        async function updateSignalResult() {
+            const signalId = document.getElementById('result-signal-id').value;
+            const result = document.getElementById('signal-result-select').value;
+            const pips = document.getElementById('signal-pips').value;
+            
+            try {
+                showLoading(true, 'Updating...');
+                const response = await api.put(`/admin/signals/${signalId}/result`, {
+                    result: result,
+                    pips_gain: pips ? parseFloat(pips) : null
+                });
+                
+                if (response.ok) {
+                    showToast('Signal updated!', 'success');
+                    closeModal('signal-result-modal');
+                    loadAdminSignals();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to update');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
         // ==========================================
         // AI FEATURES
         // ==========================================
+        async function loadChartUsageInfo() {
+            try {
+                const response = await api.get('/analyze/chart/usage');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('chart-usage-info').innerHTML = `
+                        <i class="fas fa-info-circle"></i>
+                        <span>Used: ${data.used} / ${data.limit} | Resets: ${data.reset_time || 'Never'}</span>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading usage info:', error);
+            }
+        }
+
+        async function loadPerformanceUsageInfo() {
+            try {
+                const response = await api.get('/analyze/performance/usage');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('performance-usage-info').innerHTML = `
+                        <i class="fas fa-info-circle"></i>
+                        <span>Used: ${data.used} / ${data.limit} | Resets: ${data.reset_time || 'Never'}</span>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading usage info:', error);
+            }
+        }
+
         function handleChartUpload(input) {
             const file = input.files[0];
             if (!file) return;
@@ -4485,9 +4929,11 @@
                 const data = await response.json();
                 
                 if (response.ok) {
+                    currentAnalysisId = data.id;
                     document.getElementById('chart-analysis-result').classList.remove('hidden');
                     document.getElementById('chart-analysis-content').textContent = data.analysis;
                     document.getElementById('chart-analysis-result').scrollIntoView({ behavior: 'smooth' });
+                    loadChartUsageInfo();
                 } else {
                     throw new Error(data.detail || 'Analysis failed');
                 }
@@ -4498,8 +4944,24 @@
             }
         }
 
+        async function deleteCurrentAnalysis() {
+            if (!currentAnalysisId) return;
+            if (!confirm('Delete this analysis?')) return;
+            
+            try {
+                const response = await api.delete(`/analysis/chart/${currentAnalysisId}`);
+                if (response.ok) {
+                    showToast('Analysis deleted', 'success');
+                    document.getElementById('chart-analysis-result').classList.add('hidden');
+                    currentAnalysisId = null;
+                }
+            } catch (error) {
+                showToast('Failed to delete', 'error');
+            }
+        }
+
         // ==========================================
-        // PERFORMANCE ANALYZER (UPDATED - VISION BASED)
+        // PERFORMANCE ANALYZER
         // ==========================================
         function handlePerformanceUpload(input) {
             const file = input.files[0];
@@ -4531,7 +4993,9 @@
                 const data = await response.json();
                 
                 if (response.ok) {
+                    currentPerformanceId = data.id;
                     displayAnalysis(data.analysis);
+                    loadPerformanceUsageInfo();
                 } else {
                     throw new Error(data.detail || 'Analysis failed');
                 }
@@ -4596,8 +5060,24 @@
             document.getElementById('analysis-results').scrollIntoView({ behavior: 'smooth' });
         }
 
+        async function deleteCurrentPerformance() {
+            if (!currentPerformanceId) return;
+            if (!confirm('Delete this analysis?')) return;
+            
+            try {
+                const response = await api.delete(`/analysis/performance/${currentPerformanceId}`);
+                if (response.ok) {
+                    showToast('Analysis deleted', 'success');
+                    document.getElementById('analysis-results').classList.add('hidden');
+                    currentPerformanceId = null;
+                }
+            } catch (error) {
+                showToast('Failed to delete', 'error');
+            }
+        }
+
         // ==========================================
-        // AI MENTOR (UPDATED WITH KNOWLEDGE TOGGLE)
+        // AI MENTOR
         // ==========================================
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
@@ -4606,7 +5086,6 @@
 
             const includeKnowledge = document.getElementById('knowledge-toggle').checked;
 
-            // Add user message
             const messagesContainer = document.getElementById('chat-messages');
             messagesContainer.innerHTML += `
                 <div class="chat-message user">
@@ -4616,7 +5095,6 @@
             input.value = '';
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-            // Show typing indicator
             const typingId = 'typing-' + Date.now();
             messagesContainer.innerHTML += `
                 <div class="chat-message" id="${typingId}">
@@ -4681,7 +5159,6 @@
             addModuleField();
             validateToken();
             
-            // Setup drag and drop for uploads
             const uploadAreas = document.querySelectorAll('.upload-area');
             uploadAreas.forEach(area => {
                 area.addEventListener('dragover', (e) => {
@@ -4702,7 +5179,6 @@
                 });
             });
 
-            // Setup media picker drag and drop
             const mediaPickerUpload = document.getElementById('media-picker-upload');
             if (mediaPickerUpload) {
                 mediaPickerUpload.addEventListener('click', () => {
@@ -4727,7 +5203,6 @@
             }
         });
 
-        // Close modals on outside click
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.classList.remove('show');

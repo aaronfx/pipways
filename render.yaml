@@ -1,5 +1,5 @@
 # Render Blueprint for Pipways Trading Platform v3.2
-# Production-ready configuration
+# Production-ready configuration - FIXED
 
 services:
   # API SERVICE - Python Backend
@@ -15,8 +15,7 @@ services:
         version: "3.11.0"
     
     buildCommand: |
-      echo "Installing dependencies..."
-      pip install --upgrade pip setuptools wheel
+      pip install --upgrade pip
       pip install -r requirements.txt
     
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
@@ -38,9 +37,6 @@ services:
       - key: ENVIRONMENT
         value: production
       
-      - key: FRONTEND_URL
-        value: https://pipways-web-nhem.onrender.com
-      
       - key: CORS_ORIGINS
         value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000,http://localhost:5500"
     
@@ -54,9 +50,8 @@ services:
     plan: standard
     branch: main
     
-    rootDir: .
-    buildCommand: echo "Static site - no build required"
-    publishPath: ./
+    buildCommand: ""  # Empty build command for pure static HTML
+    staticPublishPath: .  # Serve from root where index.html is located
     
     routes:
       - type: rewrite

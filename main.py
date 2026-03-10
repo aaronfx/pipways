@@ -125,7 +125,11 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+# Create uploads directory immediately (before StaticFiles mount)
+os.makedirs("uploads", exist_ok=True)
 
+# Mount uploads folder as static files
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # MOUNT UPLOADS FOLDER AS STATIC FILES
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

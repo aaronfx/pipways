@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v3.4.0
+Pipways Trading Platform API - Production Debug & System Completion v3.5.0
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.4.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.0", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -200,6 +200,21 @@ class WebinarCreate(BaseModel):
     is_premium: bool = False
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = 100
+    thumbnail: Optional[str] = None
+    recording_link: Optional[str] = None
+    reminder_message: Optional[str] = None
+
+class WebinarUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    is_premium: Optional[bool] = None
+    meeting_link: Optional[str] = None
+    max_participants: Optional[int] = None
+    thumbnail: Optional[str] = None
+    recording_link: Optional[str] = None
+    reminder_message: Optional[str] = None
 
 class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=1)
@@ -221,8 +236,56 @@ class CourseCreate(BaseModel):
     thumbnail: Optional[str] = None
     modules: Optional[List[Dict]] = None
 
+class CourseUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    content: Optional[str] = None
+    is_premium: Optional[bool] = None
+    level: Optional[str] = None
+    duration_hours: Optional[float] = None
+    thumbnail: Optional[str] = None
+
+class ModuleCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    content: Optional[str] = None
+    video_url: Optional[str] = None
+    sort_order: Optional[int] = 0
+    is_premium: bool = False
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    video_url: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_premium: Optional[bool] = None
+
+class QuizCreate(BaseModel):
+    course_id: int
+    title: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    passing_score: int = Field(default=70, ge=0, le=100)
+    questions: Optional[List[Dict]] = []
+
+class QuizUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    passing_score: Optional[int] = None
+
+class QuizQuestionCreate(BaseModel):
+    quiz_id: int
+    question_text: str
+    question_type: str = Field(default="multiple_choice", pattern="^(multiple_choice|true_false|text)$")
+    options: Optional[List[str]] = []
+    correct_answer: str
+    points: int = Field(default=1, ge=1)
+    sort_order: Optional[int] = 0
+
+class QuizAttempt(BaseModel):
+    quiz_id: int
+    answers: Dict[str, Any]
+
 class PerformanceAnalysisRequest(BaseModel):
-    trades: List[Dict[str, Any]]
+    trades: Optional[List[Dict[str, Any]]] = []
     account_balance: Optional[float] = None
     trading_period_days: Optional[int] = None
 
@@ -230,6 +293,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
     history: Optional[List[Dict[str, str]]] = []
+    include_knowledge: Optional[bool] = True
 
 class UserUpdate(BaseModel):
     role: Optional[str] = None
@@ -327,6 +391,9 @@ async def init_db():
                 meeting_link VARCHAR(500),
                 is_premium BOOLEAN DEFAULT FALSE,
                 max_participants INTEGER DEFAULT 100,
+                thumbnail VARCHAR(500),
+                recording_link VARCHAR(500),
+                reminder_message TEXT,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -360,6 +427,63 @@ async def init_db():
                 sort_order INTEGER DEFAULT 0,
                 is_premium BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Course quizzes table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS course_quizzes (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                title VARCHAR(255) NOT NULL,
+                description TEXT,
+                passing_score INTEGER DEFAULT 70,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Quiz questions table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_questions (
+                id SERIAL PRIMARY KEY,
+                quiz_id INTEGER REFERENCES course_quizzes(id) ON DELETE CASCADE,
+                question_text TEXT NOT NULL,
+                question_type VARCHAR(20) DEFAULT 'multiple_choice',
+                options JSONB,
+                correct_answer TEXT NOT NULL,
+                points INTEGER DEFAULT 1,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Quiz attempts table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_attempts (
+                id SERIAL PRIMARY KEY,
+                quiz_id INTEGER REFERENCES course_quizzes(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                answers JSONB,
+                score INTEGER,
+                max_score INTEGER,
+                percentage DECIMAL(5,2),
+                passed BOOLEAN DEFAULT FALSE,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # User course progress table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_course_progress (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                module_id INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
+                completed BOOLEAN DEFAULT FALSE,
+                completed_at TIMESTAMP,
+                UNIQUE(user_id, module_id)
             )
         """)
 
@@ -1111,7 +1235,351 @@ async def list_media(
         return {"files": [dict(row) for row in rows]}
 
 # ============================================================================
-# Courses
+# Courses - Admin Management (FIXED)
+# ============================================================================
+
+@app.get("/admin/courses")
+async def get_admin_courses(
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    admin: dict = Depends(get_admin_user)
+):
+    """Get all courses for admin with pagination and search"""
+    async with db_pool.acquire() as conn:
+        where_clauses = ["1=1"]
+        params = []
+
+        if search:
+            where_clauses.append(f"(title ILIKE ${len(params)+1} OR description ILIKE ${len(params)+1})")
+            params.append(f"%{search}%")
+
+        count_query = f"SELECT COUNT(*) FROM courses WHERE {' AND '.join(where_clauses)}"
+        total = await conn.fetchval(count_query, *params)
+
+        offset = (page - 1) * limit
+        query = f"""
+            SELECT c.*, u.full_name as creator_name,
+                   (SELECT COUNT(*) FROM course_modules WHERE course_id = c.id) as module_count,
+                   (SELECT COUNT(*) FROM course_quizzes WHERE course_id = c.id) as quiz_count
+            FROM courses c
+            LEFT JOIN users u ON c.created_by = u.id
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY c.created_at DESC
+            LIMIT ${len(params)+1} OFFSET ${len(params)+2}
+        """
+        params.extend([limit, offset])
+
+        rows = await conn.fetch(query, *params)
+        return {
+            "courses": [dict(row) for row in rows],
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit
+        }
+
+@app.get("/admin/courses/{course_id}")
+async def get_admin_course_detail(course_id: int, admin: dict = Depends(get_admin_user)):
+    """Get detailed course info with modules for admin"""
+    async with db_pool.acquire() as conn:
+        course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        modules = await conn.fetch(
+            "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id",
+            course_id
+        )
+        
+        quizzes = await conn.fetch(
+            "SELECT * FROM course_quizzes WHERE course_id = $1",
+            course_id
+        )
+        
+        return {
+            "course": dict(course),
+            "modules": [dict(m) for m in modules],
+            "quizzes": [dict(q) for q in quizzes]
+        }
+
+@app.put("/admin/courses/{course_id}")
+async def update_course(course_id: int, course_update: CourseUpdate, admin: dict = Depends(get_admin_user)):
+    """Update course details"""
+    async with db_pool.acquire() as conn:
+        # Check if course exists
+        existing = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        update_fields = []
+        params = []
+        
+        if course_update.title is not None:
+            update_fields.append(f"title = ${len(params)+1}")
+            params.append(course_update.title)
+            
+        if course_update.description is not None:
+            update_fields.append(f"description = ${len(params)+1}")
+            params.append(course_update.description)
+            
+        if course_update.content is not None:
+            update_fields.append(f"content = ${len(params)+1}")
+            params.append(course_update.content)
+            
+        if course_update.level is not None:
+            update_fields.append(f"level = ${len(params)+1}")
+            params.append(course_update.level)
+            
+        if course_update.duration_hours is not None:
+            update_fields.append(f"duration_hours = ${len(params)+1}")
+            params.append(course_update.duration_hours)
+            
+        if course_update.thumbnail is not None:
+            update_fields.append(f"thumbnail = ${len(params)+1}")
+            params.append(course_update.thumbnail)
+            
+        if course_update.is_premium is not None:
+            update_fields.append(f"is_premium = ${len(params)+1}")
+            params.append(course_update.is_premium)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(course_id)
+        
+        query = f"UPDATE courses SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        return {"message": "Course updated successfully", "id": course_id}
+
+@app.delete("/admin/courses/{course_id}")
+async def delete_course(course_id: int, admin: dict = Depends(get_admin_user)):
+    """Delete course and all related data"""
+    async with db_pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM courses WHERE id = $1", course_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Course not found")
+        return {"message": "Course deleted successfully"}
+
+# ============================================================================
+# Module Management
+# ============================================================================
+
+@app.post("/admin/courses/{course_id}/modules")
+async def create_module(course_id: int, module: ModuleCreate, admin: dict = Depends(get_admin_user)):
+    """Create new module for course"""
+    async with db_pool.acquire() as conn:
+        course_exists = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
+        if not course_exists:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        module_id = await conn.fetchval("""
+            INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+        """, course_id, module.title, module.content, module.video_url, 
+             module.sort_order or 0, module.is_premium)
+        
+        return {"id": module_id, "message": "Module created successfully"}
+
+@app.put("/admin/modules/{module_id}")
+async def update_module(module_id: int, module_update: ModuleUpdate, admin: dict = Depends(get_admin_user)):
+    """Update module"""
+    async with db_pool.acquire() as conn:
+        existing = await conn.fetchval("SELECT id FROM course_modules WHERE id = $1", module_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Module not found")
+        
+        update_fields = []
+        params = []
+        
+        if module_update.title is not None:
+            update_fields.append(f"title = ${len(params)+1}")
+            params.append(module_update.title)
+            
+        if module_update.content is not None:
+            update_fields.append(f"content = ${len(params)+1}")
+            params.append(module_update.content)
+            
+        if module_update.video_url is not None:
+            update_fields.append(f"video_url = ${len(params)+1}")
+            params.append(module_update.video_url)
+            
+        if module_update.sort_order is not None:
+            update_fields.append(f"sort_order = ${len(params)+1}")
+            params.append(module_update.sort_order)
+            
+        if module_update.is_premium is not None:
+            update_fields.append(f"is_premium = ${len(params)+1}")
+            params.append(module_update.is_premium)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        params.append(module_id)
+        
+        query = f"UPDATE course_modules SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        return {"message": "Module updated successfully", "id": module_id}
+
+@app.delete("/admin/modules/{module_id}")
+async def delete_module(module_id: int, admin: dict = Depends(get_admin_user)):
+    """Delete module"""
+    async with db_pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM course_modules WHERE id = $1", module_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Module not found")
+        return {"message": "Module deleted successfully"}
+
+@app.post("/admin/modules/reorder")
+async def reorder_modules(module_order: Dict[int, int], admin: dict = Depends(get_admin_user)):
+    """Reorder modules - receives dict of {module_id: sort_order}"""
+    async with db_pool.acquire() as conn:
+        async with conn.transaction():
+            for module_id, sort_order in module_order.items():
+                await conn.execute(
+                    "UPDATE course_modules SET sort_order = $1 WHERE id = $2",
+                    sort_order, module_id
+                )
+        return {"message": "Modules reordered successfully"}
+
+# ============================================================================
+# Quiz Management
+# ============================================================================
+
+@app.get("/admin/courses/{course_id}/quizzes")
+async def get_course_quizzes(course_id: int, admin: dict = Depends(get_admin_user)):
+    """Get all quizzes for a course"""
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT * FROM course_quizzes WHERE course_id = $1 ORDER BY created_at DESC",
+            course_id
+        )
+        return {"quizzes": [dict(row) for row in rows]}
+
+@app.post("/admin/quizzes")
+async def create_quiz(quiz: QuizCreate, admin: dict = Depends(get_admin_user)):
+    """Create new quiz for course"""
+    async with db_pool.acquire() as conn:
+        course_exists = await conn.fetchval("SELECT id FROM courses WHERE id = $1", quiz.course_id)
+        if not course_exists:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        admin_id = admin.get("id") or admin.get("sub")
+        
+        # Create quiz
+        quiz_id = await conn.fetchval("""
+            INSERT INTO course_quizzes (course_id, title, description, passing_score, created_by)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+        """, quiz.course_id, quiz.title, quiz.description, quiz.passing_score, int(admin_id))
+        
+        # Add questions if provided
+        if quiz.questions:
+            for idx, q in enumerate(quiz.questions):
+                await conn.execute("""
+                    INSERT INTO quiz_questions 
+                    (quiz_id, question_text, question_type, options, correct_answer, points, sort_order)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                """, quiz_id, q.get("question_text"), q.get("question_type", "multiple_choice"),
+                     json.dumps(q.get("options", [])), q.get("correct_answer"), 
+                     q.get("points", 1), idx)
+        
+        return {"id": quiz_id, "message": "Quiz created successfully"}
+
+@app.get("/admin/quizzes/{quiz_id}")
+async def get_quiz_detail(quiz_id: int, admin: dict = Depends(get_admin_user)):
+    """Get quiz with questions"""
+    async with db_pool.acquire() as conn:
+        quiz = await conn.fetchrow("SELECT * FROM course_quizzes WHERE id = $1", quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        questions = await conn.fetch(
+            "SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order",
+            quiz_id
+        )
+        
+        return {
+            "quiz": dict(quiz),
+            "questions": [dict(q) for q in questions]
+        }
+
+@app.put("/admin/quizzes/{quiz_id}")
+async def update_quiz(quiz_id: int, quiz_update: QuizUpdate, admin: dict = Depends(get_admin_user)):
+    """Update quiz"""
+    async with db_pool.acquire() as conn:
+        existing = await conn.fetchval("SELECT id FROM course_quizzes WHERE id = $1", quiz_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        update_fields = []
+        params = []
+        
+        if quiz_update.title is not None:
+            update_fields.append(f"title = ${len(params)+1}")
+            params.append(quiz_update.title)
+            
+        if quiz_update.description is not None:
+            update_fields.append(f"description = ${len(params)+1}")
+            params.append(quiz_update.description)
+            
+        if quiz_update.passing_score is not None:
+            update_fields.append(f"passing_score = ${len(params)+1}")
+            params.append(quiz_update.passing_score)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(quiz_id)
+        
+        query = f"UPDATE course_quizzes SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        return {"message": "Quiz updated successfully", "id": quiz_id}
+
+@app.delete("/admin/quizzes/{quiz_id}")
+async def delete_quiz(quiz_id: int, admin: dict = Depends(get_admin_user)):
+    """Delete quiz"""
+    async with db_pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM course_quizzes WHERE id = $1", quiz_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        return {"message": "Quiz deleted successfully"}
+
+@app.post("/admin/quizzes/{quiz_id}/questions")
+async def add_quiz_question(quiz_id: int, question: QuizQuestionCreate, admin: dict = Depends(get_admin_user)):
+    """Add question to quiz"""
+    async with db_pool.acquire() as conn:
+        quiz_exists = await conn.fetchval("SELECT id FROM course_quizzes WHERE id = $1", quiz_id)
+        if not quiz_exists:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        question_id = await conn.fetchval("""
+            INSERT INTO quiz_questions 
+            (quiz_id, question_text, question_type, options, correct_answer, points, sort_order)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+        """, quiz_id, question.question_text, question.question_type,
+             json.dumps(question.options), question.correct_answer,
+             question.points, question.sort_order)
+        
+        return {"id": question_id, "message": "Question added successfully"}
+
+@app.delete("/admin/questions/{question_id}")
+async def delete_question(question_id: int, admin: dict = Depends(get_admin_user)):
+    """Delete question"""
+    async with db_pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM quiz_questions WHERE id = $1", question_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Question not found")
+        return {"message": "Question deleted successfully"}
+
+# ============================================================================
+# Public Courses & Quizzes
 # ============================================================================
 
 @app.get("/courses")
@@ -1171,68 +1639,115 @@ async def get_course_by_id(course_id: int, current_user: Optional[dict] = Depend
             course_id
         )
         course["modules"] = [dict(m) for m in modules]
+        
+        # Get quizzes
+        quizzes = await conn.fetch(
+            "SELECT id, title, description, passing_score FROM course_quizzes WHERE course_id = $1",
+            course_id
+        )
+        course["quizzes"] = [dict(q) for q in quizzes]
+        
         return course
 
-@app.post("/admin/courses")
-async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
+@app.get("/courses/{course_id}/quiz/{quiz_id}")
+async def get_quiz_for_user(
+    course_id: int, 
+    quiz_id: int, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Get quiz questions for user (without correct answers)"""
     async with db_pool.acquire() as conn:
-        admin_id = admin.get("id") or admin.get("sub")
-        course_id = await conn.fetchval("""
-            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id
-        """, course.title, course.description, course.content, course.level, 
-             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
-        
-        if course.modules:
-            for idx, module in enumerate(course.modules):
-                await conn.execute("""
-                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """, course_id, module.get("title"), module.get("content"), 
-                     module.get("video_url"), idx, module.get("is_premium", False))
-        
-        return {"id": course_id, "message": "Course created"}
-
-@app.put("/admin/courses/{course_id}")
-async def update_course(course_id: int, course: CourseCreate, admin: dict = Depends(get_admin_user)):
-    """Update course and its modules"""
-    async with db_pool.acquire() as conn:
-        # Check if course exists
-        existing = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
-        if not existing:
+        # Verify access
+        course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not course:
             raise HTTPException(status_code=404, detail="Course not found")
+            
+        if course["is_premium"] and current_user.get("subscription_tier") not in ["premium", "vip"]:
+            raise HTTPException(status_code=403, detail="Premium subscription required")
         
-        # Update course
-        await conn.execute("""
-            UPDATE courses 
-            SET title = $1, description = $2, content = $3, level = $4, 
-                duration_hours = $5, thumbnail = $6, is_premium = $7, updated_at = NOW()
-            WHERE id = $8
-        """, course.title, course.description, course.content, course.level,
-             course.duration_hours, course.thumbnail, course.is_premium, course_id)
+        quiz = await conn.fetchrow(
+            "SELECT * FROM course_quizzes WHERE id = $1 AND course_id = $2",
+            quiz_id, course_id
+        )
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
         
-        # Delete existing modules and recreate
-        await conn.execute("DELETE FROM course_modules WHERE course_id = $1", course_id)
+        questions = await conn.fetch(
+            """SELECT id, question_text, question_type, options, points, sort_order 
+               FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order""",
+            quiz_id
+        )
         
-        if course.modules:
-            for idx, module in enumerate(course.modules):
-                await conn.execute("""
-                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """, course_id, module.get("title"), module.get("content"), 
-                     module.get("video_url"), idx, module.get("is_premium", False))
-        
-        return {"message": "Course updated successfully", "id": course_id}
+        return {
+            "quiz": dict(quiz),
+            "questions": [dict(q) for q in questions]
+        }
 
-@app.delete("/admin/courses/{course_id}")
-async def delete_course(course_id: int, admin: dict = Depends(get_admin_user)):
+@app.post("/quiz/{quiz_id}/submit")
+async def submit_quiz_attempt(
+    quiz_id: int, 
+    attempt: QuizAttempt,
+    current_user: dict = Depends(get_current_user)
+):
+    """Submit quiz attempt and grade"""
     async with db_pool.acquire() as conn:
-        await conn.execute("DELETE FROM courses WHERE id = $1", course_id)
-        return {"message": "Course deleted"}
+        quiz = await conn.fetchrow("SELECT * FROM course_quizzes WHERE id = $1", quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        # Get all questions with correct answers
+        questions = await conn.fetch(
+            "SELECT id, correct_answer, points FROM quiz_questions WHERE quiz_id = $1",
+            quiz_id
+        )
+        
+        total_score = 0
+        max_score = sum(q["points"] for q in questions)
+        user_answers = attempt.answers
+        
+        for q in questions:
+            user_answer = user_answers.get(str(q["id"]))
+            if user_answer and str(user_answer).strip().lower() == str(q["correct_answer"]).strip().lower():
+                total_score += q["points"]
+        
+        percentage = (total_score / max_score * 100) if max_score > 0 else 0
+        passed = percentage >= quiz["passing_score"]
+        
+        # Save attempt
+        attempt_id = await conn.fetchval("""
+            INSERT INTO quiz_attempts 
+            (quiz_id, user_id, answers, score, max_score, percentage, passed)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+        """, quiz_id, current_user["id"], json.dumps(user_answers),
+             total_score, max_score, percentage, passed)
+        
+        return {
+            "attempt_id": attempt_id,
+            "score": total_score,
+            "max_score": max_score,
+            "percentage": round(percentage, 2),
+            "passed": passed,
+            "passing_score": quiz["passing_score"]
+        }
+
+@app.get("/quiz/results/me")
+async def get_my_quiz_results(current_user: dict = Depends(get_current_user)):
+    """Get current user's quiz results"""
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT qa.*, cq.title as quiz_title, c.title as course_title
+            FROM quiz_attempts qa
+            JOIN course_quizzes cq ON qa.quiz_id = cq.id
+            JOIN courses c ON cq.course_id = c.id
+            WHERE qa.user_id = $1
+            ORDER BY qa.completed_at DESC
+        """, current_user["id"])
+        
+        return {"results": [dict(row) for row in rows]}
 
 # ============================================================================
-# Webinars
+# Webinars (Fixed and Enhanced)
 # ============================================================================
 
 @app.get("/webinars")
@@ -1281,36 +1796,91 @@ async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depe
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
-        webinar_id = await conn.fetchval("""
-            INSERT INTO webinars (title, description, scheduled_at, duration_minutes, meeting_link, is_premium, created_by, max_participants)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id
-        """, webinar.title, webinar.description, webinar.scheduled_at, 
-             webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, int(admin_id), webinar.max_participants)
-        return {"id": webinar_id, "message": "Webinar created"}
+        try:
+            webinar_id = await conn.fetchval("""
+                INSERT INTO webinars (
+                    title, description, scheduled_at, duration_minutes, meeting_link, 
+                    is_premium, max_participants, thumbnail, recording_link, reminder_message, created_by
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                RETURNING id
+            """, webinar.title, webinar.description, webinar.scheduled_at, 
+                 webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
+                 webinar.max_participants, webinar.thumbnail, webinar.recording_link,
+                 webinar.reminder_message, int(admin_id))
+            return {"id": webinar_id, "message": "Webinar created successfully"}
+        except Exception as e:
+            logger.error(f"Error creating webinar: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to create webinar: {str(e)}")
 
 @app.put("/admin/webinars/{webinar_id}")
-async def update_webinar(webinar_id: int, webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
+async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = Depends(get_admin_user)):
     """Update webinar"""
     async with db_pool.acquire() as conn:
-        result = await conn.execute("""
-            UPDATE webinars 
-            SET title = $1, description = $2, scheduled_at = $3, duration_minutes = $4,
-                meeting_link = $5, is_premium = $6, max_participants = $7
-            WHERE id = $8
-        """, webinar.title, webinar.description, webinar.scheduled_at, webinar.duration_minutes,
-             webinar.meeting_link, webinar.is_premium, webinar.max_participants, webinar_id)
-        
-        if result == "UPDATE 0":
+        existing = await conn.fetchval("SELECT id FROM webinars WHERE id = $1", webinar_id)
+        if not existing:
             raise HTTPException(status_code=404, detail="Webinar not found")
+        
+        update_fields = []
+        params = []
+        
+        if webinar.title is not None:
+            update_fields.append(f"title = ${len(params)+1}")
+            params.append(webinar.title)
             
+        if webinar.description is not None:
+            update_fields.append(f"description = ${len(params)+1}")
+            params.append(webinar.description)
+            
+        if webinar.scheduled_at is not None:
+            update_fields.append(f"scheduled_at = ${len(params)+1}")
+            params.append(webinar.scheduled_at)
+            
+        if webinar.duration_minutes is not None:
+            update_fields.append(f"duration_minutes = ${len(params)+1}")
+            params.append(webinar.duration_minutes)
+            
+        if webinar.meeting_link is not None:
+            update_fields.append(f"meeting_link = ${len(params)+1}")
+            params.append(webinar.meeting_link)
+            
+        if webinar.is_premium is not None:
+            update_fields.append(f"is_premium = ${len(params)+1}")
+            params.append(webinar.is_premium)
+            
+        if webinar.max_participants is not None:
+            update_fields.append(f"max_participants = ${len(params)+1}")
+            params.append(webinar.max_participants)
+            
+        if webinar.thumbnail is not None:
+            update_fields.append(f"thumbnail = ${len(params)+1}")
+            params.append(webinar.thumbnail)
+            
+        if webinar.recording_link is not None:
+            update_fields.append(f"recording_link = ${len(params)+1}")
+            params.append(webinar.recording_link)
+            
+        if webinar.reminder_message is not None:
+            update_fields.append(f"reminder_message = ${len(params)+1}")
+            params.append(webinar.reminder_message)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        params.append(webinar_id)
+        
+        query = f"UPDATE webinars SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
         return {"message": "Webinar updated successfully", "id": webinar_id}
 
 @app.delete("/admin/webinars/{webinar_id}")
 async def delete_webinar(webinar_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
-        await conn.execute("DELETE FROM webinars WHERE id = $1", webinar_id)
-        return {"message": "Webinar deleted"}
+        result = await conn.execute("DELETE FROM webinars WHERE id = $1", webinar_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Webinar not found")
+        return {"message": "Webinar deleted successfully"}
 
 # ============================================================================
 # Signals
@@ -1399,8 +1969,67 @@ async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "Signal deleted"}
 
 # ============================================================================
-# AI Chat (Mentor)
+# AI Chat (Mentor) with Knowledge Retrieval
 # ============================================================================
+
+async def search_knowledge_base(query: str, user_id: int):
+    """Search platform content for relevant context"""
+    async with db_pool.acquire() as conn:
+        context_parts = []
+        
+        # Search blog posts
+        blog_results = await conn.fetch("""
+            SELECT title, content, category FROM blog_posts 
+            WHERE status = 'published' AND (title ILIKE $1 OR content ILIKE $1 OR category ILIKE $1)
+            LIMIT 3
+        """, f"%{query}%")
+        
+        if blog_results:
+            context_parts.append("## Relevant Blog Posts:")
+            for post in blog_results:
+                excerpt = post["content"][:200] + "..." if len(post["content"]) > 200 else post["content"]
+                context_parts.append(f"- {post['title']} ({post['category']}): {excerpt}")
+        
+        # Search courses
+        course_results = await conn.fetch("""
+            SELECT c.title, c.description, c.level FROM courses c
+            WHERE c.title ILIKE $1 OR c.description ILIKE $1
+            LIMIT 2
+        """, f"%{query}%")
+        
+        if course_results:
+            context_parts.append("\n## Relevant Courses:")
+            for course in course_results:
+                context_parts.append(f"- {course['title']} ({course['level']}): {course['description'][:150]}...")
+        
+        # Search webinars
+        webinar_results = await conn.fetch("""
+            SELECT title, description, scheduled_at FROM webinars
+            WHERE scheduled_at > NOW() AND (title ILIKE $1 OR description ILIKE $1)
+            ORDER BY scheduled_at ASC
+            LIMIT 2
+        """, f"%{query}%")
+        
+        if webinar_results:
+            context_parts.append("\n## Upcoming Webinars:")
+            for w in webinar_results:
+                context_parts.append(f"- {w['title']} on {w['scheduled_at'].strftime('%Y-%m-%d')}")
+        
+        # Get user performance summary for personalization
+        perf_results = await conn.fetch("""
+            SELECT analysis_data->>'trader_score' as score, 
+                   analysis_data->>'performance_summary' as summary
+            FROM performance_analyses 
+            WHERE user_id = $1 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        """, user_id)
+        
+        user_context = ""
+        if perf_results:
+            user_context = f"\n## User's Recent Trading Performance: Score {perf_results[0]['score'] or 'N/A'}"
+        
+        return "\n".join(context_parts) + user_context
 
 @app.post("/chat")
 async def chat_with_ai(
@@ -1411,8 +2040,25 @@ async def chat_with_ai(
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
+        # Search knowledge base if requested
+        knowledge_context = ""
+        if request.include_knowledge:
+            knowledge_context = await search_knowledge_base(request.message, current_user["id"])
+        
+        system_prompt = """You are an expert trading mentor with 20+ years of experience in forex, stocks, and crypto trading. You provide personalized, actionable advice on trading strategies, risk management, trading psychology, and market analysis. 
+        
+        Important guidelines:
+        1. Keep responses concise but informative (max 3 paragraphs unless detailed analysis requested)
+        2. Always emphasize risk management and discipline
+        3. Reference specific platform content when relevant (courses, blog posts, webinars)
+        4. Consider the user's trading history and performance when providing advice
+        5. Be encouraging but realistic about trading expectations"""
+        
+        if knowledge_context:
+            system_prompt += f"\n\n## Platform Knowledge Base Context:\n{knowledge_context}\n\nUse this context to provide relevant, specific recommendations referencing our courses and materials when appropriate."
+        
         messages = [
-            {"role": "system", "content": """You are an expert trading mentor with 20+ years of experience in forex, stocks, and crypto trading. You provide personalized, actionable advice on trading strategies, risk management, trading psychology, and market analysis. Keep responses concise but informative (max 3 paragraphs). Always emphasize risk management and discipline."""},
+            {"role": "system", "content": system_prompt},
         ]
         
         if request.history:
@@ -1443,12 +2089,12 @@ async def chat_with_ai(
             result = response.json()
             ai_message = result["choices"][0]["message"]["content"]
             
-            user_id = current_user.get("id") or current_user.get("sub")
+            # Store in chat history with user isolation
             async with db_pool.acquire() as conn:
                 await conn.execute("""
                     INSERT INTO chat_history (user_id, message, response, context)
                     VALUES ($1, $2, $3, $4)
-                """, int(user_id), request.message, ai_message, request.context)
+                """, current_user["id"], request.message, ai_message, knowledge_context[:500])
             
             return {"response": ai_message, "timestamp": datetime.utcnow().isoformat()}
             
@@ -1461,19 +2107,19 @@ async def get_chat_history(
     limit: int = Query(20),
     current_user: dict = Depends(get_current_user)
 ):
+    """Get chat history - user isolated"""
     async with db_pool.acquire() as conn:
-        user_id = current_user.get("id") or current_user.get("sub")
         rows = await conn.fetch("""
             SELECT message, response, created_at 
             FROM chat_history 
             WHERE user_id = $1 
             ORDER BY created_at DESC 
             LIMIT $2
-        """, int(user_id), limit)
+        """, current_user["id"], limit)
         return {"history": [dict(row) for row in rows]}
 
 # ============================================================================
-# AI Performance Analyzer
+# AI Performance Analyzer with Vision (UPDATED)
 # ============================================================================
 
 @app.post("/analyze/performance")
@@ -1481,12 +2127,13 @@ async def analyze_performance(
     request: PerformanceAnalysisRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    """Text-based performance analysis (fallback)"""
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
-        total_trades = len(request.trades)
-        winning_trades = len([t for t in request.trades if t.get("pips", 0) > 0])
+        total_trades = len(request.trades) if request.trades else 0
+        winning_trades = len([t for t in (request.trades or []) if t.get("pips", 0) > 0]) if request.trades else 0
         losing_trades = total_trades - winning_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
@@ -1500,7 +2147,7 @@ Total Trades: {total_trades}
 Win Rate: {win_rate:.1f}%
 
 Trade History:
-{json.dumps(request.trades, indent=2)}
+{json.dumps(request.trades or [], indent=2)}
 
 Provide analysis in strict JSON format with fields: performance_summary (with total_trades, win_rate, net_pips, avg_win, avg_loss, risk_reward_ratio, expectancy, profit_factor, max_drawdown), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes arrays), recommended_courses (array), mentor_advice (string)."""
 
@@ -1540,12 +2187,12 @@ Provide analysis in strict JSON format with fields: performance_summary (with to
                 
                 analysis_data = json.loads(cleaned)
                 
-                user_id = current_user.get("id") or current_user.get("sub")
+                # Store analysis with user isolation
                 async with db_pool.acquire() as conn:
                     await conn.execute("""
                         INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
                         VALUES ($1, $2, $3, $4)
-                    """, int(user_id), json.dumps(analysis_data), json.dumps(request.trades),
+                    """, current_user["id"], json.dumps(analysis_data), json.dumps(request.trades),
                          analysis_data.get("trader_score", 0))
                 
                 return {
@@ -1560,6 +2207,147 @@ Provide analysis in strict JSON format with fields: performance_summary (with to
     except Exception as e:
         logger.error(f"Performance analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analyze/performance/vision")
+async def analyze_performance_vision(
+    file: UploadFile = File(...),
+    account_balance: Optional[float] = Form(None),
+    trading_period_days: Optional[int] = Form(30),
+    current_user: dict = Depends(get_current_user)
+):
+    """Vision-based performance analysis from screenshots/PDFs"""
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+
+    try:
+        contents = await file.read()
+        file_ext = file.filename.split(".")[-1].lower()
+        
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large (max 10MB)")
+
+        # For PDFs, we'll extract text using simple approach since we can't add PyPDF2
+        # In production, you'd want to use a proper PDF extraction library
+        if file_ext == 'pdf':
+            # For now, reject PDFs with message to use images
+            raise HTTPException(status_code=400, detail="PDF support coming soon. Please upload image screenshots (JPG/PNG) for now.")
+        
+        # Process image with vision AI
+        image_base64 = base64.b64encode(contents).decode()
+
+        system_prompt = """You are an expert trading data extraction and analysis AI. Your task is to:
+1. Extract all visible trade data from the trading statement/screenshot
+2. Identify: Pair/Symbol, Entry Price, Exit Price, Lots/Size, Profit/Loss in pips or currency, Direction (Buy/Sell), Date/Time if visible
+3. Calculate performance metrics
+4. Provide professional trading analysis
+
+Respond in strict JSON format with:
+{
+  "extracted_trades": [{"pair": "EURUSD", "direction": "buy", "entry": 1.0850, "exit": 1.0900, "lots": 0.1, "pips": 50, "profit": 500}],
+  "performance_summary": {"total_trades": 10, "win_rate": "65%", "net_pips": 150, "avg_win": 30, "avg_loss": -20, "risk_reward_ratio": "1:1.5", "profit_factor": 1.8, "max_drawdown": "5%"},
+  "trader_score": 75,
+  "strengths": ["identified strength 1", "strength 2"],
+  "weaknesses": ["weakness 1", "weakness 2"],
+  "top_mistakes": ["mistake 1", "mistake 2"],
+  "improvement_plan": {
+    "immediate_actions": ["action 1", "action 2"],
+    "strategy_improvements": ["improvement 1"],
+    "risk_management_fixes": ["fix 1"]
+  },
+  "recommended_courses": ["Risk Management", "Technical Analysis"],
+  "mentor_advice": "Personalized advice based on the trading patterns observed"
+}"""
+
+        user_prompt = f"""Analyze this trading statement screenshot. Extract all trade data and provide comprehensive performance analysis.
+
+Account Balance (if provided by user): {account_balance or 'Not provided'}
+Trading Period: {trading_period_days} days
+
+Extract every visible trade and calculate all metrics accurately."""
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways Vision Analyzer"
+                },
+                json={
+                    "model": settings.OPENROUTER_VISION_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": user_prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/{file_ext};base64,{image_base64}"}}
+                            ]
+                        }
+                    ],
+                    "max_tokens": 2500,
+                    "temperature": 0.4
+                }
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI vision analysis failed")
+
+            result = response.json()
+            ai_content = result["choices"][0]["message"]["content"]
+            
+            try:
+                cleaned = ai_content.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                    cleaned = cleaned.strip()
+                
+                analysis_data = json.loads(cleaned)
+                
+                # Store analysis with user isolation
+                async with db_pool.acquire() as conn:
+                    await conn.execute("""
+                        INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
+                        VALUES ($1, $2, $3, $4)
+                    """, current_user["id"], json.dumps(analysis_data), 
+                         json.dumps(analysis_data.get("extracted_trades", [])),
+                         analysis_data.get("trader_score", 0))
+                
+                return {
+                    "analysis": analysis_data,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "extracted_trades": analysis_data.get("extracted_trades", [])
+                }
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parse error: {e}, content: {ai_content[:200]}")
+                return {"raw_analysis": ai_content, "error": "Parse error - but analysis completed", "extracted_text": ai_content[:1000]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Vision analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analyze/performance/history")
+async def get_performance_history(
+    limit: int = Query(10),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get user's performance analysis history"""
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT id, analysis_data, trader_score, created_at
+            FROM performance_analyses
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+        """, current_user["id"], limit)
+        
+        return {"history": [dict(row) for row in rows]}
 
 # ============================================================================
 # AI Chart Analysis
@@ -1652,7 +2440,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.4.0",
+        "version": "3.5.0",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -1662,13 +2450,13 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.4.0 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.0 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
 async def spa_catch_all(path: str, request: Request):
     # Skip API routes
-    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health", "settings")):
+    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health", "settings", "quiz")):
         raise HTTPException(status_code=404, detail="Not found")
     
     # Check if requesting a blog post slug (path doesn't contain dots and isn't a file)
@@ -1679,7 +2467,7 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.4.0"}
+    return {"message": "Pipways API v3.5.0"}
 
 # Global exception handler
 @app.exception_handler(Exception)

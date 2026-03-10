@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v3.5.0
+Pipways Trading Platform API - Production Debug & System Completion v3.5.1
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.5.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.1", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -192,6 +192,7 @@ class BlogPostUpdate(BaseModel):
     tags: Optional[List[str]] = None
     category: Optional[str] = None
 
+# BUG FIX 1: Removed thumbnail field from Webinar models
 class WebinarCreate(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -200,7 +201,7 @@ class WebinarCreate(BaseModel):
     is_premium: bool = False
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = 100
-    thumbnail: Optional[str] = None
+    # REMOVED: thumbnail field
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
@@ -212,19 +213,40 @@ class WebinarUpdate(BaseModel):
     is_premium: Optional[bool] = None
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = None
-    thumbnail: Optional[str] = None
+    # REMOVED: thumbnail field
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
+# BUG FIX 2: Added missing signal fields
 class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=1)
     direction: str = Field(..., pattern="^(buy|sell)$")
     entry_price: float
     stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    tp1: Optional[float] = None  # NEW FIELD
+    tp2: Optional[float] = None  # NEW FIELD
+    risk_reward_ratio: Optional[str] = None  # NEW FIELD
+    expires_at: Optional[datetime] = None  # NEW FIELD
     timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
+
+class SignalUpdate(BaseModel):  # NEW MODEL for updates
+    pair: Optional[str] = None
+    direction: Optional[str] = None
+    entry_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    tp1: Optional[float] = None
+    tp2: Optional[float] = None
+    risk_reward_ratio: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    timeframe: Optional[str] = None
+    analysis: Optional[str] = None
+    is_premium: Optional[bool] = None
+
+class SignalResultUpdate(BaseModel):  # NEW MODEL for result updates
+    result: str = Field(..., pattern="^(WIN|LOSS|PARTIAL|EXPIRED)$")
+    pips_gain_loss: Optional[float] = None
 
 class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1)
@@ -359,7 +381,7 @@ async def init_db():
             )
         """)
 
-        # Signals table
+        # BUG FIX 2: Added tp1, tp2, risk_reward_ratio, expires_at, result columns to signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -368,9 +390,14 @@ async def init_db():
                 entry_price DECIMAL(10,5),
                 stop_loss DECIMAL(10,5),
                 take_profit DECIMAL(10,5),
+                tp1 DECIMAL(10,5),
+                tp2 DECIMAL(10,5),
+                risk_reward_ratio TEXT,
+                expires_at TIMESTAMP,
                 timeframe VARCHAR(20),
                 analysis TEXT,
                 status VARCHAR(20) DEFAULT 'active',
+                result VARCHAR(20),
                 pips_gain DECIMAL(10,2),
                 is_premium BOOLEAN DEFAULT FALSE,
                 created_by INTEGER REFERENCES users(id),
@@ -380,7 +407,7 @@ async def init_db():
             )
         """)
 
-        # Webinars table
+        # BUG FIX 1: Removed thumbnail column from webinars table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -391,7 +418,6 @@ async def init_db():
                 meeting_link VARCHAR(500),
                 is_premium BOOLEAN DEFAULT FALSE,
                 max_participants INTEGER DEFAULT 100,
-                thumbnail VARCHAR(500),
                 recording_link VARCHAR(500),
                 reminder_message TEXT,
                 created_by INTEGER REFERENCES users(id),
@@ -1302,6 +1328,30 @@ async def get_admin_course_detail(course_id: int, admin: dict = Depends(get_admi
             "quizzes": [dict(q) for q in quizzes]
         }
 
+@app.post("/admin/courses")
+async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
+    """Create new course"""
+    async with db_pool.acquire() as conn:
+        admin_id = admin.get("id") or admin.get("sub")
+        
+        course_id = await conn.fetchval("""
+            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+        """, course.title, course.description, course.content, course.level, 
+             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
+        
+        # Create modules if provided
+        if course.modules:
+            for idx, module in enumerate(course.modules):
+                await conn.execute("""
+                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, course_id, module.get("title"), module.get("content"), 
+                     module.get("video_url"), idx, module.get("is_premium", False))
+        
+        return {"id": course_id, "message": "Course created successfully"}
+
 @app.put("/admin/courses/{course_id}")
 async def update_course(course_id: int, course_update: CourseUpdate, admin: dict = Depends(get_admin_user)):
     """Update course details"""
@@ -1792,6 +1842,7 @@ async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depe
         
         return webinar
 
+# BUG FIX 1: Removed thumbnail from webinar creation
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -1800,19 +1851,20 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
             webinar_id = await conn.fetchval("""
                 INSERT INTO webinars (
                     title, description, scheduled_at, duration_minutes, meeting_link, 
-                    is_premium, max_participants, thumbnail, recording_link, reminder_message, created_by
+                    is_premium, max_participants, recording_link, reminder_message, created_by
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id
             """, webinar.title, webinar.description, webinar.scheduled_at, 
                  webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
-                 webinar.max_participants, webinar.thumbnail, webinar.recording_link,
+                 webinar.max_participants, webinar.recording_link,
                  webinar.reminder_message, int(admin_id))
             return {"id": webinar_id, "message": "Webinar created successfully"}
         except Exception as e:
             logger.error(f"Error creating webinar: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to create webinar: {str(e)}")
 
+# BUG FIX 1: Removed thumbnail from webinar update
 @app.put("/admin/webinars/{webinar_id}")
 async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = Depends(get_admin_user)):
     """Update webinar"""
@@ -1852,10 +1904,8 @@ async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = 
             update_fields.append(f"max_participants = ${len(params)+1}")
             params.append(webinar.max_participants)
             
-        if webinar.thumbnail is not None:
-            update_fields.append(f"thumbnail = ${len(params)+1}")
-            params.append(webinar.thumbnail)
-            
+        # REMOVED: thumbnail handling
+        
         if webinar.recording_link is not None:
             update_fields.append(f"recording_link = ${len(params)+1}")
             params.append(webinar.recording_link)
@@ -1914,6 +1964,7 @@ async def get_signals(
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
 
+# BUG FIX 5: Ensure signal detail returns all fields including new ones
 @app.get("/signals/{signal_id}")
 async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
     """Get single signal by ID"""
@@ -1933,34 +1984,120 @@ async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depend
         
         return signal
 
+# BUG FIX 2: Updated to include tp1, tp2, risk_reward_ratio, expires_at
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         signal_id = await conn.fetchval("""
-            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, timeframe, analysis, is_premium, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO signals (
+                pair, direction, entry_price, stop_loss, tp1, tp2, 
+                risk_reward_ratio, expires_at, timeframe, analysis, is_premium, created_by
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
         """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
+             signal.tp1, signal.tp2, signal.risk_reward_ratio, signal.expires_at,
+             signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
         return {"id": signal_id, "message": "Signal created"}
 
+# BUG FIX 3: Fixed PUT endpoint with proper fields
 @app.put("/admin/signals/{signal_id}")
-async def update_signal(signal_id: int, signal: SignalCreate, admin: dict = Depends(get_admin_user)):
+async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depends(get_admin_user)):
     """Update signal"""
     async with db_pool.acquire() as conn:
-        result = await conn.execute("""
-            UPDATE signals 
-            SET pair = $1, direction = $2, entry_price = $3, stop_loss = $4,
-                take_profit = $5, timeframe = $6, analysis = $7, is_premium = $8, updated_at = NOW()
-            WHERE id = $9
-        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
-             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, signal_id)
+        # Build update query dynamically
+        update_fields = []
+        params = []
         
-        if result == "UPDATE 0":
+        if signal.pair is not None:
+            update_fields.append(f"pair = ${len(params)+1}")
+            params.append(signal.pair.upper())
+            
+        if signal.direction is not None:
+            update_fields.append(f"direction = ${len(params)+1}")
+            params.append(signal.direction)
+            
+        if signal.entry_price is not None:
+            update_fields.append(f"entry_price = ${len(params)+1}")
+            params.append(signal.entry_price)
+            
+        if signal.stop_loss is not None:
+            update_fields.append(f"stop_loss = ${len(params)+1}")
+            params.append(signal.stop_loss)
+            
+        if signal.tp1 is not None:
+            update_fields.append(f"tp1 = ${len(params)+1}")
+            params.append(signal.tp1)
+            
+        if signal.tp2 is not None:
+            update_fields.append(f"tp2 = ${len(params)+1}")
+            params.append(signal.tp2)
+            
+        if signal.risk_reward_ratio is not None:
+            update_fields.append(f"risk_reward_ratio = ${len(params)+1}")
+            params.append(signal.risk_reward_ratio)
+            
+        if signal.expires_at is not None:
+            update_fields.append(f"expires_at = ${len(params)+1}")
+            params.append(signal.expires_at)
+            
+        if signal.timeframe is not None:
+            update_fields.append(f"timeframe = ${len(params)+1}")
+            params.append(signal.timeframe)
+            
+        if signal.analysis is not None:
+            update_fields.append(f"analysis = ${len(params)+1}")
+            params.append(signal.analysis)
+            
+        if signal.is_premium is not None:
+            update_fields.append(f"is_premium = ${len(params)+1}")
+            params.append(signal.is_premium)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(signal_id)
+        
+        query = f"UPDATE signals SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        if not result:
             raise HTTPException(status_code=404, detail="Signal not found")
             
         return {"message": "Signal updated successfully", "id": signal_id}
+
+# BUG FIX 4: New endpoint for updating signal results
+@app.put("/admin/signals/{signal_id}/result")
+async def update_signal_result(
+    signal_id: int, 
+    result_data: SignalResultUpdate, 
+    admin: dict = Depends(get_admin_user)
+):
+    """Update signal result (WIN, LOSS, PARTIAL, EXPIRED)"""
+    async with db_pool.acquire() as conn:
+        existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Signal not found")
+        
+        # Update result, pips_gain, status, and closed_at
+        await conn.execute("""
+            UPDATE signals 
+            SET result = $1, 
+                pips_gain = $2, 
+                status = 'closed',
+                closed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $3
+        """, result_data.result, result_data.pips_gain_loss, signal_id)
+        
+        return {
+            "message": "Signal result updated successfully", 
+            "id": signal_id,
+            "result": result_data.result,
+            "pips_gain": result_data.pips_gain_loss
+        }
 
 @app.delete("/admin/signals/{signal_id}")
 async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
@@ -2440,7 +2577,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.5.0",
+        "version": "3.5.1",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -2450,7 +2587,7 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.0 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.1 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
@@ -2467,7 +2604,7 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.0"}
+    return {"message": "Pipways API v3.5.1"}
 
 # Global exception handler
 @app.exception_handler(Exception)

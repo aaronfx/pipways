@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Production v3.2.0
-Complete implementation with chat endpoint and robust error handling
+Pipways Trading Platform API - Same-Origin Architecture v3.3.0
+FastAPI serves frontend directly - No CORS required
 """
 
 import os
@@ -19,6 +19,7 @@ from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Que
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles  # ADDED
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from dotenv import load_dotenv
 import httpx
@@ -64,27 +65,8 @@ class Settings:
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # CORS origins - Production ready
-    @property
-    def CORS_ORIGINS(self):
-        origins = [
-            "https://pipways-web-nhem.onrender.com",
-            "https://pipways.com",
-            "https://www.pipways.com",
-            "http://localhost:3000",
-            "http://localhost:8080",
-            "http://localhost:5500",
-            "http://127.0.0.1:5500",
-            "http://localhost:8000",
-            "file://",
-            "null"
-        ]
-        
-        env_origins = os.getenv("CORS_ORIGINS", "")
-        if env_origins:
-            origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
-        
-        return list(set(origins))
+    # Simplified CORS - single origin doesn't need restrictions but kept for safety
+    CORS_ORIGINS = ["*"]
 
 settings = Settings()
 
@@ -131,9 +113,9 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.2.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.3.0", lifespan=lifespan)
 
-# CORS Middleware - Must be first
+# CORS Middleware - Simplified for same-origin (kept for flexibility)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -143,6 +125,9 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+
+# MOUNT UPLOADS FOLDER AS STATIC FILES
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 security = HTTPBearer(auto_error=False)
 
@@ -844,13 +829,6 @@ async def delete_media(media_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM media_files WHERE id = $1", media_id)
         return {"message": "Media deleted"}
 
-@app.get("/uploads/{filename}")
-async def serve_upload(filename: str):
-    file_path = os.path.join("uploads", filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path)
-    raise HTTPException(status_code=404, detail="File not found")
-
 # LMS - Courses with Modules
 @app.get("/courses")
 async def get_courses(
@@ -1263,12 +1241,28 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.2.0",
+        "version": "3.3.0",
         "database": db_status,
         "cloudinary_enabled": CLOUDINARY_AVAILABLE and bool(settings.CLOUDINARY_CLOUD_NAME),
         "cors_origins": len(settings.CORS_ORIGINS),
         "timestamp": datetime.utcnow().isoformat()
     }
+
+# SERVE FRONTEND - ROOT ROUTE
+@app.get("/")
+async def serve_frontend():
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"message": "Pipways API v3.3.0 - Frontend not deployed. Place index.html in root directory."}
+
+# SPA CATCH-ALL ROUTE - Must be last
+@app.get("/{path:path}")
+async def spa_catch_all(path: str):
+    # Serve index.html for any non-API route (handles client-side routing)
+    # API routes defined above take precedence
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {"message": "Pipways API v3.3.0"}
 
 # Global exception handler
 @app.exception_handler(Exception)

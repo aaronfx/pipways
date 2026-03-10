@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Same-Origin Architecture v3.3.1
+Pipways Trading Platform API - Production Debug & System Completion v3.4.0
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.3.1", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.4.0", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -178,6 +178,20 @@ class BlogPostCreate(BaseModel):
     tags: Optional[List[str]] = []
     category: Optional[str] = None
 
+class BlogPostUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    excerpt: Optional[str] = None
+    is_premium: Optional[bool] = None
+    status: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    slug: Optional[str] = None
+    featured_image: Optional[str] = None
+    tags: Optional[List[str]] = None
+    category: Optional[str] = None
+
 class WebinarCreate(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -216,6 +230,22 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
     history: Optional[List[Dict[str, str]]] = []
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    subscription_tier: Optional[str] = None
+    subscription_status: Optional[str] = None
+    full_name: Optional[str] = None
+
+class SiteSettingsUpdate(BaseModel):
+    site_name: Optional[str] = None
+    telegram_free_link: Optional[str] = None
+    telegram_vip_link: Optional[str] = None
+    vip_price: Optional[float] = None
+    vip_price_currency: Optional[str] = None
+    seo_default_title: Optional[str] = None
+    seo_default_description: Optional[str] = None
+    contact_email: Optional[str] = None
 
 # ============================================================================
 # Database Initialization
@@ -368,6 +398,29 @@ async def init_db():
                 trader_score INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        """)
+
+        # Site settings table (NEW)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS site_settings (
+                id SERIAL PRIMARY KEY,
+                site_name VARCHAR(255) DEFAULT 'Pipways',
+                telegram_free_link VARCHAR(500),
+                telegram_vip_link VARCHAR(500),
+                vip_price DECIMAL(10,2) DEFAULT 99.00,
+                vip_price_currency VARCHAR(3) DEFAULT 'USD',
+                seo_default_title VARCHAR(255),
+                seo_default_description TEXT,
+                contact_email VARCHAR(255),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Insert default settings if not exists
+        await conn.execute("""
+            INSERT INTO site_settings (id, site_name, telegram_free_link, telegram_vip_link, vip_price)
+            SELECT 1, 'Pipways', 'https://t.me/pipways_free', 'https://t.me/pipways_vip', 99.00
+            WHERE NOT EXISTS (SELECT 1 FROM site_settings WHERE id = 1)
         """)
 
         # Create default admin
@@ -615,6 +668,49 @@ async def get_all_users(
             "pages": (total + limit - 1) // limit
         }
 
+@app.put("/admin/users/{user_id}")
+async def update_user(user_id: int, update_data: UserUpdate, admin: dict = Depends(get_admin_user)):
+    """Update user role and subscription details"""
+    async with db_pool.acquire() as conn:
+        # Prevent self-demotion
+        admin_id = admin.get("id") or admin.get("sub")
+        if int(user_id) == int(admin_id) and update_data.role and update_data.role != "admin":
+            raise HTTPException(status_code=400, detail="Cannot remove your own admin privileges")
+
+        # Build update query dynamically
+        update_fields = []
+        params = []
+        
+        if update_data.role is not None:
+            update_fields.append(f"role = ${len(params)+1}")
+            params.append(update_data.role)
+            
+        if update_data.subscription_tier is not None:
+            update_fields.append(f"subscription_tier = ${len(params)+1}")
+            params.append(update_data.subscription_tier)
+            
+        if update_data.subscription_status is not None:
+            update_fields.append(f"subscription_status = ${len(params)+1}")
+            params.append(update_data.subscription_status)
+            
+        if update_data.full_name is not None:
+            update_fields.append(f"full_name = ${len(params)+1}")
+            params.append(update_data.full_name)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(user_id)
+        
+        query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        return {"message": "User updated successfully", "id": user_id}
+
 @app.delete("/admin/users/{user_id}")
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -623,6 +719,94 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
             raise HTTPException(status_code=400, detail="Cannot delete yourself")
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return {"message": "User deleted"}
+
+# ============================================================================
+# Site Settings Endpoints (NEW)
+# ============================================================================
+
+@app.get("/admin/settings")
+async def get_site_settings(admin: dict = Depends(get_admin_user)):
+    """Get site settings"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM site_settings WHERE id = 1")
+        if not row:
+            raise HTTPException(status_code=404, detail="Settings not found")
+        return dict(row)
+
+@app.put("/admin/settings")
+async def update_site_settings(settings_update: SiteSettingsUpdate, admin: dict = Depends(get_admin_user)):
+    """Update site settings"""
+    async with db_pool.acquire() as conn:
+        # Build update query dynamically
+        update_fields = []
+        params = []
+        
+        if settings_update.site_name is not None:
+            update_fields.append(f"site_name = ${len(params)+1}")
+            params.append(settings_update.site_name)
+            
+        if settings_update.telegram_free_link is not None:
+            update_fields.append(f"telegram_free_link = ${len(params)+1}")
+            params.append(settings_update.telegram_free_link)
+            
+        if settings_update.telegram_vip_link is not None:
+            update_fields.append(f"telegram_vip_link = ${len(params)+1}")
+            params.append(settings_update.telegram_vip_link)
+            
+        if settings_update.vip_price is not None:
+            update_fields.append(f"vip_price = ${len(params)+1}")
+            params.append(settings_update.vip_price)
+            
+        if settings_update.vip_price_currency is not None:
+            update_fields.append(f"vip_price_currency = ${len(params)+1}")
+            params.append(settings_update.vip_price_currency)
+            
+        if settings_update.seo_default_title is not None:
+            update_fields.append(f"seo_default_title = ${len(params)+1}")
+            params.append(settings_update.seo_default_title)
+            
+        if settings_update.seo_default_description is not None:
+            update_fields.append(f"seo_default_description = ${len(params)+1}")
+            params.append(settings_update.seo_default_description)
+            
+        if settings_update.contact_email is not None:
+            update_fields.append(f"contact_email = ${len(params)+1}")
+            params.append(settings_update.contact_email)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(1)  # id = 1
+        
+        query = f"UPDATE site_settings SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Settings not found")
+            
+        # Return updated settings
+        row = await conn.fetchrow("SELECT * FROM site_settings WHERE id = 1")
+        return dict(row)
+
+@app.get("/settings/public")
+async def get_public_settings():
+    """Get public site settings (no auth required)"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT site_name, telegram_free_link, telegram_vip_link, vip_price, 
+                   vip_price_currency, seo_default_title, seo_default_description, contact_email 
+            FROM site_settings WHERE id = 1
+        """)
+        if not row:
+            return {
+                "site_name": "Pipways",
+                "telegram_free_link": "https://t.me/pipways_free",
+                "telegram_vip_link": "https://t.me/pipways_vip",
+                "vip_price": 99.00,
+                "vip_price_currency": "USD"
+            }
+        return dict(row)
 
 # ============================================================================
 # Blog Management
@@ -671,7 +855,52 @@ async def get_blog_posts(
         params.extend([limit, offset])
         
         rows = await conn.fetch(query, *params)
-        return {"posts": [dict(row) for row in rows], "total": total, "page": page}
+        return {"posts": [dict(row) for row in rows], "total": total, "page": page, "pages": (total + limit - 1) // limit}
+
+@app.get("/blog/posts/{slug}")
+async def get_blog_post_by_slug(slug: str, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """Get single blog post by slug (public)"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT bp.*, u.full_name as author_name 
+            FROM blog_posts bp
+            LEFT JOIN users u ON bp.author_id = u.id
+            WHERE bp.slug = $1
+        """, slug)
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Post not found")
+            
+        post = dict(row)
+        
+        # Check if premium content and user has access
+        if post.get("is_premium"):
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Authentication required for premium content")
+            if current_user.get("subscription_tier") not in ["premium", "vip"] and current_user.get("role") not in ["admin", "moderator"]:
+                raise HTTPException(status_code=403, detail="Premium subscription required")
+        
+        # Check if draft and user is not admin
+        if post.get("status") == "draft" and (not current_user or current_user.get("role") not in ["admin", "moderator"]):
+            raise HTTPException(status_code=404, detail="Post not found")
+            
+        return post
+
+@app.get("/admin/blog/{post_id}")
+async def get_blog_post_by_id(post_id: int, admin: dict = Depends(get_admin_user)):
+    """Get single blog post by ID (admin only)"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT bp.*, u.full_name as author_name 
+            FROM blog_posts bp
+            LEFT JOIN users u ON bp.author_id = u.id
+            WHERE bp.id = $1
+        """, post_id)
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Post not found")
+            
+        return dict(row)
 
 @app.post("/admin/blog")
 async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin_user)):
@@ -700,10 +929,95 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
              
         return {"id": post_id, "slug": slug, "message": "Blog post created"}
 
+@app.put("/admin/blog/{post_id}")
+async def update_blog_post(post_id: int, post_update: BlogPostUpdate, admin: dict = Depends(get_admin_user)):
+    """Update blog post"""
+    async with db_pool.acquire() as conn:
+        # Check if post exists
+        existing = await conn.fetchrow("SELECT * FROM blog_posts WHERE id = $1", post_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        # Build update query dynamically
+        update_fields = []
+        params = []
+        
+        if post_update.title is not None:
+            update_fields.append(f"title = ${len(params)+1}")
+            params.append(post_update.title)
+            
+        if post_update.content is not None:
+            update_fields.append(f"content = ${len(params)+1}")
+            params.append(post_update.content)
+            # Update excerpt automatically if content changed
+            excerpt = post_update.content.replace("<[^>]*>", "")[:150] + "..."
+            update_fields.append(f"excerpt = ${len(params)+1}")
+            params.append(excerpt)
+            
+        if post_update.is_premium is not None:
+            update_fields.append(f"is_premium = ${len(params)+1}")
+            params.append(post_update.is_premium)
+            
+        if post_update.status is not None:
+            update_fields.append(f"status = ${len(params)+1}")
+            params.append(post_update.status)
+            # Update published_at if status changed to published
+            if post_update.status == "published" and existing["status"] != "published":
+                update_fields.append(f"published_at = NOW()")
+            
+        if post_update.scheduled_at is not None:
+            update_fields.append(f"scheduled_at = ${len(params)+1}")
+            params.append(post_update.scheduled_at)
+            
+        if post_update.meta_title is not None:
+            update_fields.append(f"meta_title = ${len(params)+1}")
+            params.append(post_update.meta_title)
+            
+        if post_update.meta_description is not None:
+            update_fields.append(f"meta_description = ${len(params)+1}")
+            params.append(post_update.meta_description)
+            
+        if post_update.slug is not None:
+            # Check slug uniqueness if changing
+            if post_update.slug != existing["slug"]:
+                slug_exists = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1 AND id != $2", post_update.slug, post_id)
+                if slug_exists:
+                    raise HTTPException(status_code=400, detail="Slug already exists")
+            update_fields.append(f"slug = ${len(params)+1}")
+            params.append(post_update.slug)
+            
+        if post_update.featured_image is not None:
+            update_fields.append(f"featured_image = ${len(params)+1}")
+            params.append(post_update.featured_image)
+            
+        if post_update.tags is not None:
+            update_fields.append(f"tags = ${len(params)+1}")
+            params.append(post_update.tags)
+            
+        if post_update.category is not None:
+            update_fields.append(f"category = ${len(params)+1}")
+            params.append(post_update.category)
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+            
+        update_fields.append("updated_at = NOW()")
+        params.append(post_id)
+        
+        query = f"UPDATE blog_posts SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+        result = await conn.fetchval(query, *params)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Post not found")
+            
+        return {"message": "Blog post updated successfully", "id": post_id}
+
 @app.delete("/admin/blog/{post_id}")
 async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
-        await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
+        result = await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Post not found")
         return {"message": "Post deleted"}
 
 # ============================================================================
@@ -835,6 +1149,30 @@ async def get_courses(
             
         return courses
 
+@app.get("/courses/{course_id}")
+async def get_course_by_id(course_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """Get single course by ID"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Course not found")
+            
+        course = dict(row)
+        
+        # Check premium access
+        if course.get("is_premium"):
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Authentication required")
+            if current_user.get("subscription_tier") not in ["premium", "vip"] and current_user.get("role") not in ["admin", "moderator"]:
+                raise HTTPException(status_code=403, detail="Premium subscription required")
+        
+        modules = await conn.fetch(
+            "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order",
+            course_id
+        )
+        course["modules"] = [dict(m) for m in modules]
+        return course
+
 @app.post("/admin/courses")
 async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -855,6 +1193,37 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
                      module.get("video_url"), idx, module.get("is_premium", False))
         
         return {"id": course_id, "message": "Course created"}
+
+@app.put("/admin/courses/{course_id}")
+async def update_course(course_id: int, course: CourseCreate, admin: dict = Depends(get_admin_user)):
+    """Update course and its modules"""
+    async with db_pool.acquire() as conn:
+        # Check if course exists
+        existing = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        # Update course
+        await conn.execute("""
+            UPDATE courses 
+            SET title = $1, description = $2, content = $3, level = $4, 
+                duration_hours = $5, thumbnail = $6, is_premium = $7, updated_at = NOW()
+            WHERE id = $8
+        """, course.title, course.description, course.content, course.level,
+             course.duration_hours, course.thumbnail, course.is_premium, course_id)
+        
+        # Delete existing modules and recreate
+        await conn.execute("DELETE FROM course_modules WHERE course_id = $1", course_id)
+        
+        if course.modules:
+            for idx, module in enumerate(course.modules):
+                await conn.execute("""
+                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, course_id, module.get("title"), module.get("content"), 
+                     module.get("video_url"), idx, module.get("is_premium", False))
+        
+        return {"message": "Course updated successfully", "id": course_id}
 
 @app.delete("/admin/courses/{course_id}")
 async def delete_course(course_id: int, admin: dict = Depends(get_admin_user)):
@@ -889,6 +1258,25 @@ async def get_webinars(
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
 
+@app.get("/webinars/{webinar_id}")
+async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """Get single webinar by ID"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Webinar not found")
+            
+        webinar = dict(row)
+        
+        # Check premium access
+        if webinar.get("is_premium"):
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Authentication required")
+            if current_user.get("subscription_tier") not in ["premium", "vip"] and current_user.get("role") not in ["admin", "moderator"]:
+                raise HTTPException(status_code=403, detail="Premium subscription required")
+        
+        return webinar
+
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -900,6 +1288,23 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
         """, webinar.title, webinar.description, webinar.scheduled_at, 
              webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, int(admin_id), webinar.max_participants)
         return {"id": webinar_id, "message": "Webinar created"}
+
+@app.put("/admin/webinars/{webinar_id}")
+async def update_webinar(webinar_id: int, webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
+    """Update webinar"""
+    async with db_pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE webinars 
+            SET title = $1, description = $2, scheduled_at = $3, duration_minutes = $4,
+                meeting_link = $5, is_premium = $6, max_participants = $7
+            WHERE id = $8
+        """, webinar.title, webinar.description, webinar.scheduled_at, webinar.duration_minutes,
+             webinar.meeting_link, webinar.is_premium, webinar.max_participants, webinar_id)
+        
+        if result == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="Webinar not found")
+            
+        return {"message": "Webinar updated successfully", "id": webinar_id}
 
 @app.delete("/admin/webinars/{webinar_id}")
 async def delete_webinar(webinar_id: int, admin: dict = Depends(get_admin_user)):
@@ -939,6 +1344,25 @@ async def get_signals(
         rows = await conn.fetch(query, *params)
         return [dict(row) for row in rows]
 
+@app.get("/signals/{signal_id}")
+async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """Get single signal by ID"""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM signals WHERE id = $1", signal_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Signal not found")
+            
+        signal = dict(row)
+        
+        # Check premium access
+        if signal.get("is_premium"):
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Authentication required")
+            if current_user.get("subscription_tier") not in ["premium", "vip"] and current_user.get("role") not in ["admin", "moderator"]:
+                raise HTTPException(status_code=403, detail="Premium subscription required")
+        
+        return signal
+
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -950,6 +1374,23 @@ async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_us
         """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
              signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
         return {"id": signal_id, "message": "Signal created"}
+
+@app.put("/admin/signals/{signal_id}")
+async def update_signal(signal_id: int, signal: SignalCreate, admin: dict = Depends(get_admin_user)):
+    """Update signal"""
+    async with db_pool.acquire() as conn:
+        result = await conn.execute("""
+            UPDATE signals 
+            SET pair = $1, direction = $2, entry_price = $3, stop_loss = $4,
+                take_profit = $5, timeframe = $6, analysis = $7, is_premium = $8, updated_at = NOW()
+            WHERE id = $9
+        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, signal_id)
+        
+        if result == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="Signal not found")
+            
+        return {"message": "Signal updated successfully", "id": signal_id}
 
 @app.delete("/admin/signals/{signal_id}")
 async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
@@ -1211,7 +1652,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.3.1",
+        "version": "3.4.0",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -1221,18 +1662,24 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.3.1 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.4.0 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
-async def spa_catch_all(path: str):
+async def spa_catch_all(path: str, request: Request):
     # Skip API routes
-    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health")):
+    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health", "settings")):
         raise HTTPException(status_code=404, detail="Not found")
+    
+    # Check if requesting a blog post slug (path doesn't contain dots and isn't a file)
+    if path and "." not in path and not path.startswith(("api", "static", "assets")):
+        # Let frontend handle routing
+        if os.path.exists("index.html"):
+            return FileResponse("index.html")
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.3.1"}
+    return {"message": "Pipways API v3.4.0"}
 
 # Global exception handler
 @app.exception_handler(Exception)

@@ -3,7 +3,9 @@ services:
     name: pipways-app
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      mkdir -p uploads
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
@@ -19,13 +21,6 @@ services:
       - key: ADMIN_PASSWORD
         value: admin123
       - key: OPENROUTER_API_KEY
-        sync: false
-      # Optional Cloudinary config
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
         sync: false
 
 databases:

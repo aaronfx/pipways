@@ -1,6 +1,6 @@
 """
-Pipways Trading Platform API - Production v3.1.2
-Fixes: CORS, Database SSL, Media endpoints, Error handling
+Pipways Trading Platform API - Production v3.2.0
+Single-file complete backend with all features
 """
 
 import os
@@ -12,58 +12,62 @@ import logging
 import base64
 import json
 import uuid
+import io
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
+from typing import Optional, List, Dict, Any, Union
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from dotenv import load_dotenv
 import httpx
 from contextlib import asynccontextmanager
 
-# Optional Cloudinary import
+# Optional imports with fallbacks
 try:
     import cloudinary
     import cloudinary.uploader
     CLOUDINARY_AVAILABLE = True
 except ImportError:
     CLOUDINARY_AVAILABLE = False
-    logging.warning("Cloudinary not installed. Using local storage for uploads.")
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# Configuration
+# ==========================================
+# CONFIGURATION
+# ==========================================
 class Settings:
     DATABASE_URL = os.getenv("DATABASE_URL")
-    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars-long")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60
     REFRESH_TOKEN_EXPIRE_DAYS = 7
-    RESET_TOKEN_EXPIRE_HOURS = 1
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     
-    # Cloudinary Config (Optional)
+    # Cloudinary Config
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
     CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
     CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 
-    # Use reliable vision-capable models
+    # AI Models
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
     OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # CORS origins - CRITICAL FIX
+    # CORS origins
     @property
     def CORS_ORIGINS(self):
-        # Default origins including your deployed frontend
         origins = [
             "https://pipways-web-nhem.onrender.com",
             "https://pipways.com",
@@ -73,19 +77,24 @@ class Settings:
             "http://localhost:5500",
             "http://127.0.0.1:5500",
             "http://localhost:8000",
-            "null"  # For local file:// testing
+            "null",
+            "*"
         ]
         
-        # Add from environment variable
         env_origins = os.getenv("CORS_ORIGINS", "")
         if env_origins:
             origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
         
-        return list(set(origins))  # Remove duplicates
+        # Always include frontend URL from env if available
+        frontend_url = os.getenv("FRONTEND_URL")
+        if frontend_url and frontend_url not in origins:
+            origins.append(frontend_url)
+            
+        return list(set(origins))
 
 settings = Settings()
 
-# Configure Cloudinary only if available and configured
+# Configure Cloudinary
 if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
     cloudinary.config(
         cloud_name=settings.CLOUDINARY_CLOUD_NAME,
@@ -96,140 +105,13 @@ if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
 # Database pool
 db_pool: Optional[asyncpg.Pool] = None
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global db_pool
-    try:
-        # CRITICAL FIX: Handle Render's PostgreSQL SSL requirement
-        dsn = settings.DATABASE_URL
-        if dsn and "render.com" in dsn and "sslmode" not in dsn:
-            dsn += "?sslmode=require"
-        
-        if not dsn:
-            logger.error("DATABASE_URL not set!")
-            raise ValueError("DATABASE_URL environment variable is required")
-            
-        db_pool = await asyncpg.create_pool(
-            dsn, 
-            min_size=2, 
-            max_size=10,
-            command_timeout=60,
-            server_settings={
-                'jit': 'off'  # Disable JIT for compatibility
-            }
-        )
-        await init_db()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Database initialization error: {e}")
-        raise
-    yield
-    if db_pool:
-        await db_pool.close()
-
-app = FastAPI(title="Pipways API", version="3.1.2", lifespan=lifespan)
-
-# CRITICAL FIX: CORS Middleware - Must be before other middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,
-)
-
-# Security
-security = HTTPBearer(auto_error=False)
-
-# Enhanced Models
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    full_name: str = Field(..., min_length=2, max_length=100)
-
-    @field_validator('password')
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain a lowercase letter')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain an uppercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain a number')
-        if not any(c in '@$!%*?&' for c in v):
-            raise ValueError('Password must contain a special character (@$!%*?&)')
-        return v
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-class Token(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    user: Dict[str, Any]
-
-class BlogPostCreate(BaseModel):
-    title: str = Field(..., min_length=1)
-    content: str = Field(..., min_length=1)
-    excerpt: Optional[str] = None
-    is_premium: bool = False
-    status: str = Field(default="published", pattern="^(draft|published|scheduled)$")
-    scheduled_at: Optional[datetime] = None
-    meta_title: Optional[str] = None
-    meta_description: Optional[str] = None
-    slug: Optional[str] = None
-    featured_image: Optional[str] = None
-    tags: Optional[List[str]] = []
-    category: Optional[str] = None
-
-class WebinarCreate(BaseModel):
-    title: str = Field(..., min_length=1)
-    description: str = Field(..., min_length=1)
-    scheduled_at: datetime
-    duration_minutes: int = Field(default=60, ge=1)
-    is_premium: bool = False
-    meeting_link: Optional[str] = None
-    max_participants: Optional[int] = 100
-
-class SignalCreate(BaseModel):
-    pair: str = Field(..., min_length=1)
-    direction: str = Field(..., pattern="^(buy|sell)$")
-    entry_price: float
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    timeframe: str = "1H"
-    analysis: Optional[str] = None
-    is_premium: bool = False
-
-class CourseCreate(BaseModel):
-    title: str = Field(..., min_length=1)
-    description: str = Field(..., min_length=1)
-    content: str = Field(..., min_length=1)
-    is_premium: bool = False
-    level: str = Field(default="beginner", pattern="^(beginner|intermediate|advanced)$")
-    duration_hours: Optional[float] = None
-    thumbnail: Optional[str] = None
-    modules: Optional[List[Dict]] = None
-
-class PerformanceAnalysisRequest(BaseModel):
-    trades: List[Dict[str, Any]]
-    account_balance: Optional[float] = None
-    trading_period_days: Optional[int] = None
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
-    context: Optional[str] = ""
-
-# Database initialization
+# ==========================================
+# DATABASE SETUP
+# ==========================================
 async def init_db():
+    """Initialize database tables"""
     async with db_pool.acquire() as conn:
-        # Users table with enhanced fields
+        # Users table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -247,31 +129,41 @@ async def init_db():
                 reset_token_expires TIMESTAMP
             )
         """)
+        
+        # Create index on email
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        """)
 
-        # Enhanced blog posts with SEO and scheduling
+        # Blog posts
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
+                slug VARCHAR(255) UNIQUE,
                 content TEXT NOT NULL,
                 excerpt TEXT,
                 author_id INTEGER REFERENCES users(id),
                 is_premium BOOLEAN DEFAULT FALSE,
-                status VARCHAR(20) DEFAULT 'published',
+                status VARCHAR(20) DEFAULT 'draft',
                 scheduled_at TIMESTAMP,
+                published_at TIMESTAMP,
                 meta_title VARCHAR(255),
                 meta_description TEXT,
-                slug VARCHAR(255) UNIQUE,
                 featured_image VARCHAR(500),
                 tags TEXT[],
                 category VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                published_at TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_blog_posts_status ON blog_posts(status);
+            CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug);
+        """)
 
-        # Signals table
+        # Signals
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -287,12 +179,11 @@ async def init_db():
                 is_premium BOOLEAN DEFAULT FALSE,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 closed_at TIMESTAMP
             )
         """)
 
-        # Enhanced webinars
+        # Webinars
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -308,7 +199,18 @@ async def init_db():
             )
         """)
 
-        # Enhanced courses with modules support
+        # Webinar registrations
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS webinar_registrations (
+                id SERIAL PRIMARY KEY,
+                webinar_id INTEGER REFERENCES webinars(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(webinar_id, user_id)
+            )
+        """)
+
+        # Courses
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -325,7 +227,7 @@ async def init_db():
             )
         """)
 
-        # Course modules for LMS
+        # Course modules
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_modules (
                 id SERIAL PRIMARY KEY,
@@ -335,7 +237,20 @@ async def init_db():
                 video_url VARCHAR(500),
                 sort_order INTEGER DEFAULT 0,
                 is_premium BOOLEAN DEFAULT FALSE,
+                duration_minutes INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # User progress
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_progress (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                module_id INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, module_id)
             )
         """)
 
@@ -375,25 +290,202 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # Chart analyses
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS chart_analyses (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                pair VARCHAR(20),
+                timeframe VARCHAR(10),
+                image_url VARCHAR(500),
+                analysis_text TEXT,
+                structured_data JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
         # Create default admin
-        try:
-            admin_exists = await conn.fetchval("SELECT id FROM users WHERE email = $1", settings.ADMIN_EMAIL)
-            if not admin_exists:
-                hashed = bcrypt.hashpw(settings.ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
-                await conn.execute("""
-                    INSERT INTO users (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified)
-                    VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
-                """, settings.ADMIN_EMAIL, hashed, "System Administrator")
-                logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
-            else:
-                await conn.execute("""
-                    UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'
-                """, settings.ADMIN_EMAIL)
-        except Exception as e:
-            logger.error(f"Error creating admin: {e}")
+        await create_default_admin(conn)
 
-# Auth utilities
+async def create_default_admin(conn):
+    """Create default admin user if not exists"""
+    try:
+        admin_exists = await conn.fetchval(
+            "SELECT id FROM users WHERE email = $1", 
+            settings.ADMIN_EMAIL
+        )
+        if not admin_exists:
+            hashed = bcrypt.hashpw(
+                settings.ADMIN_PASSWORD.encode(), 
+                bcrypt.gensalt()
+            ).decode()
+            await conn.execute("""
+                INSERT INTO users 
+                (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified)
+                VALUES ($1, $2, $3, 'admin', 'vip', 'active', TRUE)
+            """, settings.ADMIN_EMAIL, hashed, "System Administrator")
+            logger.info(f"Default admin created: {settings.ADMIN_EMAIL}")
+        else:
+            # Ensure admin has admin role
+            await conn.execute("""
+                UPDATE users SET role = 'admin' 
+                WHERE email = $1 AND role != 'admin'
+            """, settings.ADMIN_EMAIL)
+    except Exception as e:
+        logger.error(f"Error creating admin: {e}")
+
+# ==========================================
+# LIFESPAN & APP INIT
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global db_pool
+    try:
+        dsn = settings.DATABASE_URL
+        if dsn and "render.com" in dsn and "sslmode" not in dsn:
+            dsn += "?sslmode=require"
+        
+        if not dsn:
+            logger.error("DATABASE_URL not set!")
+            raise ValueError("DATABASE_URL environment variable is required")
+            
+        db_pool = await asyncpg.create_pool(
+            dsn, 
+            min_size=2, 
+            max_size=10,
+            command_timeout=60,
+            server_settings={'jit': 'off'}
+        )
+        await init_db()
+        logger.info("Database initialized successfully")
+        
+        # Create uploads directory
+        os.makedirs("uploads", exist_ok=True)
+        os.makedirs("uploads/images", exist_ok=True)
+        os.makedirs("uploads/videos", exist_ok=True)
+        os.makedirs("uploads/documents", exist_ok=True)
+        
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        raise
+    yield
+    if db_pool:
+        await db_pool.close()
+
+app = FastAPI(
+    title="Pipways API", 
+    version="3.2.0", 
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+
+# Mount uploads
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Security
+security = HTTPBearer(auto_error=False)
+
+# ==========================================
+# PYDANTIC MODELS
+# ==========================================
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: str = Field(..., min_length=2, max_length=100)
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain a lowercase letter')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain an uppercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain a number')
+        if not any(c in '@$!%*?&' for c in v):
+            raise ValueError('Password must contain a special character (@$!%*?&)')
+        return v
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: Dict[str, Any]
+
+class BlogPostCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
+    excerpt: Optional[str] = None
+    is_premium: bool = False
+    status: str = Field(default="draft", pattern="^(draft|published|scheduled)$")
+    scheduled_at: Optional[datetime] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    slug: Optional[str] = None
+    featured_image: Optional[str] = None
+    tags: Optional[List[str]] = []
+    category: Optional[str] = "General"
+
+class WebinarCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    scheduled_at: datetime
+    duration_minutes: int = Field(default=60, ge=1)
+    is_premium: bool = False
+    meeting_link: Optional[str] = None
+    max_participants: Optional[int] = 100
+
+class SignalCreate(BaseModel):
+    pair: str = Field(..., min_length=1)
+    direction: str = Field(..., pattern="^(buy|sell)$")
+    entry_price: float
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    timeframe: str = "1H"
+    analysis: Optional[str] = None
+    is_premium: bool = False
+
+class CourseCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
+    is_premium: bool = False
+    level: str = Field(default="beginner", pattern="^(beginner|intermediate|advanced)$")
+    duration_hours: Optional[float] = None
+    thumbnail: Optional[str] = None
+    modules: Optional[List[Dict]] = []
+
+class PerformanceAnalysisRequest(BaseModel):
+    trades: List[Dict[str, Any]]
+    account_balance: Optional[float] = None
+    trading_period_days: Optional[int] = 30
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    context: Optional[str] = ""
+
+# ==========================================
+# AUTH UTILITIES
+# ==========================================
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
@@ -411,10 +503,6 @@ def create_refresh_token(data: dict):
     expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-
-def create_reset_token():
-    import secrets
-    return secrets.token_urlsafe(32)
 
 async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
@@ -447,7 +535,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             raise HTTPException(status_code=401, detail="Invalid token")
 
         if "role" in payload and "email" in payload:
-            # Check if token is expired
             if datetime.utcnow().timestamp() > payload.get("exp", 0):
                 raise HTTPException(status_code=401, detail="Token expired")
             return payload
@@ -468,7 +555,9 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
-# Auth endpoints
+# ==========================================
+# AUTH ROUTES
+# ==========================================
 @app.post("/auth/register", response_model=Token)
 async def register(user_data: UserRegister):
     async with db_pool.acquire() as conn:
@@ -559,39 +648,32 @@ async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(secu
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
-# Admin endpoints
+# ==========================================
+# ADMIN ROUTES
+# ==========================================
 @app.get("/admin/stats")
 async def get_admin_stats(admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         total_users = await conn.fetchval("SELECT COUNT(*) FROM users") or 0
-        total_signals = await conn.fetchval("SELECT COUNT(*) FROM signals") or 0
         active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'") or 0
         premium_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier IN ('premium', 'vip')") or 0
         total_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts") or 0
-        draft_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'draft'") or 0
-        scheduled_posts = await conn.fetchval("SELECT COUNT(*) FROM blog_posts WHERE status = 'scheduled'") or 0
         total_courses = await conn.fetchval("SELECT COUNT(*) FROM courses") or 0
         total_webinars = await conn.fetchval("SELECT COUNT(*) FROM webinars") or 0
         
         return {
             "total_users": total_users,
-            "total_signals": total_signals,
             "active_signals": active_signals,
             "premium_users": premium_users,
-            "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0,
-            "content_stats": {
-                "blog_posts": total_posts,
-                "drafts": draft_posts,
-                "scheduled": scheduled_posts,
-                "courses": total_courses,
-                "webinars": total_webinars
-            }
+            "blog_posts": total_posts,
+            "courses": total_courses,
+            "webinars": total_webinars,
+            "conversion_rate": round((premium_users / total_users * 100), 2) if total_users > 0 else 0
         }
 
 @app.get("/admin/users")
 async def get_all_users(
     search: Optional[str] = Query(None),
-    role: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     admin: dict = Depends(get_admin_user)
@@ -603,10 +685,6 @@ async def get_all_users(
         if search:
             where_clauses.append(f"(email ILIKE ${len(params)+1} OR full_name ILIKE ${len(params)+1})")
             params.append(f"%{search}%")
-
-        if role:
-            where_clauses.append(f"role = ${len(params)+1}")
-            params.append(role)
 
         count_query = f"SELECT COUNT(*) FROM users WHERE {' AND '.join(where_clauses)}"
         total = await conn.fetchval(count_query, *params)
@@ -630,16 +708,9 @@ async def get_all_users(
             "pages": (total + limit - 1) // limit
         }
 
-@app.put("/admin/users/{user_id}/role")
-async def update_user_role(user_id: int, role: str = Query(...), admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        await conn.execute("UPDATE users SET role = $1 WHERE id = $2", role, user_id)
-        return {"message": f"User role updated to {role}"}
-
 @app.delete("/admin/users/{user_id}")
 async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
-        # Prevent self-deletion
         admin_id = admin.get("id") or admin.get("sub")
         if int(user_id) == int(admin_id):
             raise HTTPException(status_code=400, detail="Cannot delete yourself")
@@ -647,25 +718,13 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return {"message": "User deleted"}
 
-@app.post("/admin/users/{user_id}/toggle-subscription")
-async def toggle_subscription(
-    user_id: int,
-    tier: str = Query(...),
-    status: str = Query(...),
-    admin: dict = Depends(get_admin_user)
-):
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-            UPDATE users SET subscription_tier = $1, subscription_status = $2 WHERE id = $3
-        """, tier, status, user_id)
-        return {"message": "Subscription updated"}
-
-# Blog Management
+# ==========================================
+# BLOG ROUTES
+# ==========================================
 @app.get("/blog/posts")
 async def get_blog_posts(
     status: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
-    tag: Optional[str] = Query(None),
     limit: int = Query(10, le=50),
     page: int = Query(1, ge=1),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -674,9 +733,9 @@ async def get_blog_posts(
         where_clauses = ["1=1"]
         params = []
         
-        # Filter by status (admin sees all, users see only published)
+        # Public only sees published
         if not current_user or current_user.get("role") not in ["admin", "moderator"]:
-            where_clauses.append("(status = 'published' OR status IS NULL)")
+            where_clauses.append("(status = 'published')")
             where_clauses.append("(scheduled_at IS NULL OR scheduled_at <= NOW())")
         elif status:
             where_clauses.append(f"status = ${len(params)+1}")
@@ -685,10 +744,6 @@ async def get_blog_posts(
         if category:
             where_clauses.append(f"category = ${len(params)+1}")
             params.append(category)
-            
-        if tag:
-            where_clauses.append(f"${len(params)+1} = ANY(tags)")
-            params.append(tag)
 
         count_query = f"SELECT COUNT(*) FROM blog_posts WHERE {' AND '.join(where_clauses)}"
         total = await conn.fetchval(count_query, *params)
@@ -707,16 +762,37 @@ async def get_blog_posts(
         rows = await conn.fetch(query, *params)
         return {"posts": [dict(row) for row in rows], "total": total, "page": page}
 
+@app.get("/blog/posts/{slug}")
+async def get_blog_post(slug: str, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT bp.*, u.full_name as author_name 
+            FROM blog_posts bp
+            LEFT JOIN users u ON bp.author_id = u.id
+            WHERE bp.slug = $1
+        """, slug)
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Post not found")
+            
+        post = dict(row)
+        
+        # Check premium access
+        if post.get("is_premium"):
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free" and (not current_user or current_user.get("role") != "admin"):
+                raise HTTPException(status_code=403, detail="Premium content requires subscription")
+                
+        return post
+
 @app.post("/admin/blog")
 async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         
-        # Generate slug if not provided
+        # Generate slug
         base_slug = post.slug or re.sub(r'[^\w\s-]', '', post.title.lower().replace(" ", "-"))[:50]
         slug = base_slug
-        
-        # Check slug uniqueness
         counter = 1
         while await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug):
             slug = f"{base_slug}-{counter}"
@@ -729,8 +805,7 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
         post_id = await conn.fetchval("""
             INSERT INTO blog_posts (
                 title, content, excerpt, author_id, is_premium, status, 
-                scheduled_at, meta_title, meta_description, slug, featured_image, tags, category,
-                published_at
+                scheduled_at, meta_title, meta_description, slug, featured_image, tags, category, published_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING id
         """, post.title, post.content, post.excerpt, int(admin_id), post.is_premium, 
@@ -745,7 +820,9 @@ async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
         await conn.execute("DELETE FROM blog_posts WHERE id = $1", post_id)
         return {"message": "Post deleted"}
 
-# Media Upload - Works with or without Cloudinary
+# ==========================================
+# MEDIA ROUTES
+# ==========================================
 @app.post("/admin/media/upload")
 async def upload_media(
     file: UploadFile = File(...),
@@ -756,11 +833,10 @@ async def upload_media(
         file_ext = file.filename.split(".")[-1].lower()
         unique_name = f"{uuid.uuid4().hex}.{file_ext}"
         
-        # Validate file size (50MB max)
         if len(contents) > 50 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="File too large (max 50MB)")
         
-        # Try Cloudinary first if available and configured
+        # Try Cloudinary first
         if CLOUDINARY_AVAILABLE and settings.CLOUDINARY_CLOUD_NAME:
             try:
                 result = cloudinary.uploader.upload(
@@ -789,29 +865,26 @@ async def upload_media(
                 logger.warning(f"Cloudinary upload failed, falling back to local: {cloud_err}")
         
         # Local storage fallback
-        upload_dir = "uploads"
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = os.path.join(upload_dir, unique_name)
+        file_type = "image" if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] else \
+                   "video" if file_ext in ['mp4', 'webm', 'mov'] else "document"
+        
+        subdir = "images" if file_type == "image" else "videos" if file_type == "video" else "documents"
+        file_path = f"uploads/{subdir}/{unique_name}"
         
         with open(file_path, "wb") as f:
             f.write(contents)
         
-        # Determine file type
-        file_type = "image" if file_ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] else \
-                   "video" if file_ext in ['mp4', 'webm', 'mov'] else "document"
-        
-        # Save to database
         admin_id = admin.get("id") or admin.get("sub")
         async with db_pool.acquire() as conn:
             media_id = await conn.fetchval("""
                 INSERT INTO media_files (filename, url, file_type, size_bytes, uploaded_by)
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
-            """, file.filename, f"/uploads/{unique_name}", file_type, len(contents), int(admin_id))
+            """, file.filename, f"/uploads/{subdir}/{unique_name}", file_type, len(contents), int(admin_id))
             
         return {
             "id": media_id,
-            "url": f"/uploads/{unique_name}",
+            "url": f"/uploads/{subdir}/{unique_name}",
             "filename": file.filename,
             "size": len(contents),
             "source": "local"
@@ -822,31 +895,29 @@ async def upload_media(
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-# NEW: Media list endpoint for frontend
-@app.get("/admin/media/list")
+@app.get("/admin/media")
 async def list_media(
+    file_type: Optional[str] = Query(None),
     limit: int = Query(50, le=100),
     admin: dict = Depends(get_admin_user)
 ):
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            """SELECT m.*, u.full_name as uploader_name 
-               FROM media_files m 
-               LEFT JOIN users u ON m.uploaded_by = u.id 
-               ORDER BY m.created_at DESC 
-               LIMIT $1""",
-            limit
-        )
+        query = "SELECT m.*, u.full_name as uploader_name FROM media_files m LEFT JOIN users u ON m.uploaded_by = u.id"
+        params = []
+        
+        if file_type:
+            query += " WHERE m.file_type = $1"
+            params.append(file_type)
+            
+        query += " ORDER BY m.created_at DESC LIMIT $%d" % (len(params) + 1)
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
         return {"files": [dict(row) for row in rows]}
 
-@app.get("/uploads/{filename}")
-async def serve_upload(filename: str):
-    file_path = os.path.join("uploads", filename)
-    if os.path.exists(file_path):
-        return FileResponse(file_path)
-    raise HTTPException(status_code=404, detail="File not found")
-
-# LMS - Courses with Modules
+# ==========================================
+# COURSE ROUTES
+# ==========================================
 @app.get("/courses")
 async def get_courses(
     level: Optional[str] = Query(None),
@@ -870,7 +941,6 @@ async def get_courses(
         
         rows = await conn.fetch(query, *params)
         
-        # Get modules for each course
         courses = []
         for row in rows:
             course = dict(row)
@@ -883,6 +953,63 @@ async def get_courses(
             
         return courses
 
+@app.get("/courses/{course_id}")
+async def get_course(course_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    async with db_pool.acquire() as conn:
+        course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+            
+        course = dict(course)
+        
+        # Check access
+        if course.get("is_premium"):
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free" and (not current_user or current_user.get("role") != "admin"):
+                raise HTTPException(status_code=403, detail="Premium course requires subscription")
+        
+        modules = await conn.fetch(
+            "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order",
+            course_id
+        )
+        course["modules"] = [dict(m) for m in modules]
+        
+        # Get user progress if logged in
+        if current_user:
+            user_id = current_user.get("id") or current_user.get("sub")
+            progress = await conn.fetch(
+                "SELECT module_id FROM user_progress WHERE user_id = $1 AND course_id = $2",
+                int(user_id), course_id
+            )
+            completed_modules = {p["module_id"] for p in progress}
+            for module in course["modules"]:
+                module["completed"] = module["id"] in completed_modules
+        
+        return course
+
+@app.post("/courses/{course_id}/modules/{module_id}/complete")
+async def complete_module(
+    course_id: int, 
+    module_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    async with db_pool.acquire() as conn:
+        user_id = current_user.get("id") or current_user.get("sub")
+        
+        # Check if already completed
+        existing = await conn.fetchval("""
+            SELECT id FROM user_progress 
+            WHERE user_id = $1 AND module_id = $2
+        """, int(user_id), module_id)
+        
+        if not existing:
+            await conn.execute("""
+                INSERT INTO user_progress (user_id, course_id, module_id)
+                VALUES ($1, $2, $3)
+            """, int(user_id), course_id, module_id)
+            
+        return {"message": "Module marked as complete"}
+
 @app.post("/admin/courses")
 async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
     async with db_pool.acquire() as conn:
@@ -894,18 +1021,21 @@ async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_us
         """, course.title, course.description, course.content, course.level, 
              course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
         
-        # Insert modules if provided
+        # Insert modules
         if course.modules:
             for idx, module in enumerate(course.modules):
                 await conn.execute("""
-                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
-                    VALUES ($1, $2, $3, $4, $5, $6)
+                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium, duration_minutes)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """, course_id, module.get("title"), module.get("content"), 
-                     module.get("video_url"), idx, module.get("is_premium", False))
+                     module.get("video_url"), idx, module.get("is_premium", False),
+                     module.get("duration_minutes"))
         
         return {"id": course_id, "message": "Course created"}
 
-# Webinars
+# ==========================================
+# WEBINAR ROUTES
+# ==========================================
 @app.get("/webinars")
 async def get_webinars(
     upcoming: bool = Query(True),
@@ -927,7 +1057,62 @@ async def get_webinars(
         params.append(limit)
         
         rows = await conn.fetch(query, *params)
-        return [dict(row) for row in rows]
+        
+        # Add registration count
+        webinars = []
+        for row in rows:
+            webinar = dict(row)
+            count = await conn.fetchval(
+                "SELECT COUNT(*) FROM webinar_registrations WHERE webinar_id = $1",
+                webinar["id"]
+            )
+            webinar["registrations"] = count
+            
+            # Check if current user is registered
+            if current_user:
+                user_id = current_user.get("id") or current_user.get("sub")
+                registered = await conn.fetchval("""
+                    SELECT id FROM webinar_registrations 
+                    WHERE webinar_id = $1 AND user_id = $2
+                """, webinar["id"], int(user_id))
+                webinar["is_registered"] = registered is not None
+            else:
+                webinar["is_registered"] = False
+                
+            webinars.append(webinar)
+            
+        return webinars
+
+@app.post("/webinars/{webinar_id}/register")
+async def register_webinar(
+    webinar_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    async with db_pool.acquire() as conn:
+        # Check if webinar exists and has space
+        webinar = await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
+        if not webinar:
+            raise HTTPException(status_code=404, detail="Webinar not found")
+            
+        count = await conn.fetchval(
+            "SELECT COUNT(*) FROM webinar_registrations WHERE webinar_id = $1",
+            webinar_id
+        )
+        
+        if count >= webinar["max_participants"]:
+            raise HTTPException(status_code=400, detail="Webinar is full")
+        
+        user_id = current_user.get("id") or current_user.get("sub")
+        
+        try:
+            await conn.execute("""
+                INSERT INTO webinar_registrations (webinar_id, user_id)
+                VALUES ($1, $2)
+            """, webinar_id, int(user_id))
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=400, detail="Already registered")
+            
+        return {"message": "Registered successfully"}
 
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
@@ -938,10 +1123,13 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
         """, webinar.title, webinar.description, webinar.scheduled_at, 
-             webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, int(admin_id), webinar.max_participants)
+             webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
+             int(admin_id), webinar.max_participants)
         return {"id": webinar_id, "message": "Webinar created"}
 
-# Signals
+# ==========================================
+# SIGNAL ROUTES
+# ==========================================
 @app.get("/signals")
 async def get_signals(
     status: Optional[str] = Query(None),
@@ -982,7 +1170,9 @@ async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_us
              signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
         return {"id": signal_id, "message": "Signal created"}
 
-# AI Performance Analyzer
+# ==========================================
+# AI ANALYSIS ROUTES
+# ==========================================
 @app.post("/analyze/performance")
 async def analyze_performance(
     request: PerformanceAnalysisRequest,
@@ -993,23 +1183,28 @@ async def analyze_performance(
     
     try:
         total_trades = len(request.trades)
-        winning_trades = len([t for t in request.trades if t.get("pips", 0) > 0 or t.get("profit", 0) > 0])
-        losing_trades = total_trades - winning_trades
+        winning_trades = len([t for t in request.trades if t.get("pips", 0) > 0])
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         
-        system_prompt = """You are a professional trading performance analyst and trading mentor with over 20 years of experience in institutional trading, risk management, and trader psychology."""
-
-        user_prompt = f"""Analyze the following trading performance data:
-
-Account Balance: {request.account_balance or 'Not provided'}
-Trading Period: {request.trading_period_days or 'Not provided'} days
+        system_prompt = """You are a professional trading performance analyst with 20+ years of institutional trading experience."""
+        
+        user_prompt = f"""Analyze this trading data:
+Account Balance: {request.account_balance or 'N/A'}
+Period: {request.trading_period_days or 'N/A'} days
 Total Trades: {total_trades}
 Win Rate: {win_rate:.1f}%
 
-Trade History:
-{json.dumps(request.trades, indent=2)}
+Trades: {json.dumps(request.trades, indent=2)}
 
-Provide analysis in strict JSON format with fields: performance_summary (with total_trades, win_rate, net_pips, avg_win, avg_loss, risk_reward_ratio, expectancy, profit_factor, max_drawdown), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes arrays), recommended_courses (array), mentor_advice (string)."""
+Return JSON with:
+- performance_summary (total_trades, win_rate, net_pips, avg_win, avg_loss, risk_reward_ratio)
+- trader_score (0-100)
+- strengths (array)
+- weaknesses (array)
+- top_mistakes (array)
+- improvement_plan (immediate_actions, strategy_improvements, risk_management_fixes)
+- recommended_courses (array)
+- mentor_advice (string)"""
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -1037,38 +1232,35 @@ Provide analysis in strict JSON format with fields: performance_summary (with to
             result = response.json()
             ai_content = result["choices"][0]["message"]["content"]
             
-            try:
-                cleaned = ai_content.strip()
-                if cleaned.startswith("```"):
-                    cleaned = cleaned.split("```")[1]
-                    if cleaned.startswith("json"):
-                        cleaned = cleaned[4:]
-                    cleaned = cleaned.strip()
+            # Parse JSON from markdown if needed
+            cleaned = ai_content.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+                cleaned = cleaned.strip()
+            
+            analysis_data = json.loads(cleaned)
+            
+            # Save to database
+            user_id = current_user.get("id") or current_user.get("sub")
+            async with db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
+                    VALUES ($1, $2, $3, $4)
+                """, int(user_id), json.dumps(analysis_data), json.dumps(request.trades),
+                     analysis_data.get("trader_score", 0))
+            
+            return {
+                "analysis": analysis_data,
+                "timestamp": datetime.utcnow().isoformat(),
+                "trades_analyzed": total_trades
+            }
                 
-                analysis_data = json.loads(cleaned)
-                
-                user_id = current_user.get("id") or current_user.get("sub")
-                async with db_pool.acquire() as conn:
-                    await conn.execute("""
-                        INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
-                        VALUES ($1, $2, $3, $4)
-                    """, int(user_id), json.dumps(analysis_data), json.dumps(request.trades),
-                         analysis_data.get("trader_score", 0))
-                
-                return {
-                    "analysis": analysis_data,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "trades_analyzed": total_trades
-                }
-                
-            except json.JSONDecodeError:
-                return {"raw_analysis": ai_content, "error": "Parse error"}
-
     except Exception as e:
         logger.error(f"Performance analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Chart Analysis
 @app.post("/analyze/chart")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -1083,12 +1275,24 @@ async def analyze_chart(
     try:
         contents = await file.read()
         if len(contents) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=413, detail="File too large")
+            raise HTTPException(status_code=413, detail="File too large (max 10MB)")
 
         image_base64 = base64.b64encode(contents).decode()
 
-        prompt = f"""Analyze this {pair} chart on {timeframe}. Context: {additional_info}
-Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, take_profit (array), risk_reward, confidence, market_structure, support_resistance (object with support/resistance arrays), key_observations."""
+        prompt = f"""Analyze this {pair} chart on {timeframe} timeframe. 
+Additional context: {additional_info}
+
+Provide JSON with:
+- summary (brief analysis)
+- signal (BUY/SELL/NEUTRAL/WAIT)
+- entry_zone (price range)
+- stop_loss (price)
+- take_profit (array of targets)
+- risk_reward (ratio like 1:2)
+- confidence (High/Medium/Low)
+- market_structure (trend description)
+- support_resistance (key levels)
+- key_observations (list)"""
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -1097,7 +1301,7 @@ Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, t
                     "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways AI Analysis"
+                    "X-Title": "Pipways Chart Analysis"
                 },
                 json={
                     "model": settings.OPENROUTER_VISION_MODEL,
@@ -1121,19 +1325,23 @@ Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, t
             result = response.json()
             ai_response = result["choices"][0]["message"]["content"]
             
+            # Parse JSON
+            cleaned = ai_response.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+                cleaned = cleaned.strip()
+            
             try:
-                cleaned = ai_response.strip()
-                if cleaned.startswith("```"):
-                    cleaned = cleaned.split("```")[1]
-                    if cleaned.startswith("json"):
-                        cleaned = cleaned[4:]
-                    cleaned = cleaned.strip()
-                
                 analysis_data = json.loads(cleaned)
-                
-                formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
+            except:
+                analysis_data = {"raw_response": ai_response}
+            
+            # Format nice report
+            formatted_report = f"""📊 TECHNICAL ANALYSIS: {pair} ({timeframe})
 
-🎯 TRADING SIGNAL: {analysis_data.get('signal', 'UNKNOWN')}
+🎯 SIGNAL: {analysis_data.get('signal', 'N/A')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📈 ENTRY ZONE: {analysis_data.get('entry_zone', 'N/A')}
@@ -1143,38 +1351,130 @@ Provide JSON with: summary, signal (BUY/SELL/NO TRADE), entry_zone, stop_loss, t
 🎲 CONFIDENCE: {analysis_data.get('confidence', 'N/A')}
 
 📝 SUMMARY:
-{analysis_data.get('summary', 'No summary')}
+{analysis_data.get('summary', 'No summary provided')}
 
 🏗️ MARKET STRUCTURE:
 {analysis_data.get('market_structure', 'N/A')}
 
-📊 SUPPORT/RESISTANCE:
-Support: {', '.join(analysis_data.get('support_resistance', {}).get('support', []))}
-Resistance: {', '.join(analysis_data.get('support_resistance', {}).get('resistance', []))}
+📊 KEY LEVELS:
+{analysis_data.get('support_resistance', 'N/A')}
 
 🔍 OBSERVATIONS:
 {analysis_data.get('key_observations', 'None')}"""
 
-                return {
-                    "analysis": formatted_report,
-                    "structured_data": analysis_data,
-                    "image_base64": image_base64,
-                    "pair": pair,
-                    "timeframe": timeframe
-                }
-                
-            except json.JSONDecodeError:
-                return {
-                    "analysis": ai_response,
-                    "image_base64": image_base64,
-                    "pair": pair,
-                    "timeframe": timeframe
-                }
+            # Save to database
+            user_id = current_user.get("id") or current_user.get("sub")
+            async with db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO chart_analyses (user_id, pair, timeframe, analysis_text, structured_data)
+                    VALUES ($1, $2, $3, $4, $5)
+                """, int(user_id), pair, timeframe, formatted_report, json.dumps(analysis_data))
+            
+            return {
+                "analysis": formatted_report,
+                "structured_data": analysis_data,
+                "pair": pair,
+                "timeframe": timeframe
+            }
                 
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/mentor/chat")
+async def mentor_chat(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    try:
+        # Get user history for context
+        user_id = current_user.get("id") or current_user.get("sub")
+        
+        async with db_pool.acquire() as conn:
+            # Get recent performance analysis
+            perf = await conn.fetchrow("""
+                SELECT analysis_data FROM performance_analyses 
+                WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
+            """, int(user_id))
+            
+            # Get recent chat history
+            history = await conn.fetch("""
+                SELECT message, response FROM chat_history 
+                WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5
+            """, int(user_id))
+        
+        context = ""
+        if perf:
+            analysis = json.loads(perf['analysis_data'])
+            context = f"User trader score: {analysis.get('trader_score', 'N/A')}. "
+            context += f"Top mistakes: {', '.join(analysis.get('top_mistakes', []))}. "
+            context += f"Strengths: {', '.join(analysis.get('strengths', []))}."
+        
+        system_prompt = f"""You are a professional trading mentor. You know this about the user: {context}
+Be encouraging but honest. Reference their specific weaknesses and strengths when relevant.
+Suggest specific courses or improvements based on their profile."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add recent history
+        for h in reversed(history):
+            messages.append({"role": "user", "content": h["message"]})
+            messages.append({"role": "assistant", "content": h["response"]})
+            
+        messages.append({"role": "user", "content": request.message})
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": settings.OPENROUTER_MODEL,
+                    "messages": messages,
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                }
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI service error")
+                
+            result = response.json()
+            ai_response = result["choices"][0]["message"]["content"]
+            
+            # Save to history
+            await conn.execute("""
+                INSERT INTO chat_history (user_id, message, response, context)
+                VALUES ($1, $2, $3, $4)
+            """, int(user_id), request.message, ai_response, context)
+            
+            return {"response": ai_response}
+            
+    except Exception as e:
+        logger.error(f"Mentor chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/mentor/history")
+async def get_mentor_history(
+    limit: int = Query(20),
+    current_user: dict = Depends(get_current_user)
+):
+    async with db_pool.acquire() as conn:
+        user_id = current_user.get("id") or current_user.get("sub")
+        rows = await conn.fetch("""
+            SELECT message, response, created_at FROM chat_history 
+            WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2
+        """, int(user_id), limit)
+        return {"history": [dict(row) for row in rows]}
+
+# ==========================================
+# HEALTH & ROOT
+# ==========================================
 @app.get("/health")
 async def health_check():
     db_status = "unknown"
@@ -1188,11 +1488,23 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.1.2",
+        "version": "3.2.0",
         "database": db_status,
         "cloudinary_enabled": CLOUDINARY_AVAILABLE and bool(settings.CLOUDINARY_CLOUD_NAME),
-        "cors_origins": len(settings.CORS_ORIGINS),
         "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/")
+async def root():
+    """Serve frontend if available, otherwise API info"""
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return {
+        "name": "Pipways API",
+        "version": "3.2.0",
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health"
     }
 
 # Global exception handler

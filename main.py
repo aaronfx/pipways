@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v3.5.3
+Pipways Trading Platform API - Production Debug & System Completion v3.5.0
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.5.3", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.0", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -192,7 +192,6 @@ class BlogPostUpdate(BaseModel):
     tags: Optional[List[str]] = None
     category: Optional[str] = None
 
-# FIXED: Removed thumbnail field
 class WebinarCreate(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -201,10 +200,10 @@ class WebinarCreate(BaseModel):
     is_premium: bool = False
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = 100
+    thumbnail: Optional[str] = None
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
-# FIXED: Removed thumbnail field
 class WebinarUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -213,38 +212,19 @@ class WebinarUpdate(BaseModel):
     is_premium: Optional[bool] = None
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = None
+    thumbnail: Optional[str] = None
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
-# FIXED: Added Field aliases to match frontend field names (tp1, tp2)
 class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=1)
     direction: str = Field(..., pattern="^(buy|sell)$")
     entry_price: float
     stop_loss: Optional[float] = None
-    take_profit_1: Optional[float] = Field(None, alias="tp1")
-    take_profit_2: Optional[float] = Field(None, alias="tp2")
-    risk_reward_ratio: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    take_profit: Optional[float] = None
     timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
-
-# FIXED: Added Field aliases to match frontend field names (tp1, tp2)
-class SignalUpdate(BaseModel):
-    pair: Optional[str] = None
-    direction: Optional[str] = None
-    entry_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit_1: Optional[float] = Field(None, alias="tp1")
-    take_profit_2: Optional[float] = Field(None, alias="tp2")
-    risk_reward_ratio: Optional[str] = None
-    expires_at: Optional[datetime] = None
-    timeframe: Optional[str] = None
-    analysis: Optional[str] = None
-    is_premium: Optional[bool] = None
-    status: Optional[str] = None
-    result: Optional[str] = None
 
 class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1)
@@ -304,6 +284,11 @@ class QuizAttempt(BaseModel):
     quiz_id: int
     answers: Dict[str, Any]
 
+class PerformanceAnalysisRequest(BaseModel):
+    trades: Optional[List[Dict[str, Any]]] = []
+    account_balance: Optional[float] = None
+    trading_period_days: Optional[int] = None
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
@@ -325,11 +310,6 @@ class SiteSettingsUpdate(BaseModel):
     seo_default_title: Optional[str] = None
     seo_default_description: Optional[str] = None
     contact_email: Optional[str] = None
-
-# FIXED: Added pips_gain field
-class SignalResultUpdate(BaseModel):
-    result: str = Field(..., pattern="^(WIN|LOSS|PARTIAL|EXPIRED)$")
-    pips_gain: Optional[float] = None
 
 # ============================================================================
 # Database Initialization
@@ -379,7 +359,7 @@ async def init_db():
             )
         """)
 
-        # Signals table - Enhanced (verified columns exist)
+        # Signals table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -387,16 +367,12 @@ async def init_db():
                 direction VARCHAR(10) NOT NULL,
                 entry_price DECIMAL(10,5),
                 stop_loss DECIMAL(10,5),
-                take_profit_1 DECIMAL(10,5),
-                take_profit_2 DECIMAL(10,5),
-                risk_reward_ratio VARCHAR(20),
+                take_profit DECIMAL(10,5),
                 timeframe VARCHAR(20),
                 analysis TEXT,
                 status VARCHAR(20) DEFAULT 'active',
-                result VARCHAR(20) DEFAULT NULL,
                 pips_gain DECIMAL(10,2),
                 is_premium BOOLEAN DEFAULT FALSE,
-                expires_at TIMESTAMP,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -404,7 +380,7 @@ async def init_db():
             )
         """)
 
-        # Webinars table - FIXED: No thumbnail column
+        # Webinars table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -415,6 +391,7 @@ async def init_db():
                 meeting_link VARCHAR(500),
                 is_premium BOOLEAN DEFAULT FALSE,
                 max_participants INTEGER DEFAULT 100,
+                thumbnail VARCHAR(500),
                 recording_link VARCHAR(500),
                 reminder_message TEXT,
                 created_by INTEGER REFERENCES users(id),
@@ -535,24 +512,11 @@ async def init_db():
             )
         """)
 
-        # AI Chart Analysis table - User isolated
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS chart_analyses (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                pair VARCHAR(20),
-                timeframe VARCHAR(10),
-                image_url VARCHAR(500),
-                analysis_text TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Performance analyses table - User isolated
+        # Performance analyses table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS performance_analyses (
                 id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id),
                 analysis_data JSONB NOT NULL,
                 raw_trades JSONB,
                 trader_score INTEGER,
@@ -560,17 +524,7 @@ async def init_db():
             )
         """)
 
-        # AI Usage Logs table - NEW
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS ai_usage_logs (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                analysis_type VARCHAR(50) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Site settings table
+        # Site settings table (NEW)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS site_settings (
                 id SERIAL PRIMARY KEY,
@@ -673,55 +627,6 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
     if role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
-
-# ============================================================================
-# AI Usage Tracking
-# ============================================================================
-
-async def check_ai_usage_limit(user_id: int, analysis_type: str, tier: str) -> bool:
-    """Check if user has exceeded AI usage limits"""
-    async with db_pool.acquire() as conn:
-        if analysis_type == "chart":
-            if tier in ["premium", "vip"]:
-                # 3 per day for premium
-                count = await conn.fetchval("""
-                    SELECT COUNT(*) FROM ai_usage_logs 
-                    WHERE user_id = $1 AND analysis_type = 'chart' 
-                    AND created_at > NOW() - INTERVAL '1 day'
-                """, user_id)
-                return count < 3
-            else:
-                # 3 total for free
-                count = await conn.fetchval("""
-                    SELECT COUNT(*) FROM ai_usage_logs 
-                    WHERE user_id = $1 AND analysis_type = 'chart'
-                """, user_id)
-                return count < 3
-        elif analysis_type == "performance":
-            if tier in ["premium", "vip"]:
-                # 1 per week for premium
-                count = await conn.fetchval("""
-                    SELECT COUNT(*) FROM ai_usage_logs 
-                    WHERE user_id = $1 AND analysis_type = 'performance' 
-                    AND created_at > NOW() - INTERVAL '7 days'
-                """, user_id)
-                return count < 1
-            else:
-                # 1 total for free
-                count = await conn.fetchval("""
-                    SELECT COUNT(*) FROM ai_usage_logs 
-                    WHERE user_id = $1 AND analysis_type = 'performance'
-                """, user_id)
-                return count < 1
-    return False
-
-async def log_ai_usage(user_id: int, analysis_type: str):
-    """Log AI usage for tracking"""
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-            INSERT INTO ai_usage_logs (user_id, analysis_type)
-            VALUES ($1, $2)
-        """, user_id, analysis_type)
 
 # ============================================================================
 # Auth Endpoints
@@ -940,7 +845,7 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "User deleted"}
 
 # ============================================================================
-# Site Settings Endpoints
+# Site Settings Endpoints (NEW)
 # ============================================================================
 
 @app.get("/admin/settings")
@@ -1240,7 +1145,7 @@ async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "Post deleted"}
 
 # ============================================================================
-# Media Upload & Management
+# Media Upload
 # ============================================================================
 
 @app.post("/admin/media/upload")
@@ -1329,53 +1234,8 @@ async def list_media(
         )
         return {"files": [dict(row) for row in rows]}
 
-@app.delete("/admin/media/{media_id}")
-async def delete_media(media_id: int, admin: dict = Depends(get_admin_user)):
-    """Delete media file with usage checking"""
-    async with db_pool.acquire() as conn:
-        # Get media info
-        media = await conn.fetchrow("SELECT * FROM media_files WHERE id = $1", media_id)
-        if not media:
-            raise HTTPException(status_code=404, detail="Media not found")
-        
-        url = media["url"]
-        
-        # Check if used in blog posts
-        blog_usage = await conn.fetchval("""
-            SELECT COUNT(*) FROM blog_posts 
-            WHERE featured_image = $1
-        """, url)
-        
-        # Check if used in courses
-        course_usage = await conn.fetchval("""
-            SELECT COUNT(*) FROM courses 
-            WHERE thumbnail = $1
-        """, url)
-        
-        # Check if used in webinars (removed thumbnail check since column doesn't exist)
-        webinar_usage = 0
-        
-        total_usage = blog_usage + course_usage + webinar_usage
-        
-        if total_usage > 0:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Cannot delete: Media is used in {blog_usage} blog posts, {course_usage} courses"
-            )
-        
-        # Delete from storage if local file
-        if url.startswith("/uploads/"):
-            file_path = os.path.join("uploads", url.replace("/uploads/", ""))
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        
-        # Delete from database
-        await conn.execute("DELETE FROM media_files WHERE id = $1", media_id)
-        
-        return {"message": "Media deleted successfully"}
-
 # ============================================================================
-# Courses - Admin Management
+# Courses - Admin Management (FIXED)
 # ============================================================================
 
 @app.get("/admin/courses")
@@ -1441,31 +1301,6 @@ async def get_admin_course_detail(course_id: int, admin: dict = Depends(get_admi
             "modules": [dict(m) for m in modules],
             "quizzes": [dict(q) for q in quizzes]
         }
-
-@app.post("/admin/courses")
-async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
-    """Create new course with modules"""
-    async with db_pool.acquire() as conn:
-        admin_id = admin.get("id") or admin.get("sub")
-        
-        # Create course
-        course_id = await conn.fetchval("""
-            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id
-        """, course.title, course.description, course.content, course.level, 
-             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
-        
-        # Create modules if provided
-        if course.modules:
-            for idx, module in enumerate(course.modules):
-                await conn.execute("""
-                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """, course_id, module.get("title"), module.get("content"), 
-                     module.get("video_url"), idx, module.get("is_premium", False))
-        
-        return {"id": course_id, "message": "Course created successfully"}
 
 @app.put("/admin/courses/{course_id}")
 async def update_course(course_id: int, course_update: CourseUpdate, admin: dict = Depends(get_admin_user)):
@@ -1912,7 +1747,7 @@ async def get_my_quiz_results(current_user: dict = Depends(get_current_user)):
         return {"results": [dict(row) for row in rows]}
 
 # ============================================================================
-# Webinars (Fixed - Removed thumbnail)
+# Webinars (Fixed and Enhanced)
 # ============================================================================
 
 @app.get("/webinars")
@@ -1959,20 +1794,19 @@ async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depe
 
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
-    """Create webinar - Fixed: removed thumbnail"""
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         try:
             webinar_id = await conn.fetchval("""
                 INSERT INTO webinars (
                     title, description, scheduled_at, duration_minutes, meeting_link, 
-                    is_premium, max_participants, recording_link, reminder_message, created_by
+                    is_premium, max_participants, thumbnail, recording_link, reminder_message, created_by
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING id
             """, webinar.title, webinar.description, webinar.scheduled_at, 
                  webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
-                 webinar.max_participants, webinar.recording_link,
+                 webinar.max_participants, webinar.thumbnail, webinar.recording_link,
                  webinar.reminder_message, int(admin_id))
             return {"id": webinar_id, "message": "Webinar created successfully"}
         except Exception as e:
@@ -1981,7 +1815,7 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
 
 @app.put("/admin/webinars/{webinar_id}")
 async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = Depends(get_admin_user)):
-    """Update webinar - Fixed: removed thumbnail"""
+    """Update webinar"""
     async with db_pool.acquire() as conn:
         existing = await conn.fetchval("SELECT id FROM webinars WHERE id = $1", webinar_id)
         if not existing:
@@ -2018,6 +1852,10 @@ async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = 
             update_fields.append(f"max_participants = ${len(params)+1}")
             params.append(webinar.max_participants)
             
+        if webinar.thumbnail is not None:
+            update_fields.append(f"thumbnail = ${len(params)+1}")
+            params.append(webinar.thumbnail)
+            
         if webinar.recording_link is not None:
             update_fields.append(f"recording_link = ${len(params)+1}")
             params.append(webinar.recording_link)
@@ -2045,7 +1883,7 @@ async def delete_webinar(webinar_id: int, admin: dict = Depends(get_admin_user))
         return {"message": "Webinar deleted successfully"}
 
 # ============================================================================
-# Signals (Fixed and Enhanced)
+# Signals
 # ============================================================================
 
 @app.get("/signals")
@@ -2078,7 +1916,7 @@ async def get_signals(
 
 @app.get("/signals/{signal_id}")
 async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
-    """Get single signal by ID with full details"""
+    """Get single signal by ID"""
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM signals WHERE id = $1", signal_id)
         if not row:
@@ -2097,118 +1935,32 @@ async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depend
 
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
-    """Create signal - Fixed: Uses model aliases to accept tp1/tp2 from frontend"""
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
-        try:
-            signal_id = await conn.fetchval("""
-                INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit_1, take_profit_2, 
-                    risk_reward_ratio, timeframe, analysis, is_premium, expires_at, created_by)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                RETURNING id
-            """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
-                 signal.take_profit_1, signal.take_profit_2, signal.risk_reward_ratio, 
-                 signal.timeframe, signal.analysis, signal.is_premium, signal.expires_at, int(admin_id))
-            return {"id": signal_id, "message": "Signal created successfully"}
-        except Exception as e:
-            logger.error(f"Error creating signal: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create signal: {str(e)}")
+        signal_id = await conn.fetchval("""
+            INSERT INTO signals (pair, direction, entry_price, stop_loss, take_profit, timeframe, analysis, is_premium, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id
+        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
+        return {"id": signal_id, "message": "Signal created"}
 
 @app.put("/admin/signals/{signal_id}")
-async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depends(get_admin_user)):
-    """Update signal including result - Fixed: Uses model aliases to accept tp1/tp2 from frontend"""
+async def update_signal(signal_id: int, signal: SignalCreate, admin: dict = Depends(get_admin_user)):
+    """Update signal"""
     async with db_pool.acquire() as conn:
-        existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Signal not found")
-            
-        update_fields = []
-        params = []
+        result = await conn.execute("""
+            UPDATE signals 
+            SET pair = $1, direction = $2, entry_price = $3, stop_loss = $4,
+                take_profit = $5, timeframe = $6, analysis = $7, is_premium = $8, updated_at = NOW()
+            WHERE id = $9
+        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
+             signal.take_profit, signal.timeframe, signal.analysis, signal.is_premium, signal_id)
         
-        if signal.pair is not None:
-            update_fields.append(f"pair = ${len(params)+1}")
-            params.append(signal.pair.upper())
-        if signal.direction is not None:
-            update_fields.append(f"direction = ${len(params)+1}")
-            params.append(signal.direction)
-        if signal.entry_price is not None:
-            update_fields.append(f"entry_price = ${len(params)+1}")
-            params.append(signal.entry_price)
-        if signal.stop_loss is not None:
-            update_fields.append(f"stop_loss = ${len(params)+1}")
-            params.append(signal.stop_loss)
-        if signal.take_profit_1 is not None:
-            update_fields.append(f"take_profit_1 = ${len(params)+1}")
-            params.append(signal.take_profit_1)
-        if signal.take_profit_2 is not None:
-            update_fields.append(f"take_profit_2 = ${len(params)+1}")
-            params.append(signal.take_profit_2)
-        if signal.risk_reward_ratio is not None:
-            update_fields.append(f"risk_reward_ratio = ${len(params)+1}")
-            params.append(signal.risk_reward_ratio)
-        if signal.timeframe is not None:
-            update_fields.append(f"timeframe = ${len(params)+1}")
-            params.append(signal.timeframe)
-        if signal.analysis is not None:
-            update_fields.append(f"analysis = ${len(params)+1}")
-            params.append(signal.analysis)
-        if signal.is_premium is not None:
-            update_fields.append(f"is_premium = ${len(params)+1}")
-            params.append(signal.is_premium)
-        if signal.status is not None:
-            update_fields.append(f"status = ${len(params)+1}")
-            params.append(signal.status)
-        if signal.result is not None:
-            update_fields.append(f"result = ${len(params)+1}")
-            params.append(signal.result)
-            if signal.result in ["WIN", "LOSS", "PARTIAL", "EXPIRED"]:
-                update_fields.append(f"closed_at = NOW()")
-        if signal.expires_at is not None:
-            update_fields.append(f"expires_at = ${len(params)+1}")
-            params.append(signal.expires_at)
-        
-        if not update_fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
-            
-        update_fields.append("updated_at = NOW()")
-        params.append(signal_id)
-        
-        query = f"UPDATE signals SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
-        result = await conn.fetchval(query, *params)
-        
-        if not result:
+        if result == "UPDATE 0":
             raise HTTPException(status_code=404, detail="Signal not found")
             
         return {"message": "Signal updated successfully", "id": signal_id}
-
-@app.put("/admin/signals/{signal_id}/result")
-async def update_signal_result(
-    signal_id: int, 
-    result_update: SignalResultUpdate, 
-    admin: dict = Depends(get_admin_user)
-):
-    """Dedicated endpoint for updating signal result only - Fixed: Now handles pips_gain"""
-    async with db_pool.acquire() as conn:
-        existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Signal not found")
-        
-        # Update result, pips_gain and closed_at
-        await conn.execute("""
-            UPDATE signals 
-            SET result = $1, 
-                pips_gain = $2,
-                status = 'closed',
-                closed_at = NOW(),
-                updated_at = NOW()
-            WHERE id = $3
-        """, result_update.result, result_update.pips_gain, signal_id)
-        
-        return {
-            "message": "Signal result updated successfully", 
-            "id": signal_id,
-            "result": result_update.result
-        }
 
 @app.delete("/admin/signals/{signal_id}")
 async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
@@ -2372,6 +2124,92 @@ async def get_chat_history(
 
 @app.post("/analyze/performance")
 async def analyze_performance(
+    request: PerformanceAnalysisRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Text-based performance analysis (fallback)"""
+    if not settings.OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    try:
+        total_trades = len(request.trades) if request.trades else 0
+        winning_trades = len([t for t in (request.trades or []) if t.get("pips", 0) > 0]) if request.trades else 0
+        losing_trades = total_trades - winning_trades
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        system_prompt = """You are a professional trading performance analyst with over 20 years of experience in institutional trading, risk management, and trader psychology."""
+
+        user_prompt = f"""Analyze the following trading performance data:
+
+Account Balance: {request.account_balance or 'Not provided'}
+Trading Period: {request.trading_period_days or 'Not provided'} days
+Total Trades: {total_trades}
+Win Rate: {win_rate:.1f}%
+
+Trade History:
+{json.dumps(request.trades or [], indent=2)}
+
+Provide analysis in strict JSON format with fields: performance_summary (with total_trades, win_rate, net_pips, avg_win, avg_loss, risk_reward_ratio, expectancy, profit_factor, max_drawdown), trader_score (1-100), strengths (array), weaknesses (array), behavior_patterns (array), top_mistakes (array), improvement_plan (object with immediate_actions, strategy_improvements, risk_management_fixes arrays), recommended_courses (array), mentor_advice (string)."""
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways Performance Analyzer"
+                },
+                json={
+                    "model": settings.OPENROUTER_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "max_tokens": 2500,
+                    "temperature": 0.4
+                }
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(status_code=500, detail="AI analysis failed")
+
+            result = response.json()
+            ai_content = result["choices"][0]["message"]["content"]
+            
+            try:
+                cleaned = ai_content.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                    cleaned = cleaned.strip()
+                
+                analysis_data = json.loads(cleaned)
+                
+                # Store analysis with user isolation
+                async with db_pool.acquire() as conn:
+                    await conn.execute("""
+                        INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
+                        VALUES ($1, $2, $3, $4)
+                    """, current_user["id"], json.dumps(analysis_data), json.dumps(request.trades),
+                         analysis_data.get("trader_score", 0))
+                
+                return {
+                    "analysis": analysis_data,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "trades_analyzed": total_trades
+                }
+                
+            except json.JSONDecodeError:
+                return {"raw_analysis": ai_content, "error": "Parse error"}
+
+    except Exception as e:
+        logger.error(f"Performance analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analyze/performance/vision")
+async def analyze_performance_vision(
     file: UploadFile = File(...),
     account_balance: Optional[float] = Form(None),
     trading_period_days: Optional[int] = Form(30),
@@ -2381,11 +2219,6 @@ async def analyze_performance(
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
 
-    # Check usage limits
-    can_use = await check_ai_usage_limit(current_user["id"], "performance", current_user.get("subscription_tier", "free"))
-    if not can_use:
-        raise HTTPException(status_code=429, detail="AI usage limit exceeded. Upgrade to premium for more analyses.")
-
     try:
         contents = await file.read()
         file_ext = file.filename.split(".")[-1].lower()
@@ -2394,7 +2227,9 @@ async def analyze_performance(
             raise HTTPException(status_code=413, detail="File too large (max 10MB)")
 
         # For PDFs, we'll extract text using simple approach since we can't add PyPDF2
+        # In production, you'd want to use a proper PDF extraction library
         if file_ext == 'pdf':
+            # For now, reject PDFs with message to use images
             raise HTTPException(status_code=400, detail="PDF support coming soon. Please upload image screenshots (JPG/PNG) for now.")
         
         # Process image with vision AI
@@ -2481,9 +2316,6 @@ Extract every visible trade and calculate all metrics accurately."""
                          json.dumps(analysis_data.get("extracted_trades", [])),
                          analysis_data.get("trader_score", 0))
                 
-                # Log usage
-                await log_ai_usage(current_user["id"], "performance")
-                
                 return {
                     "analysis": analysis_data,
                     "timestamp": datetime.utcnow().isoformat(),
@@ -2505,7 +2337,7 @@ async def get_performance_history(
     limit: int = Query(10),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get user's performance analysis history - USER ISOLATED"""
+    """Get user's performance analysis history"""
     async with db_pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT id, analysis_data, trader_score, created_at
@@ -2517,25 +2349,8 @@ async def get_performance_history(
         
         return {"history": [dict(row) for row in rows]}
 
-@app.delete("/analysis/performance/{analysis_id}")
-async def delete_performance_analysis(analysis_id: int, current_user: dict = Depends(get_current_user)):
-    """Delete user's own performance analysis"""
-    async with db_pool.acquire() as conn:
-        # Verify ownership
-        owner = await conn.fetchval(
-            "SELECT user_id FROM performance_analyses WHERE id = $1", 
-            analysis_id
-        )
-        if not owner:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        if owner != current_user["id"]:
-            raise HTTPException(status_code=403, detail="Can only delete your own analyses")
-        
-        await conn.execute("DELETE FROM performance_analyses WHERE id = $1", analysis_id)
-        return {"message": "Analysis deleted"}
-
 # ============================================================================
-# AI Chart Analysis (Screenshot Analysis) - USER ISOLATED
+# AI Chart Analysis
 # ============================================================================
 
 @app.post("/analyze/chart")
@@ -2546,14 +2361,8 @@ async def analyze_chart(
     additional_info: Optional[str] = Form(""),
     current_user: dict = Depends(get_current_user)
 ):
-    """AI Chart Screenshot Analysis - User isolated with usage limits"""
     if not settings.OPENROUTER_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
-
-    # Check usage limits
-    can_use = await check_ai_usage_limit(current_user["id"], "chart", current_user.get("subscription_tier", "free"))
-    if not can_use:
-        raise HTTPException(status_code=429, detail="AI usage limit exceeded. Free users get 3 analyses total. Upgrade to premium for 3 per day.")
 
     try:
         contents = await file.read()
@@ -2604,16 +2413,6 @@ Provide a detailed technical analysis including trend direction, key support/res
 
 [Analysis generated by AI at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}]"""
 
-            # Store analysis with user isolation
-            async with db_pool.acquire() as conn:
-                await conn.execute("""
-                    INSERT INTO chart_analyses (user_id, pair, timeframe, analysis_text)
-                    VALUES ($1, $2, $3, $4)
-                """, current_user["id"], pair, timeframe, formatted_report)
-            
-            # Log usage
-            await log_ai_usage(current_user["id"], "chart")
-            
             return {
                 "analysis": formatted_report,
                 "pair": pair,
@@ -2623,90 +2422,6 @@ Provide a detailed technical analysis including trend direction, key support/res
     except Exception as e:
         logger.error(f"Chart analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/analyze/chart/history")
-async def get_chart_analysis_history(
-    limit: int = Query(10),
-    current_user: dict = Depends(get_current_user)
-):
-    """Get user's chart analysis history - USER ISOLATED"""
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT id, pair, timeframe, analysis_text, created_at
-            FROM chart_analyses
-            WHERE user_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2
-        """, current_user["id"], limit)
-        
-        return {"history": [dict(row) for row in rows]}
-
-@app.delete("/analysis/chart/{analysis_id}")
-async def delete_chart_analysis(analysis_id: int, current_user: dict = Depends(get_current_user)):
-    """Delete user's own chart analysis"""
-    async with db_pool.acquire() as conn:
-        # Verify ownership
-        owner = await conn.fetchval(
-            "SELECT user_id FROM chart_analyses WHERE id = $1", 
-            analysis_id
-        )
-        if not owner:
-            raise HTTPException(status_code=404, detail="Analysis not found")
-        if owner != current_user["id"]:
-            raise HTTPException(status_code=403, detail="Can only delete your own analyses")
-        
-        await conn.execute("DELETE FROM chart_analyses WHERE id = $1", analysis_id)
-        return {"message": "Analysis deleted"}
-
-@app.get("/ai/usage")
-async def get_ai_usage(current_user: dict = Depends(get_current_user)):
-    """Get current AI usage stats for user"""
-    async with db_pool.acquire() as conn:
-        tier = current_user.get("subscription_tier", "free")
-        
-        # Chart usage
-        if tier in ["premium", "vip"]:
-            chart_used = await conn.fetchval("""
-                SELECT COUNT(*) FROM ai_usage_logs 
-                WHERE user_id = $1 AND analysis_type = 'chart' 
-                AND created_at > NOW() - INTERVAL '1 day'
-            """, current_user["id"])
-            chart_limit = 3
-        else:
-            chart_used = await conn.fetchval("""
-                SELECT COUNT(*) FROM ai_usage_logs 
-                WHERE user_id = $1 AND analysis_type = 'chart'
-            """, current_user["id"])
-            chart_limit = 3
-        
-        # Performance usage
-        if tier in ["premium", "vip"]:
-            perf_used = await conn.fetchval("""
-                SELECT COUNT(*) FROM ai_usage_logs 
-                WHERE user_id = $1 AND analysis_type = 'performance' 
-                AND created_at > NOW() - INTERVAL '7 days'
-            """, current_user["id"])
-            perf_limit = 1
-        else:
-            perf_used = await conn.fetchval("""
-                SELECT COUNT(*) FROM ai_usage_logs 
-                WHERE user_id = $1 AND analysis_type = 'performance'
-            """, current_user["id"])
-            perf_limit = 1
-        
-        return {
-            "chart_analysis": {
-                "used": chart_used,
-                "limit": chart_limit,
-                "remaining": max(0, chart_limit - chart_used)
-            },
-            "performance_analysis": {
-                "used": perf_used,
-                "limit": perf_limit,
-                "remaining": max(0, perf_limit - perf_used)
-            },
-            "tier": tier
-        }
 
 # ============================================================================
 # Health Check & Frontend Serving
@@ -2725,7 +2440,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.5.3",
+        "version": "3.5.0",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -2735,13 +2450,13 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.3 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.0 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
 async def spa_catch_all(path: str, request: Request):
     # Skip API routes
-    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health", "settings", "quiz", "ai")):
+    if path.startswith(("auth", "admin", "blog", "courses", "webinars", "signals", "chat", "analyze", "uploads", "health", "settings", "quiz")):
         raise HTTPException(status_code=404, detail="Not found")
     
     # Check if requesting a blog post slug (path doesn't contain dots and isn't a file)
@@ -2752,7 +2467,7 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.3"}
+    return {"message": "Pipways API v3.5.0"}
 
 # Global exception handler
 @app.exception_handler(Exception)

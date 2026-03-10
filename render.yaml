@@ -1,8 +1,7 @@
 # Render Blueprint for Pipways Trading Platform v3.2
-# Production-ready configuration - FIXED
 
 services:
-  # API SERVICE - Python Backend
+  # API SERVICE
   - type: web
     name: pipways-api-nhem
     runtime: python
@@ -10,16 +9,8 @@ services:
     plan: standard
     branch: main
     
-    runtimeConfig:
-      python:
-        version: "3.11.0"
-    
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-    
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
-    
     healthCheckPath: /health
     
     envVars:
@@ -27,22 +18,16 @@ services:
         fromDatabase:
           name: pipways-db-nhem
           property: connectionString
-      
       - key: SECRET_KEY
         generateValue: true
-      
       - key: OPENROUTER_API_KEY
         sync: false
-      
-      - key: ENVIRONMENT
-        value: production
-      
       - key: CORS_ORIGINS
-        value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000,http://localhost:5500"
+        value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000"
     
     autoDeploy: true
 
-  # FRONTEND SERVICE - Static Site
+  # FRONTEND SERVICE - FIXED PUBLISH PATH
   - type: web
     name: pipways-web-nhem
     runtime: static
@@ -50,17 +35,13 @@ services:
     plan: standard
     branch: main
     
-    buildCommand: ""  # Empty build command for pure static HTML
-    staticPublishPath: .  # Serve from root where index.html is located
+    buildCommand: ""  # No build needed for static HTML
+    staticPublishPath: .  # ← CORRECTED: Serve from root where index.html is
     
     routes:
       - type: rewrite
         source: /(.*)
         destination: /index.html
-    
-    envVars:
-      - key: API_URL
-        value: https://pipways-api-nhem.onrender.com
     
     autoDeploy: true
 

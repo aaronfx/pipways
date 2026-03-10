@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v3.5.2
+Pipways Trading Platform API - Production Debug & System Completion v3.5.3
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.5.2", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.3", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -192,6 +192,7 @@ class BlogPostUpdate(BaseModel):
     tags: Optional[List[str]] = None
     category: Optional[str] = None
 
+# FIXED: Removed thumbnail field
 class WebinarCreate(BaseModel):
     title: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -203,6 +204,7 @@ class WebinarCreate(BaseModel):
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
+# FIXED: Removed thumbnail field
 class WebinarUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -214,26 +216,28 @@ class WebinarUpdate(BaseModel):
     recording_link: Optional[str] = None
     reminder_message: Optional[str] = None
 
+# FIXED: Added Field aliases to match frontend field names (tp1, tp2)
 class SignalCreate(BaseModel):
     pair: str = Field(..., min_length=1)
     direction: str = Field(..., pattern="^(buy|sell)$")
     entry_price: float
     stop_loss: Optional[float] = None
-    take_profit_1: Optional[float] = None
-    take_profit_2: Optional[float] = None
+    take_profit_1: Optional[float] = Field(None, alias="tp1")
+    take_profit_2: Optional[float] = Field(None, alias="tp2")
     risk_reward_ratio: Optional[str] = None
     expires_at: Optional[datetime] = None
     timeframe: str = "1H"
     analysis: Optional[str] = None
     is_premium: bool = False
 
+# FIXED: Added Field aliases to match frontend field names (tp1, tp2)
 class SignalUpdate(BaseModel):
     pair: Optional[str] = None
     direction: Optional[str] = None
     entry_price: Optional[float] = None
     stop_loss: Optional[float] = None
-    take_profit_1: Optional[float] = None
-    take_profit_2: Optional[float] = None
+    take_profit_1: Optional[float] = Field(None, alias="tp1")
+    take_profit_2: Optional[float] = Field(None, alias="tp2")
     risk_reward_ratio: Optional[str] = None
     expires_at: Optional[datetime] = None
     timeframe: Optional[str] = None
@@ -322,8 +326,10 @@ class SiteSettingsUpdate(BaseModel):
     seo_default_description: Optional[str] = None
     contact_email: Optional[str] = None
 
+# FIXED: Added pips_gain field
 class SignalResultUpdate(BaseModel):
     result: str = Field(..., pattern="^(WIN|LOSS|PARTIAL|EXPIRED)$")
+    pips_gain: Optional[float] = None
 
 # ============================================================================
 # Database Initialization
@@ -373,7 +379,7 @@ async def init_db():
             )
         """)
 
-        # Signals table - Enhanced
+        # Signals table - Enhanced (verified columns exist)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -398,7 +404,7 @@ async def init_db():
             )
         """)
 
-        # Webinars table - FIXED: Removed thumbnail column
+        # Webinars table - FIXED: No thumbnail column
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -1346,18 +1352,15 @@ async def delete_media(media_id: int, admin: dict = Depends(get_admin_user)):
             WHERE thumbnail = $1
         """, url)
         
-        # Check if used in webinars
-        webinar_usage = await conn.fetchval("""
-            SELECT COUNT(*) FROM webinars 
-            WHERE thumbnail = $1
-        """, url)
+        # Check if used in webinars (removed thumbnail check since column doesn't exist)
+        webinar_usage = 0
         
         total_usage = blog_usage + course_usage + webinar_usage
         
         if total_usage > 0:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Cannot delete: Media is used in {blog_usage} blog posts, {course_usage} courses, {webinar_usage} webinars"
+                detail=f"Cannot delete: Media is used in {blog_usage} blog posts, {course_usage} courses"
             )
         
         # Delete from storage if local file
@@ -2094,7 +2097,7 @@ async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depend
 
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
-    """Create signal - Fixed: ensured all columns match"""
+    """Create signal - Fixed: Uses model aliases to accept tp1/tp2 from frontend"""
     async with db_pool.acquire() as conn:
         admin_id = admin.get("id") or admin.get("sub")
         try:
@@ -2113,7 +2116,7 @@ async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_us
 
 @app.put("/admin/signals/{signal_id}")
 async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depends(get_admin_user)):
-    """Update signal including result - Fixed: ensures 405 error is resolved"""
+    """Update signal including result - Fixed: Uses model aliases to accept tp1/tp2 from frontend"""
     async with db_pool.acquire() as conn:
         existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
         if not existing:
@@ -2184,21 +2187,22 @@ async def update_signal_result(
     result_update: SignalResultUpdate, 
     admin: dict = Depends(get_admin_user)
 ):
-    """Dedicated endpoint for updating signal result only"""
+    """Dedicated endpoint for updating signal result only - Fixed: Now handles pips_gain"""
     async with db_pool.acquire() as conn:
         existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Signal not found")
         
-        # Update result and closed_at
+        # Update result, pips_gain and closed_at
         await conn.execute("""
             UPDATE signals 
             SET result = $1, 
+                pips_gain = $2,
                 status = 'closed',
                 closed_at = NOW(),
                 updated_at = NOW()
-            WHERE id = $2
-        """, result_update.result, signal_id)
+            WHERE id = $3
+        """, result_update.result, result_update.pips_gain, signal_id)
         
         return {
             "message": "Signal result updated successfully", 
@@ -2721,7 +2725,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.5.2",
+        "version": "3.5.3",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -2731,7 +2735,7 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.2 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.3 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
@@ -2748,7 +2752,7 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.2"}
+    return {"message": "Pipways API v3.5.3"}
 
 # Global exception handler
 @app.exception_handler(Exception)

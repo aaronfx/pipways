@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways - Professional Trading Platform v3.4</title>
+    <title>Pipways - Professional Trading Platform v3.5</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1108,6 +1108,142 @@
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.1);
         }
+
+        /* Quiz Styles */
+        .quiz-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .question-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .quiz-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quiz-option:hover {
+            background: var(--bg-hover);
+        }
+
+        .quiz-option input[type="radio"] {
+            margin-right: 12px;
+        }
+
+        .quiz-option.selected {
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid var(--primary);
+        }
+
+        .quiz-result {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .quiz-score {
+            font-size: 72px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* Course Admin List */
+        .course-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .course-list-item:hover {
+            border-color: var(--primary);
+        }
+
+        .module-list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-hover);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: move;
+        }
+
+        .module-number {
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Knowledge toggle */
+        .knowledge-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-hover);
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .knowledge-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* File upload progress */
+        .upload-progress {
+            width: 100%;
+            height: 4px;
+            background: var(--bg-hover);
+            border-radius: 2px;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+
+        .upload-progress-bar {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
     </style>
 <base target="_blank">
 </head>
@@ -1128,7 +1264,7 @@
     <div class="auth-wall" id="auth-wall">
         <div class="auth-container">
             <div class="auth-logo">
-                <i class="fas fa-chart-line"></i> Pipways v3.4
+                <i class="fas fa-chart-line"></i> Pipways v3.5
             </div>
             <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">Professional Trading Platform</p>
 
@@ -1296,7 +1432,7 @@
                     </div>
                     <div class="content-card">
                         <h3><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> Performance Analysis</h3>
-                        <p>Upload your trading history for comprehensive AI-powered performance evaluation.</p>
+                        <p>Upload your trading history screenshots for comprehensive AI-powered evaluation.</p>
                         <button class="btn btn-sm btn-success" onclick="showSection('performance', document.querySelectorAll('.nav-link')[4])" style="margin-top: 12px;">Analyze Now</button>
                     </div>
                     <div class="content-card">
@@ -1436,87 +1572,45 @@
                 </div>
             </div>
 
-            <!-- Performance Analyzer Section -->
+            <!-- Performance Analyzer Section (UPDATED - Vision Based) -->
             <div class="section" id="performance-section">
                 <div class="page-header">
                     <h2><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> AI Performance Analyzer</h2>
-                    <p>Get professional trading performance evaluation and improvement strategies</p>
+                    <p>Upload trading statements, screenshots, or reports for AI extraction and analysis</p>
                 </div>
                 
                 <div class="analyzer-container">
                     <div class="content-card" style="margin-bottom: 30px;">
-                        <h3 style="margin-bottom: 20px;">Select Input Method</h3>
-                        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-                            <button class="btn btn-sm" onclick="showTradeInput('manual')" id="btn-manual" style="background: var(--primary);">Manual Entry</button>
-                            <button class="btn btn-sm btn-secondary" onclick="showTradeInput('csv')" id="btn-csv">Upload CSV</button>
+                        <h3 style="margin-bottom: 20px;"><i class="fas fa-camera"></i> Upload Trading Statement</h3>
+                        <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                            Upload screenshots of your MT4/MT5 statements, broker reports, or trading journal. 
+                            Our AI will automatically extract trade data and analyze your performance.
+                        </p>
+                        
+                        <div class="upload-area" id="performance-upload-area" onclick="document.getElementById('performance-file').click()">
+                            <i class="fas fa-file-image" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Drop image/PDF here or click to upload</h3>
+                            <p style="color: var(--text-secondary); margin-top: 8px;">
+                                Supports: JPG, PNG, WEBP (PDF coming soon)<br>
+                                Max 10MB
+                            </p>
+                            <input type="file" id="performance-file" class="hidden" accept="image/*,.pdf" onchange="handlePerformanceUpload(this)">
                         </div>
-
-                        <div id="manual-input">
-                            <div class="trade-entry-grid">
-                                <div class="form-group">
-                                    <label class="form-label">Pair (e.g., EURUSD)</label>
-                                    <input type="text" id="trade-pair" class="form-input" placeholder="EURUSD">
+                        
+                        <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
+                            <img id="performance-preview" class="image-preview" style="max-height: 400px;">
+                            <div style="display: flex; gap: 12px; margin-top: 12px;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Account Balance (Optional)</label>
+                                    <input type="number" id="vision-account-balance" class="form-input" placeholder="10000" step="0.01">
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">Direction</label>
-                                    <select id="trade-direction" class="form-input">
-                                        <option value="buy">BUY</option>
-                                        <option value="sell">SELL</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Entry Price</label>
-                                    <input type="number" id="trade-entry" class="form-input" step="0.00001" placeholder="1.0850">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Exit Price</label>
-                                    <input type="number" id="trade-exit" class="form-input" step="0.00001" placeholder="1.0900">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Lot Size</label>
-                                    <input type="number" id="trade-lots" class="form-input" step="0.01" placeholder="0.1">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Pips (+/-)</label>
-                                    <input type="number" id="trade-pips" class="form-input" step="0.1" placeholder="+50">
-                                </div>
-                                <div class="form-group" style="grid-column: 1 / -1;">
-                                    <label class="form-label">Notes (Optional)</label>
-                                    <input type="text" id="trade-notes" class="form-input" placeholder="Breakout trade, FOMC news...">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Trading Period (Days)</label>
+                                    <input type="number" id="vision-trading-period" class="form-input" placeholder="30" value="30">
                                 </div>
                             </div>
-                            <button class="btn" onclick="addTrade()" style="width: auto;">
-                                <i class="fas fa-plus"></i> Add Trade
-                            </button>
-                        </div>
-
-                        <div id="csv-input" class="hidden">
-                            <div class="upload-area" onclick="document.getElementById('csv-file').click()">
-                                <i class="fas fa-file-csv" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
-                                <h3>Upload Trading History CSV</h3>
-                                <p style="color: var(--text-secondary); margin-top: 8px;">Format: Date, Pair, Direction, Entry, Exit, Lots, Pips, Notes</p>
-                                <input type="file" id="csv-file" class="hidden" accept=".csv" onchange="handleCSVUpload(this)">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="content-card hidden" id="trades-list-card" style="margin-bottom: 30px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <h3>Trades (<span id="trade-count">0</span>)</h3>
-                            <button class="btn btn-sm btn-danger" onclick="clearTrades()">Clear All</button>
-                        </div>
-                        <div class="trade-list" id="trades-container"></div>
-                        <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
-                                <label class="form-label">Account Balance (Optional)</label>
-                                <input type="number" id="account-balance" class="form-input" placeholder="10000">
-                            </div>
-                            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
-                                <label class="form-label">Trading Period (Days)</label>
-                                <input type="number" id="trading-period" class="form-input" placeholder="30" value="30">
-                            </div>
-                            <button class="btn btn-success" onclick="analyzePerformance()" style="margin-top: 20px;">
-                                <i class="fas fa-brain"></i> Analyze Performance
+                            <button class="btn btn-lg btn-success" onclick="analyzePerformanceVision()" style="margin-top: 12px;">
+                                <i class="fas fa-brain"></i> Analyze with AI Vision
                             </button>
                         </div>
                     </div>
@@ -1569,13 +1663,22 @@
             <div class="section" id="mentor-section">
                 <div class="page-header">
                     <h2><i class="fas fa-comments" style="color: var(--primary);"></i> AI Trading Mentor</h2>
-                    <p>Get personalized trading advice from our AI mentor</p>
+                    <p>Get personalized trading advice from our AI mentor with platform knowledge</p>
                 </div>
                 <div class="chat-container">
+                    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-secondary); font-size: 14px;">
+                            <i class="fas fa-info-circle"></i> AI Mentor has access to courses, webinars, and blog content
+                        </span>
+                        <label class="knowledge-toggle">
+                            <input type="checkbox" id="knowledge-toggle" checked>
+                            <span>Use Platform Knowledge</span>
+                        </label>
+                    </div>
                     <div class="chat-messages" id="chat-messages">
                         <div class="chat-message">
                             <div class="chat-bubble">
-                                <strong>AI Mentor:</strong> Hello! I'm your personal trading mentor. Ask me anything about trading strategies, risk management, psychology, or market analysis. How can I help you today?
+                                <strong>AI Mentor:</strong> Hello! I'm your personal trading mentor. I have access to all Pipways courses, blog posts, and webinar schedules. Ask me anything about trading strategies, risk management, psychology, or market analysis. How can I help you today?
                             </div>
                         </div>
                     </div>
@@ -1610,6 +1713,24 @@
                     <div class="content-card">
                         <p style="text-align: center; color: var(--text-secondary);">Loading courses...</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- Course Detail Section (NEW) -->
+            <div class="section" id="course-detail-section">
+                <div class="page-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <div>
+                            <button class="btn btn-sm btn-secondary" onclick="showSection('courses', document.querySelectorAll('.nav-link')[6])" style="width: auto; margin-bottom: 12px;">
+                                <i class="fas fa-arrow-left"></i> Back to Courses
+                            </button>
+                            <h2 id="course-detail-title">Course Title</h2>
+                        </div>
+                        <span class="status-badge" id="course-detail-level">Beginner</span>
+                    </div>
+                </div>
+                <div class="analyzer-container" id="course-detail-content">
+                    <!-- Populated dynamically -->
                 </div>
             </div>
 
@@ -1659,6 +1780,17 @@
                 </div>
             </div>
 
+            <!-- Quiz Taking Section (NEW) -->
+            <div class="section" id="quiz-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-question-circle"></i> Course Quiz</h2>
+                    <p id="quiz-subtitle">Test your knowledge</p>
+                </div>
+                <div class="quiz-container" id="quiz-container">
+                    <!-- Quiz content populated dynamically -->
+                </div>
+            </div>
+
             <!-- Admin Section -->
             <div class="section" id="admin-section">
                 <div class="page-header">
@@ -1696,7 +1828,9 @@
                 <div class="admin-tabs">
                     <button class="admin-tab active" onclick="showAdminTab('content', this)" id="tab-content">Content</button>
                     <button class="admin-tab" onclick="showAdminTab('users', this)" id="tab-users">Users</button>
-                    <button class="admin-tab" onclick="showAdminTab('lms', this)" id="tab-lms">LMS</button>
+                    <button class="admin-tab" onclick="showAdminTab('courses', this)" id="tab-admin-courses">Courses</button>
+                    <button class="admin-tab" onclick="showAdminTab('quizzes', this)" id="tab-quizzes">Quizzes</button>
+                    <button class="admin-tab" onclick="showAdminTab('webinars', this)" id="tab-webinars">Webinars</button>
                     <button class="admin-tab" onclick="showAdminTab('signals', this)" id="tab-signals">Signals</button>
                     <button class="admin-tab" onclick="showAdminTab('media', this)" id="tab-media">Media</button>
                     <button class="admin-tab" onclick="showAdminTab('settings', this)" id="tab-settings">Settings</button>
@@ -1756,107 +1890,54 @@
                     </div>
                 </div>
 
-                <!-- LMS Panel -->
-                <div class="admin-panel" id="panel-lms">
-                    <div class="content-grid" style="padding: 0 30px;">
-                        <div class="content-card">
-                            <h3><i class="fas fa-graduation-cap" style="color: var(--warning);"></i> Create Course</h3>
-                            <form id="course-form" onsubmit="createCourse(event)">
-                                <div class="form-group">
-                                    <input type="text" name="title" class="form-input" placeholder="Course Title" required>
+                <!-- Courses Panel (NEW) -->
+                <div class="admin-panel" id="panel-courses">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Course Management</h3>
+                            <div style="display: flex; gap: 12px;">
+                                <div class="search-box" style="max-width: 200px;">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="admin-course-search" placeholder="Search courses..." oninput="loadAdminCourses()">
                                 </div>
-                                <div class="form-group">
-                                    <textarea name="description" class="form-textarea" placeholder="Short description" rows="2" required></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <textarea name="content" class="form-textarea" placeholder="Full course content / curriculum" rows="4" required></textarea>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                    <div class="form-group">
-                                        <select name="level" class="form-input">
-                                            <option value="beginner">Beginner</option>
-                                            <option value="intermediate">Intermediate</option>
-                                            <option value="advanced">Advanced</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <input type="number" name="duration_hours" class="form-input" placeholder="Duration (hours)" step="0.5">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Course Thumbnail</label>
-                                    <div style="display: flex; gap: 8px;">
-                                        <input type="text" name="thumbnail" class="form-input" placeholder="https://..." id="course-thumbnail-input">
-                                        <button type="button" class="btn btn-sm btn-secondary" onclick="openMediaPicker('course-thumbnail')" style="width: auto;">
-                                            <i class="fas fa-image"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label class="form-label">Course Modules</label>
-                                    <div id="modules-container">
-                                        <div class="module-item">
-                                            <div class="module-header">
-                                                <input type="text" class="form-input" placeholder="Module 1 Title" style="flex: 1; margin-right: 8px;">
-                                                <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.module-item').remove()">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                            <textarea class="form-textarea" placeholder="Module content" rows="2"></textarea>
-                                            <input type="text" class="form-input" placeholder="Video URL (optional)" style="margin-top: 8px;">
-                                        </div>
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addModuleField()" style="margin-top: 12px;">
-                                        <i class="fas fa-plus"></i> Add Module
-                                    </button>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <input type="checkbox" name="is_premium" style="margin-right: 8px;">
-                                        Premium Course
-                                    </label>
-                                </div>
-                                <button type="submit" class="btn btn-sm" style="background: var(--warning); color: var(--bg-dark);">Create Course</button>
-                            </form>
+                                <button class="btn btn-sm btn-success" onclick="openCourseModal()">
+                                    <i class="fas fa-plus"></i> New Course
+                                </button>
+                            </div>
                         </div>
+                        <div id="admin-courses-list" style="padding: 20px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <div class="pagination" id="courses-pagination"></div>
+                    </div>
+                </div>
 
-                        <div class="content-card">
-                            <h3><i class="fas fa-video" style="color: var(--secondary);"></i> Create Webinar</h3>
-                            <form id="webinar-form" onsubmit="createWebinar(event)">
-                                <div class="form-group">
-                                    <input type="text" name="title" class="form-input" placeholder="Webinar Title" required>
-                                </div>
-                                <div class="form-group">
-                                    <textarea name="description" class="form-textarea" placeholder="Description" rows="3" required></textarea>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                    <div class="form-group">
-                                        <label class="form-label">Date & Time</label>
-                                        <input type="datetime-local" name="scheduled_at" class="form-input" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Duration (minutes)</label>
-                                        <input type="number" name="duration_minutes" class="form-input" value="60" min="15" step="15">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Meeting Link (Zoom/Google Meet)</label>
-                                    <input type="url" name="meeting_link" class="form-input" placeholder="https://zoom.us/j/..." required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Max Participants</label>
-                                    <input type="number" name="max_participants" class="form-input" value="100" min="1">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <input type="checkbox" name="is_premium" style="margin-right: 8px;">
-                                        Premium Webinar
-                                    </label>
-                                </div>
-                                <button type="submit" class="btn btn-sm btn-success">Create Webinar</button>
-                            </form>
+                <!-- Quizzes Panel (NEW) -->
+                <div class="admin-panel" id="panel-quizzes">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Quiz Management</h3>
+                            <button class="btn btn-sm btn-success" onclick="openQuizModal()">
+                                <i class="fas fa-plus"></i> Create Quiz
+                            </button>
+                        </div>
+                        <div id="admin-quizzes-list" style="padding: 20px;">
+                            <p style="color: var(--text-secondary); text-align: center;">Select a course to manage quizzes</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Webinars Panel (NEW) -->
+                <div class="admin-panel" id="panel-webinars">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Webinar Management</h3>
+                            <button class="btn btn-sm btn-success" onclick="openWebinarModal()">
+                                <i class="fas fa-plus"></i> Create Webinar
+                            </button>
+                        </div>
+                        <div id="admin-webinars-list" style="padding: 20px;">
+                            <!-- Populated dynamically -->
                         </div>
                     </div>
                 </div>
@@ -2092,6 +2173,187 @@
                 </div>
             </div>
 
+            <!-- Course Modal (NEW) -->
+            <div class="modal" id="course-modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3 id="course-modal-title">Create Course</h3>
+                        <button class="modal-close" onclick="closeModal('course-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="course-form">
+                            <input type="hidden" id="edit-course-id" value="">
+                            <div class="form-group">
+                                <label class="form-label">Course Title</label>
+                                <input type="text" name="title" class="form-input" id="course-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Short Description</label>
+                                <textarea name="description" class="form-textarea" id="course-description" rows="2" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Full Content / Curriculum</label>
+                                <textarea name="content" class="form-textarea" id="course-content" rows="4" required></textarea>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label class="form-label">Level</label>
+                                    <select name="level" class="form-input" id="course-level-select">
+                                        <option value="beginner">Beginner</option>
+                                        <option value="intermediate">Intermediate</option>
+                                        <option value="advanced">Advanced</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Duration (hours)</label>
+                                    <input type="number" name="duration_hours" class="form-input" id="course-duration" step="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <input type="checkbox" name="is_premium" id="course-is-premium" style="margin-right: 8px;">
+                                        Premium Course
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Thumbnail URL</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" name="thumbnail" class="form-input" placeholder="https://..." id="course-thumbnail-input">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="openMediaPicker('course-thumbnail')" style="width: auto;">
+                                        <i class="fas fa-image"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group" id="modules-section">
+                                <label class="form-label">Course Modules</label>
+                                <div id="modules-container">
+                                    <!-- Modules added dynamically -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="addModuleField()" style="margin-top: 12px;">
+                                    <i class="fas fa-plus"></i> Add Module
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeModal('course-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="submitCourse()" style="width: auto;" id="course-submit-btn">Create Course</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz Modal (NEW) -->
+            <div class="modal" id="quiz-modal">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div class="modal-header">
+                        <h3 id="quiz-modal-title">Create Quiz</h3>
+                        <button class="modal-close" onclick="closeModal('quiz-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="quiz-form">
+                            <div class="form-group">
+                                <label class="form-label">Select Course</label>
+                                <select name="course_id" class="form-input" id="quiz-course-select" required>
+                                    <option value="">Select a course...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Quiz Title</label>
+                                <input type="text" name="title" class="form-input" id="quiz-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-textarea" id="quiz-description" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Passing Score (%)</label>
+                                <input type="number" name="passing_score" class="form-input" id="quiz-passing-score" value="70" min="0" max="100">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Questions</label>
+                                <div id="questions-container">
+                                    <!-- Questions added dynamically -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="addQuestionField()" style="margin-top: 12px;">
+                                    <i class="fas fa-plus"></i> Add Question
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeModal('quiz-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="submitQuiz()" style="width: auto;">Create Quiz</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Webinar Modal (UPDATED) -->
+            <div class="modal" id="webinar-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="webinar-modal-title">Create Webinar</h3>
+                        <button class="modal-close" onclick="closeModal('webinar-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="webinar-form">
+                            <input type="hidden" id="edit-webinar-id" value="">
+                            <div class="form-group">
+                                <label class="form-label">Webinar Title</label>
+                                <input type="text" name="title" class="form-input" id="webinar-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-textarea" id="webinar-description" rows="3" required></textarea>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Date & Time</label>
+                                    <input type="datetime-local" name="scheduled_at" class="form-input" id="webinar-scheduled-at" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Duration (minutes)</label>
+                                    <input type="number" name="duration_minutes" class="form-input" id="webinar-duration" value="60" min="15" step="15" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Meeting Link</label>
+                                <input type="url" name="meeting_link" class="form-input" id="webinar-meeting-link" placeholder="https://zoom.us/j/..." required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Thumbnail URL</label>
+                                <input type="url" name="thumbnail" class="form-input" id="webinar-thumbnail" placeholder="https://...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Recording Link (optional)</label>
+                                <input type="url" name="recording_link" class="form-input" id="webinar-recording" placeholder="https://...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Reminder Message</label>
+                                <textarea name="reminder_message" class="form-textarea" id="webinar-reminder" rows="2" placeholder="Custom reminder message for participants..."></textarea>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Max Participants</label>
+                                    <input type="number" name="max_participants" class="form-input" id="webinar-max-participants" value="100" min="1" required>
+                                </div>
+                                <div class="form-group" style="display: flex; align-items: center;">
+                                    <label class="form-label" style="display: flex; align-items: center; cursor: pointer;">
+                                        <input type="checkbox" name="is_premium" id="webinar-is-premium" style="margin-right: 8px; width: 18px; height: 18px;">
+                                        Premium Webinar (VIP only)
+                                    </label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeModal('webinar-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="submitWebinar()" style="width: auto;" id="webinar-submit-btn">Create Webinar</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- User Edit Modal -->
             <div class="modal" id="user-edit-modal">
                 <div class="modal-content" style="max-width: 500px;">
@@ -2174,14 +2436,17 @@
         let authToken = localStorage.getItem('access_token');
         let refreshToken = localStorage.getItem('refresh_token');
         let currentUser = null;
-        let trades = [];
         let currentPage = 1;
         let statsChart = null;
         let chartFile = null;
+        let performanceFile = null;
         let chatHistory = [];
         let currentMediaTarget = null;
         let selectedMediaUrl = null;
         let siteSettings = null;
+        let adminCoursesPage = 1;
+        let editingCourseId = null;
+        let editingWebinarId = null;
 
         // ==========================================
         // API SERVICE LAYER
@@ -2303,6 +2568,17 @@
             });
         }
 
+        function formatDateTime(dateString) {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
         function animateValue(id, start, end, duration) {
             const obj = document.getElementById(id);
             if (!obj) return;
@@ -2356,7 +2632,6 @@
             document.getElementById('main-app').classList.remove('hidden');
             
             if (currentUser) {
-                // FIXED: Only show admin for role === "admin"
                 const isAdmin = currentUser.role === "admin";
                 
                 if (isAdmin) {
@@ -2372,7 +2647,6 @@
                 document.getElementById('user-avatar').textContent = (currentUser.full_name || currentUser.email).charAt(0).toUpperCase();
             }
             
-            // Load public settings
             loadPublicSettings();
         }
 
@@ -2381,7 +2655,6 @@
                 const response = await fetch('/settings/public');
                 if (response.ok) {
                     siteSettings = await response.json();
-                    // Update Telegram links if configured
                     if (siteSettings.telegram_free_link) {
                         const btn = document.getElementById('btn-telegram-free');
                         if (btn) btn.onclick = () => window.open(siteSettings.telegram_free_link, '_blank');
@@ -2505,10 +2778,23 @@
         }
 
         function showSection(sectionName, element) {
-            // Handle blog reader specially
             if (sectionName === 'blog-reader') {
                 document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
                 document.getElementById('blog-reader-section').classList.add('active');
+                window.scrollTo(0, 0);
+                return;
+            }
+
+            if (sectionName === 'course-detail') {
+                document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+                document.getElementById('course-detail-section').classList.add('active');
+                window.scrollTo(0, 0);
+                return;
+            }
+
+            if (sectionName === 'quiz') {
+                document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
+                document.getElementById('quiz-section').classList.add('active');
                 window.scrollTo(0, 0);
                 return;
             }
@@ -2523,6 +2809,9 @@
             if (sectionName === 'admin') {
                 loadAdminStats();
                 loadBlogPosts();
+                loadAdminCourses();
+                loadAdminWebinars();
+                loadQuizCourses();
             } else if (sectionName === 'signals') {
                 loadSignals();
             } else if (sectionName === 'courses') {
@@ -2557,6 +2846,12 @@
                 loadMediaList();
             } else if (tabName === 'settings') {
                 loadSettings();
+            } else if (tabName === 'courses') {
+                loadAdminCourses();
+            } else if (tabName === 'webinars') {
+                loadAdminWebinars();
+            } else if (tabName === 'quizzes') {
+                loadQuizCourses();
             }
         }
 
@@ -2788,7 +3083,6 @@
                 
                 if (response.ok) {
                     showToast('Settings saved successfully', 'success');
-                    // Reload public settings
                     loadPublicSettings();
                 } else {
                     const error = await response.json();
@@ -2902,7 +3196,6 @@
                 
                 const post = await response.json();
                 
-                // Populate blog reader
                 const reader = document.getElementById('blog-reader-content');
                 reader.innerHTML = `
                     <div class="blog-reader-header">
@@ -2943,7 +3236,6 @@
         }
 
         function openBlogModal() {
-            // Reset form
             document.getElementById('blog-form').reset();
             document.getElementById('blog-post-id').value = '';
             document.getElementById('editor-content').innerHTML = '';
@@ -2964,7 +3256,6 @@
                 
                 const post = await response.json();
                 
-                // Populate form
                 document.getElementById('blog-post-id').value = post.id;
                 document.getElementById('blog-title').value = post.title;
                 document.getElementById('blog-category-select').value = post.category || 'Trading';
@@ -2975,13 +3266,11 @@
                 document.getElementById('blog-is-premium').checked = post.is_premium || false;
                 document.getElementById('editor-content').innerHTML = post.content || '';
                 
-                // Handle tags
                 document.querySelectorAll('.tag').forEach(t => t.remove());
                 if (post.tags && post.tags.length > 0) {
                     post.tags.forEach(tag => addTag(tag));
                 }
                 
-                // Handle schedule
                 if (post.scheduled_at) {
                     const date = new Date(post.scheduled_at);
                     date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -2991,7 +3280,6 @@
                     document.getElementById('schedule-field').classList.add('hidden');
                 }
                 
-                // Update UI
                 document.getElementById('blog-modal-title').textContent = 'Edit Blog Post';
                 document.getElementById('blog-submit-btn').textContent = 'Update';
                 updateSEOPreview();
@@ -3169,6 +3457,479 @@
         }
 
         // ==========================================
+        // ADMIN COURSE MANAGEMENT (NEW)
+        // ==========================================
+        async function loadAdminCourses(page = 1) {
+            adminCoursesPage = page;
+            try {
+                const search = document.getElementById('admin-course-search')?.value || '';
+                let url = `/admin/courses?page=${page}&limit=10`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+                
+                const response = await api.get(url);
+                if (!response.ok) throw new Error('Failed to load courses');
+                
+                const data = await response.json();
+                const container = document.getElementById('admin-courses-list');
+                
+                if (!data.courses || data.courses.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-graduation-cap"></i><p>No courses found</p></div>';
+                } else {
+                    container.innerHTML = data.courses.map(course => `
+                        <div class="course-list-item">
+                            <div style="display: flex; align-items: center; gap: 16px;">
+                                ${course.thumbnail ? `<img src="${course.thumbnail}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">` : 
+                                  `<div style="width: 60px; height: 60px; background: var(--bg-hover); border-radius: 8px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-graduation-cap"></i></div>`}
+                                <div>
+                                    <h4 style="margin-bottom: 4px;">${course.title}</h4>
+                                    <div style="font-size: 14px; color: var(--text-secondary);">
+                                        ${course.level} • ${course.module_count || 0} modules • ${course.quiz_count || 0} quizzes
+                                        ${course.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="action-btns">
+                                <button class="action-btn" onclick="editCourse(${course.id})" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn" onclick="manageCourseModules(${course.id})" title="Manage Modules">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <button class="action-btn delete" onclick="deleteCourse(${course.id})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                
+                const pagination = document.getElementById('courses-pagination');
+                if (data.pages > 1) {
+                    let pagesHtml = '';
+                    for (let i = 1; i <= data.pages; i++) {
+                        pagesHtml += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="loadAdminCourses(${i})">${i}</button>`;
+                    }
+                    pagination.innerHTML = pagesHtml;
+                } else {
+                    pagination.innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Error loading admin courses:', error);
+            }
+        }
+
+        function openCourseModal() {
+            editingCourseId = null;
+            document.getElementById('course-form').reset();
+            document.getElementById('modules-container').innerHTML = '';
+            document.getElementById('course-modal-title').textContent = 'Create Course';
+            document.getElementById('course-submit-btn').textContent = 'Create Course';
+            addModuleField();
+            document.getElementById('course-modal').classList.add('show');
+        }
+
+        async function editCourse(courseId) {
+            try {
+                showLoading(true, 'Loading course...');
+                const response = await api.get(`/admin/courses/${courseId}`);
+                if (!response.ok) throw new Error('Failed to load course');
+                
+                const data = await response.json();
+                const course = data.course;
+                
+                editingCourseId = courseId;
+                document.getElementById('course-title').value = course.title;
+                document.getElementById('course-description').value = course.description || '';
+                document.getElementById('course-content').value = course.content || '';
+                document.getElementById('course-level-select').value = course.level || 'beginner';
+                document.getElementById('course-duration').value = course.duration_hours || '';
+                document.getElementById('course-thumbnail-input').value = course.thumbnail || '';
+                document.getElementById('course-is-premium').checked = course.is_premium || false;
+                
+                // Load modules
+                document.getElementById('modules-container').innerHTML = '';
+                if (data.modules && data.modules.length > 0) {
+                    data.modules.forEach((module, index) => {
+                        addModuleField(module);
+                    });
+                } else {
+                    addModuleField();
+                }
+                
+                document.getElementById('course-modal-title').textContent = 'Edit Course';
+                document.getElementById('course-submit-btn').textContent = 'Update Course';
+                document.getElementById('course-modal').classList.add('show');
+            } catch (error) {
+                showToast('Failed to load course', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function submitCourse() {
+            const courseData = {
+                title: document.getElementById('course-title').value,
+                description: document.getElementById('course-description').value,
+                content: document.getElementById('course-content').value,
+                level: document.getElementById('course-level-select').value,
+                duration_hours: parseFloat(document.getElementById('course-duration').value) || null,
+                thumbnail: document.getElementById('course-thumbnail-input').value,
+                is_premium: document.getElementById('course-is-premium').checked,
+                modules: collectModules()
+            };
+
+            if (!courseData.title || !courseData.description) {
+                showToast('Title and description are required', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true, editingCourseId ? 'Updating...' : 'Creating...');
+                
+                let response;
+                if (editingCourseId) {
+                    response = await api.put(`/admin/courses/${editingCourseId}`, courseData);
+                } else {
+                    response = await api.post('/admin/courses', courseData);
+                }
+                
+                if (response.ok) {
+                    showToast(editingCourseId ? 'Course updated!' : 'Course created!', 'success');
+                    closeModal('course-modal');
+                    loadAdminCourses();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function deleteCourse(courseId) {
+            if (!confirm('Are you sure you want to delete this course? This will also delete all modules and quizzes.')) return;
+            
+            try {
+                const response = await api.delete(`/admin/courses/${courseId}`);
+                if (response.ok) {
+                    showToast('Course deleted', 'success');
+                    loadAdminCourses();
+                }
+            } catch (error) {
+                showToast('Error deleting course', 'error');
+            }
+        }
+
+        function addModuleField(existingModule = null) {
+            const container = document.getElementById('modules-container');
+            const moduleDiv = document.createElement('div');
+            moduleDiv.className = 'module-item';
+            moduleDiv.innerHTML = `
+                <div class="module-header">
+                    <input type="text" class="form-input module-title" placeholder="Module Title" value="${existingModule ? existingModule.title : ''}" style="flex: 1; margin-right: 8px;">
+                    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.module-item').remove()">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <textarea class="form-textarea module-content" placeholder="Module content (supports HTML)" rows="2">${existingModule ? existingModule.content || '' : ''}</textarea>
+                <input type="text" class="form-input module-video" placeholder="Video URL (optional)" style="margin-top: 8px;" value="${existingModule ? existingModule.video_url || '' : ''}">
+                <label style="display: flex; align-items: center; margin-top: 8px; font-size: 14px; color: var(--text-secondary);">
+                    <input type="checkbox" class="module-premium" style="margin-right: 8px;" ${existingModule && existingModule.is_premium ? 'checked' : ''}>
+                    Premium Module
+                </label>
+                ${existingModule ? `<input type="hidden" class="module-id" value="${existingModule.id}">` : ''}
+            `;
+            container.appendChild(moduleDiv);
+        }
+
+        function collectModules() {
+            const modules = [];
+            document.querySelectorAll('.module-item').forEach((item, index) => {
+                const moduleId = item.querySelector('.module-id')?.value;
+                const module = {
+                    title: item.querySelector('.module-title').value,
+                    content: item.querySelector('.module-content').value,
+                    video_url: item.querySelector('.module-video').value,
+                    sort_order: index,
+                    is_premium: item.querySelector('.module-premium').checked
+                };
+                if (moduleId) module.id = parseInt(moduleId);
+                if (module.title) modules.push(module);
+            });
+            return modules;
+        }
+
+        // ==========================================
+        // QUIZ MANAGEMENT (NEW)
+        // ==========================================
+        async function loadQuizCourses() {
+            try {
+                const response = await api.get('/courses?limit=100');
+                if (!response.ok) throw new Error('Failed to load courses');
+                
+                const courses = await response.json();
+                const select = document.getElementById('quiz-course-select');
+                select.innerHTML = '<option value="">Select a course...</option>' + 
+                    courses.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
+            } catch (error) {
+                console.error('Error loading quiz courses:', error);
+            }
+        }
+
+        function openQuizModal() {
+            document.getElementById('quiz-form').reset();
+            document.getElementById('questions-container').innerHTML = '';
+            loadQuizCourses();
+            addQuestionField();
+            document.getElementById('quiz-modal').classList.add('show');
+        }
+
+        function addQuestionField() {
+            const container = document.getElementById('questions-container');
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'question-card';
+            questionDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4>Question</h4>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.question-card').remove()">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-input question-text" placeholder="Enter question text" required>
+                </div>
+                <div class="form-group">
+                    <select class="form-input question-type" onchange="toggleQuestionOptions(this)">
+                        <option value="multiple_choice">Multiple Choice</option>
+                        <option value="true_false">True/False</option>
+                        <option value="text">Text Answer</option>
+                    </select>
+                </div>
+                <div class="question-options">
+                    <div class="form-group">
+                        <label class="form-label">Options (one per line)</label>
+                        <textarea class="form-textarea options-list" rows="3" placeholder="Option 1&#10;Option 2&#10;Option 3&#10;Option 4"></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Correct Answer</label>
+                    <input type="text" class="form-input correct-answer" placeholder="Enter correct answer" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Points</label>
+                    <input type="number" class="form-input question-points" value="1" min="1" style="width: 100px;">
+                </div>
+            `;
+            container.appendChild(questionDiv);
+        }
+
+        function toggleQuestionOptions(select) {
+            const optionsDiv = select.closest('.question-card').querySelector('.question-options');
+            if (select.value === 'text') {
+                optionsDiv.style.display = 'none';
+            } else {
+                optionsDiv.style.display = 'block';
+            }
+        }
+
+        async function submitQuiz() {
+            const courseId = document.getElementById('quiz-course-select').value;
+            if (!courseId) {
+                showToast('Please select a course', 'error');
+                return;
+            }
+
+            const questions = [];
+            document.querySelectorAll('.question-card').forEach((card, index) => {
+                const type = card.querySelector('.question-type').value;
+                const q = {
+                    question_text: card.querySelector('.question-text').value,
+                    question_type: type,
+                    options: type === 'text' ? [] : card.querySelector('.options-list').value.split('\n').filter(o => o.trim()),
+                    correct_answer: card.querySelector('.correct-answer').value,
+                    points: parseInt(card.querySelector('.question-points').value) || 1,
+                    sort_order: index
+                };
+                if (q.question_text) questions.push(q);
+            });
+
+            const quizData = {
+                course_id: parseInt(courseId),
+                title: document.getElementById('quiz-title').value,
+                description: document.getElementById('quiz-description').value,
+                passing_score: parseInt(document.getElementById('quiz-passing-score').value) || 70,
+                questions: questions
+            };
+
+            if (!quizData.title || questions.length === 0) {
+                showToast('Title and at least one question are required', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true, 'Creating quiz...');
+                const response = await api.post('/admin/quizzes', quizData);
+                
+                if (response.ok) {
+                    showToast('Quiz created successfully!', 'success');
+                    closeModal('quiz-modal');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create quiz');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ==========================================
+        // WEBINAR MANAGEMENT (UPDATED)
+        // ==========================================
+        async function loadAdminWebinars() {
+            try {
+                const response = await api.get('/webinars?upcoming=false&limit=50');
+                if (!response.ok) throw new Error('Failed to load webinars');
+                
+                const webinars = await response.json();
+                const container = document.getElementById('admin-webinars-list');
+                
+                if (!webinars || webinars.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-video"></i><p>No webinars found</p></div>';
+                    return;
+                }
+
+                container.innerHTML = webinars.map(webinar => `
+                    <div class="course-list-item">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            ${webinar.thumbnail ? `<img src="${webinar.thumbnail}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">` : 
+                              `<div style="width: 60px; height: 60px; background: var(--bg-hover); border-radius: 8px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-video"></i></div>`}
+                            <div>
+                                <h4 style="margin-bottom: 4px;">${webinar.title}</h4>
+                                <div style="font-size: 14px; color: var(--text-secondary);">
+                                    ${formatDateTime(webinar.scheduled_at)} • ${webinar.duration_minutes} min
+                                    ${webinar.is_premium ? '<span class="premium-badge" style="position: static; display: inline-block; margin-left: 8px;">PRO</span>' : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="action-btns">
+                            <button class="action-btn" onclick="editWebinar(${webinar.id})" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteWebinar(${webinar.id})" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading webinars:', error);
+            }
+        }
+
+        function openWebinarModal() {
+            editingWebinarId = null;
+            document.getElementById('webinar-form').reset();
+            document.getElementById('webinar-modal-title').textContent = 'Create Webinar';
+            document.getElementById('webinar-submit-btn').textContent = 'Create Webinar';
+            document.getElementById('webinar-modal').classList.add('show');
+        }
+
+        async function editWebinar(webinarId) {
+            try {
+                const response = await api.get(`/webinars/${webinarId}`);
+                if (!response.ok) throw new Error('Failed to load webinar');
+                
+                const webinar = await response.json();
+                
+                editingWebinarId = webinarId;
+                document.getElementById('webinar-title').value = webinar.title;
+                document.getElementById('webinar-description').value = webinar.description || '';
+                
+                // Format datetime for input
+                const date = new Date(webinar.scheduled_at);
+                date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                document.getElementById('webinar-scheduled-at').value = date.toISOString().slice(0, 16);
+                
+                document.getElementById('webinar-duration').value = webinar.duration_minutes;
+                document.getElementById('webinar-meeting-link').value = webinar.meeting_link || '';
+                document.getElementById('webinar-thumbnail').value = webinar.thumbnail || '';
+                document.getElementById('webinar-recording').value = webinar.recording_link || '';
+                document.getElementById('webinar-reminder').value = webinar.reminder_message || '';
+                document.getElementById('webinar-max-participants').value = webinar.max_participants;
+                document.getElementById('webinar-is-premium').checked = webinar.is_premium;
+                
+                document.getElementById('webinar-modal-title').textContent = 'Edit Webinar';
+                document.getElementById('webinar-submit-btn').textContent = 'Update Webinar';
+                document.getElementById('webinar-modal').classList.add('show');
+            } catch (error) {
+                showToast('Failed to load webinar', 'error');
+            }
+        }
+
+        async function submitWebinar() {
+            const webinarData = {
+                title: document.getElementById('webinar-title').value,
+                description: document.getElementById('webinar-description').value,
+                scheduled_at: new Date(document.getElementById('webinar-scheduled-at').value).toISOString(),
+                duration_minutes: parseInt(document.getElementById('webinar-duration').value),
+                meeting_link: document.getElementById('webinar-meeting-link').value,
+                thumbnail: document.getElementById('webinar-thumbnail').value || null,
+                recording_link: document.getElementById('webinar-recording').value || null,
+                reminder_message: document.getElementById('webinar-reminder').value || null,
+                max_participants: parseInt(document.getElementById('webinar-max-participants').value),
+                is_premium: document.getElementById('webinar-is-premium').checked
+            };
+
+            if (!webinarData.title || !webinarData.scheduled_at || !webinarData.meeting_link) {
+                showToast('Please fill in all required fields', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true, editingWebinarId ? 'Updating...' : 'Creating...');
+                
+                let response;
+                if (editingWebinarId) {
+                    response = await api.put(`/admin/webinars/${editingWebinarId}`, webinarData);
+                } else {
+                    response = await api.post('/admin/webinars', webinarData);
+                }
+                
+                if (response.ok) {
+                    showToast(editingWebinarId ? 'Webinar updated!' : 'Webinar created!', 'success');
+                    closeModal('webinar-modal');
+                    loadAdminWebinars();
+                    loadWebinars();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function deleteWebinar(webinarId) {
+            if (!confirm('Are you sure you want to delete this webinar?')) return;
+            
+            try {
+                const response = await api.delete(`/admin/webinars/${webinarId}`);
+                if (response.ok) {
+                    showToast('Webinar deleted', 'success');
+                    loadAdminWebinars();
+                }
+            } catch (error) {
+                showToast('Error deleting webinar', 'error');
+            }
+        }
+
+        // ==========================================
         // MEDIA MANAGEMENT
         // ==========================================
         function openMediaPicker(target) {
@@ -3245,7 +4006,6 @@
                 if (response.ok) {
                     showToast('Image uploaded!', 'success');
                     loadMediaPickerGrid();
-                    // Auto-select the uploaded image
                     selectedMediaUrl = data.url;
                 } else {
                     throw new Error('Upload failed');
@@ -3321,80 +4081,8 @@
         }
 
         // ==========================================
-        // LMS MANAGEMENT
+        // PUBLIC COURSES
         // ==========================================
-        function addModuleField() {
-            const container = document.getElementById('modules-container');
-            const moduleCount = container.children.length + 1;
-            const moduleDiv = document.createElement('div');
-            moduleDiv.className = 'module-item';
-            moduleDiv.innerHTML = `
-                <div class="module-header">
-                    <span class="module-number" style="color: var(--text-secondary); font-weight: 600; margin-right: 8px;">${moduleCount}.</span>
-                    <input type="text" class="form-input" placeholder="Module Title" style="flex: 1; margin-right: 8px;">
-                    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.module-item').remove(); renumberModules();">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <textarea class="form-textarea" placeholder="Module content (supports HTML)" rows="3"></textarea>
-                <input type="text" class="form-input" placeholder="Video URL (optional - YouTube embed or direct link)" style="margin-top: 8px;">
-                <label style="display: flex; align-items: center; margin-top: 8px; font-size: 14px; color: var(--text-secondary);">
-                    <input type="checkbox" class="module-premium" style="margin-right: 8px;">
-                    Premium Module
-                </label>
-            `;
-            container.appendChild(moduleDiv);
-        }
-
-        function renumberModules() {
-            document.querySelectorAll('.module-item').forEach((item, index) => {
-                item.querySelector('.module-number').textContent = (index + 1) + '.';
-            });
-        }
-
-        async function createCourse(e) {
-            e.preventDefault();
-            const form = e.target;
-            
-            const modules = Array.from(document.querySelectorAll('.module-item')).map((item, index) => ({
-                title: item.querySelector('input[type="text"]').value,
-                content: item.querySelector('textarea').value,
-                video_url: item.querySelectorAll('input[type="text"]')[1].value,
-                sort_order: index,
-                is_premium: item.querySelector('.module-premium')?.checked || false
-            }));
-
-            const data = {
-                title: form.querySelector('[name="title"]').value,
-                description: form.querySelector('[name="description"]').value,
-                content: form.querySelector('[name="content"]').value,
-                level: form.querySelector('[name="level"]').value,
-                duration_hours: parseFloat(form.querySelector('[name="duration_hours"]').value) || null,
-                thumbnail: form.querySelector('[name="thumbnail"]').value,
-                is_premium: form.querySelector('[name="is_premium"]').checked,
-                modules: modules
-            };
-
-            try {
-                showLoading(true, 'Creating course...');
-                const response = await api.post('/admin/courses', data);
-                
-                if (response.ok) {
-                    showToast('Course created successfully!', 'success');
-                    form.reset();
-                    document.getElementById('modules-container').innerHTML = '';
-                    addModuleField();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to create course');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
         async function loadCourses() {
             try {
                 const level = document.getElementById('course-level')?.value || '';
@@ -3411,7 +4099,7 @@
                 }
 
                 container.innerHTML = data.map(course => `
-                    <div class="content-card">
+                    <div class="content-card" onclick="viewCourseDetail(${course.id})" style="cursor: pointer;">
                         ${course.thumbnail ? `<img src="${course.thumbnail}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 16px;">` : '<div style="width: 100%; height: 200px; background: var(--bg-hover); border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-graduation-cap" style="font-size: 48px; color: var(--text-secondary);"></i></div>'}
                         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                             <span class="status-badge">${course.level}</span>
@@ -3421,7 +4109,7 @@
                         <p style="color: var(--text-secondary); margin: 8px 0;">${course.description}</p>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
                             <small style="color: var(--text-secondary);">${course.duration_hours ? course.duration_hours + ' hours' : ''} • ${course.modules?.length || 0} modules</small>
-                            <button class="btn btn-sm">Start Learning</button>
+                            <button class="btn btn-sm">View Course</button>
                         </div>
                     </div>
                 `).join('');
@@ -3430,41 +4118,228 @@
             }
         }
 
-        // ==========================================
-        // WEBINAR MANAGEMENT
-        // ==========================================
-        async function createWebinar(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            
-            const data = {
-                title: formData.get('title'),
-                description: formData.get('description'),
-                scheduled_at: new Date(formData.get('scheduled_at')).toISOString(),
-                duration_minutes: parseInt(formData.get('duration_minutes')),
-                meeting_link: formData.get('meeting_link'),
-                max_participants: parseInt(formData.get('max_participants')),
-                is_premium: formData.has('is_premium')
-            };
-
+        async function viewCourseDetail(courseId) {
             try {
-                showLoading(true, 'Creating webinar...');
-                const response = await api.post('/admin/webinars', data);
+                showLoading(true, 'Loading course...');
+                const response = await api.get(`/courses/${courseId}`);
                 
-                if (response.ok) {
-                    showToast('Webinar created successfully!', 'success');
-                    e.target.reset();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to create webinar');
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        showToast('Please login to view this course', 'error');
+                        return;
+                    }
+                    if (response.status === 403) {
+                        showToast('Premium subscription required', 'error');
+                        return;
+                    }
+                    throw new Error('Failed to load course');
                 }
+                
+                const course = await response.json();
+                
+                document.getElementById('course-detail-title').textContent = course.title;
+                document.getElementById('course-detail-level').textContent = course.level;
+                
+                let modulesHtml = '';
+                if (course.modules && course.modules.length > 0) {
+                    modulesHtml = `
+                        <div class="content-card" style="margin-bottom: 24px;">
+                            <h3 style="margin-bottom: 16px;">Course Modules</h3>
+                            ${course.modules.map((module, index) => `
+                                <div style="padding: 16px; background: var(--bg-dark); border-radius: 8px; margin-bottom: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                        <div class="module-number">${index + 1}</div>
+                                        <h4>${module.title}</h4>
+                                        ${module.is_premium ? '<span class="premium-badge" style="position: static;">PRO</span>' : ''}
+                                    </div>
+                                    <p style="color: var(--text-secondary); font-size: 14px;">${module.content || ''}</p>
+                                    ${module.video_url ? `<a href="${module.video_url}" target="_blank" class="btn btn-sm btn-secondary" style="margin-top: 8px; width: auto;"><i class="fas fa-play"></i> Watch Video</a>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                let quizzesHtml = '';
+                if (course.quizzes && course.quizzes.length > 0) {
+                    quizzesHtml = `
+                        <div class="content-card">
+                            <h3 style="margin-bottom: 16px;">Course Quizzes</h3>
+                            ${course.quizzes.map(quiz => `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--bg-dark); border-radius: 8px; margin-bottom: 12px;">
+                                    <div>
+                                        <h4>${quiz.title}</h4>
+                                        <p style="color: var(--text-secondary); font-size: 14px;">Passing score: ${quiz.passing_score}%</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-success" onclick="startQuiz(${course.id}, ${quiz.id})">
+                                        Start Quiz
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('course-detail-content').innerHTML = `
+                    <div class="content-card" style="margin-bottom: 24px;">
+                        <p style="font-size: 18px; line-height: 1.6;">${course.description}</p>
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-secondary);">
+                            <i class="fas fa-clock"></i> ${course.duration_hours || 0} hours • 
+                            <i class="fas fa-list"></i> ${course.modules?.length || 0} modules • 
+                            <i class="fas fa-question-circle"></i> ${course.quizzes?.length || 0} quizzes
+                        </div>
+                    </div>
+                    ${modulesHtml}
+                    ${quizzesHtml}
+                `;
+                
+                showSection('course-detail', null);
             } catch (error) {
-                showToast(error.message, 'error');
+                console.error('Error loading course detail:', error);
+                showToast('Failed to load course', 'error');
             } finally {
                 showLoading(false);
             }
         }
 
+        // ==========================================
+        // QUIZ TAKING (NEW)
+        // ==========================================
+        let currentQuiz = null;
+        let currentQuizAnswers = {};
+
+        async function startQuiz(courseId, quizId) {
+            try {
+                showLoading(true, 'Loading quiz...');
+                const response = await api.get(`/courses/${courseId}/quiz/${quizId}`);
+                
+                if (!response.ok) throw new Error('Failed to load quiz');
+                
+                currentQuiz = await response.json();
+                currentQuizAnswers = {};
+                
+                document.getElementById('quiz-subtitle').textContent = currentQuiz.quiz.title;
+                
+                let questionsHtml = '';
+                currentQuiz.questions.forEach((q, index) => {
+                    let optionsHtml = '';
+                    if (q.question_type === 'multiple_choice' && q.options) {
+                        optionsHtml = q.options.map((opt, optIndex) => `
+                            <div class="quiz-option" onclick="selectAnswer(${q.id}, '${opt.replace(/'/g, "\\'")}')">
+                                <input type="radio" name="q${q.id}" value="${opt}" id="q${q.id}_${optIndex}">
+                                <label for="q${q.id}_${optIndex}">${opt}</label>
+                            </div>
+                        `).join('');
+                    } else if (q.question_type === 'true_false') {
+                        optionsHtml = `
+                            <div class="quiz-option" onclick="selectAnswer(${q.id}, 'True')">
+                                <input type="radio" name="q${q.id}" value="True" id="q${q.id}_true">
+                                <label for="q${q.id}_true">True</label>
+                            </div>
+                            <div class="quiz-option" onclick="selectAnswer(${q.id}, 'False')">
+                                <input type="radio" name="q${q.id}" value="False" id="q${q.id}_false">
+                                <label for="q${q.id}_false">False</label>
+                            </div>
+                        `;
+                    } else {
+                        optionsHtml = `
+                            <div class="form-group">
+                                <textarea class="form-textarea" placeholder="Enter your answer..." onblur="selectAnswer(${q.id}, this.value)" rows="3"></textarea>
+                            </div>
+                        `;
+                    }
+                    
+                    questionsHtml += `
+                        <div class="question-card" id="question-${q.id}">
+                            <h4 style="margin-bottom: 16px;">${index + 1}. ${q.question_text}</h4>
+                            <div style="margin-bottom: 12px; color: var(--text-secondary); font-size: 14px;">
+                                Points: ${q.points}
+                            </div>
+                            <div class="options-container">
+                                ${optionsHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('quiz-container').innerHTML = `
+                    <div id="quiz-questions">
+                        ${questionsHtml}
+                    </div>
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button class="btn btn-lg" onclick="submitQuizAttempt()">
+                            <i class="fas fa-check-circle"></i> Submit Quiz
+                        </button>
+                    </div>
+                `;
+                
+                showSection('quiz', null);
+            } catch (error) {
+                showToast('Failed to load quiz', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function selectAnswer(questionId, answer) {
+            currentQuizAnswers[questionId] = answer;
+            
+            // Visual feedback for radio buttons
+            const questionCard = document.getElementById(`question-${questionId}`);
+            if (questionCard) {
+                questionCard.querySelectorAll('.quiz-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                const selected = questionCard.querySelector(`input[value="${answer}"]`);
+                if (selected) {
+                    selected.checked = true;
+                    selected.closest('.quiz-option').classList.add('selected');
+                }
+            }
+        }
+
+        async function submitQuizAttempt() {
+            if (Object.keys(currentQuizAnswers).length === 0) {
+                showToast('Please answer at least one question', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true, 'Submitting...');
+                const response = await api.post(`/quiz/${currentQuiz.quiz.id}/submit`, {
+                    quiz_id: currentQuiz.quiz.id,
+                    answers: currentQuizAnswers
+                });
+                
+                if (!response.ok) throw new Error('Failed to submit');
+                
+                const result = await response.json();
+                
+                document.getElementById('quiz-container').innerHTML = `
+                    <div class="quiz-result">
+                        <div class="quiz-score">${result.percentage}%</div>
+                        <h2 style="margin: 20px 0;">${result.passed ? '<i class="fas fa-check-circle" style="color: var(--success);"></i> Passed!' : '<i class="fas fa-times-circle" style="color: var(--danger);"></i> Failed'}</h2>
+                        <p style="font-size: 18px; margin-bottom: 20px;">
+                            You scored ${result.score} out of ${result.max_score} points
+                        </p>
+                        <p style="color: var(--text-secondary); margin-bottom: 30px;">
+                            Passing score: ${result.passing_score}%
+                        </p>
+                        <button class="btn" onclick="showSection('courses', document.querySelectorAll('.nav-link')[6])">
+                            Back to Courses
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                showToast('Failed to submit quiz', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ==========================================
+        // PUBLIC WEBINARS
+        // ==========================================
         async function loadWebinars() {
             try {
                 const response = await api.get('/webinars?upcoming=true');
@@ -3493,9 +4368,11 @@
                             <i class="fas fa-clock"></i> ${webinar.duration_minutes} minutes<br>
                             <i class="fas fa-users"></i> Max ${webinar.max_participants} participants
                         </div>
+                        ${webinar.reminder_message ? `<div style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 8px; margin: 12px 0; font-size: 14px;"><i class="fas fa-info-circle"></i> ${webinar.reminder_message}</div>` : ''}
                         <button class="btn btn-sm btn-success" onclick="window.open('${webinar.meeting_link}', '_blank')">
                             <i class="fas fa-video"></i> Join Webinar
                         </button>
+                        ${webinar.recording_link ? `<button class="btn btn-sm btn-secondary" onclick="window.open('${webinar.recording_link}', '_blank')" style="margin-top: 8px;"><i class="fas fa-play-circle"></i> Watch Recording</button>` : ''}
                     </div>
                 `}).join('');
             } catch (error) {
@@ -3504,7 +4381,7 @@
         }
 
         // ==========================================
-        // SIGNALS MANAGEMENT
+        // SIGNALS
         // ==========================================
         async function createSignal(e) {
             e.preventDefault();
@@ -3621,30 +4498,45 @@
             }
         }
 
-        async function analyzePerformance() {
-            if (trades.length === 0) {
-                showToast('Please add at least one trade', 'error');
+        // ==========================================
+        // PERFORMANCE ANALYZER (UPDATED - VISION BASED)
+        // ==========================================
+        function handlePerformanceUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            performanceFile = file;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('performance-preview').src = e.target.result;
+                document.getElementById('performance-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function analyzePerformanceVision() {
+            if (!performanceFile) {
+                showToast('Please upload a trading statement image', 'error');
                 return;
             }
 
-            const data = {
-                trades: trades,
-                account_balance: parseFloat(document.getElementById('account-balance').value) || null,
-                trading_period_days: parseInt(document.getElementById('trading-period').value) || 30
-            };
+            const formData = new FormData();
+            formData.append('file', performanceFile);
+            formData.append('account_balance', document.getElementById('vision-account-balance').value || '');
+            formData.append('trading_period_days', document.getElementById('vision-trading-period').value || '30');
 
             try {
-                showLoading(true, 'Analyzing with AI... This may take a minute');
-                const response = await api.post('/analyze/performance', data);
+                showLoading(true, 'AI is analyzing your trading statement... This may take up to 2 minutes');
+                const response = await api.upload('/analyze/performance/vision', formData);
+                const data = await response.json();
                 
-                if (!response.ok) throw new Error('Analysis failed');
-                
-                const result = await response.json();
-                displayAnalysis(result.analysis);
-                
+                if (response.ok) {
+                    displayAnalysis(data.analysis);
+                } else {
+                    throw new Error(data.detail || 'Analysis failed');
+                }
             } catch (error) {
-                console.error('Analysis error:', error);
-                showToast('Failed to analyze performance', 'error');
+                showToast(error.message, 'error');
             } finally {
                 showLoading(false);
             }
@@ -3704,10 +4596,15 @@
             document.getElementById('analysis-results').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // ==========================================
+        // AI MENTOR (UPDATED WITH KNOWLEDGE TOGGLE)
+        // ==========================================
         async function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             if (!message) return;
+
+            const includeKnowledge = document.getElementById('knowledge-toggle').checked;
 
             // Add user message
             const messagesContainer = document.getElementById('chat-messages');
@@ -3732,7 +4629,8 @@
                 const response = await api.post('/chat', {
                     message: message,
                     context: 'Trading mentor session',
-                    history: chatHistory.slice(-10)
+                    history: chatHistory.slice(-10),
+                    include_knowledge: includeKnowledge
                 });
                 
                 document.getElementById(typingId).remove();
@@ -3774,122 +4672,6 @@
             } catch (error) {
                 console.error('Error loading chat history:', error);
             }
-        }
-
-        // ==========================================
-        // TRADE MANAGEMENT
-        // ==========================================
-        function showTradeInput(method) {
-            document.getElementById('manual-input').classList.toggle('hidden', method !== 'manual');
-            document.getElementById('csv-input').classList.toggle('hidden', method !== 'csv');
-            
-            document.getElementById('btn-manual').style.background = method === 'manual' ? 'var(--primary)' : 'transparent';
-            document.getElementById('btn-manual').style.color = method === 'manual' ? 'white' : 'var(--text-secondary)';
-            document.getElementById('btn-csv').style.background = method === 'csv' ? 'var(--primary)' : 'transparent';
-            document.getElementById('btn-csv').style.color = method === 'csv' ? 'white' : 'var(--text-secondary)';
-        }
-
-        function addTrade() {
-            const trade = {
-                pair: document.getElementById('trade-pair').value.toUpperCase(),
-                direction: document.getElementById('trade-direction').value,
-                entry: parseFloat(document.getElementById('trade-entry').value),
-                exit: parseFloat(document.getElementById('trade-exit').value),
-                lots: parseFloat(document.getElementById('trade-lots').value) || 0.1,
-                pips: parseFloat(document.getElementById('trade-pips').value),
-                notes: document.getElementById('trade-notes').value
-            };
-
-            if (!trade.pair || isNaN(trade.entry) || isNaN(trade.exit)) {
-                showToast('Please fill in required fields (Pair, Entry, Exit)', 'error');
-                return;
-            }
-
-            trades.push(trade);
-            renderTrades();
-            clearTradeInputs();
-        }
-
-        function clearTradeInputs() {
-            document.getElementById('trade-pair').value = '';
-            document.getElementById('trade-entry').value = '';
-            document.getElementById('trade-exit').value = '';
-            document.getElementById('trade-pips').value = '';
-            document.getElementById('trade-notes').value = '';
-        }
-
-        function renderTrades() {
-            const container = document.getElementById('trades-container');
-            const count = document.getElementById('trade-count');
-            
-            count.textContent = trades.length;
-            document.getElementById('trades-list-card').classList.remove('hidden');
-            
-            container.innerHTML = trades.map((trade, index) => `
-                <div class="trade-item">
-                    <div>
-                        <strong>${trade.pair}</strong> ${trade.direction.toUpperCase()}
-                        <div style="font-size: 12px; color: var(--text-secondary);">${trade.notes || ''}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div>${trade.entry} → ${trade.exit}</div>
-                        <div style="font-size: 12px;">${trade.lots} lots</div>
-                    </div>
-                    <div class="trade-pnl ${trade.pips >= 0 ? 'positive' : 'negative'}" style="font-weight: bold;">
-                        ${trade.pips >= 0 ? '+' : ''}${trade.pips} pips
-                    </div>
-                    <button class="action-btn delete" onclick="removeTrade(${index})" style="color: var(--danger);">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `).join('');
-        }
-
-        function removeTrade(index) {
-            trades.splice(index, 1);
-            renderTrades();
-            if (trades.length === 0) {
-                document.getElementById('trades-list-card').classList.add('hidden');
-            }
-        }
-
-        function clearTrades() {
-            trades = [];
-            renderTrades();
-            document.getElementById('trades-list-card').classList.add('hidden');
-        }
-
-        function handleCSVUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                const lines = text.split('\n');
-                
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!line) continue;
-                    
-                    const cols = line.split(',');
-                    if (cols.length >= 6) {
-                        trades.push({
-                            pair: cols[1]?.trim() || 'UNKNOWN',
-                            direction: cols[2]?.toLowerCase().trim() || 'buy',
-                            entry: parseFloat(cols[3]) || 0,
-                            exit: parseFloat(cols[4]) || 0,
-                            lots: parseFloat(cols[5]) || 0.1,
-                            pips: parseFloat(cols[6]) || 0,
-                            notes: cols[7]?.trim() || ''
-                        });
-                    }
-                }
-                
-                renderTrades();
-                showToast(`Imported ${trades.length} trades from CSV`, 'success');
-            };
-            reader.readAsText(file);
         }
 
         // ==========================================

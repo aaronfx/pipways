@@ -1,4 +1,8 @@
+# Render Blueprint for Pipways Trading Platform v3.2
+# Production-ready configuration
+
 services:
+  # API SERVICE - Python Backend
   - type: web
     name: pipways-api-nhem
     runtime: python
@@ -6,10 +10,16 @@ services:
     plan: standard
     branch: main
     
-    buildCommand: pip install -r requirements.txt
+    runtimeConfig:
+      python:
+        version: "3.11.0"
     
-    # CORRECT - no "startCommand:" prefix, just the command
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+    buildCommand: |
+      echo "Installing dependencies..."
+      pip install --upgrade pip setuptools wheel
+      pip install -r requirements.txt
+    
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
     
     healthCheckPath: /health
     
@@ -25,10 +35,42 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       
-      - key: PYTHON_VERSION
-        value: 3.11.0
+      - key: ENVIRONMENT
+        value: production
+      
+      - key: FRONTEND_URL
+        value: https://pipways-web-nhem.onrender.com
+      
+      - key: CORS_ORIGINS
+        value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000,http://localhost:5500"
+    
+    autoDeploy: true
+
+  # FRONTEND SERVICE - Static Site
+  - type: web
+    name: pipways-web-nhem
+    runtime: static
+    region: oregon
+    plan: standard
+    branch: main
+    
+    rootDir: .
+    buildCommand: echo "Static site - no build required"
+    publishPath: ./
+    
+    routes:
+      - type: rewrite
+        source: /(.*)
+        destination: /index.html
+    
+    envVars:
+      - key: API_URL
+        value: https://pipways-api-nhem.onrender.com
+    
+    autoDeploy: true
 
 databases:
   - name: pipways-db-nhem
     region: oregon
     plan: standard
+    postgresMajorVersion: 15

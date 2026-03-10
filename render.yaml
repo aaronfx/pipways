@@ -1,52 +1,33 @@
-# Render Blueprint for Pipways Trading Platform v3.2
-
 services:
-  # API SERVICE
   - type: web
-    name: pipways-api-nhem
+    name: pipways-app
     runtime: python
-    region: oregon
-    plan: standard
-    branch: main
-    
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
-    healthCheckPath: /health
-    
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
       - key: DATABASE_URL
         fromDatabase:
-          name: pipways-db-nhem
+          name: pipways-db
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@pipways.com
+      - key: ADMIN_PASSWORD
+        value: admin123
       - key: OPENROUTER_API_KEY
         sync: false
-      - key: CORS_ORIGINS
-        value: "https://pipways-web-nhem.onrender.com,https://*.onrender.com,http://localhost:3000"
-    
-    autoDeploy: true
-
-  # FRONTEND SERVICE - FIXED PUBLISH PATH
-  - type: web
-    name: pipways-web-nhem
-    runtime: static
-    region: oregon
-    plan: standard
-    branch: main
-    
-    buildCommand: ""  # No build needed for static HTML
-    staticPublishPath: .  # ← CORRECTED: Serve from root where index.html is
-    
-    routes:
-      - type: rewrite
-        source: /(.*)
-        destination: /index.html
-    
-    autoDeploy: true
+      # Optional Cloudinary config
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
 
 databases:
-  - name: pipways-db-nhem
-    region: oregon
-    plan: standard
-    postgresMajorVersion: 15
+  - name: pipways-db
+    plan: free

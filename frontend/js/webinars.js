@@ -9,7 +9,7 @@ const webinars = {
         if (!container) return;
 
         try {
-            const data = await api.get('/api/webinars?upcoming=true');  // FIXED: Added /api prefix
+            const data = await api.get('/api/webinars?upcoming=true');
             
             if (!data || data.length === 0) {
                 container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No upcoming webinars scheduled</p></div>';

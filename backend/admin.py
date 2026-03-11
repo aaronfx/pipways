@@ -8,8 +8,9 @@ import os
 import shutil
 from datetime import datetime
 
-# FIXED: Consistent relative imports only
-from .database import db_pool, get_admin_user, get_current_user_optional
+# FIXED: Import from correct modules
+from .database import db_pool
+from .security import get_admin_user, get_current_user_optional
 from .schemas import BlogPostCreate, CourseCreate, WebinarCreate, SignalCreate, UserUpdate
 
 router = APIRouter()
@@ -58,18 +59,23 @@ async def update_user(user_id: int, user_update: UserUpdate, current_user: dict 
         # Build dynamic update query
         updates = []
         values = []
+        param_count = 1
+        
         if user_update.role is not None:
-            updates.append("role = $1")
+            updates.append(f"role = ${param_count}")
             values.append(user_update.role)
+            param_count += 1
+            
         if user_update.subscription_tier is not None:
-            updates.append("subscription_tier = $2")
+            updates.append(f"subscription_tier = ${param_count}")
             values.append(user_update.subscription_tier)
+            param_count += 1
         
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update")
         
         values.append(user_id)
-        query = f"UPDATE users SET {', '.join(updates)} WHERE id = ${len(values)}"
+        query = f"UPDATE users SET {', '.join(updates)} WHERE id = ${param_count}"
         await conn.execute(query, *values)
         
         return {"message": "User updated successfully"}

@@ -51,20 +51,31 @@ app.include_router(ai_router, prefix="/api/ai", tags=["ai"])
 app.include_router(performance_router, prefix="/api/performance", tags=["performance"])
 
 # Determine the correct path for frontend files
-# In Render, files are at /opt/render/project/src/frontend
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 
-# Check if frontend directory exists
+# Create uploads directory if it doesn't exist
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+logger.info(f"Uploads directory ensured at: {UPLOADS_DIR}")
+
+# Mount static files
 if os.path.exists(FRONTEND_DIR):
-    # Mount static files (CSS, JS, images)
-    app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
-    app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
-    app.mount("/uploads", StaticFiles(directory=os.path.join(BASE_DIR, "uploads")), name="uploads")
+    # Mount CSS and JS directories if they exist
+    css_dir = os.path.join(FRONTEND_DIR, "css")
+    js_dir = os.path.join(FRONTEND_DIR, "js")
     
-    logger.info(f"Frontend directory found at: {FRONTEND_DIR}")
+    if os.path.exists(css_dir):
+        app.mount("/css", StaticFiles(directory=css_dir), name="css")
+    if os.path.exists(js_dir):
+        app.mount("/js", StaticFiles(directory=js_dir), name="js")
+    
+    logger.info(f"Frontend static files mounted from: {FRONTEND_DIR}")
 else:
     logger.warning(f"Frontend directory not found at: {FRONTEND_DIR}")
+
+# Mount uploads directory (now it exists)
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 @app.get("/")
 async def serve_index():
@@ -81,13 +92,13 @@ async def health_check():
     return {"status": "healthy"}
 
 # Catch-all route for SPA (Single Page Application) routing
-# This handles client-side routes like /blog, /courses, /admin, etc.
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     """Serve index.html for all non-API routes (SPA behavior)"""
     # Skip API routes
-    if full_path.startswith("api/") or full_path.startswith("auth/") or full_path.startswith("blog/") or full_path.startswith("courses/") or full_path.startswith("webinars/"):
-        return {"detail": "Not Found"}
+    if full_path.startswith(("api/", "auth/", "blog/", "courses/", "webinars/")):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
     
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):

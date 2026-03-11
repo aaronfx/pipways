@@ -1,6 +1,6 @@
 /**
  * Webinars Module
- * Handles webinar display and registration
+ * Fixed: Uses data.webinars.map() with safe checks
  */
 
 const webinars = {
@@ -11,12 +11,20 @@ const webinars = {
         try {
             const data = await api.get('/api/webinars?upcoming=true');
             
-            if (!data || data.length === 0) {
+            // FIXED: Safe check
+            if (!data || !Array.isArray(data.webinars)) {
                 container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No upcoming webinars scheduled</p></div>';
                 return;
             }
 
-            container.innerHTML = data.map(webinar => this.renderWebinarCard(webinar)).join('');
+            const webinarsList = data.webinars;
+            
+            if (webinarsList.length === 0) {
+                container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No upcoming webinars scheduled</p></div>';
+                return;
+            }
+
+            container.innerHTML = webinarsList.map(webinar => this.renderWebinarCard(webinar)).join('');
             
         } catch (error) {
             container.innerHTML = `<div class="content-card"><p style="text-align: center; color: var(--danger);">Error: ${error.message}</p></div>`;

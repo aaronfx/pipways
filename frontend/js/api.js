@@ -1,46 +1,50 @@
 /**
- * API Client - Centralized fetch utilities
+ * API Client Module
+ * Handles all HTTP communication with the backend
  */
-const API_BASE = '/api';
 
 const api = {
+    baseURL: '',  // Empty for same-origin, or set to your API URL
+    
     async request(endpoint, options = {}) {
-        const url = `${API_BASE}${endpoint}`;
-        const token = localStorage.getItem('access_token');
-
-        const headers = {
-            'Content-Type': 'application/json',
-            ...options.headers
+        const url = `${this.baseURL}${endpoint}`;
+        
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
         };
 
+        // Add auth token if available
+        const token = localStorage.getItem('access_token');
         if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Handle body serialization
+        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+            config.body = JSON.stringify(config.body);
         }
 
         try {
-            const response = await fetch(url, {
-                ...options,
-                headers
-            });
-
-            if (response.status === 401) {
-                // Try to refresh token
-                const refreshed = await this.refreshToken();
-                if (refreshed) {
-                    return this.request(endpoint, options);
-                } else {
+            const response = await fetch(url, config);
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Token expired or invalid
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
                     window.location.reload();
-                    return null;
+                    throw new Error('Session expired. Please login again.');
                 }
+                
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || errorData.message || `Request failed: ${response.status}`);
             }
 
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || `HTTP ${response.status}`);
-            }
-
+            // Handle empty responses
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
                 return await response.json();
@@ -52,49 +56,27 @@ const api = {
         }
     },
 
-    async refreshToken() {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) return false;
-
-        try {
-            const response = await fetch('/auth/refresh', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${refreshToken}`
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('access_token', data.access_token);
-                localStorage.setItem('refresh_token', data.refresh_token);
-                return true;
-            }
-            return false;
-        } catch {
-            return false;
-        }
-    },
-
     get(endpoint) {
         return this.request(endpoint, { method: 'GET' });
     },
 
-    post(endpoint, data) {
-        return this.request(endpoint, {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
+    post(endpoint, body) {
+        return this.request(endpoint, { method: 'POST', body });
     },
 
-    put(endpoint, data) {
-        return this.request(endpoint, {
-            method: 'PUT',
-            body: JSON.stringify(data)
-        });
+    put(endpoint, body) {
+        return this.request(endpoint, { method: 'PUT', body });
     },
 
     delete(endpoint) {
         return this.request(endpoint, { method: 'DELETE' });
+    },
+
+    upload(endpoint, formData) {
+        return this.request(endpoint, {
+            method: 'POST',
+            body: formData,
+            headers: {} // Let browser set Content-Type with boundary
+        });
     }
 };

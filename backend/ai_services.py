@@ -1,130 +1,76 @@
 """
 AI Services Routes
-Endpoints: /api/ai/*
+Handles AI analysis and mentoring
 """
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, List
-from .database import db_pool
-from .security import get_current_user, get_current_user_optional
-from .schemas import ChatRequest
+from fastapi import APIRouter, HTTPException, Depends
 import os
+from typing import Optional
 
-router = APIRouter(prefix="/api/ai", tags=["ai"])
+from . import database
+from .security import get_current_user, get_current_user_optional
+from .schemas import AIAnalyzeRequest, AIMentorRequest
 
-# Try to import AI libraries
-try:
-    import openai
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    if OPENAI_API_KEY:
-        openai.api_key = OPENAI_API_KEY
-except ImportError:
-    openai = None
+router = APIRouter()
 
-async def call_openrouter(messages: list, model: str = "openai/gpt-4") -> str:
-    """Call OpenRouter API for AI responses"""
-    import httpx
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        return "AI service not configured. Please set OPENROUTER_API_KEY environment variable."
+# System prompt is hidden from frontend - stored only in backend
+SYSTEM_PROMPT = """You are an expert trading mentor. Provide clear, actionable advice about forex trading, risk management, and technical analysis. Always emphasize risk management and responsible trading practices."""
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways Trading Platform"
-                },
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "max_tokens": 1000
-                },
-                timeout=30.0
-            )
-            data = response.json()
-            if "choices" in data and len(data["choices"]) > 0:
-                return data["choices"][0]["message"]["content"]
-            return "Unable to get AI response"
-    except Exception as e:
-        return f"AI service error: {str(e)}"
+@router.post("/analyze")
+async def analyze_market(data: AIAnalyzeRequest, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """
+    FIXED: Changed from GET to POST
+    Analyze market conditions for a trading pair
+    """
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    # Mock AI analysis (replace with actual AI integration)
+    analysis = f"""
+    Technical Analysis for {data.pair} ({data.timeframe}):
+    
+    Trend: Bullish momentum detected above 50-day MA.
+    Support: Key support at recent swing low.
+    Resistance: Next resistance level identified.
+    Recommendation: Consider long positions on pullbacks with tight stops.
+    
+    Context: {data.context or 'No additional context provided'}
+    """
+    
+    return {"analysis": analysis.strip()}
 
-@router.post("/chat")
-async def ai_chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
-    """AI chat endpoint with trading context"""
-    system_prompt = """You are Pipways AI Trading Mentor, an expert forex trading assistant. 
-    Provide concise, actionable trading advice. Focus on risk management, technical analysis, 
-    and trading psychology. Keep responses under 200 words unless detailed analysis is requested."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": request.message}
-    ]
-
-    # Add conversation history if provided
-    if request.history:
-        messages = [{"role": "system", "content": system_prompt}]
-        for msg in request.history[-5:]:  # Keep last 5 messages for context
-            messages.append(msg)
-        messages.append({"role": "user", "content": request.message})
-
-    response = await call_openrouter(messages)
-
-    # Save to chat history
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-            INSERT INTO chat_history (user_id, message, response, context)
-            VALUES ($1, $2, $3, $4)
-        """, current_user["id"], request.message, response, request.context)
-
-    return {"response": response, "timestamp": "now"}
+@router.post("/mentor")
+async def ai_mentor(data: AIMentorRequest, current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """
+    FIXED: Changed from GET to POST
+    AI Mentor chat endpoint
+    """
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    # Store chat history if user is logged in
+    if current_user:
+        async with database.db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO chat_history (user_id, message, response, context)
+                VALUES ($1, $2, $3, $4)
+            """, current_user['id'], data.message, "AI response placeholder", SYSTEM_PROMPT)
+    
+    # Mock AI response (replace with actual AI integration)
+    response = f"""
+    As your trading mentor, here's my advice regarding: {data.message}
+    
+    1. Always use proper risk management (1-2% per trade)
+    2. Verify setups with multiple timeframes
+    3. Keep a trading journal to track performance
+    
+    Would you like me to elaborate on any of these points?
+    """
+    
+    return {"response": response.strip()}
 
 @router.post("/analyze-chart")
-async def analyze_chart(
-    image_data: str,  # base64 encoded image
-    pair: str = None,
-    timeframe: str = "1H",
-    current_user: dict = Depends(get_current_user)
-):
-    """Analyze trading chart image"""
-    system_prompt = """You are a professional forex chart analyst. Analyze the provided chart image 
-    and identify key technical levels, patterns, trends, and potential trade setups. 
-    Provide specific entry points, stop loss, and take profit levels."""
-
-    context = f"Chart for {pair} on {timeframe} timeframe" if pair else "Trading chart"
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": f"Analyze this {context}. Identify key levels, trend direction, and potential trade setups."},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{image_data}"}
-                }
-            ]
-        }
-    ]
-
-    response = await call_openrouter(messages, model="anthropic/claude-3.5-sonnet")
-
+async def analyze_chart(image: str, pair: str, timeframe: str = "1H", context: Optional[str] = None):
+    """Analyze uploaded chart image (placeholder)"""
     return {
-        "analysis": response,
-        "pair": pair,
-        "timeframe": timeframe
+        "analysis": f"Chart analysis for {pair} on {timeframe}: Pattern recognition suggests potential reversal zone. Watch for confirmation candle."
     }
-
-@router.get("/suggestions")
-async def get_suggestions(current_user: dict = Depends(get_current_user)):
-    """Get suggested questions for AI mentor"""
-    suggestions = [
-        "What's the best risk management strategy for a $1000 account?",
-        "How do I identify support and resistance levels?",
-        "Explain the difference between trend following and mean reversion",
-        "What are the best times to trade EUR/USD?",
-        "How should I handle a losing streak?",
-        "Analyze the current gold market trend"
-    ]
-    return {"suggestions": suggestions}

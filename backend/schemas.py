@@ -224,16 +224,6 @@ class CourseUpdate(BaseModel):
     duration_hours: Optional[float] = None
     thumbnail: Optional[str] = None
 
-class CourseModuleBase(BaseModel):
-    title: str = Field(..., min_length=1)
-    content: Optional[str] = None
-    video_url: Optional[str] = None
-    sort_order: int = 0
-    is_premium: bool = False
-
-class CourseModuleCreate(CourseModuleBase):
-    pass
-
 class CourseResponse(CourseBase):
     id: int
     created_by: Optional[int] = None
@@ -245,10 +235,31 @@ class CourseResponse(CourseBase):
         from_attributes = True
 
 # ============================================================================
-# Quiz Models
+# Module Models (FIXED - was missing)
+# ============================================================================
+
+class ModuleCreate(BaseModel):
+    """For creating course modules - used by courses.py"""
+    course_id: int
+    title: str = Field(..., min_length=1)
+    content: Optional[str] = None
+    video_url: Optional[str] = None
+    sort_order: int = 0
+    is_premium: bool = False
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    video_url: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_premium: Optional[bool] = None
+
+# ============================================================================
+# Quiz Models (FIXED - was missing imports)
 # ============================================================================
 
 class QuizCreate(BaseModel):
+    """For creating quizzes - used by courses.py"""
     course_id: int
     title: str = Field(..., min_length=1)
     description: Optional[str] = None
@@ -259,6 +270,11 @@ class QuizUpdate(BaseModel):
     description: Optional[str] = None
     passing_score: Optional[int] = Field(None, ge=0, le=100)
 
+class QuizAttempt(BaseModel):
+    """For submitting quiz answers - used by courses.py"""
+    quiz_id: int
+    answers: Dict[str, Any]
+
 class QuizQuestionCreate(BaseModel):
     quiz_id: int
     question_text: str
@@ -266,10 +282,6 @@ class QuizQuestionCreate(BaseModel):
     options: Optional[List[str]] = []
     correct_answer: str
     points: int = Field(default=1, ge=1)
-
-class QuizAttempt(BaseModel):
-    quiz_id: int
-    answers: Dict[str, Any]
 
 # ============================================================================
 # AI & Performance Models

@@ -78,3 +78,9 @@ class AIMentorRequest(BaseModel):
     message: str
     history: Optional[List[dict]] = []
     use_knowledge: bool = True
+
+# FIXED: Added missing schema
+class PerformanceAnalysisRequest(BaseModel):
+    image: str  # base64 encoded image
+    account_balance: float
+    trading_period_days: int

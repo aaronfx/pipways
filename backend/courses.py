@@ -1,6 +1,6 @@
 """
 Courses Routes
-Handles course content and enrollment
+Fixed: Wrapped responses with modules
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
@@ -22,7 +22,7 @@ async def get_courses(search: Optional[str] = None, level: Optional[str] = None,
         params = []
         
         if level:
-            query += " AND level = $1"
+            query += f" AND level = ${len(params)+1}"
             params.append(level)
         
         if search:
@@ -33,15 +33,16 @@ async def get_courses(search: Optional[str] = None, level: Optional[str] = None,
         
         courses = await conn.fetch(query, *params)
         
-        # Get modules for each course
         result = []
         for course in courses:
             course_dict = dict(course)
-            modules = await conn.fetch("SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order", course['id'])
+            modules = await conn.fetch(
+                "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order", 
+                course['id']
+            )
             course_dict['modules'] = [dict(m) for m in modules]
             result.append(course_dict)
         
-        # FIXED: Return wrapped response
         return {"courses": result}
 
 @router.get("/{course_id}")
@@ -56,7 +57,10 @@ async def get_course(course_id: int, current_user: Optional[dict] = Depends(get_
             raise HTTPException(status_code=404, detail="Course not found")
         
         course_dict = dict(course)
-        modules = await conn.fetch("SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order", course_id)
+        modules = await conn.fetch(
+            "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order", 
+            course_id
+        )
         course_dict['modules'] = [dict(m) for m in modules]
         
         return course_dict
@@ -116,3 +120,28 @@ async def add_module(course_id: int, module: CourseModuleCreate, current_user: d
         """, course_id, module.title, module.content, module.video_url, module.is_premium, module.sort_order)
         
         return {"id": module_id, "message": "Module added successfully"}
+
+@router.put("/{course_id}/modules/{module_id}")
+async def update_module(course_id: int, module_id: int, module: CourseModuleCreate, current_user: dict = Depends(get_admin_user)):
+    """Update course module"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE course_modules 
+            SET title = $1, content = $2, video_url = $3, is_premium = $4, sort_order = $5
+            WHERE id = $6 AND course_id = $7
+        """, module.title, module.content, module.video_url, module.is_premium, module.sort_order, module_id, course_id)
+        
+        return {"message": "Module updated successfully"}
+
+@router.delete("/{course_id}/modules/{module_id}")
+async def delete_module(course_id: int, module_id: int, current_user: dict = Depends(get_admin_user)):
+    """Delete course module"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        await conn.execute("DELETE FROM course_modules WHERE id = $1 AND course_id = $2", module_id, course_id)
+        return {"message": "Module deleted successfully"}

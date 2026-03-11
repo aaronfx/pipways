@@ -9,7 +9,7 @@ const webinars = {
         if (!container) return;
 
         try {
-            const data = await api.get('/webinars?upcoming=true');
+            const data = await api.get('/api/webinars?upcoming=true');  // FIXED: Added /api prefix
             
             if (!data || data.length === 0) {
                 container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No upcoming webinars scheduled</p></div>';
@@ -25,7 +25,6 @@ const webinars = {
 
     renderWebinarCard(webinar) {
         const isPremium = webinar.is_premium ? '<span class="badge badge-premium">VIP Only</span>' : '';
-        const isUpcoming = new Date(webinar.scheduled_at) > new Date();
         const scheduledDate = ui.formatDate(webinar.scheduled_at);
 
         return `

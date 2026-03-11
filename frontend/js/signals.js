@@ -1,6 +1,6 @@
 /**
  * Trading Signals Module
- * Handles signal display and management
+ * Fixed: Uses data.signals.map() instead of data.map()
  */
 
 const signals = {
@@ -16,12 +16,20 @@ const signals = {
             const url = filter ? `/api/signals?pair=${filter}` : '/api/signals';
             const data = await api.get(url);
             
-            if (!data || data.length === 0) {
+            // FIXED: Safe check for array
+            if (!data || !Array.isArray(data.signals)) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No active signals</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = data.map(signal => `
+            const signalsList = data.signals;
+            
+            if (signalsList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No active signals</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = signalsList.map(signal => `
                 <tr>
                     <td><strong>${signal.pair}</strong></td>
                     <td>
@@ -52,6 +60,6 @@ const signals = {
     },
 
     viewSignal(id) {
-        ui.showToast(`Viewing signal ${id} - Full details modal would open here`, 'info');
+        ui.showToast(`Viewing signal ${id}`, 'info');
     }
 };

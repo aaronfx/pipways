@@ -1,12 +1,10 @@
 services:
   - type: web
-    name: pipways-app
+    name: pipways-platform
     runtime: python
-    plan: free
-    buildCommand: |
-      pip install -r requirements.txt
-      mkdir -p uploads
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -19,10 +17,13 @@ services:
       - key: ADMIN_EMAIL
         value: admin@pipways.com
       - key: ADMIN_PASSWORD
-        value: admin123
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: uploads
       - key: OPENROUTER_API_KEY
         sync: false
 
 databases:
   - name: pipways-db
-    plan: free
+    plan: starter
+    ipAllowList: []

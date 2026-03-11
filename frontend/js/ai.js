@@ -15,7 +15,6 @@ const ai = {
         
         if (!message) return;
 
-        // Add user message
         const userMsgDiv = document.createElement('div');
         userMsgDiv.className = 'chat-message user';
         userMsgDiv.innerHTML = `<div class="chat-bubble"><strong>You:</strong> ${ui.escapeHtml(message)}</div>`;
@@ -145,12 +144,10 @@ const ai = {
     displayPerformanceResults(data) {
         document.getElementById('analysis-results').classList.remove('hidden');
         
-        // Update score
         const score = data.trader_score || 0;
         document.getElementById('trader-score').textContent = score;
         document.getElementById('score-circle').style.setProperty('--score', score);
         
-        // Interpretation
         let interpretation = 'Needs Improvement';
         if (score >= 80) interpretation = 'Excellent Trader';
         else if (score >= 60) interpretation = 'Good Performance';
@@ -158,7 +155,6 @@ const ai = {
         
         document.getElementById('score-interpretation').textContent = interpretation;
 
-        // Summary
         document.getElementById('performance-summary').innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 12px;">
                 <div>Total Trades: <strong>${data.total_trades || 0}</strong></div>
@@ -168,7 +164,6 @@ const ai = {
             </div>
         `;
 
-        // Lists
         const renderList = (items, containerId) => {
             const container = document.getElementById(containerId);
             if (!items || items.length === 0) {
@@ -182,10 +177,8 @@ const ai = {
         renderList(data.strengths, 'strengths-list');
         renderList(data.improvement_plan, 'improvement-plan');
         
-        // Mentor advice
         document.getElementById('mentor-advice').textContent = data.mentor_advice || 'Keep practicing and learning from your trades.';
         
-        // Recommended courses
         const coursesContainer = document.getElementById('recommended-courses');
         if (data.recommended_courses && data.recommended_courses.length > 0) {
             coursesContainer.innerHTML = data.recommended_courses.map(c => 

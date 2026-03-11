@@ -1,6 +1,6 @@
 /**
  * Blog Module
- * Handles blog post display and reading
+ * Fixed: Uses data.posts.map() instead of data.map()
  */
 
 const blog = {
@@ -18,12 +18,20 @@ const blog = {
 
             const data = await api.get(url);
             
-            if (!data || data.length === 0) {
+            // FIXED: Safe check for array
+            if (!data || !Array.isArray(data.posts)) {
                 container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No articles found</p></div>';
                 return;
             }
 
-            container.innerHTML = data.map(post => this.renderPostCard(post)).join('');
+            const posts = data.posts;
+            
+            if (posts.length === 0) {
+                container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No articles found</p></div>';
+                return;
+            }
+
+            container.innerHTML = posts.map(post => this.renderPostCard(post)).join('');
             
         } catch (error) {
             container.innerHTML = `<div class="content-card"><p style="text-align: center; color: var(--danger);">Error: ${error.message}</p></div>`;
@@ -55,7 +63,7 @@ const blog = {
             const post = await api.get(`/api/blog/${postId}`);
             
             container.innerHTML = `
-                <button class="btn btn-sm btn-secondary" onclick="app.showSection('blog', document.querySelectorAll('.nav-link')[8])" style="margin-bottom: 2rem;">
+                <button class="btn btn-sm btn-secondary" onclick="app.showSection('blog')" style="margin-bottom: 2rem;">
                     <i class="fas fa-arrow-left"></i> Back to Blog
                 </button>
                 ${post.featured_image ? `<img src="${post.featured_image}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 0.5rem; margin-bottom: 2rem;">` : ''}

@@ -2,18 +2,24 @@
 Security Utilities
 Authentication and authorization dependencies
 """
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
-from datetime import datetime, timedelta
 from typing import Optional
 
 from .database import db_pool, SECRET_KEY, ALGORITHM
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Verify JWT token and return current user"""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     token = credentials.credentials
     
     try:
@@ -56,6 +62,32 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     return dict(user)
 
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Optional authentication - returns user if token valid, None if no token or invalid.
+    Used for endpoints that work for both guests and logged-in users.
+    """
+    if not credentials:
+        return None
+    
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            return None
+            
+        async with db_pool.acquire() as conn:
+            user = await conn.fetchrow(
+                "SELECT id, email, full_name, role, subscription_tier, subscription_status FROM users WHERE id = $1",
+                int(user_id)
+            )
+            return dict(user) if user else None
+            
+    except (jwt.ExpiredSignatureError, jwt.JWTError, Exception):
+        return None
+
 async def get_admin_user(current_user: dict = Depends(get_current_user)):
     """Verify user is admin or moderator"""
     if current_user["role"] not in ["admin", "moderator"]:
@@ -65,18 +97,20 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
         )
     return current_user
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: Optional[int] = None):
     """Create JWT access token"""
+    import datetime
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_delta)
     else:
-        expire = datetime.utcnow() + timedelta(minutes=60)
+        expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def create_refresh_token(data: dict):
     """Create JWT refresh token"""
-    expire = datetime.utcnow() + timedelta(days=7)
+    import datetime
+    expire = datetime.datetime.utcnow() + datetime.timedelta(days=7)
     data.update({"exp": expire})
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)

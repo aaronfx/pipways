@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v3.5.1
+Pipways Trading Platform API - Production Debug & System Completion v3.5.2
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="3.5.1", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.2", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -328,7 +328,7 @@ class SiteSettingsUpdate(BaseModel):
     contact_email: Optional[str] = None
 
 # ============================================================================
-# Database Initialization
+# Database Initialization - FIXED: Added column safety checks
 # ============================================================================
 
 async def init_db():
@@ -400,8 +400,11 @@ async def init_db():
                 closed_at TIMESTAMP
             )
         """)
+        
+        # Ensure closed_at exists (for existing databases)
+        await conn.execute("ALTER TABLE signals ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP")
 
-        # Webinars table - NO recording_link, NO thumbnail
+        # Webinars table - FIXED: Ensure reminder_message exists
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -417,8 +420,12 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # Ensure reminder_message exists for backward compatibility
+        await conn.execute("ALTER TABLE webinars ADD COLUMN IF NOT EXISTS reminder_message TEXT")
+        await conn.execute("ALTER TABLE webinars ADD COLUMN IF NOT EXISTS max_participants INTEGER DEFAULT 100")
 
-        # Drop columns if they exist (for migration)
+        # Drop deprecated columns if they exist (safe cleanup)
         await conn.execute("ALTER TABLE webinars DROP COLUMN IF EXISTS recording_link")
         await conn.execute("ALTER TABLE webinars DROP COLUMN IF EXISTS thumbnail")
 
@@ -868,7 +875,7 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "User deleted"}
 
 # ============================================================================
-# NEW: Admin Signals Endpoint
+# FIXED: Admin Signals Endpoint with better error handling
 # ============================================================================
 
 @app.get("/admin/signals")
@@ -878,16 +885,54 @@ async def get_admin_signals(
     admin: dict = Depends(get_admin_user)
 ):
     """Get all signals for admin management panel"""
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            """SELECT id, pair, direction, entry_price, stop_loss, tp1, tp2, 
-               risk_reward_ratio, timeframe, status, result, is_premium, created_at 
-               FROM signals 
-               ORDER BY created_at DESC 
-               LIMIT $1 OFFSET $2""",
-            limit, offset
-        )
-        return [dict(row) for row in rows]
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id, pair, direction, entry_price, stop_loss, tp1, tp2, 
+                   risk_reward_ratio, timeframe, status, result, is_premium, created_at 
+                   FROM signals 
+                   ORDER BY created_at DESC 
+                   LIMIT $1 OFFSET $2""",
+                limit, offset
+            )
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error loading admin signals: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error loading signals: {str(e)}")
+
+# ============================================================================
+# FIXED: Media Delete Endpoint
+# ============================================================================
+
+@app.delete("/admin/media/{media_id}")
+async def delete_media(media_id: int, admin: dict = Depends(get_admin_user)):
+    """Delete media file (database record and physical file)"""
+    try:
+        async with db_pool.acquire() as conn:
+            media = await conn.fetchrow("SELECT * FROM media_files WHERE id = $1", media_id)
+            if not media:
+                raise HTTPException(status_code=404, detail="Media not found")
+            
+            # Delete local file if exists
+            url = media["url"]
+            if url and not url.startswith("http"):
+                try:
+                    file_path = url.lstrip("/")
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logger.info(f"Deleted local file: {file_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting physical file: {e}")
+                    # Continue to delete DB record even if file deletion fails
+            
+            # Delete from database
+            await conn.execute("DELETE FROM media_files WHERE id = $1", media_id)
+            return {"message": "Media deleted successfully", "id": media_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting media: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete media: {str(e)}")
 
 # ============================================================================
 # Site Settings Endpoints
@@ -1280,7 +1325,7 @@ async def list_media(
         return {"files": [dict(row) for row in rows]}
 
 # ============================================================================
-# NEW: Courses - Admin Management with Pagination
+# FIXED: Courses - Admin Management with Pagination
 # ============================================================================
 
 @app.get("/admin/courses")
@@ -1291,145 +1336,171 @@ async def get_admin_courses_list(
     admin: dict = Depends(get_admin_user)
 ):
     """Get paginated course list for admin panel with module count"""
-    async with db_pool.acquire() as conn:
-        where_clauses = ["1=1"]
-        params = []
-        
-        if search:
-            where_clauses.append(f"(title ILIKE ${len(params)+1} OR description ILIKE ${len(params)+1})")
-            params.append(f"%{search}%")
-        
-        count_query = f"SELECT COUNT(*) FROM courses WHERE {' AND '.join(where_clauses)}"
-        total = await conn.fetchval(count_query, *params)
-        
-        offset = (page - 1) * limit
-        query = f"""
-            SELECT c.*, u.full_name as creator_name,
-                   (SELECT COUNT(*) FROM course_modules WHERE course_id = c.id) as module_count,
-                   (SELECT COUNT(*) FROM course_quizzes WHERE course_id = c.id) as quiz_count
-            FROM courses c
-            LEFT JOIN users u ON c.created_by = u.id
-            WHERE {' AND '.join(where_clauses)}
-            ORDER BY c.created_at DESC
-            LIMIT ${len(params)+1} OFFSET ${len(params)+2}
-        """
-        params.extend([limit, offset])
-        
-        rows = await conn.fetch(query, *params)
-        return {
-            "courses": [dict(row) for row in rows],
-            "total": total,
-            "page": page,
-            "pages": (total + limit - 1) // limit
-        }
+    try:
+        async with db_pool.acquire() as conn:
+            where_clauses = ["1=1"]
+            params = []
+            
+            if search:
+                where_clauses.append(f"(title ILIKE ${len(params)+1} OR description ILIKE ${len(params)+1})")
+                params.append(f"%{search}%")
+            
+            count_query = f"SELECT COUNT(*) FROM courses WHERE {' AND '.join(where_clauses)}"
+            total = await conn.fetchval(count_query, *params)
+            
+            offset = (page - 1) * limit
+            query = f"""
+                SELECT c.*, u.full_name as creator_name,
+                       (SELECT COUNT(*) FROM course_modules WHERE course_id = c.id) as module_count,
+                       (SELECT COUNT(*) FROM course_quizzes WHERE course_id = c.id) as quiz_count
+                FROM courses c
+                LEFT JOIN users u ON c.created_by = u.id
+                WHERE {' AND '.join(where_clauses)}
+                ORDER BY c.created_at DESC
+                LIMIT ${len(params)+1} OFFSET ${len(params)+2}
+            """
+            params.extend([limit, offset])
+            
+            rows = await conn.fetch(query, *params)
+            return {
+                "courses": [dict(row) for row in rows],
+                "total": total,
+                "page": page,
+                "pages": (total + limit - 1) // limit
+            }
+    except Exception as e:
+        logger.error(f"Error loading admin courses: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading courses: {str(e)}")
 
 @app.get("/admin/courses/{course_id}")
 async def get_admin_course_detail(course_id: int, admin: dict = Depends(get_admin_user)):
     """Get detailed course info with modules for admin"""
-    async with db_pool.acquire() as conn:
-        course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
-        if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        modules = await conn.fetch(
-            "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id",
-            course_id
-        )
-        
-        quizzes = await conn.fetch(
-            "SELECT * FROM course_quizzes WHERE course_id = $1",
-            course_id
-        )
-        
-        return {
-            "course": dict(course),
-            "modules": [dict(m) for m in modules],
-            "quizzes": [dict(q) for q in quizzes]
-        }
+    try:
+        async with db_pool.acquire() as conn:
+            course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+            if not course:
+                raise HTTPException(status_code=404, detail="Course not found")
+            
+            modules = await conn.fetch(
+                "SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id",
+                course_id
+            )
+            
+            quizzes = await conn.fetch(
+                "SELECT * FROM course_quizzes WHERE course_id = $1",
+                course_id
+            )
+            
+            return {
+                "course": dict(course),
+                "modules": [dict(m) for m in modules],
+                "quizzes": [dict(q) for q in quizzes]
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading course detail: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading course: {str(e)}")
 
 @app.post("/admin/courses")
 async def create_course(course: CourseCreate, admin: dict = Depends(get_admin_user)):
     """Create new course"""
-    async with db_pool.acquire() as conn:
-        admin_id = admin.get("id") or admin.get("sub")
-        
-        course_id = await conn.fetchval("""
-            INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING id
-        """, course.title, course.description, course.content, course.level, 
-             course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
-        
-        # Create modules if provided
-        if course.modules:
-            for idx, module in enumerate(course.modules):
-                await conn.execute("""
-                    INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """, course_id, module.get("title"), module.get("content"), 
-                     module.get("video_url"), idx, module.get("is_premium", False))
-        
-        return {"id": course_id, "message": "Course created successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            admin_id = admin.get("id") or admin.get("sub")
+            
+            course_id = await conn.fetchval("""
+                INSERT INTO courses (title, description, content, level, duration_hours, thumbnail, is_premium, created_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING id
+            """, course.title, course.description, course.content, course.level, 
+                 course.duration_hours, course.thumbnail, course.is_premium, int(admin_id))
+            
+            # Create modules if provided
+            if course.modules:
+                for idx, module in enumerate(course.modules):
+                    await conn.execute("""
+                        INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    """, course_id, module.get("title"), module.get("content"), 
+                         module.get("video_url"), idx, module.get("is_premium", False))
+            
+            return {"id": course_id, "message": "Course created successfully"}
+    except Exception as e:
+        logger.error(f"Error creating course: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create course: {str(e)}")
 
 @app.put("/admin/courses/{course_id}")
 async def update_course(course_id: int, course_update: CourseUpdate, admin: dict = Depends(get_admin_user)):
     """Update course details"""
-    async with db_pool.acquire() as conn:
-        # Check if course exists
-        existing = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        update_fields = []
-        params = []
-        
-        if course_update.title is not None:
-            update_fields.append(f"title = ${len(params)+1}")
-            params.append(course_update.title)
+    try:
+        async with db_pool.acquire() as conn:
+            # Check if course exists
+            existing = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Course not found")
             
-        if course_update.description is not None:
-            update_fields.append(f"description = ${len(params)+1}")
-            params.append(course_update.description)
+            update_fields = []
+            params = []
             
-        if course_update.content is not None:
-            update_fields.append(f"content = ${len(params)+1}")
-            params.append(course_update.content)
+            if course_update.title is not None:
+                update_fields.append(f"title = ${len(params)+1}")
+                params.append(course_update.title)
+                
+            if course_update.description is not None:
+                update_fields.append(f"description = ${len(params)+1}")
+                params.append(course_update.description)
+                
+            if course_update.content is not None:
+                update_fields.append(f"content = ${len(params)+1}")
+                params.append(course_update.content)
+                
+            if course_update.level is not None:
+                update_fields.append(f"level = ${len(params)+1}")
+                params.append(course_update.level)
+                
+            if course_update.duration_hours is not None:
+                update_fields.append(f"duration_hours = ${len(params)+1}")
+                params.append(course_update.duration_hours)
+                
+            if course_update.thumbnail is not None:
+                update_fields.append(f"thumbnail = ${len(params)+1}")
+                params.append(course_update.thumbnail)
+                
+            if course_update.is_premium is not None:
+                update_fields.append(f"is_premium = ${len(params)+1}")
+                params.append(course_update.is_premium)
             
-        if course_update.level is not None:
-            update_fields.append(f"level = ${len(params)+1}")
-            params.append(course_update.level)
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+                
+            update_fields.append("updated_at = NOW()")
+            params.append(course_id)
             
-        if course_update.duration_hours is not None:
-            update_fields.append(f"duration_hours = ${len(params)+1}")
-            params.append(course_update.duration_hours)
+            query = f"UPDATE courses SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+            result = await conn.fetchval(query, *params)
             
-        if course_update.thumbnail is not None:
-            update_fields.append(f"thumbnail = ${len(params)+1}")
-            params.append(course_update.thumbnail)
-            
-        if course_update.is_premium is not None:
-            update_fields.append(f"is_premium = ${len(params)+1}")
-            params.append(course_update.is_premium)
-        
-        if not update_fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
-            
-        update_fields.append("updated_at = NOW()")
-        params.append(course_id)
-        
-        query = f"UPDATE courses SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
-        result = await conn.fetchval(query, *params)
-        
-        return {"message": "Course updated successfully", "id": course_id}
+            return {"message": "Course updated successfully", "id": course_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating course: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update course: {str(e)}")
 
 @app.delete("/admin/courses/{course_id}")
 async def delete_course(course_id: int, admin: dict = Depends(get_admin_user)):
     """Delete course and all related data"""
-    async with db_pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM courses WHERE id = $1", course_id)
-        if result == "DELETE 0":
-            raise HTTPException(status_code=404, detail="Course not found")
-        return {"message": "Course deleted successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM courses WHERE id = $1", course_id)
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Course not found")
+            return {"message": "Course deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting course: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete course: {str(e)}")
 
 # ============================================================================
 # Module Management
@@ -1438,81 +1509,103 @@ async def delete_course(course_id: int, admin: dict = Depends(get_admin_user)):
 @app.post("/admin/courses/{course_id}/modules")
 async def create_module(course_id: int, module: ModuleCreate, admin: dict = Depends(get_admin_user)):
     """Create new module for course"""
-    async with db_pool.acquire() as conn:
-        course_exists = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
-        if not course_exists:
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        module_id = await conn.fetchval("""
-            INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id
-        """, course_id, module.title, module.content, module.video_url, 
-             module.sort_order or 0, module.is_premium)
-        
-        return {"id": module_id, "message": "Module created successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            course_exists = await conn.fetchval("SELECT id FROM courses WHERE id = $1", course_id)
+            if not course_exists:
+                raise HTTPException(status_code=404, detail="Course not found")
+            
+            module_id = await conn.fetchval("""
+                INSERT INTO course_modules (course_id, title, content, video_url, sort_order, is_premium)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id
+            """, course_id, module.title, module.content, module.video_url, 
+                 module.sort_order or 0, module.is_premium)
+            
+            return {"id": module_id, "message": "Module created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating module: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create module: {str(e)}")
 
 @app.put("/admin/modules/{module_id}")
 async def update_module(module_id: int, module_update: ModuleUpdate, admin: dict = Depends(get_admin_user)):
     """Update module"""
-    async with db_pool.acquire() as conn:
-        existing = await conn.fetchval("SELECT id FROM course_modules WHERE id = $1", module_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Module not found")
-        
-        update_fields = []
-        params = []
-        
-        if module_update.title is not None:
-            update_fields.append(f"title = ${len(params)+1}")
-            params.append(module_update.title)
+    try:
+        async with db_pool.acquire() as conn:
+            existing = await conn.fetchval("SELECT id FROM course_modules WHERE id = $1", module_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Module not found")
             
-        if module_update.content is not None:
-            update_fields.append(f"content = ${len(params)+1}")
-            params.append(module_update.content)
+            update_fields = []
+            params = []
             
-        if module_update.video_url is not None:
-            update_fields.append(f"video_url = ${len(params)+1}")
-            params.append(module_update.video_url)
+            if module_update.title is not None:
+                update_fields.append(f"title = ${len(params)+1}")
+                params.append(module_update.title)
+                
+            if module_update.content is not None:
+                update_fields.append(f"content = ${len(params)+1}")
+                params.append(module_update.content)
+                
+            if module_update.video_url is not None:
+                update_fields.append(f"video_url = ${len(params)+1}")
+                params.append(module_update.video_url)
+                
+            if module_update.sort_order is not None:
+                update_fields.append(f"sort_order = ${len(params)+1}")
+                params.append(module_update.sort_order)
+                
+            if module_update.is_premium is not None:
+                update_fields.append(f"is_premium = ${len(params)+1}")
+                params.append(module_update.is_premium)
             
-        if module_update.sort_order is not None:
-            update_fields.append(f"sort_order = ${len(params)+1}")
-            params.append(module_update.sort_order)
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+                
+            params.append(module_id)
             
-        if module_update.is_premium is not None:
-            update_fields.append(f"is_premium = ${len(params)+1}")
-            params.append(module_update.is_premium)
-        
-        if not update_fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
+            query = f"UPDATE course_modules SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+            result = await conn.fetchval(query, *params)
             
-        params.append(module_id)
-        
-        query = f"UPDATE course_modules SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
-        result = await conn.fetchval(query, *params)
-        
-        return {"message": "Module updated successfully", "id": module_id}
+            return {"message": "Module updated successfully", "id": module_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating module: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update module: {str(e)}")
 
 @app.delete("/admin/modules/{module_id}")
 async def delete_module(module_id: int, admin: dict = Depends(get_admin_user)):
     """Delete module"""
-    async with db_pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM course_modules WHERE id = $1", module_id)
-        if result == "DELETE 0":
-            raise HTTPException(status_code=404, detail="Module not found")
-        return {"message": "Module deleted successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM course_modules WHERE id = $1", module_id)
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Module not found")
+            return {"message": "Module deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting module: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete module: {str(e)}")
 
 @app.post("/admin/modules/reorder")
 async def reorder_modules(module_order: Dict[int, int], admin: dict = Depends(get_admin_user)):
     """Reorder modules - receives dict of {module_id: sort_order}"""
-    async with db_pool.acquire() as conn:
-        async with conn.transaction():
-            for module_id, sort_order in module_order.items():
-                await conn.execute(
-                    "UPDATE course_modules SET sort_order = $1 WHERE id = $2",
-                    sort_order, module_id
-                )
-        return {"message": "Modules reordered successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            async with conn.transaction():
+                for module_id, sort_order in module_order.items():
+                    await conn.execute(
+                        "UPDATE course_modules SET sort_order = $1 WHERE id = $2",
+                        sort_order, module_id
+                    )
+            return {"message": "Modules reordered successfully"}
+    except Exception as e:
+        logger.error(f"Error reordering modules: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reorder modules: {str(e)}")
 
 # ============================================================================
 # Quiz Management
@@ -1521,131 +1614,171 @@ async def reorder_modules(module_order: Dict[int, int], admin: dict = Depends(ge
 @app.get("/admin/courses/{course_id}/quizzes")
 async def get_course_quizzes(course_id: int, admin: dict = Depends(get_admin_user)):
     """Get all quizzes for a course"""
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT * FROM course_quizzes WHERE course_id = $1 ORDER BY created_at DESC",
-            course_id
-        )
-        return {"quizzes": [dict(row) for row in rows]}
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM course_quizzes WHERE course_id = $1 ORDER BY created_at DESC",
+                course_id
+            )
+            return {"quizzes": [dict(row) for row in rows]}
+    except Exception as e:
+        logger.error(f"Error loading quizzes: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load quizzes: {str(e)}")
 
 @app.post("/admin/quizzes")
 async def create_quiz(quiz: QuizCreate, admin: dict = Depends(get_admin_user)):
     """Create new quiz for course"""
-    async with db_pool.acquire() as conn:
-        course_exists = await conn.fetchval("SELECT id FROM courses WHERE id = $1", quiz.course_id)
-        if not course_exists:
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        admin_id = admin.get("id") or admin.get("sub")
-        
-        # Create quiz
-        quiz_id = await conn.fetchval("""
-            INSERT INTO course_quizzes (course_id, title, description, passing_score, created_by)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id
-        """, quiz.course_id, quiz.title, quiz.description, quiz.passing_score, int(admin_id))
-        
-        # Add questions if provided
-        if quiz.questions:
-            for idx, q in enumerate(quiz.questions):
-                await conn.execute("""
-                    INSERT INTO quiz_questions 
-                    (quiz_id, question_text, question_type, options, correct_answer, points, sort_order)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
-                """, quiz_id, q.get("question_text"), q.get("question_type", "multiple_choice"),
-                     json.dumps(q.get("options", [])), q.get("correct_answer"), 
-                     q.get("points", 1), idx)
-        
-        return {"id": quiz_id, "message": "Quiz created successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            course_exists = await conn.fetchval("SELECT id FROM courses WHERE id = $1", quiz.course_id)
+            if not course_exists:
+                raise HTTPException(status_code=404, detail="Course not found")
+            
+            admin_id = admin.get("id") or admin.get("sub")
+            
+            # Create quiz
+            quiz_id = await conn.fetchval("""
+                INSERT INTO course_quizzes (course_id, title, description, passing_score, created_by)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id
+            """, quiz.course_id, quiz.title, quiz.description, quiz.passing_score, int(admin_id))
+            
+            # Add questions if provided
+            if quiz.questions:
+                for idx, q in enumerate(quiz.questions):
+                    await conn.execute("""
+                        INSERT INTO quiz_questions 
+                        (quiz_id, question_text, question_type, options, correct_answer, points, sort_order)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """, quiz_id, q.get("question_text"), q.get("question_type", "multiple_choice"),
+                         json.dumps(q.get("options", [])), q.get("correct_answer"), 
+                         q.get("points", 1), idx)
+            
+            return {"id": quiz_id, "message": "Quiz created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating quiz: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create quiz: {str(e)}")
 
 @app.get("/admin/quizzes/{quiz_id}")
 async def get_quiz_detail(quiz_id: int, admin: dict = Depends(get_admin_user)):
     """Get quiz with questions"""
-    async with db_pool.acquire() as conn:
-        quiz = await conn.fetchrow("SELECT * FROM course_quizzes WHERE id = $1", quiz_id)
-        if not quiz:
-            raise HTTPException(status_code=404, detail="Quiz not found")
-        
-        questions = await conn.fetch(
-            "SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order",
-            quiz_id
-        )
-        
-        return {
-            "quiz": dict(quiz),
-            "questions": [dict(q) for q in questions]
-        }
+    try:
+        async with db_pool.acquire() as conn:
+            quiz = await conn.fetchrow("SELECT * FROM course_quizzes WHERE id = $1", quiz_id)
+            if not quiz:
+                raise HTTPException(status_code=404, detail="Quiz not found")
+            
+            questions = await conn.fetch(
+                "SELECT * FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order",
+                quiz_id
+            )
+            
+            return {
+                "quiz": dict(quiz),
+                "questions": [dict(q) for q in questions]
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading quiz: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load quiz: {str(e)}")
 
 @app.put("/admin/quizzes/{quiz_id}")
 async def update_quiz(quiz_id: int, quiz_update: QuizUpdate, admin: dict = Depends(get_admin_user)):
     """Update quiz"""
-    async with db_pool.acquire() as conn:
-        existing = await conn.fetchval("SELECT id FROM course_quizzes WHERE id = $1", quiz_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Quiz not found")
-        
-        update_fields = []
-        params = []
-        
-        if quiz_update.title is not None:
-            update_fields.append(f"title = ${len(params)+1}")
-            params.append(quiz_update.title)
+    try:
+        async with db_pool.acquire() as conn:
+            existing = await conn.fetchval("SELECT id FROM course_quizzes WHERE id = $1", quiz_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Quiz not found")
             
-        if quiz_update.description is not None:
-            update_fields.append(f"description = ${len(params)+1}")
-            params.append(quiz_update.description)
+            update_fields = []
+            params = []
             
-        if quiz_update.passing_score is not None:
-            update_fields.append(f"passing_score = ${len(params)+1}")
-            params.append(quiz_update.passing_score)
-        
-        if not update_fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
+            if quiz_update.title is not None:
+                update_fields.append(f"title = ${len(params)+1}")
+                params.append(quiz_update.title)
+                
+            if quiz_update.description is not None:
+                update_fields.append(f"description = ${len(params)+1}")
+                params.append(quiz_update.description)
+                
+            if quiz_update.passing_score is not None:
+                update_fields.append(f"passing_score = ${len(params)+1}")
+                params.append(quiz_update.passing_score)
             
-        update_fields.append("updated_at = NOW()")
-        params.append(quiz_id)
-        
-        query = f"UPDATE course_quizzes SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
-        result = await conn.fetchval(query, *params)
-        
-        return {"message": "Quiz updated successfully", "id": quiz_id}
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+                
+            update_fields.append("updated_at = NOW()")
+            params.append(quiz_id)
+            
+            query = f"UPDATE course_quizzes SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+            result = await conn.fetchval(query, *params)
+            
+            return {"message": "Quiz updated successfully", "id": quiz_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating quiz: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update quiz: {str(e)}")
 
 @app.delete("/admin/quizzes/{quiz_id}")
 async def delete_quiz(quiz_id: int, admin: dict = Depends(get_admin_user)):
     """Delete quiz"""
-    async with db_pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM course_quizzes WHERE id = $1", quiz_id)
-        if result == "DELETE 0":
-            raise HTTPException(status_code=404, detail="Quiz not found")
-        return {"message": "Quiz deleted successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM course_quizzes WHERE id = $1", quiz_id)
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Quiz not found")
+            return {"message": "Quiz deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting quiz: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete quiz: {str(e)}")
 
 @app.post("/admin/quizzes/{quiz_id}/questions")
 async def add_quiz_question(quiz_id: int, question: QuizQuestionCreate, admin: dict = Depends(get_admin_user)):
     """Add question to quiz"""
-    async with db_pool.acquire() as conn:
-        quiz_exists = await conn.fetchval("SELECT id FROM course_quizzes WHERE id = $1", quiz_id)
-        if not quiz_exists:
-            raise HTTPException(status_code=404, detail="Quiz not found")
-        
-        question_id = await conn.fetchval("""
-            INSERT INTO quiz_questions 
-            (quiz_id, question_text, question_type, options, correct_answer, points, sort_order)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id
-        """, quiz_id, question.question_text, question.question_type,
-             json.dumps(question.options), question.correct_answer,
-             question.points, question.sort_order)
-        
-        return {"id": question_id, "message": "Question added successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            quiz_exists = await conn.fetchval("SELECT id FROM course_quizzes WHERE id = $1", quiz_id)
+            if not quiz_exists:
+                raise HTTPException(status_code=404, detail="Quiz not found")
+            
+            question_id = await conn.fetchval("""
+                INSERT INTO quiz_questions 
+                (quiz_id, question_text, question_type, options, correct_answer, points, sort_order)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING id
+            """, quiz_id, question.question_text, question.question_type,
+                 json.dumps(question.options), question.correct_answer,
+                 question.points, question.sort_order)
+            
+            return {"id": question_id, "message": "Question added successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding question: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to add question: {str(e)}")
 
 @app.delete("/admin/questions/{question_id}")
 async def delete_question(question_id: int, admin: dict = Depends(get_admin_user)):
     """Delete question"""
-    async with db_pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM quiz_questions WHERE id = $1", question_id)
-        if result == "DELETE 0":
-            raise HTTPException(status_code=404, detail="Question not found")
-        return {"message": "Question deleted successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM quiz_questions WHERE id = $1", question_id)
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Question not found")
+            return {"message": "Question deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting question: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete question: {str(e)}")
 
 # ============================================================================
 # Public Courses & Quizzes
@@ -1802,7 +1935,7 @@ async def submit_quiz_attempt(
 
 @app.get("/quiz/results/me")
 async def get_my_quiz_results(current_user: dict = Depends(get_current_user)):
-    """Get current user's quiz results"""
+    """Get current user's quiz results - FIXED: User isolated"""
     async with db_pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT qa.*, cq.title as quiz_title, c.title as course_title
@@ -1816,7 +1949,7 @@ async def get_my_quiz_results(current_user: dict = Depends(get_current_user)):
         return {"results": [dict(row) for row in rows]}
 
 # ============================================================================
-# Webinars (Fixed - No recording_link)
+# FIXED: Webinars (Verified Schema Consistency)
 # ============================================================================
 
 @app.get("/webinars")
@@ -1825,22 +1958,26 @@ async def get_webinars(
     limit: int = Query(20),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM webinars WHERE 1=1"
-        params = []
-        
-        if upcoming:
-            query += " AND scheduled_at > NOW()"
+    try:
+        async with db_pool.acquire() as conn:
+            query = "SELECT * FROM webinars WHERE 1=1"
+            params = []
             
-        tier = current_user.get("subscription_tier", "free") if current_user else "free"
-        if tier == "free":
-            query += " AND is_premium = FALSE"
+            if upcoming:
+                query += " AND scheduled_at > NOW()"
+                
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free":
+                query += " AND is_premium = FALSE"
+                
+            query += " ORDER BY scheduled_at ASC LIMIT $1"
+            params.append(limit)
             
-        query += " ORDER BY scheduled_at ASC LIMIT $1"
-        params.append(limit)
-        
-        rows = await conn.fetch(query, *params)
-        return [dict(row) for row in rows]
+            rows = await conn.fetch(query, *params)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error loading webinars: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load webinars: {str(e)}")
 
 @app.get("/webinars/{webinar_id}")
 async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
@@ -1863,9 +2000,9 @@ async def get_webinar_by_id(webinar_id: int, current_user: Optional[dict] = Depe
 
 @app.post("/admin/webinars")
 async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        admin_id = admin.get("id") or admin.get("sub")
-        try:
+    try:
+        async with db_pool.acquire() as conn:
+            admin_id = admin.get("id") or admin.get("sub")
             webinar_id = await conn.fetchval("""
                 INSERT INTO webinars (
                     title, description, scheduled_at, duration_minutes, meeting_link, 
@@ -1877,73 +2014,85 @@ async def create_webinar(webinar: WebinarCreate, admin: dict = Depends(get_admin
                  webinar.duration_minutes, webinar.meeting_link, webinar.is_premium, 
                  webinar.max_participants, webinar.reminder_message, int(admin_id))
             return {"id": webinar_id, "message": "Webinar created successfully"}
-        except Exception as e:
-            logger.error(f"Error creating webinar: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create webinar: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error creating webinar: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create webinar: {str(e)}")
 
 @app.put("/admin/webinars/{webinar_id}")
 async def update_webinar(webinar_id: int, webinar: WebinarUpdate, admin: dict = Depends(get_admin_user)):
     """Update webinar"""
-    async with db_pool.acquire() as conn:
-        existing = await conn.fetchval("SELECT id FROM webinars WHERE id = $1", webinar_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Webinar not found")
-        
-        update_fields = []
-        params = []
-        
-        if webinar.title is not None:
-            update_fields.append(f"title = ${len(params)+1}")
-            params.append(webinar.title)
+    try:
+        async with db_pool.acquire() as conn:
+            existing = await conn.fetchval("SELECT id FROM webinars WHERE id = $1", webinar_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Webinar not found")
             
-        if webinar.description is not None:
-            update_fields.append(f"description = ${len(params)+1}")
-            params.append(webinar.description)
+            update_fields = []
+            params = []
             
-        if webinar.scheduled_at is not None:
-            update_fields.append(f"scheduled_at = ${len(params)+1}")
-            params.append(webinar.scheduled_at)
+            if webinar.title is not None:
+                update_fields.append(f"title = ${len(params)+1}")
+                params.append(webinar.title)
+                
+            if webinar.description is not None:
+                update_fields.append(f"description = ${len(params)+1}")
+                params.append(webinar.description)
+                
+            if webinar.scheduled_at is not None:
+                update_fields.append(f"scheduled_at = ${len(params)+1}")
+                params.append(webinar.scheduled_at)
+                
+            if webinar.duration_minutes is not None:
+                update_fields.append(f"duration_minutes = ${len(params)+1}")
+                params.append(webinar.duration_minutes)
+                
+            if webinar.meeting_link is not None:
+                update_fields.append(f"meeting_link = ${len(params)+1}")
+                params.append(webinar.meeting_link)
+                
+            if webinar.is_premium is not None:
+                update_fields.append(f"is_premium = ${len(params)+1}")
+                params.append(webinar.is_premium)
+                
+            if webinar.max_participants is not None:
+                update_fields.append(f"max_participants = ${len(params)+1}")
+                params.append(webinar.max_participants)
+                
+            if webinar.reminder_message is not None:
+                update_fields.append(f"reminder_message = ${len(params)+1}")
+                params.append(webinar.reminder_message)
             
-        if webinar.duration_minutes is not None:
-            update_fields.append(f"duration_minutes = ${len(params)+1}")
-            params.append(webinar.duration_minutes)
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+                
+            params.append(webinar_id)
             
-        if webinar.meeting_link is not None:
-            update_fields.append(f"meeting_link = ${len(params)+1}")
-            params.append(webinar.meeting_link)
+            query = f"UPDATE webinars SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+            result = await conn.fetchval(query, *params)
             
-        if webinar.is_premium is not None:
-            update_fields.append(f"is_premium = ${len(params)+1}")
-            params.append(webinar.is_premium)
-            
-        if webinar.max_participants is not None:
-            update_fields.append(f"max_participants = ${len(params)+1}")
-            params.append(webinar.max_participants)
-            
-        if webinar.reminder_message is not None:
-            update_fields.append(f"reminder_message = ${len(params)+1}")
-            params.append(webinar.reminder_message)
-        
-        if not update_fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
-            
-        params.append(webinar_id)
-        
-        query = f"UPDATE webinars SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
-        result = await conn.fetchval(query, *params)
-        
-        return {"message": "Webinar updated successfully", "id": webinar_id}
+            return {"message": "Webinar updated successfully", "id": webinar_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating webinar: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update webinar: {str(e)}")
 
 @app.delete("/admin/webinars/{webinar_id}")
 async def delete_webinar(webinar_id: int, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM webinars WHERE id = $1", webinar_id)
-        if result == "DELETE 0":
-            raise HTTPException(status_code=404, detail="Webinar not found")
-        return {"message": "Webinar deleted successfully"}
+    try:
+        async with db_pool.acquire() as conn:
+            result = await conn.execute("DELETE FROM webinars WHERE id = $1", webinar_id)
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Webinar not found")
+            return {"message": "Webinar deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting webinar: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete webinar: {str(e)}")
 
 # ============================================================================
-# Signals
+# FIXED: Signals (Verified Schema Consistency)
 # ============================================================================
 
 @app.get("/signals")
@@ -1953,26 +2102,30 @@ async def get_signals(
     limit: int = Query(50),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    async with db_pool.acquire() as conn:
-        query = "SELECT * FROM signals WHERE 1=1"
-        params = []
-        
-        if status:
-            query += f" AND status = ${len(params)+1}"
-            params.append(status)
-        if pair:
-            query += f" AND pair ILIKE ${len(params)+1}"
-            params.append(f"%{pair}%")
+    try:
+        async with db_pool.acquire() as conn:
+            query = "SELECT * FROM signals WHERE 1=1"
+            params = []
             
-        tier = current_user.get("subscription_tier", "free") if current_user else "free"
-        if tier == "free":
-            query += " AND is_premium = FALSE"
+            if status:
+                query += f" AND status = ${len(params)+1}"
+                params.append(status)
+            if pair:
+                query += f" AND pair ILIKE ${len(params)+1}"
+                params.append(f"%{pair}%")
+                
+            tier = current_user.get("subscription_tier", "free") if current_user else "free"
+            if tier == "free":
+                query += " AND is_premium = FALSE"
+                
+            query += f" ORDER BY created_at DESC LIMIT ${len(params)+1}"
+            params.append(limit)
             
-        query += f" ORDER BY created_at DESC LIMIT ${len(params)+1}"
-        params.append(limit)
-        
-        rows = await conn.fetch(query, *params)
-        return [dict(row) for row in rows]
+            rows = await conn.fetch(query, *params)
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error loading signals: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load signals: {str(e)}")
 
 @app.get("/signals/{signal_id}")
 async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depends(get_current_user_optional)):
@@ -1995,85 +2148,95 @@ async def get_signal_by_id(signal_id: int, current_user: Optional[dict] = Depend
 
 @app.post("/admin/signals")
 async def create_signal(signal: SignalCreate, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        admin_id = admin.get("id") or admin.get("sub")
-        signal_id = await conn.fetchval("""
-            INSERT INTO signals (
-                pair, direction, entry_price, stop_loss, tp1, tp2, 
-                risk_reward_ratio, expires_at, timeframe, analysis, is_premium, created_by
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            RETURNING id
-        """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
-             signal.tp1, signal.tp2, signal.risk_reward_ratio, signal.expires_at,
-             signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
-        return {"id": signal_id, "message": "Signal created"}
+    try:
+        async with db_pool.acquire() as conn:
+            admin_id = admin.get("id") or admin.get("sub")
+            signal_id = await conn.fetchval("""
+                INSERT INTO signals (
+                    pair, direction, entry_price, stop_loss, tp1, tp2, 
+                    risk_reward_ratio, expires_at, timeframe, analysis, is_premium, created_by
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id
+            """, signal.pair.upper(), signal.direction, signal.entry_price, signal.stop_loss,
+                 signal.tp1, signal.tp2, signal.risk_reward_ratio, signal.expires_at,
+                 signal.timeframe, signal.analysis, signal.is_premium, int(admin_id))
+            return {"id": signal_id, "message": "Signal created"}
+    except Exception as e:
+        logger.error(f"Error creating signal: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create signal: {str(e)}")
 
 @app.put("/admin/signals/{signal_id}")
 async def update_signal(signal_id: int, signal: SignalUpdate, admin: dict = Depends(get_admin_user)):
     """Update signal"""
-    async with db_pool.acquire() as conn:
-        # Build update query dynamically
-        update_fields = []
-        params = []
-        
-        if signal.pair is not None:
-            update_fields.append(f"pair = ${len(params)+1}")
-            params.append(signal.pair.upper())
+    try:
+        async with db_pool.acquire() as conn:
+            # Build update query dynamically
+            update_fields = []
+            params = []
             
-        if signal.direction is not None:
-            update_fields.append(f"direction = ${len(params)+1}")
-            params.append(signal.direction)
+            if signal.pair is not None:
+                update_fields.append(f"pair = ${len(params)+1}")
+                params.append(signal.pair.upper())
+                
+            if signal.direction is not None:
+                update_fields.append(f"direction = ${len(params)+1}")
+                params.append(signal.direction)
+                
+            if signal.entry_price is not None:
+                update_fields.append(f"entry_price = ${len(params)+1}")
+                params.append(signal.entry_price)
+                
+            if signal.stop_loss is not None:
+                update_fields.append(f"stop_loss = ${len(params)+1}")
+                params.append(signal.stop_loss)
+                
+            if signal.tp1 is not None:
+                update_fields.append(f"tp1 = ${len(params)+1}")
+                params.append(signal.tp1)
+                
+            if signal.tp2 is not None:
+                update_fields.append(f"tp2 = ${len(params)+1}")
+                params.append(signal.tp2)
+                
+            if signal.risk_reward_ratio is not None:
+                update_fields.append(f"risk_reward_ratio = ${len(params)+1}")
+                params.append(signal.risk_reward_ratio)
+                
+            if signal.expires_at is not None:
+                update_fields.append(f"expires_at = ${len(params)+1}")
+                params.append(signal.expires_at)
+                
+            if signal.timeframe is not None:
+                update_fields.append(f"timeframe = ${len(params)+1}")
+                params.append(signal.timeframe)
+                
+            if signal.analysis is not None:
+                update_fields.append(f"analysis = ${len(params)+1}")
+                params.append(signal.analysis)
+                
+            if signal.is_premium is not None:
+                update_fields.append(f"is_premium = ${len(params)+1}")
+                params.append(signal.is_premium)
             
-        if signal.entry_price is not None:
-            update_fields.append(f"entry_price = ${len(params)+1}")
-            params.append(signal.entry_price)
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+                
+            update_fields.append("updated_at = NOW()")
+            params.append(signal_id)
             
-        if signal.stop_loss is not None:
-            update_fields.append(f"stop_loss = ${len(params)+1}")
-            params.append(signal.stop_loss)
+            query = f"UPDATE signals SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
+            result = await conn.fetchval(query, *params)
             
-        if signal.tp1 is not None:
-            update_fields.append(f"tp1 = ${len(params)+1}")
-            params.append(signal.tp1)
-            
-        if signal.tp2 is not None:
-            update_fields.append(f"tp2 = ${len(params)+1}")
-            params.append(signal.tp2)
-            
-        if signal.risk_reward_ratio is not None:
-            update_fields.append(f"risk_reward_ratio = ${len(params)+1}")
-            params.append(signal.risk_reward_ratio)
-            
-        if signal.expires_at is not None:
-            update_fields.append(f"expires_at = ${len(params)+1}")
-            params.append(signal.expires_at)
-            
-        if signal.timeframe is not None:
-            update_fields.append(f"timeframe = ${len(params)+1}")
-            params.append(signal.timeframe)
-            
-        if signal.analysis is not None:
-            update_fields.append(f"analysis = ${len(params)+1}")
-            params.append(signal.analysis)
-            
-        if signal.is_premium is not None:
-            update_fields.append(f"is_premium = ${len(params)+1}")
-            params.append(signal.is_premium)
-        
-        if not update_fields:
-            raise HTTPException(status_code=400, detail="No fields to update")
-            
-        update_fields.append("updated_at = NOW()")
-        params.append(signal_id)
-        
-        query = f"UPDATE signals SET {', '.join(update_fields)} WHERE id = ${len(params)} RETURNING id"
-        result = await conn.fetchval(query, *params)
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="Signal not found")
-            
-        return {"message": "Signal updated successfully", "id": signal_id}
+            if not result:
+                raise HTTPException(status_code=404, detail="Signal not found")
+                
+            return {"message": "Signal updated successfully", "id": signal_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating signal: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update signal: {str(e)}")
 
 @app.put("/admin/signals/{signal_id}/result")
 async def update_signal_result(
@@ -2082,37 +2245,47 @@ async def update_signal_result(
     admin: dict = Depends(get_admin_user)
 ):
     """Update signal result (WIN, LOSS, PARTIAL, EXPIRED)"""
-    async with db_pool.acquire() as conn:
-        existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Signal not found")
-        
-        # Update result, pips_gain, status, and closed_at
-        await conn.execute("""
-            UPDATE signals 
-            SET result = $1, 
-                pips_gain = $2, 
-                status = 'closed',
-                closed_at = NOW(),
-                updated_at = NOW()
-            WHERE id = $3
-        """, result_data.result, result_data.pips_gain_loss, signal_id)
-        
-        return {
-            "message": "Signal result updated successfully", 
-            "id": signal_id,
-            "result": result_data.result,
-            "pips_gain": result_data.pips_gain_loss
-        }
+    try:
+        async with db_pool.acquire() as conn:
+            existing = await conn.fetchval("SELECT id FROM signals WHERE id = $1", signal_id)
+            if not existing:
+                raise HTTPException(status_code=404, detail="Signal not found")
+            
+            # Update result, pips_gain, status, and closed_at
+            await conn.execute("""
+                UPDATE signals 
+                SET result = $1, 
+                    pips_gain = $2, 
+                    status = 'closed',
+                    closed_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = $3
+            """, result_data.result, result_data.pips_gain_loss, signal_id)
+            
+            return {
+                "message": "Signal result updated successfully", 
+                "id": signal_id,
+                "result": result_data.result,
+                "pips_gain": result_data.pips_gain_loss
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating signal result: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update result: {str(e)}")
 
 @app.delete("/admin/signals/{signal_id}")
 async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
-    async with db_pool.acquire() as conn:
-        await conn.execute("DELETE FROM signals WHERE id = $1", signal_id)
-        return {"message": "Signal deleted"}
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute("DELETE FROM signals WHERE id = $1", signal_id)
+            return {"message": "Signal deleted"}
+    except Exception as e:
+        logger.error(f"Error deleting signal: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete signal: {str(e)}")
 
 # ============================================================================
-# AI Chat (Mentor) with Knowledge Retrieval
+# AI Chat (Mentor) with Knowledge Retrieval - SECURED: Backend prompts only
 # ============================================================================
 
 async def search_knowledge_base(query: str, user_id: int):
@@ -2188,6 +2361,7 @@ async def chat_with_ai(
         if request.include_knowledge:
             knowledge_context = await search_knowledge_base(request.message, current_user["id"])
         
+        # SECURED: System prompt hardcoded in backend only
         system_prompt = """You are an expert trading mentor with 20+ years of experience in forex, stocks, and crypto trading. You provide personalized, actionable advice on trading strategies, risk management, trading psychology, and market analysis. 
         
         Important guidelines:
@@ -2232,7 +2406,7 @@ async def chat_with_ai(
             result = response.json()
             ai_message = result["choices"][0]["message"]["content"]
             
-            # Store in chat history with user isolation
+            # Store in chat history with user isolation (FIXED: User privacy)
             async with db_pool.acquire() as conn:
                 await conn.execute("""
                     INSERT INTO chat_history (user_id, message, response, context)
@@ -2250,19 +2424,23 @@ async def get_chat_history(
     limit: int = Query(20),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get chat history - user isolated"""
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT message, response, created_at 
-            FROM chat_history 
-            WHERE user_id = $1 
-            ORDER BY created_at DESC 
-            LIMIT $2
-        """, current_user["id"], limit)
-        return {"history": [dict(row) for row in rows]}
+    """Get chat history - FIXED: User isolated"""
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT message, response, created_at 
+                FROM chat_history 
+                WHERE user_id = $1 
+                ORDER BY created_at DESC 
+                LIMIT $2
+            """, current_user["id"], limit)
+            return {"history": [dict(row) for row in rows]}
+    except Exception as e:
+        logger.error(f"Error loading chat history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load chat history: {str(e)}")
 
 # ============================================================================
-# AI Performance Analyzer with Vision
+# AI Performance Analyzer with Vision - FIXED: User isolated
 # ============================================================================
 
 @app.post("/analyze/performance")
@@ -2330,7 +2508,7 @@ Provide analysis in strict JSON format with fields: performance_summary (with to
                 
                 analysis_data = json.loads(cleaned)
                 
-                # Store analysis with user isolation
+                # FIXED: Store analysis with user isolation
                 async with db_pool.acquire() as conn:
                     await conn.execute("""
                         INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
@@ -2450,7 +2628,7 @@ Extract every visible trade and calculate all metrics accurately."""
                 
                 analysis_data = json.loads(cleaned)
                 
-                # Store analysis with user isolation
+                # FIXED: Store analysis with user isolation
                 async with db_pool.acquire() as conn:
                     await conn.execute("""
                         INSERT INTO performance_analyses (user_id, analysis_data, raw_trades, trader_score)
@@ -2480,17 +2658,21 @@ async def get_performance_history(
     limit: int = Query(10),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get user's performance analysis history"""
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT id, analysis_data, trader_score, created_at
-            FROM performance_analyses
-            WHERE user_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2
-        """, current_user["id"], limit)
-        
-        return {"history": [dict(row) for row in rows]}
+    """Get user's performance analysis history - FIXED: User isolated"""
+    try:
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT id, analysis_data, trader_score, created_at
+                FROM performance_analyses
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2
+            """, current_user["id"], limit)
+            
+            return {"history": [dict(row) for row in rows]}
+    except Exception as e:
+        logger.error(f"Error loading performance history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load history: {str(e)}")
 
 # ============================================================================
 # AI Chart Analysis
@@ -2583,7 +2765,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "3.5.1",
+        "version": "3.5.2",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -2593,7 +2775,7 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.1 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.2 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
@@ -2610,15 +2792,26 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v3.5.1"}
+    return {"message": "Pipways API v3.5.2"}
 
-# Global exception handler
+# FIXED: Global exception handler with structured error responses
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global error: {str(exc)}", exc_info=True)
+    
+    # Return structured error response
+    error_detail = str(exc)
+    if "column" in error_detail.lower() and "does not exist" in error_detail.lower():
+        error_detail = f"Database schema error: {error_detail}. Please run database initialization."
+    
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "message": str(exc)}
+        content={
+            "error": "Internal Server Error",
+            "detail": error_detail,
+            "path": str(request.url.path),
+            "timestamp": datetime.utcnow().isoformat()
+        }
     )
 
 if __name__ == "__main__":

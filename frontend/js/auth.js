@@ -11,16 +11,35 @@ const auth = {
 
     async checkAuth() {
         const token = localStorage.getItem('access_token');
-        if (!token) return;
+        if (!token) {
+            this.showAuthWall();
+            return;
+        }
 
         try {
             const user = await api.get('/auth/me');
             this.currentUser = user;
+            this.hideAuthWall();
             this.updateUI();
         } catch (e) {
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
+            this.showAuthWall();
         }
+    },
+
+    showAuthWall() {
+        const authWall = document.getElementById('auth-wall');
+        const mainApp = document.getElementById('main-app');
+        if (authWall) authWall.style.display = 'flex';
+        if (mainApp) mainApp.style.display = 'none';
+    },
+
+    hideAuthWall() {
+        const authWall = document.getElementById('auth-wall');
+        const mainApp = document.getElementById('main-app');
+        if (authWall) authWall.style.display = 'none';
+        if (mainApp) mainApp.style.display = 'block';
     },
 
     updateUI() {
@@ -29,25 +48,26 @@ const auth = {
         const userInfo = document.getElementById('user-info');
 
         if (this.currentUser) {
-            loginBtn.style.display = 'none';
-            logoutBtn.style.display = 'block';
-            userInfo.style.display = 'block';
-            userInfo.textContent = this.currentUser.full_name || this.currentUser.email;
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (logoutBtn) logoutBtn.style.display = 'block';
+            if (userInfo) {
+                userInfo.style.display = 'block';
+                userInfo.textContent = this.currentUser.full_name || this.currentUser.email;
+            }
 
-            // Show admin link if admin
             if (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator') {
                 this.addAdminLink();
             }
         } else {
-            loginBtn.style.display = 'block';
-            logoutBtn.style.display = 'none';
-            userInfo.style.display = 'none';
+            if (loginBtn) loginBtn.style.display = 'block';
+            if (logoutBtn) logoutBtn.style.display = 'none';
+            if (userInfo) userInfo.style.display = 'none';
         }
     },
 
     addAdminLink() {
         const navLinks = document.querySelector('.nav-links');
-        if (!navLinks.querySelector('a[href="/admin"]')) {
+        if (navLinks && !navLinks.querySelector('a[href="/admin"]')) {
             const adminLink = document.createElement('a');
             adminLink.href = '/admin';
             adminLink.textContent = 'Admin';
@@ -56,20 +76,34 @@ const auth = {
     },
 
     showLoginModal() {
-        document.getElementById('login-modal').classList.add('show');
+        const modal = document.getElementById('login-modal');
+        if (modal) modal.classList.add('show');
     },
 
     closeLoginModal() {
-        document.getElementById('login-modal').classList.remove('show');
+        const modal = document.getElementById('login-modal');
+        if (modal) modal.classList.remove('show');
     },
 
     showRegisterModal() {
         this.closeLoginModal();
-        document.getElementById('register-modal').classList.add('show');
+        const modal = document.getElementById('register-modal');
+        if (modal) modal.classList.add('show');
     },
 
     closeRegisterModal() {
-        document.getElementById('register-modal').classList.remove('show');
+        const modal = document.getElementById('register-modal');
+        if (modal) modal.classList.remove('show');
+    },
+
+    validatePassword(password) {
+        const errors = [];
+        if (password.length < 8) errors.push("Minimum 8 characters");
+        if (!/[A-Z]/.test(password)) errors.push("One uppercase letter");
+        if (!/[a-z]/.test(password)) errors.push("One lowercase letter");
+        if (!/[0-9]/.test(password)) errors.push("One number");
+        if (!/[@$!%*?&]/.test(password)) errors.push("One special character (@$!%*?&)");
+        return errors;
     },
 
     async handleLogin(e) {
@@ -78,7 +112,6 @@ const auth = {
         const password = document.getElementById('login-password').value;
 
         try {
-            // Use direct fetch for auth endpoints (not under /api)
             const response = await fetch('/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -94,6 +127,7 @@ const auth = {
             localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('refresh_token', data.refresh_token);
             this.currentUser = data.user;
+            this.hideAuthWall();
             this.updateUI();
             this.closeLoginModal();
             ui.showToast('Login successful!', 'success');
@@ -109,8 +143,14 @@ const auth = {
         const email = document.getElementById('reg-email').value;
         const password = document.getElementById('reg-password').value;
 
+        // Password validation
+        const validationErrors = this.validatePassword(password);
+        if (validationErrors.length > 0) {
+            ui.showToast('Password requirements: ' + validationErrors.join(', '), 'error');
+            return;
+        }
+
         try {
-            // Use direct fetch for auth endpoints (not under /api)
             const response = await fetch('/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -126,6 +166,7 @@ const auth = {
             localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('refresh_token', data.refresh_token);
             this.currentUser = data.user;
+            this.hideAuthWall();
             this.updateUI();
             this.closeRegisterModal();
             ui.showToast('Registration successful!', 'success');
@@ -136,9 +177,17 @@ const auth = {
     },
 
     logout() {
+        // Clear chat history on logout
+        if (window.ai && window.ai.chatHistory) {
+            window.ai.chatHistory = [];
+        }
+        const chatContainer = document.getElementById('chat-history');
+        if (chatContainer) chatContainer.innerHTML = '';
+
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         this.currentUser = null;
+        this.showAuthWall();
         this.updateUI();
         ui.showToast('Logged out', 'info');
         window.location.href = '/';

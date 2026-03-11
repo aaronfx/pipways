@@ -42,7 +42,7 @@ const admin = {
                     <div class="card">
                         <div class="card-header">
                             <h3>Recent Users</h3>
-                            <a href="#" onclick="admin.loadUsers()">View All</a>
+                            <a href="#" onclick="admin.loadUsers(); return false;">View All</a>
                         </div>
                         <table>
                             <thead>
@@ -71,7 +71,7 @@ const admin = {
                             <h3>Quick Actions</h3>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                            <button onclick="window.location='/signals'">Manage Signals</button>
+                            <button onclick="admin.loadAdminSignals()">Manage Signals</button>
                             <button onclick="window.location='/blog'">Manage Blog</button>
                             <button onclick="window.location='/courses'">Manage Courses</button>
                             <button onclick="window.location='/webinars'">Manage Webinars</button>
@@ -144,6 +144,76 @@ const admin = {
             container.innerHTML = html;
         } catch (error) {
             container.innerHTML = `<div class="error">Failed to load users: ${error.message}</div>`;
+        }
+    },
+
+    async loadAdminSignals() {
+        const container = document.getElementById('main-content');
+        container.innerHTML = '<div class="loading">Loading signals...</div>';
+
+        try {
+            const signals = await api.get('/api/admin/signals?limit=100');
+
+            const html = `
+                <div class="page-header">
+                    <h1>Signal Management</h1>
+                    <button onclick="admin.showCreateSignalModal()">Create Signal</button>
+                    <button onclick="admin.loadDashboard(document.getElementById('main-content'))">Back</button>
+                </div>
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pair</th>
+                                <th>Direction</th>
+                                <th>Entry</th>
+                                <th>Status</th>
+                                <th>Result</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${signals.map(s => `
+                                <tr>
+                                    <td><strong>${s.pair}</strong></td>
+                                    <td><span class="badge badge-${s.direction === 'buy' ? 'success' : 'danger'}">${s.direction}</span></td>
+                                    <td>${s.entry_price}</td>
+                                    <td>${s.status}</td>
+                                    <td>${s.result || 'Pending'}</td>
+                                    <td>
+                                        <button onclick="admin.editSignal(${s.id})">Edit</button>
+                                        <button class="secondary" onclick="admin.deleteSignal(${s.id})">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        } catch (error) {
+            container.innerHTML = `<div class="error">Failed to load signals: ${error.message}</div>`;
+        }
+    },
+
+    showCreateSignalModal() {
+        // Implementation placeholder - would open modal with form
+        ui.showToast('Signal creation modal would open here');
+    },
+
+    async editSignal(signalId) {
+        ui.showToast('Edit signal form for ID: ' + signalId);
+    },
+
+    async deleteSignal(signalId) {
+        if (!confirm('Delete this signal?')) return;
+        try {
+            await api.delete(`/api/admin/signals/${signalId}`);
+            ui.showToast('Signal deleted', 'success');
+            this.loadAdminSignals();
+        } catch (error) {
+            ui.showToast(error.message, 'error');
         }
     },
 

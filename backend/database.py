@@ -56,7 +56,6 @@ async def close_database_pool():
 
 async def init_db():
     """Initialize database tables"""
-    from database import db_pool
     import bcrypt
 
     async with db_pool.acquire() as conn:

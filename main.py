@@ -1,5 +1,5 @@
 """
-Pipways Trading Platform API - Production Debug & System Completion v4.0.0
+Pipways Trading Platform API - Production Debug & System Completion v3.5.2
 FastAPI serves frontend directly - No CORS required
 """
 
@@ -12,7 +12,6 @@ import logging
 import base64
 import json
 import uuid
-import secrets
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Union
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Query, Request, status
@@ -54,7 +53,6 @@ class Settings:
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     
     # Cloudinary Config
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
@@ -113,7 +111,7 @@ async def lifespan(app: FastAPI):
     if db_pool:
         await db_pool.close()
 
-app = FastAPI(title="Pipways API", version="4.0.0", lifespan=lifespan)
+app = FastAPI(title="Pipways API", version="3.5.2", lifespan=lifespan)
 
 # CORS Middleware
 app.add_middleware(
@@ -159,31 +157,6 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
-
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
-class PasswordReset(BaseModel):
-    reset_token: str
-    new_password: str = Field(..., min_length=8)
-
-    @field_validator('new_password')
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain a lowercase letter')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain an uppercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain a number')
-        if not any(c in '@$!%*?&' for c in v):
-            raise ValueError('Password must contain a special character (@$!%*?&)')
-        return v
-
-class GoogleLogin(BaseModel):
-    token: str
 
 class Token(BaseModel):
     access_token: str
@@ -336,6 +309,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     context: Optional[str] = ""
     history: Optional[List[Dict[str, str]]] = []
+    include_knowledge: Optional[bool] = True
 
 class UserUpdate(BaseModel):
     role: Optional[str] = None
@@ -354,12 +328,12 @@ class SiteSettingsUpdate(BaseModel):
     contact_email: Optional[str] = None
 
 # ============================================================================
-# Database Initialization - FIXED: Added column safety checks and new auth columns
+# Database Initialization - FIXED: Added column safety checks
 # ============================================================================
 
 async def init_db():
     async with db_pool.acquire() as conn:
-        # Users table - FIXED: Added google_id, login_attempts, lock_until
+        # Users table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -374,17 +348,9 @@ async def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP,
                 reset_token VARCHAR(255),
-                reset_token_expires TIMESTAMP,
-                google_id VARCHAR(255) UNIQUE,
-                login_attempts INTEGER DEFAULT 0,
-                lock_until TIMESTAMP
+                reset_token_expires TIMESTAMP
             )
         """)
-        
-        # Ensure new columns exist for backward compatibility
-        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE")
-        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS login_attempts INTEGER DEFAULT 0")
-        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS lock_until TIMESTAMP")
 
         # Blog posts table
         await conn.execute("""
@@ -409,7 +375,7 @@ async def init_db():
             )
         """)
 
-        # Signals table with all required columns - FIXED: Ensured all columns present
+        # Signals table with all required columns
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -420,7 +386,7 @@ async def init_db():
                 take_profit DECIMAL(10,5),
                 tp1 DECIMAL(10,5),
                 tp2 DECIMAL(10,5),
-                risk_reward_ratio VARCHAR(20),
+                risk_reward_ratio TEXT,
                 expires_at TIMESTAMP,
                 timeframe VARCHAR(20),
                 analysis TEXT,
@@ -435,13 +401,10 @@ async def init_db():
             )
         """)
         
-        # Ensure all signal columns exist
+        # Ensure closed_at exists (for existing databases)
         await conn.execute("ALTER TABLE signals ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP")
-        await conn.execute("ALTER TABLE signals ADD COLUMN IF NOT EXISTS tp1 DECIMAL(10,5)")
-        await conn.execute("ALTER TABLE signals ADD COLUMN IF NOT EXISTS tp2 DECIMAL(10,5)")
-        await conn.execute("ALTER TABLE signals ADD COLUMN IF NOT EXISTS risk_reward_ratio VARCHAR(20)")
 
-        # Webinars table - FIXED: Ensure all columns exist
+        # Webinars table - FIXED: Ensure reminder_message exists
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -458,10 +421,9 @@ async def init_db():
             )
         """)
         
-        # Ensure webinar columns exist
+        # Ensure reminder_message exists for backward compatibility
         await conn.execute("ALTER TABLE webinars ADD COLUMN IF NOT EXISTS reminder_message TEXT")
         await conn.execute("ALTER TABLE webinars ADD COLUMN IF NOT EXISTS max_participants INTEGER DEFAULT 100")
-        await conn.execute("ALTER TABLE webinars ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 60")
 
         # Drop deprecated columns if they exist (safe cleanup)
         await conn.execute("ALTER TABLE webinars DROP COLUMN IF EXISTS recording_link")
@@ -527,7 +489,7 @@ async def init_db():
             )
         """)
 
-        # Quiz attempts table - FIXED: Ensure user isolation
+        # Quiz attempts table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS quiz_attempts (
                 id SERIAL PRIMARY KEY,
@@ -555,11 +517,11 @@ async def init_db():
             )
         """)
 
-        # Chat history table - FIXED: User isolated
+        # Chat history table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id),
                 message TEXT NOT NULL,
                 response TEXT NOT NULL,
                 context TEXT,
@@ -580,21 +542,17 @@ async def init_db():
             )
         """)
 
-        # Performance analyses table - FIXED: User isolated with proper indexing
+        # Performance analyses table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS performance_analyses (
                 id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id),
                 analysis_data JSONB NOT NULL,
                 raw_trades JSONB,
                 trader_score INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
-        # Create index for faster user queries
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_perf_analysis_user_id ON performance_analyses(user_id)")
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_history_user_id ON chat_history(user_id)")
 
         # Site settings table
         await conn.execute("""
@@ -633,7 +591,7 @@ async def init_db():
             logger.error(f"Error creating admin: {e}")
 
 # ============================================================================
-# Auth Utilities - FIXED: Added login attempt tracking
+# Auth Utilities
 # ============================================================================
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -701,7 +659,7 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
     return current_user
 
 # ============================================================================
-# Auth Endpoints - FIXED: Added password reset, Google login, and brute force protection
+# Auth Endpoints
 # ============================================================================
 
 @app.post("/auth/register", response_model=Token)
@@ -739,34 +697,10 @@ async def register(user_data: UserRegister):
 async def login(credentials: UserLogin):
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow("SELECT * FROM users WHERE email = $1", credentials.email)
-        
-        # FIXED: Check for brute force protection
-        if user and user["lock_until"] and user["lock_until"] > datetime.utcnow():
-            remaining = (user["lock_until"] - datetime.utcnow()).seconds // 60
-            raise HTTPException(status_code=403, detail=f"Account locked. Try again in {remaining} minutes.")
-        
         if not user or not verify_password(credentials.password, user["password_hash"]):
-            # Increment failed attempts
-            if user:
-                attempts = (user["login_attempts"] or 0) + 1
-                lock_until = None
-                if attempts >= 5:
-                    lock_until = datetime.utcnow() + timedelta(minutes=30)
-                    attempts = 0
-                
-                await conn.execute("""
-                    UPDATE users SET login_attempts = $1, lock_until = $2 WHERE id = $3
-                """, attempts, lock_until, user["id"])
-                
-                if lock_until:
-                    raise HTTPException(status_code=403, detail="Too many failed attempts. Account locked for 30 minutes.")
-            
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # Reset login attempts on successful login
-        await conn.execute("""
-            UPDATE users SET login_attempts = 0, lock_until = NULL, last_login = NOW() WHERE id = $1
-        """, user["id"])
+        await conn.execute("UPDATE users SET last_login = NOW() WHERE id = $1", user["id"])
 
         token_data = {
             "sub": str(user["id"]),
@@ -783,137 +717,6 @@ async def login(credentials: UserLogin):
             "refresh_token": refresh_token,
             "user": dict(user)
         }
-
-@app.post("/auth/google", response_model=Token)
-async def google_login(data: GoogleLogin):
-    """Verify Google token and login/register user"""
-    try:
-        # Verify token with Google
-        async with httpx.AsyncClient() as client:
-            google_response = await client.get(
-                f"https://oauth2.googleapis.com/tokeninfo?id_token={data.token}"
-            )
-            
-            if google_response.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid Google token")
-            
-            google_data = google_response.json()
-            
-            if google_data.get("aud") != settings.GOOGLE_CLIENT_ID:
-                raise HTTPException(status_code=401, detail="Invalid client ID")
-            
-            email = google_data.get("email")
-            google_id = google_data.get("sub")
-            full_name = google_data.get("name", email.split("@")[0])
-            
-            if not email or not google_id:
-                raise HTTPException(status_code=400, detail="Invalid Google data")
-        
-        async with db_pool.acquire() as conn:
-            # Check if user exists by google_id or email
-            user = await conn.fetchrow("SELECT * FROM users WHERE google_id = $1 OR email = $2", google_id, email)
-            
-            if user:
-                # Update google_id if not set
-                if not user["google_id"]:
-                    await conn.execute("UPDATE users SET google_id = $1 WHERE id = $2", google_id, user["id"])
-                
-                user_id = user["id"]
-                user_role = user["role"]
-                user_tier = user["subscription_tier"]
-                user_name = user["full_name"]
-            else:
-                # Create new user
-                user_id = await conn.fetchval("""
-                    INSERT INTO users (email, password_hash, full_name, role, subscription_tier, subscription_status, email_verified, google_id)
-                    VALUES ($1, $2, $3, 'user', 'free', 'active', TRUE, $4)
-                    RETURNING id
-                """, email, get_password_hash(secrets.token_urlsafe(32)), full_name, google_id)
-                
-                user_role = "user"
-                user_tier = "free"
-                user_name = full_name
-            
-            # Generate tokens
-            token_data = {
-                "sub": str(user_id),
-                "email": email,
-                "full_name": user_name,
-                "role": user_role,
-                "subscription_tier": user_tier
-            }
-            access_token = create_access_token(token_data)
-            refresh_token = create_refresh_token({"sub": str(user_id)})
-            
-            return {
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "user": {
-                    "id": user_id,
-                    "email": email,
-                    "full_name": user_name,
-                    "role": user_role,
-                    "subscription_tier": user_tier
-                }
-            }
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Google login error: {e}")
-        raise HTTPException(status_code=500, detail="Google authentication failed")
-
-@app.post("/auth/request-password-reset")
-async def request_password_reset(data: PasswordResetRequest):
-    """Request password reset - sends token (simulated - would send email in production)"""
-    async with db_pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT id, email FROM users WHERE email = $1", data.email)
-        
-        if not user:
-            # Return success even if email not found (security)
-            return {"message": "If the email exists, a reset link has been sent"}
-        
-        # Generate reset token
-        reset_token = secrets.token_urlsafe(32)
-        expires = datetime.utcnow() + timedelta(hours=1)
-        
-        await conn.execute("""
-            UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3
-        """, reset_token, expires, user["id"])
-        
-        # In production, send email here
-        # For now, return token in response (for testing)
-        logger.info(f"Password reset token for {data.email}: {reset_token}")
-        
-        return {
-            "message": "Password reset requested",
-            "reset_token": reset_token,  # Remove in production, send via email only
-            "expires_in": "1 hour"
-        }
-
-@app.post("/auth/reset-password")
-async def reset_password(data: PasswordReset):
-    """Reset password using token"""
-    async with db_pool.acquire() as conn:
-        user = await conn.fetchrow("""
-            SELECT id FROM users 
-            WHERE reset_token = $1 AND reset_token_expires > NOW()
-        """, data.reset_token)
-        
-        if not user:
-            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-        
-        # Hash new password
-        hashed_pw = get_password_hash(data.new_password)
-        
-        # Update password and clear token
-        await conn.execute("""
-            UPDATE users 
-            SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL, updated_at = NOW()
-            WHERE id = $2
-        """, hashed_pw, user["id"])
-        
-        return {"message": "Password reset successful"}
 
 @app.post("/auth/refresh")
 async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -1072,7 +875,7 @@ async def delete_user(user_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "User deleted"}
 
 # ============================================================================
-# FIXED: Admin Signals Endpoint with complete field support
+# FIXED: Admin Signals Endpoint with better error handling
 # ============================================================================
 
 @app.get("/admin/signals")
@@ -1085,10 +888,10 @@ async def get_admin_signals(
     try:
         async with db_pool.acquire() as conn:
             rows = await conn.fetch(
-                """SELECT s.*, u.full_name as creator_name 
-                   FROM signals s 
-                   LEFT JOIN users u ON s.created_by = u.id 
-                   ORDER BY s.created_at DESC 
+                """SELECT id, pair, direction, entry_price, stop_loss, tp1, tp2, 
+                   risk_reward_ratio, timeframe, status, result, is_premium, created_at 
+                   FROM signals 
+                   ORDER BY created_at DESC 
                    LIMIT $1 OFFSET $2""",
                 limit, offset
             )
@@ -1220,7 +1023,7 @@ async def get_public_settings():
         return dict(row)
 
 # ============================================================================
-# Blog Management - FIXED: Image URL formatting with leading slash
+# Blog Management
 # ============================================================================
 
 @app.get("/blog/posts")
@@ -1266,16 +1069,7 @@ async def get_blog_posts(
         params.extend([limit, offset])
         
         rows = await conn.fetch(query, *params)
-        
-        # FIXED: Ensure featured_image has leading slash for local paths
-        posts = []
-        for row in rows:
-            post = dict(row)
-            if post.get("featured_image") and not post["featured_image"].startswith(("http", "/", "data:")):
-                post["featured_image"] = "/" + post["featured_image"]
-            posts.append(post)
-            
-        return {"posts": posts, "total": total, "page": page, "pages": (total + limit - 1) // limit}
+        return {"posts": [dict(row) for row in rows], "total": total, "page": page, "pages": (total + limit - 1) // limit}
 
 @app.get("/blog/posts/{slug}")
 async def get_blog_post_by_slug(slug: str, current_user: Optional[dict] = Depends(get_current_user_optional)):
@@ -1292,10 +1086,6 @@ async def get_blog_post_by_slug(slug: str, current_user: Optional[dict] = Depend
             raise HTTPException(status_code=404, detail="Post not found")
             
         post = dict(row)
-        
-        # FIXED: Ensure featured_image has leading slash
-        if post.get("featured_image") and not post["featured_image"].startswith(("http", "/", "data:")):
-            post["featured_image"] = "/" + post["featured_image"]
         
         # Check if premium content and user has access
         if post.get("is_premium"):
@@ -1341,11 +1131,6 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
         
         published_at = datetime.utcnow() if post.status == "published" and not post.scheduled_at else None
         
-        # FIXED: Store featured_image without leading slash for consistency, add it in response
-        featured_image = post.featured_image
-        if featured_image and featured_image.startswith("/"):
-            featured_image = featured_image[1:]
-        
         post_id = await conn.fetchval("""
             INSERT INTO blog_posts (
                 title, content, excerpt, author_id, is_premium, status, 
@@ -1354,7 +1139,7 @@ async def create_blog_post(post: BlogPostCreate, admin: dict = Depends(get_admin
             RETURNING id
         """, post.title, post.content, post.excerpt, int(admin_id), post.is_premium, 
              post.status, post.scheduled_at, post.meta_title, post.meta_description,
-             slug, featured_image, post.tags, post.category, published_at)
+             slug, post.featured_image, post.tags, post.category, published_at)
              
         return {"id": post_id, "slug": slug, "message": "Blog post created"}
 
@@ -1416,12 +1201,8 @@ async def update_blog_post(post_id: int, post_update: BlogPostUpdate, admin: dic
             params.append(post_update.slug)
             
         if post_update.featured_image is not None:
-            # FIXED: Normalize image path
-            featured_image = post_update.featured_image
-            if featured_image and featured_image.startswith("/"):
-                featured_image = featured_image[1:]
             update_fields.append(f"featured_image = ${len(params)+1}")
-            params.append(featured_image)
+            params.append(post_update.featured_image)
             
         if post_update.tags is not None:
             update_fields.append(f"tags = ${len(params)+1}")
@@ -1454,7 +1235,7 @@ async def delete_blog_post(post_id: int, admin: dict = Depends(get_admin_user)):
         return {"message": "Post deleted"}
 
 # ============================================================================
-# Media Upload - FIXED: Return URLs with leading slash
+# Media Upload
 # ============================================================================
 
 @app.post("/admin/media/upload")
@@ -1516,7 +1297,7 @@ async def upload_media(
             
         return {
             "id": media_id,
-            "url": f"/uploads/{unique_name}",  # FIXED: Leading slash
+            "url": f"/uploads/{unique_name}",
             "filename": file.filename,
             "source": "local"
         }
@@ -2504,7 +2285,7 @@ async def delete_signal(signal_id: int, admin: dict = Depends(get_admin_user)):
         raise HTTPException(status_code=500, detail=f"Failed to delete signal: {str(e)}")
 
 # ============================================================================
-# AI Chat (Mentor) - SECURED: Backend-only prompts, no knowledge toggle
+# AI Chat (Mentor) with Knowledge Retrieval - SECURED: Backend prompts only
 # ============================================================================
 
 async def search_knowledge_base(query: str, user_id: int):
@@ -2575,6 +2356,11 @@ async def chat_with_ai(
         raise HTTPException(status_code=503, detail="AI service not configured")
     
     try:
+        # Search knowledge base if requested
+        knowledge_context = ""
+        if request.include_knowledge:
+            knowledge_context = await search_knowledge_base(request.message, current_user["id"])
+        
         # SECURED: System prompt hardcoded in backend only
         system_prompt = """You are an expert trading mentor with 20+ years of experience in forex, stocks, and crypto trading. You provide personalized, actionable advice on trading strategies, risk management, trading psychology, and market analysis. 
         
@@ -2583,12 +2369,7 @@ async def chat_with_ai(
         2. Always emphasize risk management and discipline
         3. Reference specific platform content when relevant (courses, blog posts, webinars)
         4. Consider the user's trading history and performance when providing advice
-        5. Be encouraging but realistic about trading expectations
-        
-        You have access to the platform's knowledge base including courses, blog posts, and webinars. Use this information to provide relevant recommendations."""
-        
-        # Always include knowledge base (secured, no user toggle)
-        knowledge_context = await search_knowledge_base(request.message, current_user["id"])
+        5. Be encouraging but realistic about trading expectations"""
         
         if knowledge_context:
             system_prompt += f"\n\n## Platform Knowledge Base Context:\n{knowledge_context}\n\nUse this context to provide relevant, specific recommendations referencing our courses and materials when appropriate."
@@ -2659,7 +2440,7 @@ async def get_chat_history(
         raise HTTPException(status_code=500, detail=f"Failed to load chat history: {str(e)}")
 
 # ============================================================================
-# AI Performance Analyzer with Vision - FIXED: User isolated queries
+# AI Performance Analyzer with Vision - FIXED: User isolated
 # ============================================================================
 
 @app.post("/analyze/performance")
@@ -2894,7 +2675,7 @@ async def get_performance_history(
         raise HTTPException(status_code=500, detail=f"Failed to load history: {str(e)}")
 
 # ============================================================================
-# AI Chart Analysis - FIXED: Added capabilities description
+# AI Chart Analysis
 # ============================================================================
 
 @app.post("/analyze/chart")
@@ -2915,17 +2696,6 @@ async def analyze_chart(
 
         image_base64 = base64.b64encode(contents).decode()
 
-        system_prompt = """You are an expert technical analyst specializing in forex, crypto, stocks, commodities, and indices. 
-        
-        You analyze charts to identify:
-        - Trend direction (bullish, bearish, sideways)
-        - Key support and resistance levels
-        - Chart patterns (head and shoulders, triangles, flags, etc.)
-        - Candlestick patterns
-        - Possible trade setups with entry, stop loss, and target levels
-        
-        Provide clear, actionable analysis in a structured format."""
-
         prompt = f"""Analyze this {pair} chart on {timeframe}. Context: {additional_info}
 
 Provide a detailed technical analysis including trend direction, key support/resistance levels, pattern recognition, and a trading recommendation if applicable. Format your response as a professional trading report."""
@@ -2942,7 +2712,6 @@ Provide a detailed technical analysis including trend direction, key support/res
                 json={
                     "model": settings.OPENROUTER_VISION_MODEL,
                     "messages": [
-                        {"role": "system", "content": system_prompt},
                         {
                             "role": "user",
                             "content": [
@@ -2972,13 +2741,7 @@ Provide a detailed technical analysis including trend direction, key support/res
             return {
                 "analysis": formatted_report,
                 "pair": pair,
-                "timeframe": timeframe,
-                "capabilities": [
-                    "Forex pairs", "Cryptocurrency charts", "Stock charts", 
-                    "Commodities", "Indices", "Trend direction detection",
-                    "Support and resistance identification", "Chart pattern recognition",
-                    "Trade setup suggestions"
-                ]
+                "timeframe": timeframe
             }
                 
     except Exception as e:
@@ -3002,7 +2765,7 @@ async def health_check():
     
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
-        "version": "4.0.0",
+        "version": "3.5.2",
         "database": db_status,
         "timestamp": datetime.utcnow().isoformat()
     }
@@ -3012,7 +2775,7 @@ async def health_check():
 async def serve_frontend():
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v4.0.0 - Place index.html in root directory"}
+    return {"message": "Pipways API v3.5.2 - Place index.html in root directory"}
 
 # SPA catch-all route (must be LAST)
 @app.get("/{path:path}")
@@ -3029,7 +2792,7 @@ async def spa_catch_all(path: str, request: Request):
     
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"message": "Pipways API v4.0.0"}
+    return {"message": "Pipways API v3.5.2"}
 
 # FIXED: Global exception handler with structured error responses
 @app.exception_handler(Exception)

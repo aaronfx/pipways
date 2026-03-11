@@ -1,11 +1,12 @@
 """
 AI Services Routes
-Fixed: Real AI integration instead of placeholders
+Fixed: Real OpenRouter API integration
 """
 from fastapi import APIRouter, HTTPException, Depends
 import os
-from typing import Optional
-import base64
+import httpx
+from typing import Optional, List
+import json
 
 from . import database
 from .security import get_current_user, get_current_user_optional
@@ -14,126 +15,149 @@ from .schemas import AIAnalyzeRequest, AIMentorRequest
 router = APIRouter()
 
 # Hidden system prompt - never exposed to frontend
-SYSTEM_PROMPT = """You are an expert trading mentor for the Pipways platform. 
-Provide clear, actionable advice about forex trading, risk management, and technical analysis. 
-Always emphasize risk management and responsible trading practices."""
+SYSTEM_PROMPT = """You are Pipways AI, an expert trading mentor. Provide clear, actionable advice about forex trading, risk management, and technical analysis. Always emphasize risk management and responsible trading practices. Be concise but thorough."""
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+SITE_URL = "https://pipwaysapp.onrender.com"
+SITE_NAME = "Pipways AI"
+
+async def call_openrouter(messages: List[dict], temperature: float = 0.7):
+    """Call OpenRouter API with proper headers"""
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+    
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": SITE_URL,
+        "X-Title": SITE_NAME,
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "openrouter/auto",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": 2000
+    }
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
+        
+        if response.status_code != 200:
+            error_text = response.text
+            raise HTTPException(status_code=500, detail=f"AI service error: {error_text}")
+        
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
 
 @router.post("/analyze")
 async def analyze_market(data: AIAnalyzeRequest, current_user: Optional[dict] = Depends(get_current_user_optional)):
     """
-    Analyze market conditions for a trading pair
+    Analyze market conditions for a trading pair using OpenRouter
     """
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    # Generate real analysis based on inputs (integrate with OpenAI/Anthropic here)
-    analysis = f"""
-Technical Analysis for {data.pair} ({data.timeframe}):
+    try:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"""Provide technical analysis for {data.pair} on {data.timeframe} timeframe.
+            
+Additional context: {data.context or 'None provided'}
 
-Trend: Bullish momentum detected with strong support at key levels.
-Support: Identified at recent consolidation zone.
-Resistance: Next major resistance level approaching.
-Recommendation: Consider long positions on confirmed breakouts with proper risk management.
-
-Context: {data.context or 'Standard technical analysis applied'}
-Risk Warning: Always use stop losses and manage position size (1-2% risk per trade).
-    """.strip()
-    
-    return {"analysis": analysis}
+Include:
+1. Trend direction and strength
+2. Key support and resistance levels
+3. Entry and exit recommendations
+4. Risk management advice
+5. Key technical indicators to watch"""}
+        ]
+        
+        analysis = await call_openrouter(messages)
+        return {"analysis": analysis}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/mentor")
 async def ai_mentor(data: AIMentorRequest, current_user: Optional[dict] = Depends(get_current_user_optional)):
     """
-    AI Mentor chat endpoint - provides trading advice
+    AI Mentor chat endpoint using OpenRouter
     """
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    # Store chat history if user is logged in
-    if current_user:
-        async with database.db_pool.acquire() as conn:
-            await conn.execute("""
-                INSERT INTO chat_history (user_id, message, response, context)
-                VALUES ($1, $2, $3, $4)
-            """, current_user['id'], data.message, "AI response generated", SYSTEM_PROMPT)
-    
-    # Generate contextual response based on user message
-    user_msg = data.message.lower()
-    
-    # Simple keyword-based responses (replace with actual AI API integration)
-    if 'risk' in user_msg or 'management' in user_msg:
-        response = """Risk Management is crucial for trading success:
-
-1. Never risk more than 1-2% of your account per trade
-2. Always use stop losses - determine your exit before entry
-3. Use proper position sizing based on your stop loss distance
-4. Maintain a risk-reward ratio of at least 1:2
-5. Keep a trading journal to track your R-multiples
-
-Would you like specific guidance on calculating position sizes?"""
-    
-    elif 'entry' in user_msg or 'setup' in user_msg:
-        response = """For trade entries, focus on these key elements:
-
-1. Confluence - Look for multiple factors aligning (trend, support/resistance, indicators)
-2. Confirmation - Wait for candlestick patterns or momentum shifts
-3. Timeframe alignment - Check higher timeframes for trend direction
-4. Risk-defined - Know your stop loss before entering
-5. Patience - Don't chase; wait for your setup to come to you
-
-What specific pair or strategy are you working on?"""
-    
-    elif 'psychology' in user_msg or 'emotion' in user_msg:
-        response = """Trading Psychology is often the difference between success and failure:
-
-1. Stick to your trading plan - don't deviate based on FOMO
-2. Accept losses as part of the business - focus on process, not outcomes
-3. Take breaks after consecutive losses to avoid revenge trading
-4. Maintain a trading journal to identify emotional patterns
-5. Set daily/weekly loss limits and walk away when reached
-
-Remember: The market will be here tomorrow. Protect your capital."""
-    
-    else:
-        response = f"""Thank you for your question about "{data.message}".
-
-As your trading mentor, here's my advice:
-
-1. Always prioritize risk management over profits
-2. Verify your analysis with multiple timeframes
-3. Keep detailed records of all trades (journal)
-4. Continuously educate yourself - markets evolve
-5. Stay disciplined with your trading plan
-
-Would you like me to elaborate on any specific aspect of trading strategy, risk management, or technical analysis?"""
-    
-    return {"response": response.strip()}
+    try:
+        # Build conversation history
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        
+        # Add recent history
+        for msg in data.history[-5:]:
+            role = "assistant" if msg.get("role") == "assistant" else "user"
+            messages.append({"role": role, "content": msg.get("content", "")})
+        
+        # Add current message
+        messages.append({"role": "user", "content": data.message})
+        
+        response_text = await call_openrouter(messages)
+        
+        # Store chat history if user is logged in
+        if current_user:
+            async with database.db_pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO chat_history (user_id, message, response, context)
+                    VALUES ($1, $2, $3, $4)
+                """, current_user['id'], data.message, response_text, "AI mentor chat")
+        
+        return {"response": response_text}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyze-chart")
-async def analyze_chart(image: str, pair: str, timeframe: str = "1H", context: Optional[str] = None):
+async def analyze_chart(data: dict, current_user: Optional[dict] = Depends(get_current_user_optional)):
     """
-    Analyze uploaded chart image using AI Vision
+    Analyze uploaded chart image using OpenRouter Vision
     """
-    # Process the base64 image and analyze (integrate with GPT-4 Vision or similar)
-    analysis = f"""Chart Analysis for {pair} on {timeframe}:
-
-Pattern Recognition:
-- Price action showing consolidation pattern
-- Volume profile suggests accumulation phase
-
-Key Levels:
-- Support: Recent swing low holding
-- Resistance: Previous high acting as ceiling
-
-Technical Indicators:
-- Moving averages aligned with trend
-- Momentum showing potential reversal setup
-
-Recommendation:
-Watch for breakout above resistance with volume confirmation. If breakout occurs, target next resistance level. If rejected, expect pullback to support.
-
-{context if context else ''}
-
-Always confirm with risk management before entering."""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
     
-    return {"analysis": analysis.strip()}
+    try:
+        image_data = data.get("image", "")
+        pair = data.get("pair", "EURUSD")
+        timeframe = data.get("timeframe", "1H")
+        context = data.get("context", "")
+        
+        # Prepare vision-capable message
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"""Analyze this trading chart for {pair} on {timeframe} timeframe. 
+                        
+Context: {context if context else 'No additional context'}
+
+Provide:
+1. Pattern recognition (support/resistance, trendlines, chart patterns)
+2. Technical indicator signals visible
+3. Entry/exit recommendations
+4. Risk management levels (SL/TP suggestions)"""
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_data if image_data.startswith("http") else f"data:image/jpeg;base64,{image_data.split(',')[1] if ',' in image_data else image_data}"
+                        }
+                    }
+                ]
+            }
+        ]
+        
+        analysis = await call_openrouter(messages, temperature=0.5)
+        return {"analysis": analysis}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

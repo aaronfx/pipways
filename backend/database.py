@@ -10,20 +10,18 @@ from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
-# Global database pool - initialized to None, set by lifespan
+# Global database pool
 db_pool: Optional[asyncpg.Pool] = None
 
-# Configuration from environment
+# Configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars-long")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-# Admin credentials
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 async def init_database_pool():
     """Initialize the database connection pool"""
@@ -31,10 +29,9 @@ async def init_database_pool():
     try:
         if not DATABASE_URL:
             logger.error("DATABASE_URL environment variable is not set!")
-            raise ValueError("DATABASE_URL is required")
+            raise ValueError("DATABASE_URL is required - check Render environment variables")
         
         dsn = DATABASE_URL
-        # Add SSL for Render PostgreSQL if not present
         if "render.com" in dsn and "sslmode" not in dsn:
             dsn += "?sslmode=require"
         
@@ -66,7 +63,7 @@ async def init_db():
     import bcrypt
     
     if not db_pool:
-        logger.error("Cannot init DB - pool is None")
+        logger.error("Cannot initialize DB - pool is None")
         return
     
     async with db_pool.acquire() as conn:
@@ -183,7 +180,7 @@ async def init_db():
             )
         """)
         
-        # Quizzes
+        # Course quizzes
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_quizzes (
                 id SERIAL PRIMARY KEY,
@@ -192,7 +189,8 @@ async def init_db():
                 description TEXT,
                 passing_score INTEGER DEFAULT 70,
                 created_by INTEGER REFERENCES users(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
@@ -211,6 +209,71 @@ async def init_db():
             )
         """)
         
+        # Quiz attempts
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_attempts (
+                id SERIAL PRIMARY KEY,
+                quiz_id INTEGER REFERENCES course_quizzes(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                answers JSONB,
+                score INTEGER,
+                max_score INTEGER,
+                percentage DECIMAL(5,2),
+                passed BOOLEAN DEFAULT FALSE,
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # User course progress
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_course_progress (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+                module_id INTEGER REFERENCES course_modules(id) ON DELETE CASCADE,
+                completed BOOLEAN DEFAULT FALSE,
+                completed_at TIMESTAMP,
+                UNIQUE(user_id, module_id)
+            )
+        """)
+        
+        # Chat history - FIXED: Added missing table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                response TEXT NOT NULL,
+                context TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Media files - FIXED: Added missing table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS media_files (
+                id SERIAL PRIMARY KEY,
+                filename VARCHAR(255) NOT NULL,
+                url VARCHAR(500) NOT NULL,
+                file_type VARCHAR(50),
+                size_bytes INTEGER,
+                uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Performance analyses - FIXED: Added missing table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS performance_analyses (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                analysis_data JSONB NOT NULL,
+                raw_trades JSONB,
+                trader_score INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Site settings
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS site_settings (
@@ -220,14 +283,17 @@ async def init_db():
                 telegram_vip_link VARCHAR(500),
                 vip_price DECIMAL(10,2) DEFAULT 99.00,
                 vip_price_currency VARCHAR(3) DEFAULT 'USD',
+                seo_default_title VARCHAR(255),
+                seo_default_description TEXT,
                 contact_email VARCHAR(255),
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
+        # Insert default settings
         await conn.execute("""
-            INSERT INTO site_settings (id, site_name, telegram_free_link, telegram_vip_link)
-            SELECT 1, 'Pipways', 'https://t.me/pipways_free', 'https://t.me/pipways_vip'
+            INSERT INTO site_settings (id, site_name, telegram_free_link, telegram_vip_link, vip_price)
+            SELECT 1, 'Pipways', 'https://t.me/pipways_free', 'https://t.me/pipways_vip', 99.00
             WHERE NOT EXISTS (SELECT 1 FROM site_settings WHERE id = 1)
         """)
         
@@ -246,11 +312,12 @@ async def init_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager - handles startup/shutdown"""
+    """Application lifespan manager"""
     try:
         await init_database_pool()
         await init_db()
         yield
+        logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Startup failed: {e}")
         raise

@@ -8,10 +8,8 @@ import jwt
 from datetime import datetime, timedelta
 from typing import Optional
 
-try:
-    from .database import db_pool, SECRET_KEY, ALGORITHM
-except ImportError:
-    from database import db_pool, SECRET_KEY, ALGORITHM
+# FIXED: Consistent relative imports only
+from .database import db_pool, SECRET_KEY, ALGORITHM
 
 security = HTTPBearer(auto_error=False)
 

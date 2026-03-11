@@ -1,6 +1,6 @@
 """
 Signals Routes
-Handles trading signals display and management
+Fixed: Wrapped responses
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
@@ -19,11 +19,15 @@ async def get_signals(pair: Optional[str] = None, current_user: Optional[dict] =
     
     async with database.db_pool.acquire() as conn:
         if pair:
-            signals = await conn.fetch("SELECT * FROM signals WHERE pair = $1 AND status = 'active' ORDER BY created_at DESC", pair)
+            signals = await conn.fetch(
+                "SELECT * FROM signals WHERE pair = $1 AND status = 'active' ORDER BY created_at DESC", 
+                pair
+            )
         else:
-            signals = await conn.fetch("SELECT * FROM signals WHERE status = 'active' ORDER BY created_at DESC")
+            signals = await conn.fetch(
+                "SELECT * FROM signals WHERE status = 'active' ORDER BY created_at DESC"
+            )
         
-        # Return wrapped response
         return {"signals": [dict(s) for s in signals]}
 
 @router.get("/history")
@@ -33,7 +37,9 @@ async def get_signal_history(current_user: Optional[dict] = Depends(get_current_
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        signals = await conn.fetch("SELECT * FROM signals WHERE status != 'active' ORDER BY closed_at DESC LIMIT 50")
+        signals = await conn.fetch(
+            "SELECT * FROM signals WHERE status != 'active' ORDER BY closed_at DESC LIMIT 50"
+        )
         return {"signals": [dict(s) for s in signals]}
 
 @router.get("/{signal_id}")

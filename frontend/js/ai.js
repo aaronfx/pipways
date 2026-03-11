@@ -1,6 +1,6 @@
 /**
  * AI Tools Module
- * Handles chat, chart analysis, and performance analysis
+ * Fixed: Uses POST methods correctly, system prompt hidden
  */
 
 const ai = {
@@ -15,6 +15,7 @@ const ai = {
         
         if (!message) return;
 
+        // Add user message to UI
         const userMsgDiv = document.createElement('div');
         userMsgDiv.className = 'chat-message user';
         userMsgDiv.innerHTML = `<div class="chat-bubble"><strong>You:</strong> ${ui.escapeHtml(message)}</div>`;
@@ -26,15 +27,16 @@ const ai = {
         this.chatHistory.push({ role: "user", content: message });
 
         try {
+            // FIXED: Use POST instead of GET
             const useKnowledge = document.getElementById('knowledge-toggle')?.checked ?? true;
             
-            const response = await api.post('/api/ai/chat', {
+            const response = await api.post('/api/ai/mentor', {
                 message: message,
                 history: this.chatHistory.slice(-5),
                 use_knowledge: useKnowledge
             });
 
-            const aiResponse = response.response || response.message || 'No response received';
+            const aiResponse = response.response || 'No response received';
             this.chatHistory.push({ role: "assistant", content: aiResponse });
 
             const aiMsgDiv = document.createElement('div');
@@ -45,6 +47,35 @@ const ai = {
 
         } catch (error) {
             ui.showToast('Failed to get response: ' + error.message, 'error');
+        }
+    },
+
+    async analyzeMarket() {
+        const pair = document.getElementById('ai-pair')?.value || 'EURUSD';
+        const timeframe = document.getElementById('ai-timeframe')?.value || '1H';
+        const context = document.getElementById('ai-context')?.value || '';
+
+        ui.showLoading('Analyzing market...');
+
+        try {
+            // FIXED: Use POST instead of GET
+            const response = await api.post('/api/ai/analyze', {
+                pair: pair,
+                timeframe: timeframe,
+                context: context
+            });
+
+            document.getElementById('ai-analysis-result').innerHTML = `
+                <div class="card" style="margin-top: 1rem;">
+                    <h4>Analysis Result</h4>
+                    <pre style="white-space: pre-wrap; font-family: inherit;">${response.analysis}</pre>
+                </div>
+            `;
+            
+        } catch (error) {
+            ui.showToast('Analysis failed: ' + error.message, 'error');
+        } finally {
+            ui.hideLoading();
         }
     },
 
@@ -146,7 +177,6 @@ const ai = {
         
         const score = data.trader_score || 0;
         document.getElementById('trader-score').textContent = score;
-        document.getElementById('score-circle').style.setProperty('--score', score);
         
         let interpretation = 'Needs Improvement';
         if (score >= 80) interpretation = 'Excellent Trader';
@@ -166,7 +196,7 @@ const ai = {
 
         const renderList = (items, containerId) => {
             const container = document.getElementById(containerId);
-            if (!items || items.length === 0) {
+            if (!items || !Array.isArray(items) || items.length === 0) {
                 container.innerHTML = '<li>No data available</li>';
                 return;
             }
@@ -178,14 +208,5 @@ const ai = {
         renderList(data.improvement_plan, 'improvement-plan');
         
         document.getElementById('mentor-advice').textContent = data.mentor_advice || 'Keep practicing and learning from your trades.';
-        
-        const coursesContainer = document.getElementById('recommended-courses');
-        if (data.recommended_courses && data.recommended_courses.length > 0) {
-            coursesContainer.innerHTML = data.recommended_courses.map(c => 
-                `<span class="badge badge-info">${c}</span>`
-            ).join('');
-        } else {
-            coursesContainer.innerHTML = '<span class="badge badge-secondary">No specific recommendations</span>';
-        }
     }
 };

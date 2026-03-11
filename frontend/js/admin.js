@@ -56,13 +56,12 @@ const admin = {
         }
     },
 
-    // Blog Management
     async loadBlogPosts() {
         const tbody = document.getElementById('blog-table-body');
         if (!tbody) return;
 
         try {
-            const posts = await api.get('/api/blog?limit=50');  // FIXED: Added /api prefix
+            const posts = await api.get('/api/blog?limit=50');
             
             tbody.innerHTML = posts.map(post => `
                 <tr>
@@ -91,7 +90,7 @@ const admin = {
 
     async editBlogPost(id) {
         try {
-            const post = await api.get(`/api/blog/${id}`);  // FIXED: Added /api prefix
+            const post = await api.get(`/api/blog/${id}`);
             
             document.getElementById('blog-post-id').value = post.id;
             document.getElementById('blog-title').value = post.title;
@@ -122,9 +121,9 @@ const admin = {
 
         try {
             if (id) {
-                await api.put(`/api/blog/${id}`, data);  // FIXED: Added /api prefix
+                await api.put(`/api/blog/${id}`, data);
             } else {
-                await api.post('/api/blog', data);  // FIXED: Added /api prefix
+                await api.post('/api/blog', data);
             }
             
             ui.closeModal('blog-modal');
@@ -140,7 +139,7 @@ const admin = {
         if (!confirm('Are you sure you want to delete this post?')) return;
         
         try {
-            await api.delete(`/api/blog/${id}`);  // FIXED: Added /api prefix
+            await api.delete(`/api/blog/${id}`);
             ui.showToast('Post deleted', 'success');
             this.loadBlogPosts();
         } catch (error) {
@@ -148,7 +147,6 @@ const admin = {
         }
     },
 
-    // User Management
     async loadUsers() {
         const tbody = document.getElementById('users-table-body');
         if (!tbody) return;
@@ -222,13 +220,12 @@ const admin = {
         }
     },
 
-    // Course Management
     async loadAdminCourses() {
         const container = document.getElementById('admin-courses-list');
         if (!container) return;
 
         try {
-            const courses = await api.get('/api/courses');  // FIXED: Added /api prefix
+            const courses = await api.get('/api/courses');
             
             container.innerHTML = courses.map(course => `
                 <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
@@ -257,7 +254,7 @@ const admin = {
 
     async editCourse(id) {
         try {
-            const course = await api.get(`/api/courses/${id}`);  // FIXED: Added /api prefix
+            const course = await api.get(`/api/courses/${id}`);
             
             document.getElementById('course-id').value = course.id;
             document.getElementById('course-title').value = course.title;
@@ -290,9 +287,9 @@ const admin = {
 
         try {
             if (id) {
-                await api.put(`/api/courses/${id}`, data);  // FIXED: Added /api prefix
+                await api.put(`/api/courses/${id}`, data);
             } else {
-                await api.post('/api/courses', data);  // FIXED: Added /api prefix
+                await api.post('/api/courses', data);
             }
             
             ui.closeModal('course-modal');
@@ -308,7 +305,7 @@ const admin = {
         if (!confirm('Delete this course and all its modules?')) return;
         
         try {
-            await api.delete(`/api/courses/${id}`);  // FIXED: Added /api prefix
+            await api.delete(`/api/courses/${id}`);
             ui.showToast('Course deleted', 'success');
             this.loadAdminCourses();
         } catch (error) {
@@ -316,13 +313,12 @@ const admin = {
         }
     },
 
-    // Webinar Management
     async loadAdminWebinars() {
         const container = document.getElementById('admin-webinars-list');
         if (!container) return;
 
         try {
-            const webinars = await api.get('/api/webinars');  // FIXED: Added /api prefix
+            const webinars = await api.get('/api/webinars');
             
             container.innerHTML = webinars.map(w => `
                 <div class="card" style="margin-bottom: 1rem;">
@@ -353,7 +349,7 @@ const admin = {
 
     async editWebinar(id) {
         try {
-            const webinars = await api.get('/api/webinars');  // FIXED: Added /api prefix
+            const webinars = await api.get('/api/webinars');
             const webinar = webinars.find(w => w.id === id);
             if (!webinar) throw new Error('Webinar not found');
 
@@ -390,9 +386,9 @@ const admin = {
 
         try {
             if (id) {
-                await api.put(`/api/webinars/${id}`, data);  // FIXED: Added /api prefix
+                await api.put(`/api/webinars/${id}`, data);
             } else {
-                await api.post('/api/webinars', data);  // FIXED: Added /api prefix
+                await api.post('/api/webinars', data);
             }
             
             ui.closeModal('webinar-modal');
@@ -408,7 +404,7 @@ const admin = {
         if (!confirm('Delete this webinar?')) return;
         
         try {
-            await api.delete(`/api/webinars/${id}`);  // FIXED: Added /api prefix
+            await api.delete(`/api/webinars/${id}`);
             ui.showToast('Webinar deleted', 'success');
             this.loadAdminWebinars();
         } catch (error) {
@@ -416,7 +412,6 @@ const admin = {
         }
     },
 
-    // Signal Management
     async loadAdminSignals() {
         const tbody = document.getElementById('admin-signals-table-body');
         if (!tbody) return;
@@ -514,7 +509,6 @@ const admin = {
         }
     },
 
-    // Settings
     async loadSettings() {
         try {
             const settings = await api.get('/api/admin/settings');
@@ -551,7 +545,6 @@ const admin = {
         }
     },
 
-    // Media Upload
     async handleMediaUpload(input) {
         const files = input.files;
         if (!files.length) return;

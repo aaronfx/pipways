@@ -1,6 +1,6 @@
 /**
  * AI Tools Module
- * Fixed: Correct endpoints and error handling
+ * Fixed: Real backend integration instead of placeholders
  */
 
 const ai = {
@@ -13,8 +13,9 @@ const ai = {
         const messagesContainer = document.getElementById('chat-messages');
         const message = input.value.trim();
         
-        if (!message) return;
+        if (!message || !messagesContainer) return;
 
+        // Add user message
         const userMsgDiv = document.createElement('div');
         userMsgDiv.className = 'chat-message user';
         userMsgDiv.innerHTML = `<div class="chat-bubble"><strong>You:</strong> ${ui.escapeHtml(message)}</div>`;
@@ -28,14 +29,16 @@ const ai = {
         try {
             const useKnowledge = document.getElementById('knowledge-toggle')?.checked ?? true;
             
-            // FIXED: Correct endpoint POST /api/ai/mentor
+            // FIXED: Call actual backend endpoint
             const response = await api.post('/api/ai/mentor', {
                 message: message,
-                history: this.chatHistory.slice(-5),
+                history: this.chatHistory.slice(-10),
                 use_knowledge: useKnowledge
             });
 
-            const aiResponse = response.response || response.message || 'No response received';
+            // FIXED: Extract actual response from backend
+            const aiResponse = response.response || 'No response received';
+
             this.chatHistory.push({ role: "assistant", content: aiResponse });
 
             const aiMsgDiv = document.createElement('div');
@@ -45,9 +48,14 @@ const ai = {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
         } catch (error) {
-            // FIXED: Proper error message extraction
+            console.error('Chat error:', error);
             const errorMsg = typeof error.message === 'string' ? error.message : 'Failed to get response';
-            ui.showToast('Failed to get response: ' + errorMsg, 'error');
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'chat-message';
+            errorDiv.innerHTML = `<div class="chat-bubble" style="color: var(--danger);"><strong>Error:</strong> ${ui.escapeHtml(errorMsg)}</div>`;
+            messagesContainer.appendChild(errorDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
     },
 
@@ -73,7 +81,7 @@ const ai = {
 
     async analyzeChart() {
         if (!this.currentChartImage) {
-            ui.showToast('Please upload an image first', 'error');
+            ui.showToast('Please upload a chart image first', 'error');
             return;
         }
 
@@ -84,8 +92,9 @@ const ai = {
             const timeframe = document.getElementById('chart-timeframe')?.value || '1H';
             const context = document.getElementById('chart-context')?.value || '';
 
-            // FIXED: Correct endpoint POST /api/ai/analyze with JSON body
-            const response = await api.post('/api/ai/analyze', {
+            // FIXED: Call actual backend with proper error handling
+            const response = await api.post('/api/ai/analyze-chart', {
+                image: this.currentChartImage,
                 pair: pair,
                 timeframe: timeframe,
                 context: context
@@ -94,13 +103,17 @@ const ai = {
             const analysisContent = document.getElementById('chart-analysis-content');
             const resultContainer = document.getElementById('chart-analysis-result');
             
-            if (analysisContent) analysisContent.textContent = response.analysis || 'No analysis available';
-            if (resultContainer) resultContainer.classList.remove('hidden');
+            // FIXED: Use actual backend response
+            if (analysisContent) {
+                analysisContent.textContent = response.analysis || 'Analysis completed but no content returned';
+            }
+            if (resultContainer) {
+                resultContainer.classList.remove('hidden');
+            }
             
         } catch (error) {
-            // FIXED: Handle error object properly
-            const errorMsg = error.message || 'Unknown error occurred';
-            ui.showToast('Analysis failed: ' + errorMsg, 'error');
+            console.error('Chart analysis error:', error);
+            ui.showToast('Analysis failed: ' + (error.message || 'Unknown error'), 'error');
         } finally {
             ui.hideLoading();
         }
@@ -128,17 +141,17 @@ const ai = {
 
     async analyzePerformanceVision() {
         if (!this.currentPerformanceImage) {
-            ui.showToast('Please upload a statement image', 'error');
+            ui.showToast('Please upload a trading statement image', 'error');
             return;
         }
 
-        ui.showLoading('Analyzing performance...');
+        ui.showLoading('Analyzing trading performance...');
 
         try {
             const balance = parseFloat(document.getElementById('vision-account-balance')?.value) || 0;
             const period = parseInt(document.getElementById('vision-trading-period')?.value) || 30;
 
-            // FIXED: Correct endpoint and proper error handling
+            // FIXED: Call actual backend endpoint
             const response = await api.post('/api/performance/analyze-vision', {
                 image: this.currentPerformanceImage,
                 account_balance: balance,
@@ -148,9 +161,8 @@ const ai = {
             this.displayPerformanceResults(response);
             
         } catch (error) {
-            // FIXED: Ensure we don't try to read response body twice
-            const errorMsg = error.message || 'Analysis failed';
-            ui.showToast('Analysis failed: ' + errorMsg, 'error');
+            console.error('Performance analysis error:', error);
+            ui.showToast('Analysis failed: ' + (error.message || 'Server error'), 'error');
         } finally {
             ui.hideLoading();
         }
@@ -190,11 +202,11 @@ const ai = {
         const renderList = (items, containerId) => {
             const container = document.getElementById(containerId);
             if (!container) return;
-            if (!items || items.length === 0) {
+            if (!items || !Array.isArray(items) || items.length === 0) {
                 container.innerHTML = '<li>No data available</li>';
                 return;
             }
-            container.innerHTML = items.map(item => `<li>${ui.escapeHtml(item)}</li>`).join('');
+            container.innerHTML = items.map(item => `<li>${ui.escapeHtml(String(item))}</li>`).join('');
         };
 
         renderList(data.top_mistakes, 'top-mistakes');
@@ -206,9 +218,9 @@ const ai = {
         
         const coursesContainer = document.getElementById('recommended-courses');
         if (coursesContainer) {
-            if (data.recommended_courses && data.recommended_courses.length > 0) {
+            if (data.recommended_courses && Array.isArray(data.recommended_courses) && data.recommended_courses.length > 0) {
                 coursesContainer.innerHTML = data.recommended_courses.map(c => 
-                    `<span class="badge badge-info">${ui.escapeHtml(c)}</span>`
+                    `<span class="badge badge-info">${ui.escapeHtml(String(c))}</span>`
                 ).join('');
             } else {
                 coursesContainer.innerHTML = '<span class="badge badge-secondary">No specific recommendations</span>';

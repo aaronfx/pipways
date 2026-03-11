@@ -10,18 +10,20 @@ from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
-# Global database pool
+# Global database pool - initialized to None, set by lifespan
 db_pool: Optional[asyncpg.Pool] = None
 
-# Configuration
+# Configuration from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars-long")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
+# Admin credentials
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@pipways.com")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 async def init_database_pool():
     """Initialize the database connection pool"""
@@ -32,6 +34,7 @@ async def init_database_pool():
             raise ValueError("DATABASE_URL is required - check Render environment variables")
         
         dsn = DATABASE_URL
+        # Add SSL for Render PostgreSQL if not present
         if "render.com" in dsn and "sslmode" not in dsn:
             dsn += "?sslmode=require"
         
@@ -63,7 +66,7 @@ async def init_db():
     import bcrypt
     
     if not db_pool:
-        logger.error("Cannot initialize DB - pool is None")
+        logger.error("Cannot init DB - pool is None")
         return
     
     async with db_pool.acquire() as conn:
@@ -180,7 +183,7 @@ async def init_db():
             )
         """)
         
-        # Course quizzes
+        # Quizzes
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_quizzes (
                 id SERIAL PRIMARY KEY,
@@ -312,12 +315,11 @@ async def init_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
+    """Application lifespan manager - handles startup/shutdown"""
     try:
         await init_database_pool()
         await init_db()
         yield
-        logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Startup failed: {e}")
         raise

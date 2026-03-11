@@ -2,12 +2,16 @@
 Security Utilities
 Authentication and authorization dependencies
 """
-from fastapi import HTTPException, Depends, status, Request
+from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+from datetime import datetime, timedelta
 from typing import Optional
 
-from .database import db_pool, SECRET_KEY, ALGORITHM
+try:
+    from .database import db_pool, SECRET_KEY, ALGORITHM
+except ImportError:
+    from database import db_pool, SECRET_KEY, ALGORITHM
 
 security = HTTPBearer(auto_error=False)
 
@@ -46,6 +50,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
     # Get user from database
     async with db_pool.acquire() as conn:
         user = await conn.fetchrow(
@@ -65,7 +72,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Optional authentication - returns user if token valid, None if no token or invalid.
-    Used for endpoints that work for both guests and logged-in users.
     """
     if not credentials:
         return None
@@ -76,6 +82,9 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         user_id: str = payload.get("sub")
         
         if user_id is None:
+            return None
+            
+        if not db_pool:
             return None
             
         async with db_pool.acquire() as conn:
@@ -99,18 +108,16 @@ async def get_admin_user(current_user: dict = Depends(get_current_user)):
 
 def create_access_token(data: dict, expires_delta: Optional[int] = None):
     """Create JWT access token"""
-    import datetime
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_delta)
+        expire = datetime.utcnow() + timedelta(minutes=expires_delta)
     else:
-        expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
+        expire = datetime.utcnow() + timedelta(minutes=60)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def create_refresh_token(data: dict):
     """Create JWT refresh token"""
-    import datetime
-    expire = datetime.datetime.utcnow() + datetime.timedelta(days=7)
+    expire = datetime.utcnow() + timedelta(days=7)
     data.update({"exp": expire})
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)

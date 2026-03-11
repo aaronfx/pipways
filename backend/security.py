@@ -8,8 +8,9 @@ import jwt
 from datetime import datetime, timedelta
 from typing import Optional
 
-# FIXED: Consistent relative imports only
-from .database import db_pool, SECRET_KEY, ALGORITHM
+# FIXED: Import database module, not the variable
+from . import database
+from .database import SECRET_KEY, ALGORITHM
 
 security = HTTPBearer(auto_error=False)
 
@@ -48,11 +49,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     # Get user from database
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         user = await conn.fetchrow(
             "SELECT id, email, full_name, role, subscription_tier, subscription_status FROM users WHERE id = $1",
             int(user_id)
@@ -82,10 +83,10 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         if user_id is None:
             return None
             
-        if not db_pool:
+        if not database.db_pool:
             return None
             
-        async with db_pool.acquire() as conn:
+        async with database.db_pool.acquire() as conn:
             user = await conn.fetchrow(
                 "SELECT id, email, full_name, role, subscription_tier, subscription_status FROM users WHERE id = $1",
                 int(user_id)

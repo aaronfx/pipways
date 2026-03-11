@@ -3,11 +3,12 @@
  * Handles all HTTP communication with the backend
  */
 
+const API_BASE = window.location.origin;
+
 const api = {
-    baseURL: '',  // Empty for same-origin
+    baseURL: API_BASE,
     
     async request(endpoint, options = {}) {
-        // Ensure endpoint starts with /
         if (!endpoint.startsWith('/')) {
             endpoint = '/' + endpoint;
         }
@@ -22,21 +23,17 @@ const api = {
             ...options
         };
 
-        // Add auth token if available
         const token = localStorage.getItem('access_token');
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Handle body serialization
         if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
             config.body = JSON.stringify(config.body);
         }
 
         try {
             const response = await fetch(url, config);
-            
-            // Handle non-JSON responses (500 errors return HTML)
             const contentType = response.headers.get('content-type');
             
             if (!response.ok) {
@@ -47,7 +44,6 @@ const api = {
                     throw new Error('Session expired. Please login again.');
                 }
                 
-                // Try to parse JSON error, fallback to text
                 let errorMessage;
                 try {
                     const errorData = await response.json();

@@ -10,7 +10,6 @@ const ui = {
     },
 
     setupEventListeners() {
-        // Close modals on escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 document.querySelectorAll('.modal.show').forEach(modal => {
@@ -19,7 +18,6 @@ const ui = {
             }
         });
 
-        // Close modals on backdrop click
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 this.closeModal(e.target.id);
@@ -28,7 +26,6 @@ const ui = {
     },
 
     updateTheme() {
-        // Check for dark mode preference
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.setAttribute('data-theme', 'dark');
         }

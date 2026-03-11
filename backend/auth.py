@@ -7,8 +7,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from datetime import timedelta
 from typing import Optional
 
-# FIXED: Consistent relative imports only
-from .database import db_pool, SECRET_KEY, ALGORITHM
+# FIXED: Import database module, not the variable
+from . import database
+from .database import SECRET_KEY, ALGORITHM
 from .schemas import UserRegister, UserLogin, Token
 from .security import create_access_token, create_refresh_token, get_current_user
 
@@ -17,11 +18,12 @@ router = APIRouter()
 @router.post("/register", response_model=Token)
 async def register(user_data: UserRegister):
     """Register a new user"""
-    if not db_pool:
+    # Use database.db_pool to get current value
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     try:
-        async with db_pool.acquire() as conn:
+        async with database.db_pool.acquire() as conn:
             # Check if user exists
             existing = await conn.fetchval(
                 "SELECT id FROM users WHERE email = $1", 
@@ -63,11 +65,11 @@ async def register(user_data: UserRegister):
 @router.post("/login", response_model=Token)
 async def login(credentials: UserLogin):
     """Login user"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     try:
-        async with db_pool.acquire() as conn:
+        async with database.db_pool.acquire() as conn:
             # Get user by email
             user = await conn.fetchrow("""
                 SELECT id, email, password_hash, full_name, role, subscription_tier, subscription_status 

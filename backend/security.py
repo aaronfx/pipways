@@ -1,122 +1,73 @@
 """
-Security Utilities
-Authentication and authorization dependencies
+Security & Authentication
 """
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt
+# FIXED: Import from jose, not jwt directly
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from datetime import datetime, timedelta
+import os
 from typing import Optional
 
-# FIXED: Import database module, not the variable
-from . import database
-from .database import SECRET_KEY, ALGORITHM
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-security = HTTPBearer(auto_error=False)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def create_refresh_token(data: dict):
+    expire = datetime.utcnow() + timedelta(days=7)
+    to_encode = data.copy()
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token and return current user"""
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    from . import database  # Local import to avoid circular dependency
     
     token = credentials.credentials
-    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
-        
         if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-            
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+            raise HTTPException(status_code=401, detail="Invalid authentication")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authentication")
     
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    # Get user from database
     async with database.db_pool.acquire() as conn:
-        user = await conn.fetchrow(
-            "SELECT id, email, full_name, role, subscription_tier, subscription_status FROM users WHERE id = $1",
-            int(user_id)
-        )
-        
+        user = await conn.fetchrow("SELECT * FROM users WHERE id = $1", int(user_id))
         if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    
-    return dict(user)
+            raise HTTPException(status_code=401, detail="User not found")
+        return dict(user)
 
 async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Optional authentication - returns user if token valid, None if no token or invalid.
-    """
-    if not credentials:
-        return None
-    
     try:
-        token = credentials.credentials
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        
-        if user_id is None:
-            return None
-            
-        if not database.db_pool:
-            return None
-            
-        async with database.db_pool.acquire() as conn:
-            user = await conn.fetchrow(
-                "SELECT id, email, full_name, role, subscription_tier, subscription_status FROM users WHERE id = $1",
-                int(user_id)
-            )
-            return dict(user) if user else None
-            
-    except (jwt.ExpiredSignatureError, jwt.JWTError, Exception):
+        return await get_current_user(credentials)
+    except HTTPException:
         return None
 
-async def get_admin_user(current_user: dict = Depends(get_current_user)):
-    """Verify user is admin or moderator"""
-    if current_user["role"] not in ["admin", "moderator"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    return current_user
-
-def create_access_token(data: dict, expires_delta: Optional[int] = None):
-    """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + timedelta(minutes=expires_delta)
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=60)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-def create_refresh_token(data: dict):
-    """Create JWT refresh token"""
-    expire = datetime.utcnow() + timedelta(days=7)
-    data.update({"exp": expire})
-    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
+async def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    user = await get_current_user(credentials)
+    if user["role"] not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user

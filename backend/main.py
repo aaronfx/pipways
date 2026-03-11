@@ -23,7 +23,7 @@ from .performance import router as performance_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="Pipways API",
     version="3.5",
@@ -53,29 +53,25 @@ app.include_router(performance_router, prefix="/api/performance", tags=["perform
 # Determine the correct path for frontend files
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
-UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 
 # Create uploads directory if it doesn't exist
-os.makedirs(UPLOADS_DIR, exist_ok=True)
-logger.info(f"Uploads directory ensured at: {UPLOADS_DIR}")
+os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
 
-# Mount static files
+# Mount static files (CSS, JS, images) if frontend directory exists
 if os.path.exists(FRONTEND_DIR):
-    # Mount CSS and JS directories if they exist
     css_dir = os.path.join(FRONTEND_DIR, "css")
     js_dir = os.path.join(FRONTEND_DIR, "js")
+    uploads_dir = os.path.join(BASE_DIR, "uploads")
     
     if os.path.exists(css_dir):
         app.mount("/css", StaticFiles(directory=css_dir), name="css")
     if os.path.exists(js_dir):
         app.mount("/js", StaticFiles(directory=js_dir), name="js")
     
-    logger.info(f"Frontend static files mounted from: {FRONTEND_DIR}")
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    logger.info(f"Frontend directory mounted from: {FRONTEND_DIR}")
 else:
     logger.warning(f"Frontend directory not found at: {FRONTEND_DIR}")
-
-# Mount uploads directory (now it exists)
-app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 @app.get("/")
 async def serve_index():
@@ -84,22 +80,30 @@ async def serve_index():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     else:
-        # If no frontend, return API info
-        return {"message": "Pipways API v3.5", "status": "running", "frontend": "not found"}
+        return {
+            "message": "Pipways API v3.5",
+            "status": "running",
+            "note": "Frontend not found. API is operational."
+        }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Health check endpoint"""
+    return {"status": "healthy", "version": "3.5"}
 
 # Catch-all route for SPA (Single Page Application) routing
+# This handles client-side routes like /blog, /courses, /admin, etc.
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     """Serve index.html for all non-API routes (SPA behavior)"""
-    # Skip API routes
-    if full_path.startswith(("api/", "auth/", "blog/", "courses/", "webinars/")):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not Found")
+    # Skip API routes and static files
+    if any(full_path.startswith(prefix) for prefix in [
+        "api/", "auth/", "blog/", "courses/", "webinars/", 
+        "css/", "js/", "uploads/", "health"
+    ]):
+        return {"detail": "Not Found"}
     
+    # Serve index.html for all other routes (client-side routing)
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)

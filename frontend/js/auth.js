@@ -47,34 +47,43 @@ const auth = {
     showRegister() {
         document.getElementById('login-form').classList.add('hidden');
         document.getElementById('register-form').classList.remove('hidden');
+        // Clear any previous errors
+        document.getElementById('login-error').style.display = 'none';
+        document.getElementById('register-error').style.display = 'none';
     },
 
     showLogin() {
         document.getElementById('register-form').classList.add('hidden');
         document.getElementById('login-form').classList.remove('hidden');
+        // Clear any previous errors
+        document.getElementById('login-error').style.display = 'none';
+        document.getElementById('register-error').style.display = 'none';
     },
 
     updateUI() {
         if (!this.currentUser) return;
 
-        // Update user info
+        // Update user info in sidebar
         document.getElementById('user-name').textContent = this.currentUser.full_name || this.currentUser.email;
         document.getElementById('user-email').textContent = this.currentUser.email;
         document.getElementById('user-avatar').textContent = (this.currentUser.full_name || this.currentUser.email).charAt(0).toUpperCase();
 
-        // Show admin badge if applicable
+        // Show admin badge and nav if applicable
         if (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator') {
             document.getElementById('admin-badge').classList.remove('hidden');
             document.getElementById('admin-nav-item').classList.remove('hidden');
+        } else {
+            document.getElementById('admin-badge').classList.add('hidden');
+            document.getElementById('admin-nav-item').classList.add('hidden');
         }
 
         // Update telegram buttons based on subscription
-        if (this.currentUser.subscription_tier === 'vip') {
-            const vipBtn = document.getElementById('btn-telegram-vip');
-            if (vipBtn) {
-                vipBtn.textContent = 'Join VIP Channel';
-                vipBtn.onclick = () => window.open('https://t.me/pipways_vip', '_blank');
-            }
+        const vipBtn = document.getElementById('btn-telegram-vip');
+        if (vipBtn && this.currentUser.subscription_tier === 'vip') {
+            vipBtn.innerHTML = '<i class="fas fa-crown"></i> Join VIP Channel';
+            vipBtn.onclick = () => window.open('https://t.me/pipways_vip', '_blank');
+            vipBtn.classList.remove('btn-premium');
+            vipBtn.classList.add('btn-success');
         }
     },
 
@@ -84,6 +93,7 @@ const auth = {
         const errorDiv = document.getElementById('login-error');
         
         ui.showLoading('Logging in...');
+        errorDiv.style.display = 'none';
 
         try {
             const response = await fetch('/auth/login', {
@@ -94,6 +104,13 @@ const auth = {
                     password: form.password.value
                 })
             });
+
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error('Server error: ' + text.substring(0, 100));
+            }
 
             const data = await response.json();
 
@@ -115,6 +132,7 @@ const auth = {
         } catch (error) {
             errorDiv.textContent = error.message;
             errorDiv.style.display = 'block';
+            console.error('Login error:', error);
         } finally {
             ui.hideLoading();
         }
@@ -146,6 +164,13 @@ const auth = {
                 })
             });
 
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error('Server error: ' + text.substring(0, 100));
+            }
+
             const data = await response.json();
 
             if (!response.ok) {
@@ -163,12 +188,14 @@ const auth = {
         } catch (error) {
             errorDiv.textContent = error.message;
             errorDiv.style.display = 'block';
+            console.error('Registration error:', error);
         } finally {
             ui.hideLoading();
         }
     },
 
     logout() {
+        // Clear tokens
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         this.currentUser = null;
@@ -176,7 +203,13 @@ const auth = {
         // Clear chat history
         if (window.ai) ai.chatHistory = [];
         
+        // Reset UI
         this.showAuthWall();
+        
+        // Reset forms
+        document.getElementById('login-form').reset();
+        document.getElementById('register-form').reset();
+        
         ui.showToast('Logged out successfully', 'info');
     },
 

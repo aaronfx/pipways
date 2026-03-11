@@ -35,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# FIXED: Consistent API prefixes - all under /api/ except auth
+# API Routes
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 app.include_router(signals_router, prefix="/api/signals", tags=["signals"])

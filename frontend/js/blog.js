@@ -12,7 +12,7 @@ const blog = {
         if (!container) return;
 
         try {
-            let url = '/blog?status=published';
+            let url = '/api/blog?status=published';  // FIXED: Added /api prefix
             if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
             if (category) url += `&category=${category}`;
 
@@ -52,7 +52,7 @@ const blog = {
         const container = document.getElementById('blog-reader-content');
         
         try {
-            const post = await api.get(`/blog/${postId}`);
+            const post = await api.get(`/api/blog/${postId}`);  // FIXED: Added /api prefix
             
             container.innerHTML = `
                 <button class="btn btn-sm btn-secondary" onclick="app.showSection('blog', document.querySelectorAll('.nav-link')[8])" style="margin-bottom: 2rem;">

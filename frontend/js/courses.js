@@ -12,7 +12,7 @@ const courses = {
         if (!container) return;
 
         try {
-            let url = '/api/courses';  // FIXED: Added /api prefix
+            let url = '/api/courses';
             const params = [];
             if (searchTerm) params.push(`search=${encodeURIComponent(searchTerm)}`);
             if (level) params.push(`level=${level}`);
@@ -59,7 +59,7 @@ const courses = {
         if (!container) return;
 
         try {
-            const course = await api.get(`/api/courses/${courseId}`);  // FIXED: Added /api prefix
+            const course = await api.get(`/api/courses/${courseId}`);
             
             titleEl.textContent = course.title;
             levelEl.textContent = course.level || 'All Levels';

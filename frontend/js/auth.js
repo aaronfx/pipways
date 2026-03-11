@@ -92,7 +92,7 @@ const auth = {
         errorDiv.textContent = '';
 
         try {
-            const response = await fetch('/auth/login', {
+            const response = await fetch(`${API_BASE}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -101,7 +101,6 @@ const auth = {
                 })
             });
 
-            // Handle non-JSON responses
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
@@ -150,7 +149,6 @@ const auth = {
         const form = e.target;
         const errorDiv = document.getElementById('register-error');
         
-        // Password validation
         const password = form.password.value;
         if (password.length < 8) {
             errorDiv.textContent = 'Password must be at least 8 characters';
@@ -177,7 +175,7 @@ const auth = {
         errorDiv.style.display = 'none';
 
         try {
-            const response = await fetch('/auth/register', {
+            const response = await fetch(`${API_BASE}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -1,6 +1,6 @@
 /**
  * Courses Module
- * Handles course display and enrollment
+ * Fixed: Uses data.courses.map() instead of data.map()
  */
 
 const courses = {
@@ -20,12 +20,20 @@ const courses = {
 
             const data = await api.get(url);
             
-            if (!data || data.length === 0) {
+            // FIXED: Safe check for array
+            if (!data || !Array.isArray(data.courses)) {
                 container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No courses found</p></div>';
                 return;
             }
 
-            container.innerHTML = data.map(course => this.renderCourseCard(course)).join('');
+            const coursesList = data.courses;
+            
+            if (coursesList.length === 0) {
+                container.innerHTML = '<div class="content-card"><p style="text-align: center; color: var(--text-secondary);">No courses found</p></div>';
+                return;
+            }
+
+            container.innerHTML = coursesList.map(course => this.renderCourseCard(course)).join('');
             
         } catch (error) {
             container.innerHTML = `<div class="content-card"><p style="text-align: center; color: var(--danger);">Error: ${error.message}</p></div>`;

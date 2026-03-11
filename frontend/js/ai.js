@@ -1,12 +1,12 @@
 /**
  * AI Tools Module
- * Fixed: Proper POST requests and FormData for image upload
+ * Fixed: Markdown rendering, error handling, caching support
  */
 
 const ai = {
     chatHistory: [],
     currentChartImage: null,
-    currentChartFile: null,  // Store actual File object for upload
+    currentChartFile: null,
     currentPerformanceImage: null,
 
     async sendChatMessage() {
@@ -16,7 +16,7 @@ const ai = {
         
         if (!message || !messagesContainer) return;
 
-        // Add user message to UI
+        // Add user message
         const userMsgDiv = document.createElement('div');
         userMsgDiv.className = 'chat-message user';
         userMsgDiv.innerHTML = `<div class="chat-bubble"><strong>You:</strong> ${ui.escapeHtml(message)}</div>`;
@@ -25,35 +25,40 @@ const ai = {
         input.value = '';
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        // Add to history
         this.chatHistory.push({ role: "user", content: message });
 
         try {
             const useKnowledge = document.getElementById('knowledge-toggle')?.checked ?? true;
             
-            // FIXED: Explicit POST request with JSON body to /api/ai/mentor
             const response = await api.post('/api/ai/mentor', {
                 message: message,
-                history: this.chatHistory.slice(-10), // Send last 10 messages for context
+                history: this.chatHistory.slice(-10),
                 use_knowledge: useKnowledge
             });
 
-            // Extract response
-            const aiResponse = response.response || 'No response received from AI';
+            // FIXED: Handle both success and error responses
+            let aiResponse;
+            if (response.error) {
+                aiResponse = response.response || "I'm temporarily unavailable. Please try again.";
+            } else {
+                aiResponse = response.response || 'No response received';
+            }
 
-            // Add to history
             this.chatHistory.push({ role: "assistant", content: aiResponse });
 
-            // Display AI response
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'chat-message';
-            aiMsgDiv.innerHTML = `<div class="chat-bubble"><strong>AI Mentor:</strong> ${ui.escapeHtml(aiResponse)}</div>`;
+            // FIXED: Parse Markdown for AI Mentor too
+            aiMsgDiv.innerHTML = `<div class="chat-bubble"><strong>AI Mentor:</strong> ${marked.parse(aiResponse)}</div>`;
             messagesContainer.appendChild(aiMsgDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
         } catch (error) {
             console.error('AI Mentor error:', error);
-            const errorMsg = error.message || 'Failed to get response';
+            // FIXED: Prevent "[object Object]" error display
+            const errorMsg = (error && error.message) ? error.message : 
+                           (typeof error === 'string') ? error : 
+                           JSON.stringify(error);
             
             const errorDiv = document.createElement('div');
             errorDiv.className = 'chat-message';
@@ -72,13 +77,11 @@ const ai = {
             return;
         }
 
-        // Store File object for FormData upload
         this.currentChartFile = file;
         
-        // Create preview using FileReader
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.currentChartImage = e.target.result; // base64 for preview
+            this.currentChartImage = e.target.result;
             const preview = document.getElementById('chart-preview');
             const container = document.getElementById('chart-preview-container');
             if (preview) preview.src = e.target.result;
@@ -88,9 +91,8 @@ const ai = {
     },
 
     async analyzeChart() {
-        // FIXED: Check for File object, not just base64 image
         if (!this.currentChartFile) {
-            ui.showToast('Please upload an image first', 'error');
+            ui.showToast('Please upload a chart image first', 'error');
             return;
         }
 
@@ -101,23 +103,21 @@ const ai = {
             const timeframe = document.getElementById('chart-timeframe')?.value || '1H';
             const context = document.getElementById('chart-context')?.value || '';
 
-            // FIXED: Use FormData for multipart/form-data upload
             const formData = new FormData();
             formData.append('image', this.currentChartFile);
             formData.append('pair', pair);
             formData.append('timeframe', timeframe);
-            if (context) {
-                formData.append('context', context);
-            }
+            if (context) formData.append('context', context);
 
-            // Use api.upload for FormData (sets correct Content-Type with boundary)
             const response = await api.upload('/api/ai/analyze-chart', formData);
 
             const analysisContent = document.getElementById('chart-analysis-content');
             const resultContainer = document.getElementById('chart-analysis-result');
             
             if (analysisContent) {
-                analysisContent.textContent = response.analysis || 'Analysis completed but no content returned';
+                // FIXED: Render Markdown with marked.js
+                const analysisText = response.analysis || response.error || 'No analysis available';
+                analysisContent.innerHTML = marked.parse(analysisText);
             }
             if (resultContainer) {
                 resultContainer.classList.remove('hidden');
@@ -125,7 +125,11 @@ const ai = {
             
         } catch (error) {
             console.error('Chart analysis error:', error);
-            ui.showToast('Analysis failed: ' + (error.message || 'Unknown error'), 'error');
+            // FIXED: Proper error message extraction
+            const errorMsg = (error && error.message) ? error.message : 
+                           (typeof error === 'string') ? error : 
+                           'Unknown error occurred';
+            ui.showToast('Analysis failed: ' + errorMsg, 'error');
         } finally {
             ui.hideLoading();
         }
@@ -140,7 +144,6 @@ const ai = {
             return;
         }
 
-        // Store file for upload
         this.currentPerformanceFile = file;
         
         const reader = new FileReader();
@@ -166,19 +169,20 @@ const ai = {
             const balance = parseFloat(document.getElementById('vision-account-balance')?.value) || 0;
             const period = parseInt(document.getElementById('vision-trading-period')?.value) || 30;
 
-            // FIXED: Use FormData for performance analysis if it involves file upload
-            // or JSON if it's just data. Assuming this endpoint also accepts FormData now.
-            const formData = new FormData();
-            formData.append('image', this.currentPerformanceFile);
-            formData.append('account_balance', balance);
-            formData.append('trading_period_days', period);
+            const response = await api.post('/api/performance/analyze-vision', {
+                image: this.currentPerformanceImage,
+                account_balance: balance,
+                trading_period_days: period
+            });
 
-            const response = await api.upload('/api/performance/analyze-vision', formData);
             this.displayPerformanceResults(response);
             
         } catch (error) {
             console.error('Performance analysis error:', error);
-            ui.showToast('Analysis failed: ' + (error.message || 'Server error'), 'error');
+            const errorMsg = (error && error.message) ? error.message : 
+                           (typeof error === 'string') ? error : 
+                           'Server error';
+            ui.showToast('Analysis failed: ' + errorMsg, 'error');
         } finally {
             ui.hideLoading();
         }
@@ -188,7 +192,9 @@ const ai = {
         const resultsContainer = document.getElementById('analysis-results');
         if (resultsContainer) resultsContainer.classList.remove('hidden');
         
-        const score = data.trader_score || 0;
+        // Handle metrics display
+        const metrics = data.metrics || {};
+        const score = data.trader_score || metrics.trader_score || 0;
         const scoreEl = document.getElementById('trader-score');
         const scoreCircle = document.getElementById('score-circle');
         
@@ -203,14 +209,21 @@ const ai = {
         const interpEl = document.getElementById('score-interpretation');
         if (interpEl) interpEl.textContent = interpretation;
 
+        // FIXED: Render Markdown analysis
+        const analysisEl = document.getElementById('performance-analysis-text');
+        if (analysisEl && data.analysis) {
+            analysisEl.innerHTML = marked.parse(data.analysis);
+        }
+
+        // Metrics grid
         const summary = document.getElementById('performance-summary');
         if (summary) {
             summary.innerHTML = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 12px;">
                     <div>Total Trades: <strong>${data.total_trades || 0}</strong></div>
-                    <div>Win Rate: <strong>${data.win_rate || 0}%</strong></div>
-                    <div>Profit Factor: <strong>${data.profit_factor || 'N/A'}</strong></div>
-                    <div>Avg Return: <strong>${data.average_return || 0}%</strong></div>
+                    <div>Win Rate: <strong>${metrics.winrate || data.win_rate || 0}%</strong></div>
+                    <div>Profit Factor: <strong>${metrics.profit_factor || data.profit_factor || 'N/A'}</strong></div>
+                    <div>Risk Score: <strong>${metrics.risk_score || 'Medium'}</strong></div>
                 </div>
             `;
         }

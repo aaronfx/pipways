@@ -1,12 +1,13 @@
 /**
  * UI Utilities Module
- * Handles shared UI components, navigation, and helpers
+ * Added: Mobile responsive helpers
  */
 
 const ui = {
     init() {
         this.setupEventListeners();
         this.updateTheme();
+        this.setupMobileMenu();
     },
 
     setupEventListeners() {
@@ -25,6 +26,27 @@ const ui = {
         });
     },
 
+    setupMobileMenu() {
+        // Mobile sidebar toggle
+        const sidebarToggle = document.getElementById('mobile-menu-toggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('open');
+            });
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const toggle = document.getElementById('mobile-menu-toggle');
+                if (sidebar && toggle && !sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                    sidebar.classList.remove('open');
+                }
+            }
+        });
+    },
+
     updateTheme() {
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.setAttribute('data-theme', 'dark');
@@ -33,12 +55,13 @@ const ui = {
 
     toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('open');
+        if (sidebar) sidebar.classList.toggle('open');
     },
 
     showToast(message, type = 'info') {
         const toast = document.getElementById('toast');
         const toastMessage = document.getElementById('toast-message');
+        if (!toast || !toastMessage) return;
         
         toast.className = `toast show ${type}`;
         toastMessage.textContent = message;
@@ -49,22 +72,31 @@ const ui = {
     },
 
     showLoading(text = 'Processing...') {
-        document.getElementById('loading-text').textContent = text;
-        document.getElementById('loading-overlay').classList.remove('hidden');
+        const loadingText = document.getElementById('loading-text');
+        const overlay = document.getElementById('loading-overlay');
+        if (loadingText) loadingText.textContent = text;
+        if (overlay) overlay.classList.remove('hidden');
     },
 
     hideLoading() {
-        document.getElementById('loading-overlay').classList.add('hidden');
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.classList.add('hidden');
     },
 
     openModal(modalId) {
-        document.getElementById(modalId).classList.add('show');
-        document.body.style.overflow = 'hidden';
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
     },
 
     closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('show');
-        document.body.style.overflow = '';
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+        }
     },
 
     formatDate(dateString) {

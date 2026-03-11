@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipways - Trading Education Platform</title>
+    <meta name="description" content="Professional trading signals, education, and AI-powered analysis">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <a href="/">Pipways</a>
+            </div>
+            <div class="nav-links">
+                <a href="/signals">Signals</a>
+                <a href="/blog">Blog</a>
+                <a href="/courses">Courses</a>
+                <a href="/webinars">Webinars</a>
+                <a href="/ai-tools">AI Tools</a>
+            </div>
+            <div class="nav-auth">
+                <span id="user-info" style="display:none;"></span>
+                <button id="login-btn" onclick="auth.showLoginModal()">Login</button>
+                <button id="logout-btn" onclick="auth.logout()" style="display:none;">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <!-- Dynamic content loaded here -->
+        </main>
+
+        <!-- Login Modal -->
+        <div id="login-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="auth.closeLoginModal()">&times;</span>
+                <h2>Login</h2>
+                <form id="login-form" onsubmit="auth.handleLogin(event)">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit">Login</button>
+                </form>
+                <p>Don't have an account? <a href="#" onclick="auth.showRegisterModal()">Register</a></p>
+            </div>
+        </div>
+
+        <!-- Register Modal -->
+        <div id="register-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="auth.closeRegisterModal()">&times;</span>
+                <h2>Register</h2>
+                <form id="register-form" onsubmit="auth.handleRegister(event)">
+                    <input type="text" id="reg-name" placeholder="Full Name" required>
+                    <input type="email" id="reg-email" placeholder="Email" required>
+                    <input type="password" id="reg-password" placeholder="Password" required minlength="8">
+                    <button type="submit">Register</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/signals.js"></script>
+    <script src="/js/blog.js"></script>
+    <script src="/js/webinars.js"></script>
+    <script src="/js/courses.js"></script>
+    <script src="/js/ai.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/media.js"></script>
+    <script>
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            auth.init();
+            ui.init();
+        });
+    </script>
+</body>
+</html>

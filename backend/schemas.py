@@ -90,7 +90,7 @@ class WebinarCreate(BaseModel):
     is_premium: bool = False
     meeting_link: Optional[str] = None
     max_participants: Optional[int] = 100
-    reminder_message: Optional[str] = None
+    reminder_message: Optional[str] = None  # Required field for webinar creation
 
 class WebinarUpdate(BaseModel):
     title: Optional[str] = None
@@ -131,6 +131,8 @@ class SignalUpdate(BaseModel):
     timeframe: Optional[str] = None
     analysis: Optional[str] = None
     is_premium: Optional[bool] = None
+    status: Optional[str] = None
+    result: Optional[str] = None
 
 class SignalResultUpdate(BaseModel):
     result: str = Field(..., pattern="^(WIN|LOSS|PARTIAL|EXPIRED)$")

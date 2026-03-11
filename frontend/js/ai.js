@@ -1,21 +1,22 @@
 /**
  * AI Tools Module
- * Fixed: Real backend integration instead of placeholders
+ * Fixed: Proper POST requests and FormData for image upload
  */
 
 const ai = {
     chatHistory: [],
     currentChartImage: null,
+    currentChartFile: null,  // Store actual File object for upload
     currentPerformanceImage: null,
 
     async sendChatMessage() {
         const input = document.getElementById('chat-input');
         const messagesContainer = document.getElementById('chat-messages');
-        const message = input.value.trim();
+        const message = input?.value?.trim();
         
         if (!message || !messagesContainer) return;
 
-        // Add user message
+        // Add user message to UI
         const userMsgDiv = document.createElement('div');
         userMsgDiv.className = 'chat-message user';
         userMsgDiv.innerHTML = `<div class="chat-bubble"><strong>You:</strong> ${ui.escapeHtml(message)}</div>`;
@@ -24,23 +25,26 @@ const ai = {
         input.value = '';
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
+        // Add to history
         this.chatHistory.push({ role: "user", content: message });
 
         try {
             const useKnowledge = document.getElementById('knowledge-toggle')?.checked ?? true;
             
-            // FIXED: Call actual backend endpoint
+            // FIXED: Explicit POST request with JSON body to /api/ai/mentor
             const response = await api.post('/api/ai/mentor', {
                 message: message,
-                history: this.chatHistory.slice(-10),
+                history: this.chatHistory.slice(-10), // Send last 10 messages for context
                 use_knowledge: useKnowledge
             });
 
-            // FIXED: Extract actual response from backend
-            const aiResponse = response.response || 'No response received';
+            // Extract response
+            const aiResponse = response.response || 'No response received from AI';
 
+            // Add to history
             this.chatHistory.push({ role: "assistant", content: aiResponse });
 
+            // Display AI response
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'chat-message';
             aiMsgDiv.innerHTML = `<div class="chat-bubble"><strong>AI Mentor:</strong> ${ui.escapeHtml(aiResponse)}</div>`;
@@ -48,8 +52,8 @@ const ai = {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
         } catch (error) {
-            console.error('Chat error:', error);
-            const errorMsg = typeof error.message === 'string' ? error.message : 'Failed to get response';
+            console.error('AI Mentor error:', error);
+            const errorMsg = error.message || 'Failed to get response';
             
             const errorDiv = document.createElement('div');
             errorDiv.className = 'chat-message';
@@ -68,9 +72,13 @@ const ai = {
             return;
         }
 
+        // Store File object for FormData upload
+        this.currentChartFile = file;
+        
+        // Create preview using FileReader
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.currentChartImage = e.target.result;
+            this.currentChartImage = e.target.result; // base64 for preview
             const preview = document.getElementById('chart-preview');
             const container = document.getElementById('chart-preview-container');
             if (preview) preview.src = e.target.result;
@@ -80,8 +88,9 @@ const ai = {
     },
 
     async analyzeChart() {
-        if (!this.currentChartImage) {
-            ui.showToast('Please upload a chart image first', 'error');
+        // FIXED: Check for File object, not just base64 image
+        if (!this.currentChartFile) {
+            ui.showToast('Please upload an image first', 'error');
             return;
         }
 
@@ -92,18 +101,21 @@ const ai = {
             const timeframe = document.getElementById('chart-timeframe')?.value || '1H';
             const context = document.getElementById('chart-context')?.value || '';
 
-            // FIXED: Call actual backend with proper error handling
-            const response = await api.post('/api/ai/analyze-chart', {
-                image: this.currentChartImage,
-                pair: pair,
-                timeframe: timeframe,
-                context: context
-            });
+            // FIXED: Use FormData for multipart/form-data upload
+            const formData = new FormData();
+            formData.append('image', this.currentChartFile);
+            formData.append('pair', pair);
+            formData.append('timeframe', timeframe);
+            if (context) {
+                formData.append('context', context);
+            }
+
+            // Use api.upload for FormData (sets correct Content-Type with boundary)
+            const response = await api.upload('/api/ai/analyze-chart', formData);
 
             const analysisContent = document.getElementById('chart-analysis-content');
             const resultContainer = document.getElementById('chart-analysis-result');
             
-            // FIXED: Use actual backend response
             if (analysisContent) {
                 analysisContent.textContent = response.analysis || 'Analysis completed but no content returned';
             }
@@ -128,6 +140,9 @@ const ai = {
             return;
         }
 
+        // Store file for upload
+        this.currentPerformanceFile = file;
+        
         const reader = new FileReader();
         reader.onload = (e) => {
             this.currentPerformanceImage = e.target.result;
@@ -151,13 +166,14 @@ const ai = {
             const balance = parseFloat(document.getElementById('vision-account-balance')?.value) || 0;
             const period = parseInt(document.getElementById('vision-trading-period')?.value) || 30;
 
-            // FIXED: Call actual backend endpoint
-            const response = await api.post('/api/performance/analyze-vision', {
-                image: this.currentPerformanceImage,
-                account_balance: balance,
-                trading_period_days: period
-            });
+            // FIXED: Use FormData for performance analysis if it involves file upload
+            // or JSON if it's just data. Assuming this endpoint also accepts FormData now.
+            const formData = new FormData();
+            formData.append('image', this.currentPerformanceFile);
+            formData.append('account_balance', balance);
+            formData.append('trading_period_days', period);
 
+            const response = await api.upload('/api/performance/analyze-vision', formData);
             this.displayPerformanceResults(response);
             
         } catch (error) {

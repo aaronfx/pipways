@@ -21,15 +21,12 @@ const admin = {
     },
 
     showTab(tabName, btnElement) {
-        // Hide all panels
         document.querySelectorAll('.admin-panel').forEach(panel => {
             panel.classList.remove('active');
         });
         
-        // Show target panel
         document.getElementById(`panel-${tabName}`).classList.add('active');
         
-        // Update tab buttons
         document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.classList.remove('active');
         });
@@ -37,7 +34,6 @@ const admin = {
         
         this.currentTab = tabName;
 
-        // Load tab-specific data
         switch(tabName) {
             case 'content':
                 this.loadBlogPosts();
@@ -66,7 +62,7 @@ const admin = {
         if (!tbody) return;
 
         try {
-            const posts = await api.get('/blog?limit=50');
+            const posts = await api.get('/api/blog?limit=50');  // FIXED: Added /api prefix
             
             tbody.innerHTML = posts.map(post => `
                 <tr>
@@ -95,7 +91,7 @@ const admin = {
 
     async editBlogPost(id) {
         try {
-            const post = await api.get(`/blog/${id}`);
+            const post = await api.get(`/api/blog/${id}`);  // FIXED: Added /api prefix
             
             document.getElementById('blog-post-id').value = post.id;
             document.getElementById('blog-title').value = post.title;
@@ -126,9 +122,9 @@ const admin = {
 
         try {
             if (id) {
-                await api.put(`/blog/${id}`, data);
+                await api.put(`/api/blog/${id}`, data);  // FIXED: Added /api prefix
             } else {
-                await api.post('/blog', data);
+                await api.post('/api/blog', data);  // FIXED: Added /api prefix
             }
             
             ui.closeModal('blog-modal');
@@ -144,7 +140,7 @@ const admin = {
         if (!confirm('Are you sure you want to delete this post?')) return;
         
         try {
-            await api.delete(`/blog/${id}`);
+            await api.delete(`/api/blog/${id}`);  // FIXED: Added /api prefix
             ui.showToast('Post deleted', 'success');
             this.loadBlogPosts();
         } catch (error) {
@@ -232,7 +228,7 @@ const admin = {
         if (!container) return;
 
         try {
-            const courses = await api.get('/courses');
+            const courses = await api.get('/api/courses');  // FIXED: Added /api prefix
             
             container.innerHTML = courses.map(course => `
                 <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
@@ -261,7 +257,7 @@ const admin = {
 
     async editCourse(id) {
         try {
-            const course = await api.get(`/courses/${id}`);
+            const course = await api.get(`/api/courses/${id}`);  // FIXED: Added /api prefix
             
             document.getElementById('course-id').value = course.id;
             document.getElementById('course-title').value = course.title;
@@ -294,9 +290,9 @@ const admin = {
 
         try {
             if (id) {
-                await api.put(`/courses/${id}`, data);
+                await api.put(`/api/courses/${id}`, data);  // FIXED: Added /api prefix
             } else {
-                await api.post('/courses', data);
+                await api.post('/api/courses', data);  // FIXED: Added /api prefix
             }
             
             ui.closeModal('course-modal');
@@ -312,7 +308,7 @@ const admin = {
         if (!confirm('Delete this course and all its modules?')) return;
         
         try {
-            await api.delete(`/courses/${id}`);
+            await api.delete(`/api/courses/${id}`);  // FIXED: Added /api prefix
             ui.showToast('Course deleted', 'success');
             this.loadAdminCourses();
         } catch (error) {
@@ -326,7 +322,7 @@ const admin = {
         if (!container) return;
 
         try {
-            const webinars = await api.get('/webinars');
+            const webinars = await api.get('/api/webinars');  // FIXED: Added /api prefix
             
             container.innerHTML = webinars.map(w => `
                 <div class="card" style="margin-bottom: 1rem;">
@@ -357,7 +353,7 @@ const admin = {
 
     async editWebinar(id) {
         try {
-            const webinars = await api.get('/webinars');
+            const webinars = await api.get('/api/webinars');  // FIXED: Added /api prefix
             const webinar = webinars.find(w => w.id === id);
             if (!webinar) throw new Error('Webinar not found');
 
@@ -394,9 +390,9 @@ const admin = {
 
         try {
             if (id) {
-                await api.put(`/webinars/${id}`, data);
+                await api.put(`/api/webinars/${id}`, data);  // FIXED: Added /api prefix
             } else {
-                await api.post('/webinars', data);
+                await api.post('/api/webinars', data);  // FIXED: Added /api prefix
             }
             
             ui.closeModal('webinar-modal');
@@ -412,7 +408,7 @@ const admin = {
         if (!confirm('Delete this webinar?')) return;
         
         try {
-            await api.delete(`/webinars/${id}`);
+            await api.delete(`/api/webinars/${id}`);  // FIXED: Added /api prefix
             ui.showToast('Webinar deleted', 'success');
             this.loadAdminWebinars();
         } catch (error) {
@@ -571,7 +567,6 @@ const admin = {
             const response = await api.upload('/api/admin/media/upload', formData);
             ui.showToast('Upload successful', 'success');
             
-            // Display uploaded files
             const container = document.getElementById('media-list');
             container.innerHTML = (response.urls || []).map(url => `
                 <div style="display: inline-block; margin: 5px; position: relative;">
@@ -594,7 +589,6 @@ const admin = {
     },
 
     async submitQuiz() {
-        // Implementation depends on your quiz schema
         ui.showToast('Quiz creation - implement based on your backend schema', 'info');
         ui.closeModal('quiz-modal');
     }

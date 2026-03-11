@@ -1,12 +1,13 @@
 /**
  * Authentication Module
+ * Handles login, register, logout, and auth state
  */
+
 const auth = {
     currentUser: null,
 
     init() {
         this.checkAuth();
-        this.updateUI();
     },
 
     async checkAuth() {
@@ -21,6 +22,11 @@ const auth = {
             this.currentUser = user;
             this.hideAuthWall();
             this.updateUI();
+            
+            // Load initial data
+            if (window.app) {
+                app.initUserData();
+            }
         } catch (e) {
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
@@ -29,173 +35,154 @@ const auth = {
     },
 
     showAuthWall() {
-        const authWall = document.getElementById('auth-wall');
-        const mainApp = document.getElementById('main-app');
-        if (authWall) authWall.style.display = 'flex';
-        if (mainApp) mainApp.style.display = 'none';
+        document.getElementById('auth-wall').classList.remove('hidden');
+        document.getElementById('main-app').classList.add('hidden');
     },
 
     hideAuthWall() {
-        const authWall = document.getElementById('auth-wall');
-        const mainApp = document.getElementById('main-app');
-        if (authWall) authWall.style.display = 'none';
-        if (mainApp) mainApp.style.display = 'block';
+        document.getElementById('auth-wall').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+    },
+
+    showRegister() {
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('register-form').classList.remove('hidden');
+    },
+
+    showLogin() {
+        document.getElementById('register-form').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
     },
 
     updateUI() {
-        const loginBtn = document.getElementById('login-btn');
-        const logoutBtn = document.getElementById('logout-btn');
-        const userInfo = document.getElementById('user-info');
+        if (!this.currentUser) return;
 
-        if (this.currentUser) {
-            if (loginBtn) loginBtn.style.display = 'none';
-            if (logoutBtn) logoutBtn.style.display = 'block';
-            if (userInfo) {
-                userInfo.style.display = 'block';
-                userInfo.textContent = this.currentUser.full_name || this.currentUser.email;
-            }
+        // Update user info
+        document.getElementById('user-name').textContent = this.currentUser.full_name || this.currentUser.email;
+        document.getElementById('user-email').textContent = this.currentUser.email;
+        document.getElementById('user-avatar').textContent = (this.currentUser.full_name || this.currentUser.email).charAt(0).toUpperCase();
 
-            if (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator') {
-                this.addAdminLink();
-            }
-        } else {
-            if (loginBtn) loginBtn.style.display = 'block';
-            if (logoutBtn) logoutBtn.style.display = 'none';
-            if (userInfo) userInfo.style.display = 'none';
+        // Show admin badge if applicable
+        if (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator') {
+            document.getElementById('admin-badge').classList.remove('hidden');
+            document.getElementById('admin-nav-item').classList.remove('hidden');
         }
-    },
 
-    addAdminLink() {
-        const navLinks = document.querySelector('.nav-links');
-        if (navLinks && !navLinks.querySelector('a[href="/admin"]')) {
-            const adminLink = document.createElement('a');
-            adminLink.href = '/admin';
-            adminLink.textContent = 'Admin';
-            navLinks.appendChild(adminLink);
+        // Update telegram buttons based on subscription
+        if (this.currentUser.subscription_tier === 'vip') {
+            const vipBtn = document.getElementById('btn-telegram-vip');
+            if (vipBtn) {
+                vipBtn.textContent = 'Join VIP Channel';
+                vipBtn.onclick = () => window.open('https://t.me/pipways_vip', '_blank');
+            }
         }
-    },
-
-    showLoginModal() {
-        const modal = document.getElementById('login-modal');
-        if (modal) modal.classList.add('show');
-    },
-
-    closeLoginModal() {
-        const modal = document.getElementById('login-modal');
-        if (modal) modal.classList.remove('show');
-    },
-
-    showRegisterModal() {
-        this.closeLoginModal();
-        const modal = document.getElementById('register-modal');
-        if (modal) modal.classList.add('show');
-    },
-
-    closeRegisterModal() {
-        const modal = document.getElementById('register-modal');
-        if (modal) modal.classList.remove('show');
-    },
-
-    validatePassword(password) {
-        const errors = [];
-        if (password.length < 8) errors.push("Minimum 8 characters");
-        if (!/[A-Z]/.test(password)) errors.push("One uppercase letter");
-        if (!/[a-z]/.test(password)) errors.push("One lowercase letter");
-        if (!/[0-9]/.test(password)) errors.push("One number");
-        if (!/[@$!%*?&]/.test(password)) errors.push("One special character (@$!%*?&)");
-        return errors;
     },
 
     async handleLogin(e) {
         e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
+        const form = e.target;
+        const errorDiv = document.getElementById('login-error');
+        
+        ui.showLoading('Logging in...');
 
         try {
             const response = await fetch('/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({
+                    email: form.email.value,
+                    password: form.password.value
+                })
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || 'Login failed');
+                throw new Error(data.detail || 'Login failed');
             }
 
-            const data = await response.json();
             localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('refresh_token', data.refresh_token);
             this.currentUser = data.user;
+            
             this.hideAuthWall();
             this.updateUI();
-            this.closeLoginModal();
             ui.showToast('Login successful!', 'success');
-            ui.handleRoute();
+            
+            // Load user data
+            if (window.app) app.initUserData();
+            
         } catch (error) {
-            ui.showToast(error.message || 'Login failed', 'error');
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+        } finally {
+            ui.hideLoading();
         }
     },
 
     async handleRegister(e) {
         e.preventDefault();
-        const full_name = document.getElementById('reg-name').value;
-        const email = document.getElementById('reg-email').value;
-        const password = document.getElementById('reg-password').value;
+        const form = e.target;
+        const errorDiv = document.getElementById('register-error');
 
-        // Password validation
-        const validationErrors = this.validatePassword(password);
-        if (validationErrors.length > 0) {
-            ui.showToast('Password requirements: ' + validationErrors.join(', '), 'error');
+        // Validate password
+        const password = form.password.value;
+        if (password.length < 8) {
+            errorDiv.textContent = 'Password must be at least 8 characters';
+            errorDiv.style.display = 'block';
             return;
         }
+
+        ui.showLoading('Creating account...');
 
         try {
             const response = await fetch('/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, full_name })
+                body: JSON.stringify({
+                    email: form.email.value,
+                    password: form.password.value,
+                    full_name: form.full_name.value
+                })
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.detail || 'Registration failed');
+                throw new Error(data.detail || 'Registration failed');
             }
 
-            const data = await response.json();
             localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('refresh_token', data.refresh_token);
             this.currentUser = data.user;
+            
             this.hideAuthWall();
             this.updateUI();
-            this.closeRegisterModal();
-            ui.showToast('Registration successful!', 'success');
-            ui.handleRoute();
+            ui.showToast('Account created successfully!', 'success');
+            
         } catch (error) {
-            ui.showToast(error.message || 'Registration failed', 'error');
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+        } finally {
+            ui.hideLoading();
         }
     },
 
     logout() {
-        // Clear chat history on logout
-        if (window.ai && window.ai.chatHistory) {
-            window.ai.chatHistory = [];
-        }
-        const chatContainer = document.getElementById('chat-history');
-        if (chatContainer) chatContainer.innerHTML = '';
-
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         this.currentUser = null;
+        
+        // Clear chat history
+        if (window.ai) ai.chatHistory = [];
+        
         this.showAuthWall();
-        this.updateUI();
-        ui.showToast('Logged out', 'info');
-        window.location.href = '/';
+        ui.showToast('Logged out successfully', 'info');
     },
 
     requireAuth() {
         if (!this.currentUser) {
-            this.showLoginModal();
+            ui.showToast('Please login to access this feature', 'error');
             return false;
         }
         return true;

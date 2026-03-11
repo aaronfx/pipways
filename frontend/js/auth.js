@@ -1,6 +1,6 @@
 /**
  * Authentication Module
- * Handles login, register, logout, and auth state
+ * Fixed: Admin button visibility and role checking
  */
 
 const auth = {
@@ -18,7 +18,18 @@ const auth = {
         }
 
         try {
-            const user = await api.get('/auth/me');
+            // Use window.location.origin for absolute URL
+            const response = await fetch(`${window.location.origin}/auth/me`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Auth check failed');
+            }
+            
+            const user = await response.json();
             this.currentUser = user;
             this.hideAuthWall();
             this.updateUI();
@@ -35,44 +46,78 @@ const auth = {
     },
 
     showAuthWall() {
-        document.getElementById('auth-wall').classList.remove('hidden');
-        document.getElementById('main-app').classList.add('hidden');
+        const authWall = document.getElementById('auth-wall');
+        const mainApp = document.getElementById('main-app');
+        if (authWall) authWall.classList.remove('hidden');
+        if (mainApp) mainApp.classList.add('hidden');
     },
 
     hideAuthWall() {
-        document.getElementById('auth-wall').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
+        const authWall = document.getElementById('auth-wall');
+        const mainApp = document.getElementById('main-app');
+        if (authWall) authWall.classList.add('hidden');
+        if (mainApp) mainApp.classList.remove('hidden');
     },
 
     showRegister() {
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('register-form').classList.remove('hidden');
-        document.getElementById('login-error').style.display = 'none';
-        document.getElementById('register-error').style.display = 'none';
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const loginError = document.getElementById('login-error');
+        const registerError = document.getElementById('register-error');
+        
+        if (loginForm) loginForm.classList.add('hidden');
+        if (registerForm) registerForm.classList.remove('hidden');
+        if (loginError) loginError.style.display = 'none';
+        if (registerError) registerError.style.display = 'none';
     },
 
     showLogin() {
-        document.getElementById('register-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-        document.getElementById('login-error').style.display = 'none';
-        document.getElementById('register-error').style.display = 'none';
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const loginError = document.getElementById('login-error');
+        const registerError = document.getElementById('register-error');
+        
+        if (registerForm) registerForm.classList.add('hidden');
+        if (loginForm) loginForm.classList.remove('hidden');
+        if (loginError) loginError.style.display = 'none';
+        if (registerError) registerError.style.display = 'none';
     },
 
     updateUI() {
         if (!this.currentUser) return;
 
-        document.getElementById('user-name').textContent = this.currentUser.full_name || this.currentUser.email;
-        document.getElementById('user-email').textContent = this.currentUser.email;
-        document.getElementById('user-avatar').textContent = (this.currentUser.full_name || this.currentUser.email).charAt(0).toUpperCase();
+        // Update user info
+        const userName = document.getElementById('user-name');
+        const userEmail = document.getElementById('user-email');
+        const userAvatar = document.getElementById('user-avatar');
+        
+        if (userName) userName.textContent = this.currentUser.full_name || this.currentUser.email;
+        if (userEmail) userEmail.textContent = this.currentUser.email;
+        if (userAvatar) userAvatar.textContent = (this.currentUser.full_name || this.currentUser.email).charAt(0).toUpperCase();
 
-        if (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator') {
-            document.getElementById('admin-badge').classList.remove('hidden');
-            document.getElementById('admin-nav-item').classList.remove('hidden');
-        } else {
-            document.getElementById('admin-badge').classList.add('hidden');
-            document.getElementById('admin-nav-item').classList.add('hidden');
+        // FIXED: Admin button visibility - check both 'admin' and 'moderator' roles
+        const isAdmin = this.currentUser.role === 'admin' || this.currentUser.role === 'moderator';
+        
+        const adminBadge = document.getElementById('admin-badge');
+        const adminNavItem = document.getElementById('admin-nav-item');
+        
+        if (adminBadge) {
+            if (isAdmin) {
+                adminBadge.classList.remove('hidden');
+            } else {
+                adminBadge.classList.add('hidden');
+            }
+        }
+        
+        if (adminNavItem) {
+            if (isAdmin) {
+                adminNavItem.classList.remove('hidden');
+            } else {
+                adminNavItem.classList.add('hidden');
+            }
         }
 
+        // Update VIP button if applicable
         const vipBtn = document.getElementById('btn-telegram-vip');
         if (vipBtn && this.currentUser.subscription_tier === 'vip') {
             vipBtn.innerHTML = '<i class="fas fa-crown"></i> Join VIP Channel';
@@ -88,8 +133,10 @@ const auth = {
         const errorDiv = document.getElementById('login-error');
         
         ui.showLoading('Logging in...');
-        errorDiv.style.display = 'none';
-        errorDiv.textContent = '';
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+        }
 
         try {
             const response = await fetch(`${window.location.origin}/auth/login`, {
@@ -104,17 +151,7 @@ const auth = {
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
-                console.error('Server returned non-JSON:', text.substring(0, 200));
-                
-                if (response.status === 500) {
-                    throw new Error('Server error. Please try again later.');
-                } else if (response.status === 503) {
-                    throw new Error('Database not connected. Please contact support.');
-                } else if (response.status === 404) {
-                    throw new Error('API endpoint not found.');
-                } else {
-                    throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}`);
-                }
+                throw new Error('Server returned non-JSON response');
             }
 
             const data = await response.json();
@@ -137,8 +174,10 @@ const auth = {
             
         } catch (error) {
             console.error('Login error:', error);
-            errorDiv.textContent = error.message || 'Network error. Please check your connection.';
-            errorDiv.style.display = 'block';
+            if (errorDiv) {
+                errorDiv.textContent = error.message || 'Network error. Please check your connection.';
+                errorDiv.style.display = 'block';
+            }
         } finally {
             ui.hideLoading();
         }
@@ -172,7 +211,7 @@ const auth = {
         }
 
         ui.showLoading('Creating account...');
-        errorDiv.style.display = 'none';
+        if (errorDiv) errorDiv.style.display = 'none';
 
         try {
             const response = await fetch(`${window.location.origin}/auth/register`, {
@@ -187,8 +226,7 @@ const auth = {
 
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                throw new Error('Server error: ' + text.substring(0, 100));
+                throw new Error('Server error');
             }
 
             const data = await response.json();
@@ -207,8 +245,10 @@ const auth = {
             
         } catch (error) {
             console.error('Registration error:', error);
-            errorDiv.textContent = error.message || 'Registration failed. Please try again.';
-            errorDiv.style.display = 'block';
+            if (errorDiv) {
+                errorDiv.textContent = error.message || 'Registration failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
         } finally {
             ui.hideLoading();
         }
@@ -225,11 +265,17 @@ const auth = {
         
         this.showAuthWall();
         
-        document.getElementById('admin-badge').classList.add('hidden');
-        document.getElementById('admin-nav-item').classList.add('hidden');
+        const adminBadge = document.getElementById('admin-badge');
+        const adminNavItem = document.getElementById('admin-nav-item');
         
-        document.getElementById('login-form').reset();
-        document.getElementById('register-form').reset();
+        if (adminBadge) adminBadge.classList.add('hidden');
+        if (adminNavItem) adminNavItem.classList.add('hidden');
+        
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        
+        if (loginForm) loginForm.reset();
+        if (registerForm) registerForm.reset();
         
         ui.showToast('Logged out successfully', 'info');
     },

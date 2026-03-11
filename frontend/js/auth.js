@@ -92,7 +92,7 @@ const auth = {
         errorDiv.textContent = '';
 
         try {
-            const response = await fetch(`${API_BASE}/auth/login`, {
+            const response = await fetch(`${window.location.origin}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -175,7 +175,7 @@ const auth = {
         errorDiv.style.display = 'none';
 
         try {
-            const response = await fetch(`${API_BASE}/auth/register`, {
+            const response = await fetch(`${window.location.origin}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

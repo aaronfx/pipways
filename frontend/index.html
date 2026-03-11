@@ -3,85 +3,1051 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways - Trading Education Platform</title>
-    <meta name="description" content="Professional trading signals, education, and AI-powered analysis">
-    <link rel="stylesheet" href="/css/styles.css">
+    <title>Pipways - Professional Trading Platform</title>
+    <meta name="description" content="Professional trading signals, AI analysis, and educational resources">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div id="app">
-        <!-- Navigation -->
-        <nav class="navbar">
-            <div class="nav-brand">
-                <a href="/">Pipways</a>
-            </div>
-            <div class="nav-links">
-                <a href="/signals">Signals</a>
-                <a href="/blog">Blog</a>
-                <a href="/courses">Courses</a>
-                <a href="/webinars">Webinars</a>
-                <a href="/ai-tools">AI Tools</a>
-            </div>
-            <div class="nav-auth">
-                <span id="user-info" style="display:none;"></span>
-                <button id="login-btn" onclick="auth.showLoginModal()">Login</button>
-                <button id="logout-btn" onclick="auth.logout()" style="display:none;">Logout</button>
-            </div>
-        </nav>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p id="loading-text">Processing...</p>
+    </div>
 
-        <!-- Main Content Area -->
-        <main id="main-content">
-            <!-- Dynamic content loaded here -->
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <i class="fas fa-exclamation-circle"></i>
+        <span id="toast-message">Error message</span>
+    </div>
+
+    <!-- Auth Wall -->
+    <div id="auth-wall" class="auth-container">
+        <div class="auth-logo">
+            <i class="fas fa-chart-line"></i> Pipways v3.5
+        </div>
+        <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">Professional Trading Platform</p>
+
+        <form id="login-form" onsubmit="auth.handleLogin(event)" style="width: 100%; max-width: 360px;">
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-input" required placeholder="admin@pipways.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-input" required placeholder="••••••••">
+            </div>
+            <div id="login-error" style="color: var(--danger); margin-bottom: 16px; display: none;"></div>
+            <button type="submit" class="btn" id="login-btn">
+                <span>Login</span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="auth.showRegister()" style="margin-top: 12px;">
+                Create Account
+            </button>
+        </form>
+
+        <form id="register-form" class="hidden" onsubmit="auth.handleRegister(event)" style="width: 100%; max-width: 360px;">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="full_name" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-input" required minlength="8">
+                <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
+                    Min 8 chars, uppercase, lowercase, number, special char
+                </small>
+            </div>
+            <div id="register-error" style="color: var(--danger); margin-bottom: 16px; display: none;"></div>
+            <button type="submit" class="btn" id="register-btn">
+                <span>Create Account</span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="auth.showLogin()" style="margin-top: 12px;">
+                Back to Login
+            </button>
+        </form>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" class="app-container hidden">
+        
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700;">
+                <i class="fas fa-chart-line" style="color: var(--primary);"></i>
+                <span>Pipways</span>
+            </div>
+            <button onclick="ui.toggleSidebar()" style="width: 40px; height: 40px; background: var(--bg-hover); border: none; border-radius: 10px; color: var(--text-primary); font-size: 20px; cursor: pointer;">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Pipways</span>
+                </div>
+            </div>
+
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <button class="nav-link active" onclick="app.showSection('home', this)">
+                        <i class="fas fa-home"></i>
+                        <span>Overview</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('telegram', this)">
+                        <i class="fab fa-telegram"></i>
+                        <span>Telegram Signals</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('signals', this)">
+                        <i class="fas fa-satellite-dish"></i>
+                        <span>Trading Signals</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('analysis', this)">
+                        <i class="fas fa-robot"></i>
+                        <span>AI Analysis</span>
+                        <span class="premium-badge" style="position: static; margin-left: auto;">PRO</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('performance', this)">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Performance AI</span>
+                        <span class="premium-badge" style="position: static; margin-left: auto;">NEW</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('mentor', this)">
+                        <i class="fas fa-comments"></i>
+                        <span>AI Mentor</span>
+                        <span class="premium-badge" style="position: static; margin-left: auto;">PRO</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('courses', this)">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Courses</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('webinars', this)">
+                        <i class="fas fa-video"></i>
+                        <span>Webinars</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('blog', this)">
+                        <i class="fas fa-newspaper"></i>
+                        <span>Blog</span>
+                    </button>
+                </li>
+                <li class="nav-item hidden" id="admin-nav-item">
+                    <button class="nav-link" onclick="app.showSection('admin', this)" style="color: var(--warning);">
+                        <i class="fas fa-cog"></i>
+                        <span>Admin Dashboard</span>
+                    </button>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">A</div>
+                    <div>
+                        <div style="font-weight: 600;" id="user-name">Admin User</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" id="user-email">admin@pipways.com</div>
+                        <span class="admin-badge hidden" id="admin-badge">ADMIN</span>
+                    </div>
+                </div>
+                <button class="btn btn-danger" onclick="auth.logout()" style="width: 100%;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Home Section -->
+            <div class="section active" id="home-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-home"></i> Dashboard Overview</h2>
+                    <p>Welcome to your professional trading command center</p>
+                </div>
+                <div class="content-grid">
+                    <div class="content-card">
+                        <h3><i class="fas fa-signal" style="color: var(--primary);"></i> Latest Signals</h3>
+                        <p>Access real-time buy/sell signals for forex, crypto, and commodities.</p>
+                        <button class="btn btn-sm" onclick="app.showSection('signals', document.querySelectorAll('.nav-link')[2])" style="margin-top: 12px;">View Signals</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> Performance Analysis</h3>
+                        <p>Upload your trading history for AI-powered feedback and improvement plans.</p>
+                        <button class="btn btn-sm btn-success" onclick="app.showSection('performance', document.querySelectorAll('.nav-link')[4])" style="margin-top: 12px;">Analyze Now</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h3>
+                        <p>Upload any chart image and get instant pattern recognition and trade recommendations.</p>
+                        <button class="btn btn-sm" onclick="app.showSection('analysis', document.querySelectorAll('.nav-link')[3])" style="margin-top: 12px; background: var(--warning); color: var(--bg-dark);">Analyze Chart</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-graduation-cap" style="color: var(--premium);"></i> Trading Courses</h3>
+                        <p>Master the markets with structured curriculum from basics to advanced strategies.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="app.showSection('courses', document.querySelectorAll('.nav-link')[6])" style="margin-top: 12px;">Start Learning</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-video" style="color: var(--primary);"></i> Live Webinars</h3>
+                        <p>Join interactive live sessions with professional traders and market experts.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="app.showSection('webinars', document.querySelectorAll('.nav-link')[7])" style="margin-top: 12px;">View Schedule</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-newspaper" style="color: var(--secondary);"></i> Trading Blog</h3>
+                        <p>Daily market insights, strategy breakdowns, and trading psychology articles.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="app.showSection('blog', document.querySelectorAll('.nav-link')[8])" style="margin-top: 12px;">Read Articles</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telegram Section -->
+            <div class="section" id="telegram-section">
+                <div class="page-header">
+                    <h2><i class="fab fa-telegram" style="color: var(--telegram);"></i> Telegram Signals</h2>
+                    <p>Join our professional trading communities</p>
+                </div>
+                <div class="content-grid" id="telegram-links-container">
+                    <div class="content-card">
+                        <div style="width: 80px; height: 80px; background: var(--telegram); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px; color: white;">
+                            <i class="fab fa-telegram"></i>
+                        </div>
+                        <h3 style="text-align: center;">Free Channel</h3>
+                        <div style="text-align: center; font-size: 48px; font-weight: 700; margin: 20px 0;">FREE</div>
+                        <ul style="margin: 20px 0; padding-left: 20px; color: var(--text-secondary);">
+                            <li>Daily market analysis</li>
+                            <li>3-5 free signals per week</li>
+                            <li>Educational content</li>
+                        </ul>
+                        <button class="btn btn-telegram" id="btn-telegram-free" onclick="window.open('https://t.me/pipways_free', '_blank')">
+                            <i class="fab fa-telegram"></i> Join Free Channel
+                        </button>
+                    </div>
+                    <div class="content-card" style="border-color: var(--premium);">
+                        <div style="width: 80px; height: 80px; background: var(--premium); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px; color: var(--bg-dark);">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <h3 style="text-align: center;">VIP Channel</h3>
+                        <div style="text-align: center; font-size: 48px; font-weight: 700; margin: 20px 0; color: var(--premium);">$99/mo</div>
+                        <ul style="margin: 20px 0; padding-left: 20px; color: var(--text-secondary);">
+                            <li>10-15 premium signals daily</li>
+                            <li>Real-time alerts</li>
+                            <li>Personal mentorship</li>
+                            <li>Exclusive webinars</li>
+                        </ul>
+                        <button class="btn btn-premium" id="btn-telegram-vip" onclick="ui.showToast('Please upgrade your account in settings', 'success')">
+                            <i class="fas fa-crown"></i> Upgrade to VIP
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signals Section -->
+            <div class="section" id="signals-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-satellite-dish"></i> Trading Signals</h2>
+                    <p>Professional trading signals with technical analysis</p>
+                </div>
+                <div class="data-table-container">
+                    <div class="data-table-header">
+                        <h3>Active Signals</h3>
+                        <div style="display: flex; gap: 12px;">
+                            <select id="signal-filter" class="form-select" style="width: auto;" onchange="signals.loadSignals()">
+                                <option value="">All Pairs</option>
+                                <option value="EURUSD">EURUSD</option>
+                                <option value="GBPUSD">GBPUSD</option>
+                                <option value="USDJPY">USDJPY</option>
+                                <option value="XAUUSD">XAUUSD</option>
+                            </select>
+                            <button class="btn btn-sm btn-success" onclick="signals.loadSignals()">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pair</th>
+                                    <th>Direction</th>
+                                    <th>Entry</th>
+                                    <th>SL/TP</th>
+                                    <th>Timeframe</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="signals-table-body">
+                                <tr><td colspan="7" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Chart Analysis Section -->
+            <div class="section" id="analysis-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h2>
+                    <p>Upload your chart screenshot for instant AI-powered technical analysis</p>
+                </div>
+                <div class="analyzer-container">
+                    <div class="content-card" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;">Upload Chart Image</h3>
+                        <div class="upload-area" id="chart-upload-area" onclick="document.getElementById('chart-file').click()">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Drop image here or click to upload</h3>
+                            <p style="color: var(--text-secondary); margin-top: 8px;">Supports: JPG, PNG, WEBP (Max 10MB)</p>
+                            <input type="file" id="chart-file" class="hidden" accept="image/*" onchange="ai.handleChartUpload(this)">
+                        </div>
+                        <div id="chart-preview-container" class="hidden" style="margin-top: 20px;">
+                            <img id="chart-preview" class="image-preview" style="max-height: 400px;">
+                            <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
+                                    <label class="form-label">Currency Pair</label>
+                                    <input type="text" id="chart-pair" class="form-input" placeholder="EURUSD" value="EURUSD">
+                                </div>
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
+                                    <label class="form-label">Timeframe</label>
+                                    <select id="chart-timeframe" class="form-input">
+                                        <option value="15M">15 Minutes</option>
+                                        <option value="1H" selected>1 Hour</option>
+                                        <option value="4H">4 Hours</option>
+                                        <option value="D1">Daily</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Additional Context (Optional)</label>
+                                <input type="text" id="chart-context" class="form-input" placeholder="Any specific patterns or concerns...">
+                            </div>
+                            <button class="btn btn-lg" onclick="ai.analyzeChart()" style="margin-top: 12px;">
+                                <i class="fas fa-brain"></i> Analyze with AI
+                            </button>
+                        </div>
+                    </div>
+                    <div id="chart-analysis-result" class="hidden">
+                        <div class="analysis-result" id="chart-analysis-content" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; white-space: pre-wrap;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Analyzer Section -->
+            <div class="section" id="performance-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> AI Performance Analyzer</h2>
+                    <p>Upload trading statements for AI extraction and analysis</p>
+                </div>
+                <div class="analyzer-container">
+                    <div class="content-card" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;"><i class="fas fa-camera"></i> Upload Trading Statement</h3>
+                        <div class="upload-area" id="performance-upload-area" onclick="document.getElementById('performance-file').click()">
+                            <i class="fas fa-file-image" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Drop image/PDF here or click to upload</h3>
+                            <p style="color: var(--text-secondary); margin-top: 8px;">Supports: JPG, PNG, WEBP<br>Max 10MB</p>
+                            <input type="file" id="performance-file" class="hidden" accept="image/*" onchange="ai.handlePerformanceUpload(this)">
+                        </div>
+                        <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
+                            <img id="performance-preview" class="image-preview" style="max-height: 400px;">
+                            <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
+                                    <label class="form-label">Account Balance (Optional)</label>
+                                    <input type="number" id="vision-account-balance" class="form-input" placeholder="10000" step="0.01">
+                                </div>
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
+                                    <label class="form-label">Trading Period (Days)</label>
+                                    <input type="number" id="vision-trading-period" class="form-input" placeholder="30" value="30">
+                                </div>
+                            </div>
+                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformanceVision()" style="margin-top: 12px;">
+                                <i class="fas fa-brain"></i> Analyze with AI Vision
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="analysis-results" class="hidden">
+                        <div class="score-display">
+                            <div class="score-circle" id="score-circle" style="--score: 0;">
+                                <div class="score-value" id="trader-score">0</div>
+                            </div>
+                            <h2>Trading Performance Score</h2>
+                            <p style="color: var(--text-secondary); margin-top: 8px;" id="score-interpretation">Analysis complete</p>
+                        </div>
+
+                        <div class="analysis-grid">
+                            <div class="analysis-card">
+                                <h3><i class="fas fa-chart-bar" style="color: var(--primary);"></i> Performance Summary</h3>
+                                <div id="performance-summary"></div>
+                            </div>
+                            <div class="analysis-card">
+                                <h3><i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i> Key Issues</h3>
+                                <ul class="improvement-list" id="top-mistakes"></ul>
+                            </div>
+                            <div class="analysis-card">
+                                <h3><i class="fas fa-check-circle" style="color: var(--success);"></i> Strengths</h3>
+                                <ul class="improvement-list" id="strengths-list"></ul>
+                            </div>
+                            <div class="analysis-card">
+                                <h3><i class="fas fa-arrow-up" style="color: var(--warning);"></i> Improvement Plan</h3>
+                                <ul class="improvement-list" id="improvement-plan"></ul>
+                            </div>
+                        </div>
+
+                        <div class="analysis-card" style="margin-top: 20px;">
+                            <h3><i class="fas fa-graduation-cap" style="color: var(--premium);"></i> Recommended Courses</h3>
+                            <div id="recommended-courses" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
+                        </div>
+
+                        <div class="analysis-card" style="margin-top: 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);">
+                            <h3><i class="fas fa-user-tie" style="color: var(--primary);"></i> Mentor Advice</h3>
+                            <p id="mentor-advice" style="margin-top: 12px; line-height: 1.8; font-style: italic;"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Mentor Section -->
+            <div class="section" id="mentor-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-comments" style="color: var(--primary);"></i> AI Trading Mentor</h2>
+                    <p>Get personalized trading advice from our AI mentor</p>
+                </div>
+                <div class="chat-container">
+                    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <span style="color: var(--text-secondary); font-size: 14px;">
+                            <i class="fas fa-info-circle"></i> AI Mentor has access to courses, webinars, and blog content
+                        </span>
+                        <label class="knowledge-toggle">
+                            <input type="checkbox" id="knowledge-toggle" checked>
+                            <span>Use Platform Knowledge</span>
+                        </label>
+                    </div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message">
+                            <div class="chat-bubble">
+                                <strong>AI Mentor:</strong> Hello! I'm your personal trading mentor. I have access to all Pipways courses, blog posts, and webinar schedules. Ask me anything about trading strategies, risk management, psychology, or market analysis. How can I help you today?
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="Ask your trading question..." onkeypress="if(event.key==='Enter')ai.sendChatMessage()">
+                        <button class="btn btn-sm" onclick="ai.sendChatMessage()" style="width: auto;">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Courses Section -->
+            <div class="section" id="courses-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-graduation-cap"></i> Trading Courses</h2>
+                    <p>Master the markets with our comprehensive curriculum</p>
+                </div>
+                <div class="data-table-header" style="margin: 0 30px 20px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="course-search" placeholder="Search courses..." oninput="courses.loadCourses()">
+                    </div>
+                    <select id="course-level" class="form-select" style="width: auto;" onchange="courses.loadCourses()">
+                        <option value="">All Levels</option>
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+                <div class="content-grid" id="courses-grid">
+                    <div class="content-card">
+                        <p style="text-align: center; color: var(--text-secondary);">Loading courses...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Course Detail Section -->
+            <div class="section" id="course-detail-section">
+                <div class="page-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        <div>
+                            <button class="btn btn-sm btn-secondary" onclick="app.showSection('courses', document.querySelectorAll('.nav-link')[6])" style="width: auto; margin-bottom: 12px;">
+                                <i class="fas fa-arrow-left"></i> Back to Courses
+                            </button>
+                            <h2 id="course-detail-title">Course Title</h2>
+                        </div>
+                        <span class="status-badge" id="course-detail-level">Beginner</span>
+                    </div>
+                </div>
+                <div class="analyzer-container" id="course-detail-content">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Webinars Section -->
+            <div class="section" id="webinars-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-video"></i> Live Webinars</h2>
+                    <p>Join our expert-led live trading sessions</p>
+                </div>
+                <div class="content-grid" id="webinars-grid">
+                    <div class="content-card">
+                        <p style="text-align: center; color: var(--text-secondary);">Loading webinars...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blog Section -->
+            <div class="section" id="blog-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-newspaper"></i> Trading Blog</h2>
+                    <p>Latest insights, strategies, and market analysis</p>
+                </div>
+                <div class="data-table-header" style="margin: 0 30px 20px;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="blog-search" placeholder="Search articles..." oninput="blog.loadBlogPosts()">
+                    </div>
+                    <select id="blog-category" class="form-select" style="width: auto;" onchange="blog.loadBlogPosts()">
+                        <option value="">All Categories</option>
+                        <option value="Trading">Trading</option>
+                        <option value="Analysis">Analysis</option>
+                        <option value="Psychology">Psychology</option>
+                        <option value="Strategy">Strategy</option>
+                    </select>
+                </div>
+                <div class="content-grid" id="blog-grid">
+                    <div class="content-card">
+                        <p style="text-align: center; color: var(--text-secondary);">Loading articles...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blog Reader Section -->
+            <div class="section" id="blog-reader-section">
+                <div class="blog-reader" id="blog-reader-content">
+                    <!-- Content populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Admin Section -->
+            <div class="section" id="admin-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-cog" style="color: var(--warning);"></i> Admin Dashboard</h2>
+                    <p>Manage content, users, and platform settings</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-value" id="stat-total-users">-</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);"><i class="fas fa-signal"></i></div>
+                        <div class="stat-value" id="stat-active-signals">-</div>
+                        <div class="stat-label">Active Signals</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(251, 191, 36, 0.1); color: var(--premium);"><i class="fas fa-crown"></i></div>
+                        <div class="stat-value" id="stat-premium-users">-</div>
+                        <div class="stat-label">Premium Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);"><i class="fas fa-newspaper"></i></div>
+                        <div class="stat-value" id="stat-blog-posts">-</div>
+                        <div class="stat-label">Blog Posts</div>
+                    </div>
+                </div>
+
+                <div class="admin-tabs">
+                    <button class="admin-tab active" onclick="admin.showTab('content', this)">Content</button>
+                    <button class="admin-tab" onclick="admin.showTab('users', this)">Users</button>
+                    <button class="admin-tab" onclick="admin.showTab('courses', this)">Courses</button>
+                    <button class="admin-tab" onclick="admin.showTab('quizzes', this)">Quizzes</button>
+                    <button class="admin-tab" onclick="admin.showTab('webinars', this)">Webinars</button>
+                    <button class="admin-tab" onclick="admin.showTab('signals', this)">Signals</button>
+                    <button class="admin-tab" onclick="admin.showTab('media', this)">Media</button>
+                    <button class="admin-tab" onclick="admin.showTab('settings', this)">Settings</button>
+                </div>
+
+                <!-- Content Panel -->
+                <div class="admin-panel active" id="panel-content">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Blog Posts</h3>
+                            <button class="btn btn-sm btn-success" onclick="admin.openBlogModal()">
+                                <i class="fas fa-plus"></i> New Post
+                            </button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Status</th>
+                                        <th>Category</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blog-table-body">
+                                    <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Panel -->
+                <div class="admin-panel" id="panel-users">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>User Management</h3>
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="user-search" placeholder="Search users..." oninput="admin.searchUsers()">
+                            </div>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Role</th>
+                                        <th>Subscription</th>
+                                        <th>Joined</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Courses Panel -->
+                <div class="admin-panel" id="panel-courses">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Course Management</h3>
+                            <button class="btn btn-sm btn-success" onclick="admin.openCourseModal()">
+                                <i class="fas fa-plus"></i> New Course
+                            </button>
+                        </div>
+                        <div id="admin-courses-list" style="padding: 20px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quizzes Panel -->
+                <div class="admin-panel" id="panel-quizzes">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Quiz Management</h3>
+                            <button class="btn btn-sm btn-success" onclick="admin.openQuizModal()">
+                                <i class="fas fa-plus"></i> Create Quiz
+                            </button>
+                        </div>
+                        <div id="admin-quizzes-list" style="padding: 20px;">
+                            <p style="color: var(--text-secondary); text-align: center;">Select a course to manage quizzes</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Webinars Panel -->
+                <div class="admin-panel" id="panel-webinars">
+                    <div class="data-table-container">
+                        <div class="data-table-header">
+                            <h3>Webinar Management</h3>
+                            <button class="btn btn-sm btn-success" onclick="admin.openWebinarModal()">
+                                <i class="fas fa-plus"></i> Create Webinar
+                            </button>
+                        </div>
+                        <div id="admin-webinars-list" style="padding: 20px;"></div>
+                    </div>
+                </div>
+
+                <!-- Signals Panel -->
+                <div class="admin-panel" id="panel-signals">
+                    <div class="data-table-container" style="margin-bottom: 30px;">
+                        <div class="data-table-header">
+                            <h3>Signal Management</h3>
+                            <button class="btn btn-sm btn-success" onclick="admin.openSignalModal()">
+                                <i class="fas fa-plus"></i> Create Signal
+                            </button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Pair</th>
+                                        <th>Direction</th>
+                                        <th>Entry</th>
+                                        <th>Status</th>
+                                        <th>Result</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-signals-table-body">
+                                    <tr><td colspan="6" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Media Panel -->
+                <div class="admin-panel" id="panel-media">
+                    <div class="content-card" style="margin: 0 30px;">
+                        <h3><i class="fas fa-cloud-upload-alt"></i> Media Upload</h3>
+                        <div class="upload-area" id="media-upload-area" onclick="document.getElementById('media-file').click()">
+                            <i class="fas fa-images" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Click or drag files here</h3>
+                            <p style="color: var(--text-secondary); margin-top: 8px;">Images, videos, documents (Max 50MB)</p>
+                            <input type="file" id="media-file" class="hidden" multiple onchange="admin.handleMediaUpload(this)">
+                        </div>
+                        <div id="media-list" style="margin-top: 20px;">
+                            <p style="color: var(--text-secondary); text-align: center;">Upload files to see them here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Panel -->
+                <div class="admin-panel" id="panel-settings">
+                    <div class="content-card" style="margin: 0 30px;">
+                        <h3><i class="fas fa-cog"></i> Site Settings</h3>
+                        <form id="settings-form" class="settings-form" onsubmit="admin.updateSettings(event)">
+                            <div class="form-group">
+                                <label class="form-label">Site Name</label>
+                                <input type="text" name="site_name" class="form-input" id="setting-site-name">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" name="contact_email" class="form-input" id="setting-contact-email">
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label class="form-label">Telegram Free Link</label>
+                                    <input type="url" name="telegram_free_link" class="form-input" id="setting-telegram-free">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Telegram VIP Link</label>
+                                    <input type="url" name="telegram_vip_link" class="form-input" id="setting-telegram-vip">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label class="form-label">VIP Price</label>
+                                    <input type="number" name="vip_price" class="form-input" id="setting-vip-price" step="0.01">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Currency</label>
+                                    <input type="text" name="vip_price_currency" class="form-input" id="setting-vip-currency" maxlength="3">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-sm" style="width: auto;">
+                                <i class="fas fa-save"></i> Save Settings
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Modals -->
+            <!-- Blog Modal -->
+            <div class="modal" id="blog-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="blog-modal-title">Create Blog Post</h3>
+                        <button class="modal-close" onclick="ui.closeModal('blog-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="blog-form">
+                            <input type="hidden" id="blog-post-id" value="">
+                            <div class="form-group">
+                                <label class="form-label">Title</label>
+                                <input type="text" name="title" class="form-input" id="blog-title" required>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Category</label>
+                                    <select name="category" class="form-input" id="blog-category-select">
+                                        <option value="Trading">Trading</option>
+                                        <option value="Analysis">Analysis</option>
+                                        <option value="Psychology">Psychology</option>
+                                        <option value="Strategy">Strategy</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Status</label>
+                                    <select name="status" class="form-input" id="blog-status">
+                                        <option value="draft">Draft</option>
+                                        <option value="published">Published</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Featured Image URL</label>
+                                <input type="text" name="featured_image" class="form-input" id="blog-image">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Content</label>
+                                <textarea name="content" class="form-textarea" id="blog-content" rows="10" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" name="is_premium" id="blog-is-premium" style="margin-right: 8px;">
+                                    Premium Content
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="ui.closeModal('blog-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="admin.submitBlogPost()" style="width: auto;">Publish</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Course Modal -->
+            <div class="modal" id="course-modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3 id="course-modal-title">Create Course</h3>
+                        <button class="modal-close" onclick="ui.closeModal('course-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="course-form">
+                            <input type="hidden" id="course-id" value="">
+                            <div class="form-group">
+                                <label class="form-label">Title</label>
+                                <input type="text" name="title" class="form-input" id="course-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-textarea" id="course-description" rows="3" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Content</label>
+                                <textarea name="content" class="form-textarea" id="course-content" rows="6" required></textarea>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Level</label>
+                                    <select name="level" class="form-input" id="course-level-select">
+                                        <option value="beginner">Beginner</option>
+                                        <option value="intermediate">Intermediate</option>
+                                        <option value="advanced">Advanced</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Duration (hours)</label>
+                                    <input type="number" name="duration_hours" class="form-input" id="course-duration" step="0.5">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Thumbnail URL</label>
+                                <input type="text" name="thumbnail" class="form-input" id="course-thumbnail">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" name="is_premium" id="course-is-premium" style="margin-right: 8px;">
+                                    Premium Course
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="ui.closeModal('course-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="admin.submitCourse()" style="width: auto;">Save Course</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Webinar Modal -->
+            <div class="modal" id="webinar-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="webinar-modal-title">Create Webinar</h3>
+                        <button class="modal-close" onclick="ui.closeModal('webinar-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="webinar-form">
+                            <input type="hidden" id="webinar-id" value="">
+                            <div class="form-group">
+                                <label class="form-label">Title</label>
+                                <input type="text" name="title" class="form-input" id="webinar-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-textarea" id="webinar-description" rows="3" required></textarea>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Scheduled Date</label>
+                                    <input type="datetime-local" name="scheduled_at" class="form-input" id="webinar-scheduled" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Duration (minutes)</label>
+                                    <input type="number" name="duration_minutes" class="form-input" id="webinar-duration" value="60" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Meeting Link</label>
+                                <input type="url" name="meeting_link" class="form-input" id="webinar-link">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Max Participants</label>
+                                <input type="number" name="max_participants" class="form-input" id="webinar-max" value="100">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Reminder Message</label>
+                                <textarea name="reminder_message" class="form-textarea" id="webinar-reminder" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" name="is_premium" id="webinar-is-premium" style="margin-right: 8px;">
+                                    VIP Only
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="ui.closeModal('webinar-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="admin.submitWebinar()" style="width: auto;">Schedule</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Modal -->
+            <div class="modal" id="signal-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="signal-modal-title">Create Signal</h3>
+                        <button class="modal-close" onclick="ui.closeModal('signal-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="signal-form">
+                            <input type="hidden" id="signal-id" value="">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Pair</label>
+                                    <input type="text" name="pair" class="form-input" id="signal-pair" placeholder="EURUSD" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Direction</label>
+                                    <select name="direction" class="form-input" id="signal-direction">
+                                        <option value="buy">Buy</option>
+                                        <option value="sell">Sell</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Entry Price</label>
+                                    <input type="number" name="entry_price" class="form-input" id="signal-entry" step="0.00001" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Stop Loss</label>
+                                    <input type="number" name="stop_loss" class="form-input" id="signal-sl" step="0.00001">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Take Profit 1</label>
+                                    <input type="number" name="tp1" class="form-input" id="signal-tp1" step="0.00001">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Take Profit 2</label>
+                                    <input type="number" name="tp2" class="form-input" id="signal-tp2" step="0.00001">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Analysis</label>
+                                <textarea name="analysis" class="form-textarea" id="signal-analysis" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" name="is_premium" id="signal-is-premium" style="margin-right: 8px;">
+                                    Premium Signal
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="ui.closeModal('signal-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="admin.submitSignal()" style="width: auto;">Create Signal</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz Modal -->
+            <div class="modal" id="quiz-modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3>Create Quiz</h3>
+                        <button class="modal-close" onclick="ui.closeModal('quiz-modal')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="quiz-form">
+                            <div class="form-group">
+                                <label class="form-label">Course</label>
+                                <select name="course_id" class="form-input" id="quiz-course" required>
+                                    <option value="">Select Course</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Quiz Title</label>
+                                <input type="text" name="title" class="form-input" id="quiz-title" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-textarea" id="quiz-description" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Passing Score (%)</label>
+                                <input type="number" name="passing_score" class="form-input" id="quiz-passing" value="70" min="0" max="100">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="ui.closeModal('quiz-modal')" style="width: auto;">Cancel</button>
+                        <button class="btn" onclick="admin.submitQuiz()" style="width: auto;">Create Quiz</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
-
-        <!-- Login Modal -->
-        <div id="login-modal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="auth.closeLoginModal()">&times;</span>
-                <h2>Login</h2>
-                <form id="login-form" onsubmit="auth.handleLogin(event)">
-                    <input type="email" id="login-email" placeholder="Email" required>
-                    <input type="password" id="login-password" placeholder="Password" required>
-                    <button type="submit">Login</button>
-                </form>
-                <p>Don't have an account? <a href="#" onclick="auth.showRegisterModal()">Register</a></p>
-            </div>
-        </div>
-
-        <!-- Register Modal -->
-        <div id="register-modal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="auth.closeRegisterModal()">&times;</span>
-                <h2>Register</h2>
-                <form id="register-form" onsubmit="auth.handleRegister(event)">
-                    <input type="text" id="reg-name" placeholder="Full Name" required>
-                    <input type="email" id="reg-email" placeholder="Email" required>
-                    <input type="password" id="reg-password" placeholder="Password" required minlength="8">
-                    <button type="submit">Register</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Toast Notifications -->
-        <div id="toast-container"></div>
     </div>
 
     <!-- Scripts -->
-    <script src="/js/api.js"></script>
-    <script src="/js/ui.js"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/signals.js"></script>
-    <script src="/js/blog.js"></script>
-    <script src="/js/webinars.js"></script>
-    <script src="/js/courses.js"></script>
-    <script src="/js/ai.js"></script>
-    <script src="/js/admin.js"></script>
-    <script src="/js/media.js"></script>
-    <script>
-        // Initialize app
-        document.addEventListener('DOMContentLoaded', () => {
-            auth.init();
-            ui.init();
-        });
-    </script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/signals.js"></script>
+    <script src="js/courses.js"></script>
+    <script src="js/webinars.js"></script>
+    <script src="js/blog.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

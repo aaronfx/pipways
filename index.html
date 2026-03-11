@@ -97,6 +97,8 @@
             z-index: 10000;
             transform: translateX(150%);
             transition: transform 0.3s;
+            max-width: 90vw;
+            word-wrap: break-word;
         }
 
         .toast.show {
@@ -447,7 +449,12 @@
             min-height: 100px;
         }
 
-        /* Tables */
+        /* Tables - FIXED: Mobile scroll */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         .data-table-container {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -468,6 +475,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 600px; /* FIXED: Ensure table is scrollable on mobile */
         }
 
         th, td {
@@ -529,6 +537,7 @@
             margin-bottom: 24px;
             border-bottom: 1px solid var(--border);
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .admin-tab {
@@ -561,7 +570,7 @@
             display: block;
         }
 
-        /* Modals */
+        /* Modals - FIXED: Mobile sizing */
         .modal {
             position: fixed;
             top: 0;
@@ -577,6 +586,7 @@
             visibility: hidden;
             transition: all 0.3s;
             padding: 20px;
+            overflow-y: auto; /* FIXED: Allow scrolling on mobile */
         }
 
         .modal.show {
@@ -594,6 +604,7 @@
             overflow-y: auto;
             transform: scale(0.95);
             transition: transform 0.3s;
+            margin: auto; /* FIXED: Center properly on mobile */
         }
 
         .modal.show .modal-content {
@@ -606,6 +617,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            z-index: 10;
         }
 
         .modal-body {
@@ -618,6 +633,10 @@
             display: flex;
             gap: 12px;
             justify-content: flex-end;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-card);
+            z-index: 10;
         }
 
         .modal-close {
@@ -733,6 +752,7 @@
             border: 1px solid var(--border);
             border-radius: 8px 8px 0 0;
             border-bottom: none;
+            flex-wrap: wrap; /* FIXED: Wrap on mobile */
         }
 
         .editor-btn {
@@ -817,6 +837,8 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             margin-bottom: 12px;
+            flex-wrap: wrap; /* FIXED: Wrap on mobile */
+            gap: 12px;
         }
 
         .action-btns {
@@ -853,6 +875,7 @@
             gap: 8px;
             padding: 16px;
             justify-content: center;
+            flex-wrap: wrap; /* FIXED: Wrap on mobile */
         }
 
         .page-btn {
@@ -1075,10 +1098,11 @@
             gap: 16px;
         }
 
-        /* Responsive */
+        /* FIXED: Mobile Responsiveness Improvements */
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
+                width: 260px; /* Slightly narrower on mobile */
             }
 
             .sidebar.open {
@@ -1089,12 +1113,17 @@
                 margin-left: 0;
                 max-width: 100%;
                 padding: 16px;
+                padding-top: 80px; /* Space for mobile header */
             }
 
             .mobile-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                position: fixed;
+                width: 100%;
+                top: 0;
+                left: 0;
             }
 
             .content-grid {
@@ -1103,6 +1132,11 @@
 
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .stat-value {
+                font-size: 24px; /* Smaller on mobile */
             }
 
             .data-table-header {
@@ -1110,20 +1144,75 @@
                 align-items: stretch;
             }
 
-            table {
-                font-size: 14px;
+            /* FIXED: Ensure tables are scrollable */
+            .table-wrapper {
+                margin: 0 -16px; /* Full width on mobile */
+                padding: 0 16px;
             }
 
-            th, td {
-                padding: 10px;
+            .modal {
+                padding: 10px; /* Less padding on small screens */
             }
 
             .modal-content {
                 max-height: 95vh;
+                max-width: 100%; /* Full width on very small screens */
+            }
+
+            .modal-footer {
+                flex-direction: column; /* Stack buttons on mobile */
+            }
+
+            .modal-footer .btn {
+                width: 100%;
+            }
+
+            .admin-tabs {
+                padding-bottom: 8px;
             }
 
             .blog-reader {
                 padding: 20px;
+            }
+
+            .blog-reader h1 {
+                font-size: 24px; /* Smaller heading on mobile */
+            }
+
+            .page-header h2 {
+                font-size: 20px;
+                flex-wrap: wrap;
+            }
+
+            .search-box {
+                max-width: 100%;
+            }
+
+            /* Ensure text doesn't overflow */
+            .content-card, .analysis-card, .question-card {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+
+            /* Adjust chat for mobile */
+            .chat-container {
+                height: calc(100vh - 200px);
+            }
+
+            .chat-bubble {
+                max-width: 90%; /* Wider bubbles on mobile */
+            }
+        }
+
+        /* Extra small screens */
+        @media (max-width: 375px) {
+            .stats-grid {
+                grid-template-columns: 1fr; /* Stack stats on very small screens */
+            }
+
+            .btn-sm {
+                padding: 6px 12px;
+                font-size: 12px;
             }
         }
 
@@ -1315,27 +1404,42 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Home Section -->
+            <!-- Home Section - FIXED: Improved descriptions -->
             <div class="section active" id="home-section">
                 <div class="page-header">
                     <h2><i class="fas fa-home"></i> Dashboard Overview</h2>
-                    <p>Welcome back to your professional trading environment</p>
+                    <p>Welcome to your professional trading command center</p>
                 </div>
                 <div class="content-grid">
                     <div class="content-card">
                         <h3><i class="fas fa-signal" style="color: var(--primary);"></i> Latest Signals</h3>
-                        <p>View the most recent trading signals generated by our AI and expert analysts.</p>
+                        <p>Access real-time buy/sell signals for forex, crypto, and commodities. Each signal includes entry price, stop-loss, and take-profit levels with professional technical analysis.</p>
                         <button class="btn btn-sm" onclick="showSection('signals', document.querySelectorAll('.nav-link')[2])" style="margin-top: 12px;">View Signals</button>
                     </div>
                     <div class="content-card">
                         <h3><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> Performance Analysis</h3>
-                        <p>Upload your trading history screenshots for comprehensive AI-powered evaluation.</p>
+                        <p>Upload your trading history screenshots and get instant AI-powered feedback. Discover your strengths, weaknesses, and get a personalized improvement plan to boost your win rate.</p>
                         <button class="btn btn-sm btn-success" onclick="showSection('performance', document.querySelectorAll('.nav-link')[4])" style="margin-top: 12px;">Analyze Now</button>
                     </div>
                     <div class="content-card">
                         <h3><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h3>
-                        <p>Get instant technical analysis on your chart screenshots.</p>
+                        <p>Stuck on a trade setup? Upload any chart image and our AI will identify patterns, support/resistance levels, and provide actionable trading recommendations in seconds.</p>
                         <button class="btn btn-sm" onclick="showSection('analysis', document.querySelectorAll('.nav-link')[3])" style="margin-top: 12px; background: var(--warning); color: var(--bg-dark);">Analyze Chart</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-graduation-cap" style="color: var(--premium);"></i> Trading Courses</h3>
+                        <p>Master the markets with our structured curriculum. From beginner basics to advanced strategies, learn risk management, technical analysis, and trading psychology at your own pace.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="showSection('courses', document.querySelectorAll('.nav-link')[6])" style="margin-top: 12px;">Start Learning</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-video" style="color: var(--primary);"></i> Live Webinars</h3>
+                        <p>Join interactive live sessions with professional traders. Ask questions in real-time, watch live market analysis, and learn advanced techniques from industry experts.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="showSection('webinars', document.querySelectorAll('.nav-link')[7])" style="margin-top: 12px;">View Schedule</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-newspaper" style="color: var(--secondary);"></i> Trading Blog</h3>
+                        <p>Stay updated with daily market insights, strategy breakdowns, and trading psychology articles. Access years of archived content to deepen your market understanding.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="showSection('blog', document.querySelectorAll('.nav-link')[8])" style="margin-top: 12px;">Read Articles</button>
                     </div>
                 </div>
             </div>
@@ -1403,22 +1507,25 @@
                             </button>
                         </div>
                     </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Pair</th>
-                                <th>Direction</th>
-                                <th>Entry</th>
-                                <th>SL/TP</th>
-                                <th>Timeframe</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="signals-table-body">
-                            <tr><td colspan="7" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
-                        </tbody>
-                    </table>
+                    <!-- FIXED: Added table wrapper for mobile scroll -->
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Pair</th>
+                                    <th>Direction</th>
+                                    <th>Entry</th>
+                                    <th>SL/TP</th>
+                                    <th>Timeframe</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="signals-table-body">
+                                <tr><td colspan="7" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -1439,12 +1546,12 @@
                         </div>
                         <div id="chart-preview-container" class="hidden" style="margin-top: 20px;">
                             <img id="chart-preview" class="image-preview" style="max-height: 400px;">
-                            <div style="display: flex; gap: 12px; margin-top: 12px;">
-                                <div class="form-group" style="flex: 1;">
+                            <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Currency Pair</label>
                                     <input type="text" id="chart-pair" class="form-input" placeholder="EURUSD" value="EURUSD">
                                 </div>
-                                <div class="form-group" style="flex: 1;">
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Timeframe</label>
                                     <select id="chart-timeframe" class="form-input">
                                         <option value="15M">15 Minutes</option>
@@ -1496,12 +1603,12 @@
                         
                         <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
                             <img id="performance-preview" class="image-preview" style="max-height: 400px;">
-                            <div style="display: flex; gap: 12px; margin-top: 12px;">
-                                <div class="form-group" style="flex: 1;">
+                            <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Account Balance (Optional)</label>
                                     <input type="number" id="vision-account-balance" class="form-input" placeholder="10000" step="0.01">
                                 </div>
-                                <div class="form-group" style="flex: 1;">
+                                <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Trading Period (Days)</label>
                                     <input type="number" id="vision-trading-period" class="form-input" placeholder="30" value="30">
                                 </div>
@@ -1563,7 +1670,7 @@
                     <p>Get personalized trading advice from our AI mentor with platform knowledge</p>
                 </div>
                 <div class="chat-container">
-                    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <span style="color: var(--text-secondary); font-size: 14px;">
                             <i class="fas fa-info-circle"></i> AI Mentor has access to courses, webinars, and blog content
                         </span>
@@ -1742,20 +1849,23 @@
                                 <i class="fas fa-plus"></i> New Post
                             </button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Title</th>
-                                    <th>Status</th>
-                                    <th>Category</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="blog-table-body">
-                                <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
-                            </tbody>
-                        </table>
+                        <!-- FIXED: Added table wrapper -->
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Status</th>
+                                        <th>Category</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blog-table-body">
+                                    <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -1769,20 +1879,23 @@
                                 <input type="text" id="user-search" placeholder="Search users..." oninput="searchUsers()">
                             </div>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Role</th>
-                                    <th>Subscription</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body">
-                                <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
-                            </tbody>
-                        </table>
+                        <!-- FIXED: Added table wrapper -->
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Role</th>
+                                        <th>Subscription</th>
+                                        <th>Joined</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr><td colspan="5" style="text-align: center; padding: 40px;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                         <div class="pagination" id="users-pagination"></div>
                     </div>
                 </div>
@@ -1792,7 +1905,7 @@
                     <div class="data-table-container">
                         <div class="data-table-header">
                             <h3>Course Management</h3>
-                            <div style="display: flex; gap: 12px;">
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                                 <div class="search-box" style="max-width: 200px;">
                                     <i class="fas fa-search"></i>
                                     <input type="text" id="admin-course-search" placeholder="Search courses..." oninput="loadAdminCourses()">
@@ -1848,21 +1961,24 @@
                                 <i class="fas fa-plus"></i> Create Signal
                             </button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Pair</th>
-                                    <th>Direction</th>
-                                    <th>Entry</th>
-                                    <th>Status</th>
-                                    <th>Result</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-signals-table-body">
-                                <tr><td colspan="6" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
-                            </tbody>
-                        </table>
+                        <!-- FIXED: Added table wrapper -->
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Pair</th>
+                                        <th>Direction</th>
+                                        <th>Entry</th>
+                                        <th>Status</th>
+                                        <th>Result</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-signals-table-body">
+                                    <tr><td colspan="6" style="text-align: center; padding: 40px;">Loading signals...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -2159,7 +2275,7 @@
                 </div>
             </div>
 
-            <!-- Webinar Modal - FIXED: No recording_link field -->
+            <!-- Webinar Modal -->
             <div class="modal" id="webinar-modal">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -2191,7 +2307,6 @@
                                 <label class="form-label">Meeting Link</label>
                                 <input type="url" name="meeting_link" class="form-input" id="webinar-meeting-link" placeholder="https://zoom.us/j/..." required>
                             </div>
-                            <!-- REMOVED: Recording Link field -->
                             <div class="form-group">
                                 <label class="form-label">Reminder Message</label>
                                 <textarea name="reminder_message" class="form-textarea" id="webinar-reminder" rows="2" placeholder="Custom reminder message for participants..."></textarea>
@@ -3228,283 +3343,351 @@
                 document.getElementById('editor-content').innerHTML = post.content;
                 document.getElementById('blog-content-hidden').value = post.content;
                 
-                if (post.scheduled_at) {
-                    const date = new Date(post.scheduled_at);
-                    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-                    document.getElementById('blog-scheduled-at').value = date.toISOString().slice(0, 16);
-                }
-                
-                if (post.tags) {
-                    currentTags = post.tags;
-                    renderTags();
-                }
-                
-                document.getElementById('blog-modal-title').textContent = 'Edit Blog Post';
-                document.getElementById('blog-submit-btn').textContent = 'Update';
-                updateSEOPreview();
-                toggleSchedule(post.status);
-                document.getElementById('blog-modal').classList.add('show');
-            } catch (error) {
-                showToast('Failed to load post', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function submitBlogPost() {
-            const postId = document.getElementById('blog-post-id').value;
-            const title = document.getElementById('blog-title').value;
-            
-            if (!title) {
-                showToast('Title is required', 'error');
-                return;
-            }
-            
-            const data = {
-                title: title,
-                content: document.getElementById('blog-content-hidden').value,
-                excerpt: document.getElementById('editor-content').innerText.substring(0, 150) + '...',
-                category: document.getElementById('blog-category-select').value,
-                status: document.getElementById('blog-status').value,
-                featured_image: document.getElementById('blog-image').value,
-                meta_title: document.getElementById('blog-meta-title').value,
-                meta_description: document.getElementById('blog-meta-desc').value,
-                is_premium: document.getElementById('blog-is-premium').checked,
-                tags: currentTags,
-                scheduled_at: document.getElementById('blog-scheduled-at').value || null
-            };
-            
-            try {
-                showLoading(true, postId ? 'Updating...' : 'Creating...');
-                const url = postId ? `/admin/blog/${postId}` : '/admin/blog';
-                const method = postId ? 'PUT' : 'POST';
-                
-                const response = await api.request(url, method, data);
-                
-                if (response.ok) {
-                    showToast(postId ? 'Post updated!' : 'Post created!', 'success');
-                    closeModal('blog-modal');
-                    loadBlogPosts();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to save post');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function deleteBlogPost(postId) {
-            if (!confirm('Are you sure you want to delete this post?')) return;
-            
-            try {
-                const response = await api.delete(`/admin/blog/${postId}`);
-                if (response.ok) {
-                    showToast('Post deleted', 'success');
-                    loadBlogPosts();
-                }
-            } catch (error) {
-                showToast('Error deleting post', 'error');
-            }
-        }
-
-        function toggleSchedule(status) {
-            const field = document.getElementById('schedule-field');
-            if (status === 'scheduled') {
-                field.classList.remove('hidden');
+                           if (post.scheduled_at) {
+                const date = new Date(post.scheduled_at);
+                date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                document.getElementById('blog-scheduled-at').value = date.toISOString().slice(0, 16);
+                document.getElementById('schedule-field').classList.remove('hidden');
             } else {
-                field.classList.add('hidden');
+                document.getElementById('schedule-field').classList.add('hidden');
             }
-        }
-
-        function handleTagInput(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const input = e.target;
-                const tag = input.value.trim();
-                if (tag && !currentTags.includes(tag)) {
-                    currentTags.push(tag);
-                    renderTags();
-                }
-                input.value = '';
-            }
-        }
-
-        function renderTags() {
-            const container = document.getElementById('tag-container');
-            const tagsHtml = currentTags.map(tag => `
-                <span style="background: var(--primary); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 4px;">
-                    ${tag}
-                    <i class="fas fa-times" style="cursor: pointer;" onclick="removeTag('${tag}')"></i>
-                </span>
-            `).join('');
-            container.innerHTML = tagsHtml + '<input type="text" id="tag-input" placeholder="Add tag and press Enter" onkeypress="handleTagInput(event)">';
-            document.getElementById('tags-hidden').value = JSON.stringify(currentTags);
-        }
-
-        function removeTag(tag) {
-            currentTags = currentTags.filter(t => t !== tag);
-            renderTags();
-        }
-
-        function updateSEOPreview() {
-            const title = document.getElementById('blog-title').value || 'Your Title Here';
-            const metaTitle = document.getElementById('blog-meta-title').value || title;
-            const metaDesc = document.getElementById('blog-meta-desc').value || 'Your meta description will appear here...';
             
-            document.getElementById('seo-title-preview').textContent = metaTitle;
-            document.getElementById('seo-url-preview').textContent = `pipways.com/blog/${generateSlug(title)}`;
-            document.getElementById('seo-description-preview').textContent = metaDesc;
+            currentTags = post.tags || [];
+            renderTags();
+            
+            document.getElementById('blog-modal-title').textContent = 'Edit Blog Post';
+            document.getElementById('blog-submit-btn').textContent = 'Update';
+            updateSEOPreview();
+            document.getElementById('blog-modal').classList.add('show');
+        } catch (error) {
+            showToast('Failed to load post', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function submitBlogPost() {
+        const postId = document.getElementById('blog-post-id').value;
+        const content = document.getElementById('editor-content').innerHTML;
+        document.getElementById('blog-content-hidden').value = content;
+        
+        const data = {
+            title: document.getElementById('blog-title').value,
+            content: content,
+            category: document.getElementById('blog-category-select').value,
+            status: document.getElementById('blog-status').value,
+            featured_image: document.getElementById('blog-image').value,
+            meta_title: document.getElementById('blog-meta-title').value,
+            meta_description: document.getElementById('blog-meta-desc').value,
+            is_premium: document.getElementById('blog-is-premium').checked,
+            tags: currentTags,
+            scheduled_at: document.getElementById('blog-scheduled-at').value || null
+        };
+
+        if (!data.title || !data.content) {
+            showToast('Title and content are required', 'error');
+            return;
         }
 
-        function editorFormat(command) {
-            document.execCommand(command, false, null);
-            document.getElementById('editor-content').focus();
+        try {
+            showLoading(true, postId ? 'Updating post...' : 'Creating post...');
+            const url = postId ? `/admin/blog/${postId}` : '/admin/blog';
+            const method = postId ? 'PUT' : 'POST';
+            
+            const response = await api.request(url, method, data);
+            
+            if (response.ok) {
+                showToast(postId ? 'Post updated' : 'Post created', 'success');
+                closeModal('blog-modal');
+                loadBlogPosts();
+                loadBlogPostsPublic();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save post');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function deleteBlogPost(postId) {
+        if (!confirm('Are you sure you want to delete this post?')) return;
+        
+        try {
+            showLoading(true, 'Deleting...');
+            const response = await api.delete(`/admin/blog/${postId}`);
+            
+            if (response.ok) {
+                showToast('Post deleted', 'success');
+                loadBlogPosts();
+            } else {
+                throw new Error('Failed to delete');
+            }
+        } catch (error) {
+            showToast('Error deleting post', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function toggleSchedule(status) {
+        const field = document.getElementById('schedule-field');
+        if (status === 'scheduled') {
+            field.classList.remove('hidden');
+        } else {
+            field.classList.add('hidden');
+        }
+    }
+
+    function handleTagInput(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = e.target.value.trim();
+            if (value && !currentTags.includes(value)) {
+                currentTags.push(value);
+                renderTags();
+            }
+            e.target.value = '';
+        }
+    }
+
+    function renderTags() {
+        const container = document.getElementById('tag-container');
+        const input = document.getElementById('tag-input');
+        document.getElementById('tags-hidden').value = JSON.stringify(currentTags);
+        
+        const tagsHtml = currentTags.map((tag, index) => `
+            <span class="tag">
+                ${tag}
+                <i class="fas fa-times" onclick="removeTag(${index})"></i>
+            </span>
+        `).join('');
+        
+        container.innerHTML = tagsHtml + input.outerHTML;
+        document.getElementById('tag-input').addEventListener('keypress', handleTagInput);
+    }
+
+    function removeTag(index) {
+        currentTags.splice(index, 1);
+        renderTags();
+    }
+
+    function updateSEOPreview() {
+        const title = document.getElementById('blog-title').value || 'Your Title Here';
+        const metaTitle = document.getElementById('blog-meta-title').value || title;
+        const metaDesc = document.getElementById('blog-meta-desc').value || 'Your meta description will appear here...';
+        const slug = generateSlug(title);
+        
+        document.getElementById('seo-title-preview').textContent = metaTitle;
+        document.getElementById('seo-url-preview').textContent = `pipways.com/blog/${slug}`;
+        document.getElementById('seo-description-preview').textContent = metaDesc;
+    }
+
+    function editorFormat(command) {
+        const editor = document.getElementById('editor-content');
+        editor.focus();
+        
+        switch(command) {
+            case 'bold':
+                document.execCommand('bold');
+                break;
+            case 'italic':
+                document.execCommand('italic');
+                break;
+            case 'h2':
+                document.execCommand('formatBlock', false, 'H2');
+                break;
+            case 'h3':
+                document.execCommand('formatBlock', false, 'H3');
+                break;
+            case 'ul':
+                document.execCommand('insertUnorderedList');
+                break;
+            case 'ol':
+                document.execCommand('insertOrderedList');
+                break;
+            case 'link':
+                const url = prompt('Enter URL:');
+                if (url) document.execCommand('createLink', false, url);
+                break;
+        }
+        updateEditorContent();
+    }
+
+    function insertImage() {
+        const url = prompt('Enter image URL:');
+        if (url) {
+            document.execCommand('insertImage', false, url);
             updateEditorContent();
         }
+    }
 
-        function insertImage() {
-            const url = prompt('Enter image URL:');
-            if (url) {
-                document.execCommand('insertImage', false, url);
-                updateEditorContent();
+    function insertVideo() {
+        const url = prompt('Enter video URL (YouTube embed):');
+        if (url) {
+            const embed = `<iframe width="100%" height="315" src="${url}" frameborder="0" allowfullscreen></iframe>`;
+            document.execCommand('insertHTML', false, embed);
+            updateEditorContent();
+        }
+    }
+
+    function updateEditorContent() {
+        const content = document.getElementById('editor-content').innerHTML;
+        document.getElementById('blog-content-hidden').value = content;
+    }
+
+    // ==========================================
+    // COURSE MANAGEMENT
+    // ==========================================
+    async function loadCourses() {
+        try {
+            const search = document.getElementById('course-search')?.value || '';
+            const level = document.getElementById('course-level')?.value || '';
+            
+            let url = '/courses?limit=20';
+            if (level) url += `&level=${level}`;
+            
+            const response = await api.get(url);
+            const data = await response.json();
+            const container = document.getElementById('courses-grid');
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="content-card"><p style="text-align: center;">No courses found</p></div>';
+                return;
             }
-        }
 
-        function insertVideo() {
-            const url = prompt('Enter video URL (YouTube, Vimeo):');
-            if (url) {
-                const embedUrl = url.replace('watch?v=', 'embed/');
-                document.execCommand('insertHTML', false, `<iframe src="${embedUrl}" style="width: 100%; height: 315px; border: none; margin: 16px 0;"></iframe>`);
-                updateEditorContent();
-            }
-        }
-
-        function updateEditorContent() {
-            document.getElementById('blog-content-hidden').value = document.getElementById('editor-content').innerHTML;
-        }
-
-        // ==========================================
-        // COURSES MANAGEMENT
-        // ==========================================
-        async function loadCourses() {
-            try {
-                const level = document.getElementById('course-level')?.value || '';
-                let url = '/courses?limit=20';
-                if (level) url += `&level=${level}`;
-                
-                const response = await api.get(url);
-                const courses = await response.json();
-                const container = document.getElementById('courses-grid');
-                
-                if (!courses || courses.length === 0) {
-                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No courses found</p></div>';
-                    return;
-                }
-
-                container.innerHTML = courses.map(course => `
-                    <div class="content-card" onclick="viewCourse(${course.id})" style="cursor: pointer; position: relative;">
-                        ${course.is_premium ? '<span class="premium-badge">PRO</span>' : ''}
-                        ${course.thumbnail ? `<img src="${course.thumbnail}" style="width: 100%; height: 180px; object-fit: cover; border-radius: 8px; margin-bottom: 16px;">` : ''}
-                        <span class="status-badge" style="margin-bottom: 8px; display: inline-block;">${course.level}</span>
-                        <h3>${course.title}</h3>
-                        <p style="color: var(--text-secondary); margin: 8px 0; font-size: 14px;">${course.description}</p>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
-                            <small style="color: var(--text-secondary);">
-                                <i class="fas fa-clock"></i> ${course.duration_hours || 0} hours
-                                <i class="fas fa-book" style="margin-left: 8px;"></i> ${course.modules?.length || 0} modules
-                            </small>
-                            <button class="btn btn-sm">Start Learning</button>
-                        </div>
+            container.innerHTML = data.map(course => `
+                <div class="content-card" onclick="viewCourse(${course.id})" style="cursor: pointer;">
+                    ${course.thumbnail ? `<img src="${course.thumbnail}" style="width: 100%; height: 180px; object-fit: cover; border-radius: 8px; margin-bottom: 16px;">` : '<div style="width: 100%; height: 180px; background: var(--bg-hover); border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary);"><i class="fas fa-graduation-cap fa-3x"></i></div>'}
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                        <span class="status-badge status-${course.level}">${course.level}</span>
+                        ${course.is_premium ? '<span class="premium-badge" style="position: static;">PRO</span>' : ''}
                     </div>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading courses:', error);
-            }
+                    <h3>${course.title}</h3>
+                    <p style="color: var(--text-secondary); margin: 8px 0; font-size: 14px;">${course.description?.substring(0, 100)}...</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; color: var(--text-secondary); font-size: 13px;">
+                        <span><i class="fas fa-clock"></i> ${course.duration_hours || 0} hrs</span>
+                        <span><i class="fas fa-list"></i> ${course.modules?.length || 0} modules</span>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading courses:', error);
         }
+    }
 
-        async function viewCourse(courseId) {
-            try {
-                showLoading(true, 'Loading course...');
-                const response = await api.get(`/courses/${courseId}`);
-                if (!response.ok) throw new Error('Failed to load course');
+    async function viewCourse(courseId) {
+        try {
+            showLoading(true, 'Loading course...');
+            const response = await api.get(`/courses/${courseId}`);
+            if (!response.ok) throw new Error('Failed to load course');
+            
+            const course = await response.json();
+            
+            document.getElementById('course-detail-title').textContent = course.title;
+            document.getElementById('course-detail-level').textContent = course.level;
+            document.getElementById('course-detail-level').className = `status-badge status-${course.level}`;
+            
+            const content = document.getElementById('course-detail-content');
+            content.innerHTML = `
+                <div class="content-card">
+                    ${course.thumbnail ? `<img src="${course.thumbnail}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin-bottom: 24px;">` : ''}
+                    <div style="margin-bottom: 24px;">
+                        <h3>About This Course</h3>
+                        <p style="color: var(--text-secondary); line-height: 1.8; margin-top: 12px;">${course.description}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 24px;">
+                        <h3>Course Content</h3>
+                        <p style="color: var(--text-secondary); line-height: 1.8; margin-top: 12px;">${course.content}</p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 24px; margin-bottom: 24px; flex-wrap: wrap;">
+                        <div><i class="fas fa-clock" style="color: var(--primary);"></i> Duration: ${course.duration_hours || 0} hours</div>
+                        <div><i class="fas fa-signal" style="color: var(--primary);"></i> Level: ${course.level}</div>
+                        <div><i class="fas fa-list" style="color: var(--primary);"></i> Modules: ${course.modules?.length || 0}</div>
+                    </div>
+                </div>
                 
-                const course = await response.json();
-                
-                document.getElementById('course-detail-title').textContent = course.title;
-                document.getElementById('course-detail-level').textContent = course.level;
-                
-                const content = document.getElementById('course-detail-content');
-                content.innerHTML = `
-                    <div class="content-card">
-                        ${course.thumbnail ? `<img src="${course.thumbnail}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 20px;">` : ''}
-                        <div style="margin-bottom: 20px;">
-                            <h3>About this Course</h3>
-                            <p style="color: var(--text-secondary); margin-top: 8px;">${course.description}</p>
-                        </div>
-                        <div style="margin-bottom: 20px;">
-                            <h3>Curriculum</h3>
-                            <div style="margin-top: 12px;">
-                                ${course.modules.map((module, idx) => `
-                                    <div style="padding: 16px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <div>
-                                                <strong>Module ${idx + 1}: ${module.title}</strong>
-                                                ${module.is_premium ? '<span class="premium-badge" style="position: static; margin-left: 8px;">PRO</span>' : ''}
-                                            </div>
-                                            ${module.video_url ? '<i class="fas fa-video" style="color: var(--primary);"></i>' : ''}
+                ${course.modules && course.modules.length > 0 ? `
+                <div class="content-card">
+                    <h3 style="margin-bottom: 20px;">Modules</h3>
+                    <div class="module-list">
+                        ${course.modules.map((module, idx) => `
+                            <div class="module-item" style="padding: 16px; border-bottom: 1px solid var(--border); ${module.is_premium ? 'background: rgba(251, 191, 36, 0.05);' : ''}">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">
+                                            ${idx + 1}. ${module.title}
+                                            ${module.is_premium ? '<span class="premium-badge" style="position: static; margin-left: 8px; font-size: 10px;">PRO</span>' : ''}
                                         </div>
+                                        ${module.video_url ? '<small style="color: var(--primary);"><i class="fas fa-video"></i> Video included</small>' : ''}
                                     </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                        ${course.quizzes?.length > 0 ? `
-                            <div>
-                                <h3>Assessments</h3>
-                                <div style="margin-top: 12px;">
-                                    ${course.quizzes.map(quiz => `
-                                        <button class="btn btn-sm btn-secondary" onclick="takeQuiz(${course.id}, ${quiz.id})" style="margin-right: 8px; margin-bottom: 8px;">
-                                            <i class="fas fa-question-circle"></i> ${quiz.title}
-                                        </button>
-                                    `).join('')}
+                                    ${module.completed ? '<i class="fas fa-check-circle" style="color: var(--success);"></i>' : ''}
                                 </div>
+                                ${module.content ? `<p style="color: var(--text-secondary); font-size: 14px; margin-top: 8px;">${module.content}</p>` : ''}
                             </div>
-                        ` : ''}
+                        `).join('')}
                     </div>
-                `;
+                </div>
+                ` : ''}
                 
-                showSection('course-detail', null);
-            } catch (error) {
-                showToast('Failed to load course', 'error');
-            } finally {
-                showLoading(false);
-            }
+                ${course.quizzes && course.quizzes.length > 0 ? `
+                <div class="content-card">
+                    <h3 style="margin-bottom: 20px;"><i class="fas fa-question-circle" style="color: var(--warning);"></i> Assessments</h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        ${course.quizzes.map(quiz => `
+                            <div style="padding: 16px; background: var(--bg-hover); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 600;">${quiz.title}</div>
+                                    <small style="color: var(--text-secondary);">Passing score: ${quiz.passing_score}%</small>
+                                </div>
+                                <button class="btn btn-sm" onclick="startQuiz(${course.id}, ${quiz.id})">Start Quiz</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            showSection('course-detail', null);
+        } catch (error) {
+            showToast('Failed to load course', 'error');
+        } finally {
+            showLoading(false);
         }
+    }
 
-        async function loadAdminCourses(page = 1) {
-            adminCoursesPage = page;
-            try {
-                const search = document.getElementById('admin-course-search')?.value || '';
-                let url = `/admin/courses?page=${page}&limit=10`;
-                if (search) url += `&search=${encodeURIComponent(search)}`;
-                
-                const response = await api.get(url);
-                if (!response.ok) throw new Error('Failed to load courses');
-                
-                const data = await response.json();
-                const container = document.getElementById('admin-courses-list');
-                
-                if (!data.courses || data.courses.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><i class="fas fa-book"></i><p>No courses found</p></div>';
-                } else {
-                    container.innerHTML = data.courses.map(course => `
-                        <div class="course-list-item">
+    // ==========================================
+    // ADMIN COURSES
+    // ==========================================
+    async function loadAdminCourses(page = 1) {
+        adminCoursesPage = page;
+        try {
+            const search = document.getElementById('admin-course-search')?.value || '';
+            let url = `/admin/courses?page=${page}&limit=5`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            
+            const response = await api.get(url);
+            if (!response.ok) throw new Error('Failed to load courses');
+            
+            const data = await response.json();
+            const container = document.getElementById('admin-courses-list');
+            
+            if (!data.courses || data.courses.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No courses found</p>';
+            } else {
+                container.innerHTML = data.courses.map(course => `
+                    <div style="padding: 20px; background: var(--bg-hover); border-radius: 12px; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px;">
                             <div>
                                 <h4 style="margin-bottom: 4px;">${course.title}</h4>
-                                <div style="font-size: 14px; color: var(--text-secondary);">
-                                    ${course.level} • ${course.duration_hours || 0}h • ${course.module_count} modules • ${course.is_premium ? '<span style="color: var(--premium);">Premium</span>' : 'Free'}
+                                <small style="color: var(--text-secondary);">By ${course.creator_name || 'Admin'} • ${formatDate(course.created_at)}</small>
+                                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                                    <span class="status-badge status-${course.level}">${course.level}</span>
+                                    ${course.is_premium ? '<span class="premium-badge" style="position: static;">PRO</span>' : ''}
                                 </div>
                             </div>
                             <div class="action-btns">
@@ -3516,1160 +3699,1250 @@
                                 </button>
                             </div>
                         </div>
-                    `).join('');
-                }
-
-                const pagination = document.getElementById('courses-pagination');
-                if (data.pages > 1) {
-                    let pagesHtml = '';
-                    for (let i = 1; i <= data.pages; i++) {
-                        pagesHtml += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="loadAdminCourses(${i})">${i}</button>`;
-                    }
-                    pagination.innerHTML = pagesHtml;
-                } else {
-                    pagination.innerHTML = '';
-                }
-            } catch (error) {
-                console.error('Error loading admin courses:', error);
-            }
-        }
-
-        function openCourseModal() {
-            editingCourseId = null;
-            document.getElementById('course-form').reset();
-            document.getElementById('edit-course-id').value = '';
-            document.getElementById('modules-container').innerHTML = '';
-            document.getElementById('course-modal-title').textContent = 'Create Course';
-            document.getElementById('course-submit-btn').textContent = 'Create Course';
-            document.getElementById('course-modal').classList.add('show');
-        }
-
-        function addModuleField(module = null) {
-            const container = document.getElementById('modules-container');
-            const idx = container.children.length;
-            const div = document.createElement('div');
-            div.className = 'content-card';
-            div.style.marginBottom = '12px';
-            div.innerHTML = `
-                <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-                    <input type="text" placeholder="Module Title" class="form-input module-title" value="${module?.title || ''}" required>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="width: auto;">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <input type="text" placeholder="Video URL (optional)" class="form-input module-video" value="${module?.video_url || ''}">
-                    <label style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary);">
-                        <input type="checkbox" class="module-premium" ${module?.is_premium ? 'checked' : ''}>
-                        Premium Module
-                    </label>
-                </div>
-            `;
-            container.appendChild(div);
-        }
-
-        async function submitCourse() {
-            const title = document.getElementById('course-title').value;
-            if (!title) {
-                showToast('Course title is required', 'error');
-                return;
-            }
-
-            const modules = [];
-            document.querySelectorAll('#modules-container > div').forEach(div => {
-                modules.push({
-                    title: div.querySelector('.module-title').value,
-                    video_url: div.querySelector('.module-video').value,
-                    is_premium: div.querySelector('.module-premium').checked
-                });
-            });
-
-            const data = {
-                title: title,
-                description: document.getElementById('course-description').value,
-                content: document.getElementById('course-content').value,
-                level: document.getElementById('course-level-select').value,
-                duration_hours: parseFloat(document.getElementById('course-duration').value) || null,
-                thumbnail: document.getElementById('course-thumbnail-input').value,
-                is_premium: document.getElementById('course-is-premium').checked,
-                modules: modules
-            };
-
-            try {
-                showLoading(true, editingCourseId ? 'Updating...' : 'Creating...');
-                const url = editingCourseId ? `/admin/courses/${editingCourseId}` : '/admin/courses';
-                const method = editingCourseId ? 'PUT' : 'POST';
-                
-                const response = await api.request(url, method, data);
-                
-                if (response.ok) {
-                    showToast(editingCourseId ? 'Course updated!' : 'Course created!', 'success');
-                    closeModal('course-modal');
-                    loadAdminCourses(adminCoursesPage);
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to save course');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function editCourse(courseId) {
-            try {
-                showLoading(true, 'Loading course...');
-                const response = await api.get(`/admin/courses/${courseId}`);
-                if (!response.ok) throw new Error('Failed to load course');
-                
-                const data = await response.json();
-                const course = data.course;
-                
-                editingCourseId = courseId;
-                document.getElementById('course-title').value = course.title;
-                document.getElementById('course-description').value = course.description;
-                document.getElementById('course-content').value = course.content || '';
-                document.getElementById('course-level-select').value = course.level;
-                document.getElementById('course-duration').value = course.duration_hours || '';
-                document.getElementById('course-thumbnail-input').value = course.thumbnail || '';
-                document.getElementById('course-is-premium').checked = course.is_premium;
-                
-                document.getElementById('modules-container').innerHTML = '';
-                if (data.modules) {
-                    data.modules.forEach(module => addModuleField(module));
-                }
-                
-                document.getElementById('course-modal-title').textContent = 'Edit Course';
-                document.getElementById('course-submit-btn').textContent = 'Update Course';
-                document.getElementById('course-modal').classList.add('show');
-            } catch (error) {
-                showToast('Failed to load course', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function deleteCourse(courseId) {
-            if (!confirm('Are you sure you want to delete this course?')) return;
-            
-            try {
-                const response = await api.delete(`/admin/courses/${courseId}`);
-                if (response.ok) {
-                    showToast('Course deleted', 'success');
-                    loadAdminCourses(adminCoursesPage);
-                }
-            } catch (error) {
-                showToast('Error deleting course', 'error');
-            }
-        }
-
-        // ==========================================
-        // QUIZ MANAGEMENT
-        // ==========================================
-        async function loadQuizCourses() {
-            try {
-                const response = await api.get('/admin/courses?limit=100');
-                if (!response.ok) throw new Error('Failed to load courses');
-                
-                const data = await response.json();
-                const select = document.getElementById('quiz-course-select');
-                
-                select.innerHTML = '<option value="">Select a course...</option>' + 
-                    data.courses.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
-                
-                // Also load quiz list for first course if exists
-                if (data.courses.length > 0) {
-                    loadCourseQuizzes(data.courses[0].id);
-                }
-            } catch (error) {
-                console.error('Error loading quiz courses:', error);
-            }
-        }
-
-        async function loadCourseQuizzes(courseId) {
-            try {
-                const response = await api.get(`/admin/courses/${courseId}/quizzes`);
-                if (!response.ok) throw new Error('Failed to load quizzes');
-                
-                const data = await response.json();
-                const container = document.getElementById('admin-quizzes-list');
-                
-                if (!data.quizzes || data.quizzes.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No quizzes for this course</p>';
-                } else {
-                    container.innerHTML = data.quizzes.map(quiz => `
-                        <div class="course-list-item">
-                            <div>
-                                <h4 style="margin-bottom: 4px;">${quiz.title}</h4>
-                                <div style="font-size: 14px; color: var(--text-secondary);">
-                                    Passing: ${quiz.passing_score}% • ${quiz.question_count || 0} questions
-                                </div>
-                            </div>
-                            <div class="action-btns">
-                                <button class="action-btn" onclick="editQuiz(${quiz.id})" title="Edit">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="action-btn delete" onclick="deleteQuiz(${quiz.id})" title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; gap: 24px; font-size: 13px; color: var(--text-secondary);">
+                            <span><i class="fas fa-clock"></i> ${course.duration_hours || 0} hrs</span>
+                            <span><i class="fas fa-list"></i> ${course.module_count} modules</span>
+                            <span><i class="fas fa-question-circle"></i> ${course.quiz_count} quizzes</span>
                         </div>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Error loading quizzes:', error);
-            }
-        }
-
-        function openQuizModal() {
-            document.getElementById('quiz-form').reset();
-            document.getElementById('questions-container').innerHTML = '';
-            document.getElementById('quiz-modal-title').textContent = 'Create Quiz';
-            document.getElementById('quiz-form').dataset.quizId = '';
-            loadQuizCourses();
-            document.getElementById('quiz-modal').classList.add('show');
-        }
-
-        function addQuestionField(question = null) {
-            const container = document.getElementById('questions-container');
-            const div = document.createElement('div');
-            div.className = 'content-card';
-            div.style.marginBottom = '12px';
-            div.innerHTML = `
-                <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-                    <input type="text" placeholder="Question text" class="form-input question-text" value="${question?.question_text || ''}" required>
-                    <select class="form-input question-type" style="width: 150px;">
-                        <option value="multiple_choice" ${question?.question_type === 'multiple_choice' ? 'selected' : ''}>Multiple Choice</option>
-                        <option value="true_false" ${question?.question_type === 'true_false' ? 'selected' : ''}>True/False</option>
-                    </select>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.parentElement.remove()" style="width: auto;">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <input type="text" placeholder="Options (comma separated for multiple choice)" class="form-input question-options" value="${question?.options?.join(', ') || ''}" style="margin-bottom: 12px;">
-                <input type="text" placeholder="Correct Answer" class="form-input question-answer" value="${question?.correct_answer || ''}" required>
-            `;
-            container.appendChild(div);
-        }
-
-        async function submitQuiz() {
-            const courseId = document.getElementById('quiz-course-select').value;
-            const title = document.getElementById('quiz-title').value;
-            
-            if (!courseId || !title) {
-                showToast('Course and title are required', 'error');
-                return;
-            }
-
-            const questions = [];
-            document.querySelectorAll('#questions-container > div').forEach(div => {
-                const type = div.querySelector('.question-type').value;
-                const optionsText = div.querySelector('.question-options').value;
-                questions.push({
-                    question_text: div.querySelector('.question-text').value,
-                    question_type: type,
-                    options: type === 'multiple_choice' ? optionsText.split(',').map(o => o.trim()) : ['True', 'False'],
-                    correct_answer: div.querySelector('.question-answer').value,
-                    points: 1
-                });
-            });
-
-            const data = {
-                course_id: parseInt(courseId),
-                title: title,
-                description: document.getElementById('quiz-description').value,
-                passing_score: parseInt(document.getElementById('quiz-passing-score').value),
-                questions: questions
-            };
-
-            try {
-                showLoading(true, 'Creating quiz...');
-                const response = await api.post('/admin/quizzes', data);
-                
-                if (response.ok) {
-                    showToast('Quiz created!', 'success');
-                    closeModal('quiz-modal');
-                    loadCourseQuizzes(courseId);
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to create quiz');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function editQuiz(quizId) {
-            try {
-                showLoading(true, 'Loading quiz...');
-                const response = await api.get(`/admin/quizzes/${quizId}`);
-                if (!response.ok) throw new Error('Failed to load quiz');
-                
-                const data = await response.json();
-                const quiz = data.quiz;
-                
-                document.getElementById('quiz-course-select').value = quiz.course_id;
-                document.getElementById('quiz-title').value = quiz.title;
-                document.getElementById('quiz-description').value = quiz.description || '';
-                document.getElementById('quiz-passing-score').value = quiz.passing_score || 70;
-                document.getElementById('quiz-form').dataset.quizId = quizId;
-                
-                document.getElementById('questions-container').innerHTML = '';
-                if (data.questions) {
-                    data.questions.forEach(q => addQuestionField(q));
-                }
-                
-                document.getElementById('quiz-modal-title').textContent = 'Edit Quiz';
-                document.getElementById('quiz-modal').classList.add('show');
-            } catch (error) {
-                showToast('Failed to load quiz', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function updateQuiz() {
-            const quizId = document.getElementById('quiz-form').dataset.quizId;
-            if (!quizId) return submitQuiz();
-            
-            const title = document.getElementById('quiz-title').value;
-            if (!title) {
-                showToast('Quiz title is required', 'error');
-                return;
-            }
-            
-            const data = {
-                title: title,
-                description: document.getElementById('quiz-description').value,
-                passing_score: parseInt(document.getElementById('quiz-passing-score').value) || 70
-            };
-            
-            try {
-                showLoading(true, 'Updating quiz...');
-                const response = await api.put(`/admin/quizzes/${quizId}`, data);
-                
-                if (response.ok) {
-                    showToast('Quiz updated!', 'success');
-                    closeModal('quiz-modal');
-                    const courseSelect = document.getElementById('quiz-course-select');
-                    if (courseSelect && courseSelect.value) {
-                        loadCourseQuizzes(courseSelect.value);
-                    }
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to update quiz');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function deleteQuiz(quizId) {
-            if (!confirm('Are you sure you want to delete this quiz?')) return;
-            
-            try {
-                const response = await api.delete(`/admin/quizzes/${quizId}`);
-                if (response.ok) {
-                    showToast('Quiz deleted', 'success');
-                    const courseSelect = document.getElementById('quiz-course-select');
-                    if (courseSelect && courseSelect.value) {
-                        loadCourseQuizzes(courseSelect.value);
-                    }
-                }
-            } catch (error) {
-                showToast('Error deleting quiz', 'error');
-            }
-        }
-
-        async function takeQuiz(courseId, quizId) {
-            try {
-                showLoading(true, 'Loading quiz...');
-                const response = await api.get(`/courses/${courseId}/quiz/${quizId}`);
-                if (!response.ok) throw new Error('Failed to load quiz');
-                
-                const data = await response.json();
-                
-                document.getElementById('quiz-subtitle').textContent = data.quiz.title;
-                const container = document.getElementById('quiz-container');
-                
-                container.innerHTML = `
-                    <form id="quiz-taking-form" data-quiz-id="${quizId}">
-                        ${data.questions.map((q, idx) => `
-                            <div class="question-card">
-                                <h4>Question ${idx + 1}: ${q.question_text}</h4>
-                                ${q.options.map(opt => `
-                                    <div class="question-option" onclick="selectOption(this, '${q.id}', '${opt}')">
-                                        ${opt}
-                                    </div>
-                                `).join('')}
-                                <input type="hidden" name="question_${q.id}" id="answer-${q.id}" required>
-                            </div>
-                        `).join('')}
-                        <button type="submit" class="btn btn-lg">Submit Quiz</button>
-                    </form>
-                `;
-                
-                document.getElementById('quiz-taking-form').onsubmit = submitQuizAttempt;
-                showSection('quiz', null);
-            } catch (error) {
-                showToast('Failed to load quiz', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function selectOption(element, questionId, value) {
-            const card = element.closest('.question-card');
-            card.querySelectorAll('.question-option').forEach(opt => opt.classList.remove('selected'));
-            element.classList.add('selected');
-            document.getElementById(`answer-${questionId}`).value = value;
-        }
-
-        async function submitQuizAttempt(e) {
-            e.preventDefault();
-            const quizId = e.target.dataset.quizId;
-            const formData = new FormData(e.target);
-            const answers = {};
-            
-            for (let [key, value] of formData.entries()) {
-                const questionId = key.replace('question_', '');
-                answers[questionId] = value;
-            }
-            
-            try {
-                showLoading(true, 'Submitting...');
-                const response = await api.post(`/quiz/${quizId}/submit`, { answers });
-                const result = await response.json();
-                
-                if (result.passed) {
-                    showToast(`Congratulations! You scored ${result.percentage}%`, 'success');
-                } else {
-                    showToast(`You scored ${result.percentage}%. Passing score is ${result.passing_score}%`, 'error');
-                }
-                
-                showSection('courses', document.querySelectorAll('.nav-link')[6]);
-            } catch (error) {
-                showToast('Failed to submit quiz', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        // ==========================================
-        // WEBINAR MANAGEMENT - FIXED (No recording_link)
-        // ==========================================
-        async function loadWebinars() {
-            try {
-                const response = await api.get('/webinars?upcoming=true&limit=20');
-                const webinars = await response.json();
-                const container = document.getElementById('webinars-grid');
-                
-                if (!webinars || webinars.length === 0) {
-                    container.innerHTML = '<div class="content-card"><p style="text-align: center;">No upcoming webinars</p></div>';
-                    return;
-                }
-
-                container.innerHTML = webinars.map(w => `
-                    <div class="content-card">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
-                            <div>
-                                <h3>${w.title}</h3>
-                                <p style="color: var(--text-secondary); margin-top: 8px;">${w.description || ''}</p>
-                            </div>
-                            ${w.is_premium ? '<span class="premium-badge" style="position: static;">PRO</span>' : ''}
-                        </div>
-                        <div style="display: flex; gap: 16px; margin: 16px 0; font-size: 14px; color: var(--text-secondary);">
-                            <span><i class="fas fa-calendar"></i> ${formatDateTime(w.scheduled_at)}</span>
-                            <span><i class="fas fa-clock"></i> ${w.duration_minutes} min</span>
-                        </div>
-                        ${w.meeting_link ? `<a href="${w.meeting_link}" target="_blank" class="btn btn-sm" style="width: 100%;"><i class="fas fa-video"></i> Join Webinar</a>` : ''}
                     </div>
                 `).join('');
-            } catch (error) {
-                console.error('Error loading webinars:', error);
             }
+            
+            const pagination = document.getElementById('courses-pagination');
+            if (data.pages > 1) {
+                let pagesHtml = '';
+                for (let i = 1; i <= data.pages; i++) {
+                    pagesHtml += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="loadAdminCourses(${i})">${i}</button>`;
+                }
+                pagination.innerHTML = pagesHtml;
+            } else {
+                pagination.innerHTML = '';
+            }
+        } catch (error) {
+            console.error('Error loading admin courses:', error);
+        }
+    }
+
+    function openCourseModal() {
+        editingCourseId = null;
+        document.getElementById('course-form').reset();
+        document.getElementById('edit-course-id').value = '';
+        document.getElementById('course-modal-title').textContent = 'Create Course';
+        document.getElementById('course-submit-btn').textContent = 'Create Course';
+        document.getElementById('modules-container').innerHTML = '';
+        document.getElementById('course-modal').classList.add('show');
+    }
+
+    async function editCourse(courseId) {
+        try {
+            showLoading(true, 'Loading course...');
+            const response = await api.get(`/admin/courses/${courseId}`);
+            if (!response.ok) throw new Error('Failed to load course');
+            
+            const data = await response.json();
+            const course = data.course;
+            
+            editingCourseId = courseId;
+            document.getElementById('edit-course-id').value = courseId;
+            document.getElementById('course-title').value = course.title;
+            document.getElementById('course-description').value = course.description;
+            document.getElementById('course-content').value = course.content;
+            document.getElementById('course-level-select').value = course.level;
+            document.getElementById('course-duration').value = course.duration_hours || '';
+            document.getElementById('course-thumbnail-input').value = course.thumbnail || '';
+            document.getElementById('course-is-premium').checked = course.is_premium;
+            
+            // Load modules
+            const modulesContainer = document.getElementById('modules-container');
+            if (data.modules && data.modules.length > 0) {
+                modulesContainer.innerHTML = data.modules.map((m, idx) => `
+                    <div class="module-field" style="padding: 16px; background: var(--bg-card); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <strong>Module ${idx + 1}</strong>
+                            <button type="button" class="action-btn delete" onclick="this.parentElement.parentElement.remove()">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        <input type="text" class="form-input module-title" placeholder="Module Title" value="${m.title}" style="margin-bottom: 8px;">
+                        <textarea class="form-textarea module-content" placeholder="Content" rows="2" style="margin-bottom: 8px;">${m.content || ''}</textarea>
+                        <input type="text" class="form-input module-video" placeholder="Video URL (optional)" value="${m.video_url || ''}">
+                        <label style="display: flex; align-items: center; margin-top: 8px; cursor: pointer;">
+                            <input type="checkbox" class="module-premium" ${m.is_premium ? 'checked' : ''} style="margin-right: 8px;">
+                            Premium Module
+                        </label>
+                    </div>
+                `).join('');
+            } else {
+                modulesContainer.innerHTML = '';
+            }
+            
+            document.getElementById('course-modal-title').textContent = 'Edit Course';
+            document.getElementById('course-submit-btn').textContent = 'Update Course';
+            document.getElementById('course-modal').classList.add('show');
+        } catch (error) {
+            showToast('Failed to load course', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function addModuleField() {
+        const container = document.getElementById('modules-container');
+        const count = container.children.length + 1;
+        
+        const div = document.createElement('div');
+        div.className = 'module-field';
+        div.style.cssText = 'padding: 16px; background: var(--bg-card); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border);';
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <strong>Module ${count}</strong>
+                <button type="button" class="action-btn delete" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <input type="text" class="form-input module-title" placeholder="Module Title" style="margin-bottom: 8px;" required>
+            <textarea class="form-textarea module-content" placeholder="Content" rows="2" style="margin-bottom: 8px;"></textarea>
+            <input type="text" class="form-input module-video" placeholder="Video URL (optional)">
+            <label style="display: flex; align-items: center; margin-top: 8px; cursor: pointer;">
+                <input type="checkbox" class="module-premium" style="margin-right: 8px;">
+                Premium Module
+            </label>
+        `;
+        container.appendChild(div);
+    }
+
+    async function submitCourse() {
+        const modules = [];
+        document.querySelectorAll('.module-field').forEach(field => {
+            modules.push({
+                title: field.querySelector('.module-title').value,
+                content: field.querySelector('.module-content').value,
+                video_url: field.querySelector('.module-video').value,
+                is_premium: field.querySelector('.module-premium').checked
+            });
+        });
+
+        const data = {
+            title: document.getElementById('course-title').value,
+            description: document.getElementById('course-description').value,
+            content: document.getElementById('course-content').value,
+            level: document.getElementById('course-level-select').value,
+            duration_hours: parseFloat(document.getElementById('course-duration').value) || null,
+            thumbnail: document.getElementById('course-thumbnail-input').value,
+            is_premium: document.getElementById('course-is-premium').checked,
+            modules: modules
+        };
+
+        if (!data.title || !data.description) {
+            showToast('Title and description are required', 'error');
+            return;
         }
 
-        async function loadAdminWebinars() {
-            try {
-                const response = await api.get('/webinars?upcoming=false&limit=50');
-                const webinars = await response.json();
-                const container = document.getElementById('admin-webinars-list');
-                
-                if (!webinars || webinars.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><i class="fas fa-video"></i><p>No webinars found</p></div>';
-                    return;
-                }
+        try {
+            showLoading(true, editingCourseId ? 'Updating...' : 'Creating...');
+            const url = editingCourseId ? `/admin/courses/${editingCourseId}` : '/admin/courses';
+            const method = editingCourseId ? 'PUT' : 'POST';
+            
+            const response = await api.request(url, method, data);
+            
+            if (response.ok) {
+                showToast(editingCourseId ? 'Course updated' : 'Course created', 'success');
+                closeModal('course-modal');
+                loadAdminCourses(adminCoursesPage);
+                loadCourses();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save course');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
 
-                container.innerHTML = webinars.map(w => `
-                    <div class="course-list-item">
+    async function deleteCourse(courseId) {
+        if (!confirm('Delete this course and all its modules?')) return;
+        
+        try {
+            showLoading(true, 'Deleting...');
+            const response = await api.delete(`/admin/courses/${courseId}`);
+            
+            if (response.ok) {
+                showToast('Course deleted', 'success');
+                loadAdminCourses(adminCoursesPage);
+                loadCourses();
+            } else {
+                throw new Error('Failed to delete');
+            }
+        } catch (error) {
+            showToast('Error deleting course', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // ==========================================
+    // QUIZ MANAGEMENT
+    // ==========================================
+    async function loadQuizCourses() {
+        try {
+            const response = await api.get('/courses?limit=50');
+            const courses = await response.json();
+            
+            const select = document.getElementById('quiz-course-select');
+            select.innerHTML = '<option value="">Select a course...</option>' + 
+                courses.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
+        } catch (error) {
+            console.error('Error loading courses for quiz:', error);
+        }
+    }
+
+    function openQuizModal() {
+        document.getElementById('quiz-form').reset();
+        document.getElementById('questions-container').innerHTML = '';
+        loadQuizCourses();
+        document.getElementById('quiz-modal').classList.add('show');
+    }
+
+    function addQuestionField() {
+        const container = document.getElementById('questions-container');
+        const count = container.children.length + 1;
+        
+        const div = document.createElement('div');
+        div.style.cssText = 'padding: 16px; background: var(--bg-card); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border);';
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <strong>Question ${count}</strong>
+                <button type="button" class="action-btn delete" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <input type="text" class="form-input question-text" placeholder="Question text" style="margin-bottom: 8px;" required>
+            <select class="form-input question-type" style="margin-bottom: 8px;">
+                <option value="multiple_choice">Multiple Choice</option>
+                <option value="true_false">True/False</option>
+                <option value="text">Text Answer</option>
+            </select>
+            <input type="text" class="form-input question-options" placeholder="Options (comma separated) - for multiple choice only" style="margin-bottom: 8px;">
+            <input type="text" class="form-input question-answer" placeholder="Correct Answer" style="margin-bottom: 8px;" required>
+            <input type="number" class="form-input question-points" placeholder="Points" value="1" min="1" style="width: 100px;">
+        `;
+        container.appendChild(div);
+    }
+
+    async function submitQuiz() {
+        const questions = [];
+        document.querySelectorAll('#questions-container > div').forEach(field => {
+            const type = field.querySelector('.question-type').value;
+            const options = field.querySelector('.question-options').value.split(',').map(s => s.trim()).filter(s => s);
+            
+            questions.push({
+                question_text: field.querySelector('.question-text').value,
+                question_type: type,
+                options: type === 'multiple_choice' ? options : [],
+                correct_answer: field.querySelector('.question-answer').value,
+                points: parseInt(field.querySelector('.question-points').value) || 1
+            });
+        });
+
+        const data = {
+            course_id: parseInt(document.getElementById('quiz-course-select').value),
+            title: document.getElementById('quiz-title').value,
+            description: document.getElementById('quiz-description').value,
+            passing_score: parseInt(document.getElementById('quiz-passing-score').value) || 70,
+            questions: questions
+        };
+
+        if (!data.course_id || !data.title) {
+            showToast('Course and title are required', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true, 'Creating quiz...');
+            const response = await api.post('/admin/quizzes', data);
+            
+            if (response.ok) {
+                showToast('Quiz created', 'success');
+                closeModal('quiz-modal');
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to create quiz');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function startQuiz(courseId, quizId) {
+        try {
+            showLoading(true, 'Loading quiz...');
+            const response = await api.get(`/courses/${courseId}/quiz/${quizId}`);
+            if (!response.ok) throw new Error('Failed to load quiz');
+            
+            const data = await response.json();
+            
+            document.getElementById('quiz-subtitle').textContent = data.quiz.title;
+            const container = document.getElementById('quiz-container');
+            
+            container.innerHTML = `
+                <form id="quiz-attempt-form" onsubmit="submitQuizAttempt(event, ${quizId})">
+                    ${data.questions.map((q, idx) => `
+                        <div class="content-card" style="margin-bottom: 16px;">
+                            <div style="font-weight: 600; margin-bottom: 12px;">
+                                ${idx + 1}. ${q.question_text} 
+                                <span style="color: var(--text-secondary); font-size: 13px;">(${q.points} pts)</span>
+                            </div>
+                            ${q.question_type === 'multiple_choice' ? `
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    ${q.options.map((opt, optIdx) => `
+                                        <label style="display: flex; align-items: center; padding: 12px; background: var(--bg-hover); border-radius: 8px; cursor: pointer;">
+                                            <input type="radio" name="q-${q.id}" value="${opt}" style="margin-right: 12px;" required>
+                                            ${opt}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            ` : q.question_type === 'true_false' ? `
+                                <div style="display: flex; gap: 12px;">
+                                    <label style="flex: 1; padding: 12px; background: var(--bg-hover); border-radius: 8px; text-align: center; cursor: pointer;">
+                                        <input type="radio" name="q-${q.id}" value="true" style="margin-right: 8px;"> True
+                                    </label>
+                                    <label style="flex: 1; padding: 12px; background: var(--bg-hover); border-radius: 8px; text-align: center; cursor: pointer;">
+                                        <input type="radio" name="q-${q.id}" value="false" style="margin-right: 8px;"> False
+                                    </label>
+                                </div>
+                            ` : `
+                                <input type="text" class="form-input" name="q-${q.id}" placeholder="Your answer" required>
+                            `}
+                        </div>
+                    `).join('')}
+                    <button type="submit" class="btn btn-lg" style="width: 100%;">Submit Quiz</button>
+                </form>
+            `;
+            
+            showSection('quiz', null);
+        } catch (error) {
+            showToast('Failed to load quiz', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function submitQuizAttempt(e, quizId) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const answers = {};
+        
+        for (let [key, value] of formData.entries()) {
+            const questionId = key.replace('q-', '');
+            answers[questionId] = value;
+        }
+
+        try {
+            showLoading(true, 'Submitting...');
+            const response = await api.post(`/quiz/${quizId}/submit`, { quiz_id: quizId, answers });
+            const result = await response.json();
+            
+            if (response.ok) {
+                const container = document.getElementById('quiz-container');
+                container.innerHTML = `
+                    <div class="content-card" style="text-align: center; padding: 40px;">
+                        <div style="font-size: 64px; margin-bottom: 20px;">
+                            ${result.passed ? '✅' : '❌'}
+                        </div>
+                        <h2>${result.passed ? 'Congratulations!' : 'Keep Learning'}</h2>
+                        <p style="font-size: 48px; font-weight: 700; color: ${result.passed ? 'var(--success)' : 'var(--danger)'}; margin: 20px 0;">
+                            ${result.percentage}%
+                        </p>
+                        <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                            Score: ${result.score}/${result.max_score}
+                        </p>
+                        ${result.passed ? 
+                            '<p style="color: var(--success);"><i class="fas fa-check-circle"></i> You passed!</p>' : 
+                            `<p style="color: var(--danger);">Passing score: ${result.passing_score}%</p>`
+                        }
+                        <button class="btn btn-secondary" onclick="showSection('courses', document.querySelectorAll('.nav-link')[6])" style="margin-top: 20px;">
+                            Back to Courses
+                        </button>
+                    </div>
+                `;
+            } else {
+                throw new Error('Submission failed');
+            }
+        } catch (error) {
+            showToast('Error submitting quiz', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // ==========================================
+    // WEBINAR MANAGEMENT
+    // ==========================================
+    async function loadWebinars() {
+        try {
+            const response = await api.get('/webinars?upcoming=true&limit=20');
+            const data = await response.json();
+            const container = document.getElementById('webinars-grid');
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="content-card"><p style="text-align: center;">No upcoming webinars</p></div>';
+                return;
+            }
+
+            container.innerHTML = data.map(webinar => `
+                <div class="content-card">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                        <span class="status-badge status-upcoming">Upcoming</span>
+                        ${webinar.is_premium ? '<span class="premium-badge" style="position: static;">VIP</span>' : ''}
+                    </div>
+                    <h3>${webinar.title}</h3>
+                    <p style="color: var(--text-secondary); margin: 12px 0;">${webinar.description}</p>
+                    <div style="background: var(--bg-hover); padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 14px;">
+                        <div style="margin-bottom: 8px;"><i class="fas fa-calendar" style="color: var(--primary); width: 20px;"></i> ${formatDateTime(webinar.scheduled_at)}</div>
+                        <div style="margin-bottom: 8px;"><i class="fas fa-clock" style="color: var(--primary); width: 20px;"></i> ${webinar.duration_minutes} minutes</div>
+                        <div><i class="fas fa-users" style="color: var(--primary); width: 20px;"></i> Max ${webinar.max_participants} participants</div>
+                    </div>
+                    <button class="btn" onclick="window.open('${webinar.meeting_link}', '_blank')" ${webinar.is_premium ? 'disabled' : ''}>
+                        ${webinar.is_premium ? 'VIP Only' : 'Join Webinar'}
+                    </button>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading webinars:', error);
+        }
+    }
+
+    async function loadAdminWebinars() {
+        try {
+            const response = await api.get('/webinars?upcoming=false&limit=50');
+            const data = await response.json();
+            const container = document.getElementById('admin-webinars-list');
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No webinars found</p>';
+                return;
+            }
+
+            container.innerHTML = data.map(webinar => `
+                <div style="padding: 20px; background: var(--bg-hover); border-radius: 12px; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px;">
                         <div>
-                            <h4 style="margin-bottom: 4px;">${w.title}</h4>
-                            <div style="font-size: 14px; color: var(--text-secondary);">
-                                ${formatDateTime(w.scheduled_at)} • ${w.duration_minutes} min • ${w.is_premium ? '<span style="color: var(--premium);">Premium</span>' : 'Free'}
+                            <h4 style="margin-bottom: 4px;">${webinar.title}</h4>
+                            <small style="color: var(--text-secondary);">${formatDateTime(webinar.scheduled_at)} • ${webinar.duration_minutes} mins</small>
+                            <div style="margin-top: 8px; display: flex; gap: 8px;">
+                                ${webinar.is_premium ? '<span class="premium-badge" style="position: static;">VIP</span>' : ''}
+                                <span class="status-badge">${new Date(webinar.scheduled_at) > new Date() ? 'Upcoming' : 'Past'}</span>
                             </div>
                         </div>
                         <div class="action-btns">
-                            <button class="action-btn" onclick="editWebinar(${w.id})" title="Edit">
+                            <button class="action-btn" onclick="editWebinar(${webinar.id})" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="action-btn delete" onclick="deleteWebinar(${w.id})" title="Delete">
+                            <button class="action-btn delete" onclick="deleteWebinar(${webinar.id})" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
                     </div>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading admin webinars:', error);
-            }
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading admin webinars:', error);
         }
+    }
 
-        function openWebinarModal() {
-            editingWebinarId = null;
-            document.getElementById('webinar-form').reset();
-            document.getElementById('webinar-modal-title').textContent = 'Create Webinar';
-            document.getElementById('webinar-submit-btn').textContent = 'Create Webinar';
-            document.getElementById('edit-webinar-id').value = '';
-            document.getElementById('webinar-modal').classList.add('show');
-        }
+    function openWebinarModal() {
+        editingWebinarId = null;
+        document.getElementById('webinar-form').reset();
+        document.getElementById('edit-webinar-id').value = '';
+        document.getElementById('webinar-modal-title').textContent = 'Create Webinar';
+        document.getElementById('webinar-submit-btn').textContent = 'Create Webinar';
+        document.getElementById('webinar-modal').classList.add('show');
+    }
 
-        async function editWebinar(webinarId) {
-            try {
-                showLoading(true, 'Loading webinar...');
-                const response = await api.get(`/webinars/${webinarId}`);
-                if (!response.ok) throw new Error('Failed to load webinar');
-                
-                const w = await response.json();
-                editingWebinarId = w.id;
-                
-                document.getElementById('webinar-title').value = w.title;
-                document.getElementById('webinar-description').value = w.description || '';
-                document.getElementById('webinar-meeting-link').value = w.meeting_link || '';
-                document.getElementById('webinar-duration').value = w.duration_minutes || 60;
-                document.getElementById('webinar-max-participants').value = w.max_participants || 100;
-                document.getElementById('webinar-is-premium').checked = w.is_premium || false;
-                document.getElementById('webinar-reminder').value = w.reminder_message || '';
-                
-                if (w.scheduled_at) {
-                    const date = new Date(w.scheduled_at);
-                    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-                    document.getElementById('webinar-scheduled-at').value = date.toISOString().slice(0, 16);
-                }
-                
-                document.getElementById('webinar-modal-title').textContent = 'Edit Webinar';
-                document.getElementById('webinar-submit-btn').textContent = 'Update Webinar';
-                document.getElementById('edit-webinar-id').value = w.id;
-                document.getElementById('webinar-modal').classList.add('show');
-            } catch (error) {
-                showToast('Failed to load webinar', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function submitWebinar() {
-            const title = document.getElementById('webinar-title').value;
-            const scheduledAt = document.getElementById('webinar-scheduled-at').value;
-            const meetingLink = document.getElementById('webinar-meeting-link').value;
+    async function editWebinar(webinarId) {
+        try {
+            const response = await api.get(`/webinars/${webinarId}`);
+            if (!response.ok) throw new Error('Failed to load webinar');
             
-            if (!title || !scheduledAt || !meetingLink) {
-                showToast('Please fill in all required fields', 'error');
+            const webinar = await response.json();
+            
+            editingWebinarId = webinarId;
+            document.getElementById('edit-webinar-id').value = webinarId;
+            document.getElementById('webinar-title').value = webinar.title;
+            document.getElementById('webinar-description').value = webinar.description;
+            
+            const date = new Date(webinar.scheduled_at);
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            document.getElementById('webinar-scheduled-at').value = date.toISOString().slice(0, 16);
+            
+            document.getElementById('webinar-duration').value = webinar.duration_minutes;
+            document.getElementById('webinar-meeting-link').value = webinar.meeting_link;
+            document.getElementById('webinar-max-participants').value = webinar.max_participants;
+            document.getElementById('webinar-reminder').value = webinar.reminder_message || '';
+            document.getElementById('webinar-is-premium').checked = webinar.is_premium;
+            
+            document.getElementById('webinar-modal-title').textContent = 'Edit Webinar';
+            document.getElementById('webinar-submit-btn').textContent = 'Update Webinar';
+            document.getElementById('webinar-modal').classList.add('show');
+        } catch (error) {
+            showToast('Failed to load webinar', 'error');
+        }
+    }
+
+    async function submitWebinar() {
+        const data = {
+            title: document.getElementById('webinar-title').value,
+            description: document.getElementById('webinar-description').value,
+            scheduled_at: document.getElementById('webinar-scheduled-at').value,
+            duration_minutes: parseInt(document.getElementById('webinar-duration').value),
+            meeting_link: document.getElementById('webinar-meeting-link').value,
+            max_participants: parseInt(document.getElementById('webinar-max-participants').value),
+            reminder_message: document.getElementById('webinar-reminder').value,
+            is_premium: document.getElementById('webinar-is-premium').checked
+        };
+
+        if (!data.title || !data.scheduled_at || !data.meeting_link) {
+            showToast('Please fill all required fields', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true, editingWebinarId ? 'Updating...' : 'Creating...');
+            const url = editingWebinarId ? `/admin/webinars/${editingWebinarId}` : '/admin/webinars';
+            const method = editingWebinarId ? 'PUT' : 'POST';
+            
+            const response = await api.request(url, method, data);
+            
+            if (response.ok) {
+                showToast(editingWebinarId ? 'Webinar updated' : 'Webinar created', 'success');
+                closeModal('webinar-modal');
+                loadAdminWebinars();
+                loadWebinars();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save webinar');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    async function deleteWebinar(webinarId) {
+        if (!confirm('Delete this webinar?')) return;
+        
+        try {
+            showLoading(true, 'Deleting...');
+            const response = await api.delete(`/admin/webinars/${webinarId}`);
+            
+            if (response.ok) {
+                showToast('Webinar deleted', 'success');
+                loadAdminWebinars();
+                loadWebinars();
+            } else {
+                throw new Error('Failed to delete');
+            }
+        } catch (error) {
+            showToast('Error deleting webinar', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // ==========================================
+    // SIGNAL MANAGEMENT
+    // ==========================================
+    async function loadSignals() {
+        try {
+            const filter = document.getElementById('signal-filter')?.value || '';
+            let url = '/signals?limit=50';
+            if (filter) url += `&pair=${filter}`;
+            
+            const response = await api.get(url);
+            const data = await response.json();
+            const tbody = document.getElementById('signals-table-body');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No signals available</td></tr>';
                 return;
             }
 
-            // recording_link REMOVED - not included in data
-            const data = {
-                title: title,
-                description: document.getElementById('webinar-description').value,
-                scheduled_at: new Date(scheduledAt).toISOString(),
-                duration_minutes: parseInt(document.getElementById('webinar-duration').value) || 60,
-                meeting_link: meetingLink,
-                is_premium: document.getElementById('webinar-is-premium').checked,
-                max_participants: parseInt(document.getElementById('webinar-max-participants').value) || 100,
-                reminder_message: document.getElementById('webinar-reminder').value || null
-            };
+            tbody.innerHTML = data.map(signal => `
+                <tr>
+                    <td><strong>${signal.pair}</strong></td>
+                    <td>
+                        <span style="color: ${signal.direction === 'buy' ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">
+                            ${signal.direction.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${signal.entry_price}</td>
+                    <td>
+                        <div>SL: ${signal.stop_loss || '-'}</div>
+                        <div>TP1: ${signal.tp1 || '-'}</div>
+                        <div>TP2: ${signal.tp2 || '-'}</div>
+                    </td>
+                    <td>${signal.timeframe}</td>
+                    <td>
+                        <span class="status-badge status-${signal.status}">${signal.status}</span>
+                        ${signal.result ? `<span class="status-badge" style="background: ${signal.result === 'WIN' ? 'rgba(16, 185, 129, 0.2)' : signal.result === 'LOSS' ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)'}; color: ${signal.result === 'WIN' ? 'var(--success)' : signal.result === 'LOSS' ? 'var(--danger)' : 'var(--text-secondary)'};">${signal.result}</span>` : ''}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm" onclick="viewSignalDetails(${signal.id})">View</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading signals:', error);
+        }
+    }
 
-            try {
-                showLoading(true, editingWebinarId ? 'Updating...' : 'Creating...');
-                
-                const url = editingWebinarId ? `/admin/webinars/${editingWebinarId}` : '/admin/webinars';
-                const method = editingWebinarId ? 'PUT' : 'POST';
-                
-                const response = await api.request(url, method, data);
-                
-                if (response.ok) {
-                    showToast(editingWebinarId ? 'Webinar updated!' : 'Webinar created!', 'success');
-                    closeModal('webinar-modal');
-                    loadAdminWebinars();
-                    if (!editingWebinarId) loadWebinars();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to save webinar');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
+    async function loadAdminSignals() {
+        try {
+            const response = await api.get('/admin/signals?limit=50');
+            const data = await response.json();
+            const tbody = document.getElementById('admin-signals-table-body');
+            
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No signals found</td></tr>';
+                return;
             }
+
+            tbody.innerHTML = data.map(signal => `
+                <tr>
+                    <td>${signal.pair}</td>
+                    <td style="color: ${signal.direction === 'buy' ? 'var(--success)' : 'var(--danger)'};">
+                        ${signal.direction.toUpperCase()}
+                    </td>
+                    <td>${signal.entry_price}</td>
+                    <td>
+                        <span class="status-badge status-${signal.status}">${signal.status}</span>
+                    </td>
+                    <td>
+                        ${signal.result ? `<span class="status-badge" style="background: ${signal.result === 'WIN' ? 'rgba(16, 185, 129, 0.2)' : signal.result === 'LOSS' ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)'};">${signal.result}</span>` : '-'}
+                    </td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="action-btn" onclick="openResultModal(${signal.id})" title="Set Result" ${signal.status === 'closed' ? '' : ''}>
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                            <button class="action-btn" onclick="editSignal(${signal.id})" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteSignal(${signal.id})" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading admin signals:', error);
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--danger);">Error loading signals</td></tr>';
+        }
+    }
+
+    function openSignalModal() {
+        editingSignalId = null;
+        document.getElementById('signal-form').reset();
+        document.getElementById('edit-signal-id').value = '';
+        document.getElementById('signal-modal-title').textContent = 'Create Signal';
+        document.getElementById('signal-submit-btn').textContent = 'Publish Signal';
+        document.getElementById('signal-modal').classList.add('show');
+    }
+
+    async function editSignal(signalId) {
+        try {
+            const response = await api.get(`/signals/${signalId}`);
+            if (!response.ok) throw new Error('Failed to load signal');
+            
+            const signal = await response.json();
+            
+            editingSignalId = signalId;
+            document.getElementById('edit-signal-id').value = signalId;
+            document.getElementById('signal-pair').value = signal.pair;
+            document.getElementById('signal-direction').value = signal.direction;
+            document.getElementById('signal-entry').value = signal.entry_price;
+            document.getElementById('signal-sl').value = signal.stop_loss || '';
+            document.getElementById('signal-tp1').value = signal.tp1 || '';
+            document.getElementById('signal-tp2').value = signal.tp2 || '';
+            document.getElementById('signal-rr').value = signal.risk_reward_ratio || '';
+            document.getElementById('signal-timeframe').value = signal.timeframe;
+            document.getElementById('signal-analysis').value = signal.analysis || '';
+            document.getElementById('signal-is-premium').checked = signal.is_premium;
+            
+            if (signal.expires_at) {
+                const date = new Date(signal.expires_at);
+                date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+                document.getElementById('signal-expires').value = date.toISOString().slice(0, 16);
+            }
+            
+            document.getElementById('signal-modal-title').textContent = 'Edit Signal';
+            document.getElementById('signal-submit-btn').textContent = 'Update Signal';
+            document.getElementById('signal-modal').classList.add('show');
+        } catch (error) {
+            showToast('Failed to load signal', 'error');
+        }
+    }
+
+    async function submitSignal() {
+        const data = {
+            pair: document.getElementById('signal-pair').value.toUpperCase(),
+            direction: document.getElementById('signal-direction').value,
+            entry_price: parseFloat(document.getElementById('signal-entry').value),
+            stop_loss: parseFloat(document.getElementById('signal-sl').value) || null,
+            tp1: parseFloat(document.getElementById('signal-tp1').value) || null,
+            tp2: parseFloat(document.getElementById('signal-tp2').value) || null,
+            risk_reward_ratio: document.getElementById('signal-rr').value || null,
+            expires_at: document.getElementById('signal-expires').value || null,
+            timeframe: document.getElementById('signal-timeframe').value,
+            analysis: document.getElementById('signal-analysis').value,
+            is_premium: document.getElementById('signal-is-premium').checked
+        };
+
+        if (!data.pair || !data.entry_price) {
+            showToast('Pair and entry price are required', 'error');
+            return;
         }
 
-        async function deleteWebinar(webinarId) {
-            if (!confirm('Are you sure you want to delete this webinar?')) return;
-            try {
-                const response = await api.delete(`/admin/webinars/${webinarId}`);
-                if (response.ok) {
-                    showToast('Webinar deleted', 'success');
-                    loadAdminWebinars();
-                    loadWebinars();
-                }
-            } catch (error) {
-                showToast('Error deleting webinar', 'error');
+        try {
+            showLoading(true, editingSignalId ? 'Updating...' : 'Creating...');
+            const url = editingSignalId ? `/admin/signals/${editingSignalId}` : '/admin/signals';
+            const method = editingSignalId ? 'PUT' : 'POST';
+            
+            const response = await api.request(url, method, data);
+            
+            if (response.ok) {
+                showToast(editingSignalId ? 'Signal updated' : 'Signal created', 'success');
+                closeModal('signal-modal');
+                loadAdminSignals();
+                loadSignals();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save signal');
             }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
         }
+    }
 
-        // ==========================================
-        // SIGNALS MANAGEMENT
-        // ==========================================
-        async function loadSignals() {
-            try {
-                const pair = document.getElementById('signal-filter')?.value || '';
-                let url = '/signals?limit=50';
-                if (pair) url += `&pair=${pair}`;
-                
-                const response = await api.get(url);
-                const signals = await response.json();
-                const tbody = document.getElementById('signals-table-body');
-                
-                if (!signals || signals.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No signals found</td></tr>';
-                    return;
-                }
+    function openResultModal(signalId) {
+        document.getElementById('result-signal-id').value = signalId;
+        document.getElementById('signal-result-form').reset();
+        document.getElementById('signal-result-modal').classList.add('show');
+    }
 
-                tbody.innerHTML = signals.map(s => `
-                    <tr>
-                        <td><strong>${s.pair}</strong></td>
-                        <td><span class="status-badge" style="background: ${s.direction === 'buy' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${s.direction === 'buy' ? 'var(--secondary)' : 'var(--danger)'};">${s.direction.toUpperCase()}</span></td>
-                        <td>${s.entry_price}</td>
-                        <td>SL: ${s.stop_loss || '-'}<br>TP1: ${s.tp1 || '-'}<br>TP2: ${s.tp2 || '-'}</td>
-                        <td>${s.timeframe}</td>
-                        <td><span class="status-badge status-${s.status}">${s.status}</span></td>
-                        <td>
-                            <button class="btn btn-sm" onclick="viewSignal(${s.id})" style="width: auto;">View</button>
-                        </td>
-                    </tr>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading signals:', error);
+    async function submitSignalResult() {
+        const signalId = document.getElementById('result-signal-id').value;
+        const data = {
+            result: document.getElementById('signal-result-value').value,
+            pips_gain_loss: parseFloat(document.getElementById('signal-pips').value) || null
+        };
+
+        try {
+            showLoading(true, 'Updating result...');
+            const response = await api.put(`/admin/signals/${signalId}/result`, data);
+            
+            if (response.ok) {
+                showToast('Result updated', 'success');
+                closeModal('signal-result-modal');
+                loadAdminSignals();
+                loadSignals();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to update');
             }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
         }
+    }
 
-        async function loadAdminSignals() {
-            try {
-                const response = await api.get('/admin/signals?limit=50');
-                const signals = await response.json();
-                const tbody = document.getElementById('admin-signals-table-body');
-                
-                if (!signals || signals.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No signals found</td></tr>';
-                    return;
-                }
+    async function deleteSignal(signalId) {
+        if (!confirm('Delete this signal?')) return;
+        
+        try {
+            showLoading(true, 'Deleting...');
+            const response = await api.delete(`/admin/signals/${signalId}`);
+            
+            if (response.ok) {
+                showToast('Signal deleted', 'success');
+                loadAdminSignals();
+                loadSignals();
+            } else {
+                throw new Error('Failed to delete');
+            }
+        } catch (error) {
+            showToast('Error deleting signal', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
 
-                tbody.innerHTML = signals.map(s => `
-                    <tr>
-                        <td><strong>${s.pair}</strong></td>
-                        <td><span class="status-badge" style="background: ${s.direction === 'buy' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${s.direction === 'buy' ? 'var(--secondary)' : 'var(--danger)'};">${s.direction.toUpperCase()}</span></td>
-                        <td>${s.entry_price}</td>
-                        <td><span class="status-badge status-${s.status}">${s.status}</span></td>
-                        <td>${s.result || '-'}</td>
-                        <td>
-                            <div class="action-btns">
-                                <button class="action-btn" onclick="editSignal(${s.id})" title="Edit">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="action-btn" onclick="openSignalResultModal(${s.id})" title="Update Result">
-                                    <i class="fas fa-check-circle"></i>
-                                </button>
-                                <button class="action-btn delete" onclick="deleteSignal(${s.id})" title="Delete">
+    async function viewSignalDetails(signalId) {
+        try {
+            const response = await api.get(`/signals/${signalId}`);
+            if (!response.ok) throw new Error('Failed to load signal');
+            
+            const signal = await response.json();
+            
+            alert(`
+                Pair: ${signal.pair}
+                Direction: ${signal.direction.toUpperCase()}
+                Entry: ${signal.entry_price}
+                Stop Loss: ${signal.stop_loss || 'N/A'}
+                TP1: ${signal.tp1 || 'N/A'}
+                TP2: ${signal.tp2 || 'N/A'}
+                Timeframe: ${signal.timeframe}
+                Status: ${signal.status}
+                ${signal.analysis ? `\nAnalysis:\n${signal.analysis}` : ''}
+            `);
+        } catch (error) {
+            showToast('Failed to load signal details', 'error');
+        }
+    }
+
+    // ==========================================
+    // MEDIA MANAGEMENT
+    // ==========================================
+    async function loadMediaList() {
+        try {
+            const response = await api.get('/admin/media/list?limit=50');
+            const data = await response.json();
+            const container = document.getElementById('media-list');
+            
+            if (!data.files || data.files.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No files uploaded</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 20px;">
+                    ${data.files.map(file => `
+                        <div style="position: relative; background: var(--bg-hover); border-radius: 8px; overflow: hidden;">
+                            ${file.file_type === 'image' || file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 
+                                `<img src="${file.url}" style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;" onclick="copyMediaUrl('${file.url}')">` :
+                                `<div style="width: 100%; height: 150px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary);"><i class="fas fa-file fa-3x"></i></div>`
+                            }
+                            <div style="padding: 12px; font-size: 12px;">
+                                <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.filename}</div>
+                                <div style="color: var(--text-secondary); margin-top: 4px;">${(file.size_bytes / 1024 / 1024).toFixed(2)} MB</div>
+                                <button class="action-btn delete" onclick="deleteMedia(${file.id})" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.5);">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
-                        </td>
-                    </tr>
-                `).join('');
-            } catch (error) {
-                console.error('Error loading admin signals:', error);
-            }
-        }
-
-        function openSignalModal() {
-            editingSignalId = null;
-            document.getElementById('signal-form').reset();
-            document.getElementById('signal-modal-title').textContent = 'Create Signal';
-            document.getElementById('signal-submit-btn').textContent = 'Publish Signal';
-            document.getElementById('edit-signal-id').value = '';
-            document.getElementById('signal-modal').classList.add('show');
-        }
-
-        async function editSignal(signalId) {
-            try {
-                showLoading(true, 'Loading signal...');
-                const response = await api.get(`/signals/${signalId}`);
-                if (!response.ok) throw new Error('Failed to load signal');
-                
-                const s = await response.json();
-                editingSignalId = signalId;
-                
-                document.getElementById('signal-pair').value = s.pair;
-                document.getElementById('signal-direction').value = s.direction;
-                document.getElementById('signal-entry').value = s.entry_price;
-                document.getElementById('signal-sl').value = s.stop_loss || '';
-                document.getElementById('signal-tp1').value = s.tp1 || '';
-                document.getElementById('signal-tp2').value = s.tp2 || '';
-                document.getElementById('signal-rr').value = s.risk_reward_ratio || '';
-                document.getElementById('signal-timeframe').value = s.timeframe || '1H';
-                document.getElementById('signal-analysis').value = s.analysis || '';
-                document.getElementById('signal-is-premium').checked = s.is_premium;
-                
-                if (s.expires_at) {
-                    const date = new Date(s.expires_at);
-                    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-                    document.getElementById('signal-expires').value = date.toISOString().slice(0, 16);
-                }
-                
-                document.getElementById('signal-modal-title').textContent = 'Edit Signal';
-                document.getElementById('signal-submit-btn').textContent = 'Update Signal';
-                document.getElementById('edit-signal-id').value = s.id;
-                document.getElementById('signal-modal').classList.add('show');
-            } catch (error) {
-                showToast('Failed to load signal', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function submitSignal() {
-            const data = {
-                pair: document.getElementById('signal-pair').value,
-                direction: document.getElementById('signal-direction').value,
-                entry_price: parseFloat(document.getElementById('signal-entry').value),
-                stop_loss: parseFloat(document.getElementById('signal-sl').value) || null,
-                tp1: parseFloat(document.getElementById('signal-tp1').value) || null,
-                tp2: parseFloat(document.getElementById('signal-tp2').value) || null,
-                risk_reward_ratio: document.getElementById('signal-rr').value || null,
-                timeframe: document.getElementById('signal-timeframe').value,
-                analysis: document.getElementById('signal-analysis').value,
-                is_premium: document.getElementById('signal-is-premium').checked,
-                expires_at: document.getElementById('signal-expires').value || null
-            };
-
-            try {
-                showLoading(true, editingSignalId ? 'Updating...' : 'Creating...');
-                const url = editingSignalId ? `/admin/signals/${editingSignalId}` : '/admin/signals';
-                const method = editingSignalId ? 'PUT' : 'POST';
-                
-                const response = await api.request(url, method, data);
-                
-                if (response.ok) {
-                    showToast(editingSignalId ? 'Signal updated!' : 'Signal created!', 'success');
-                    closeModal('signal-modal');
-                    loadAdminSignals();
-                    loadSignals();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to save signal');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function openSignalResultModal(signalId) {
-            document.getElementById('result-signal-id').value = signalId;
-            document.getElementById('signal-result-form').reset();
-            document.getElementById('signal-result-modal').classList.add('show');
-        }
-
-        async function submitSignalResult() {
-            const signalId = document.getElementById('result-signal-id').value;
-            const data = {
-                result: document.getElementById('signal-result-value').value,
-                pips_gain_loss: parseFloat(document.getElementById('signal-pips').value) || null
-            };
-
-            try {
-                showLoading(true, 'Updating result...');
-                const response = await api.put(`/admin/signals/${signalId}/result`, data);
-                
-                if (response.ok) {
-                    showToast('Result updated!', 'success');
-                    closeModal('signal-result-modal');
-                    loadAdminSignals();
-                    loadSignals();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to update result');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function deleteSignal(signalId) {
-            if (!confirm('Are you sure you want to delete this signal?')) return;
-            
-            try {
-                const response = await api.delete(`/admin/signals/${signalId}`);
-                if (response.ok) {
-                    showToast('Signal deleted', 'success');
-                    loadAdminSignals();
-                    loadSignals();
-                }
-            } catch (error) {
-                showToast('Error deleting signal', 'error');
-            }
-        }
-
-        function restoreSignalForm() {
-            // Cleanup function when modal closes
-        }
-
-        // ==========================================
-        // AI ANALYSIS & MENTOR
-        // ==========================================
-        function handleChartUpload(input) {
-            if (input.files && input.files[0]) {
-                chartFile = input.files[0];
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    document.getElementById('chart-preview').src = e.target.result;
-                    document.getElementById('chart-preview-container').classList.remove('hidden');
-                };
-                reader.readAsDataURL(chartFile);
-            }
-        }
-
-        async function analyzeChart() {
-            if (!chartFile) {
-                showToast('Please upload an image first', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', chartFile);
-            formData.append('pair', document.getElementById('chart-pair').value);
-            formData.append('timeframe', document.getElementById('chart-timeframe').value);
-            formData.append('additional_info', document.getElementById('chart-context').value);
-
-            try {
-                showLoading(true, 'Analyzing chart with AI...');
-                const response = await api.upload('/analyze/chart', formData);
-                const result = await response.json();
-                
-                document.getElementById('chart-analysis-content').textContent = result.analysis;
-                document.getElementById('chart-analysis-result').classList.remove('hidden');
-            } catch (error) {
-                showToast('Analysis failed', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function handlePerformanceUpload(input) {
-            if (input.files && input.files[0]) {
-                performanceFile = input.files[0];
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    document.getElementById('performance-preview').src = e.target.result;
-                    document.getElementById('performance-preview-container').classList.remove('hidden');
-                };
-                reader.readAsDataURL(performanceFile);
-            }
-        }
-
-        async function analyzePerformanceVision() {
-            if (!performanceFile) {
-                showToast('Please upload a statement image', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', performanceFile);
-            formData.append('account_balance', document.getElementById('vision-account-balance').value);
-            formData.append('trading_period_days', document.getElementById('vision-trading-period').value);
-
-            try {
-                showLoading(true, 'Analyzing performance with AI Vision...');
-                const response = await api.upload('/analyze/performance/vision', formData);
-                const result = await response.json();
-                
-                displayAnalysisResults(result.analysis);
-            } catch (error) {
-                showToast('Analysis failed', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function displayAnalysisResults(analysis) {
-            document.getElementById('analysis-results').classList.remove('hidden');
-            
-            // Animate score
-            const score = analysis.trader_score || 0;
-            document.getElementById('score-circle').style.setProperty('--score', score);
-            animateValue('trader-score', 0, score, 1500);
-            
-            // Interpretation
-            let interpretation = 'Needs Improvement';
-            if (score >= 80) interpretation = 'Excellent Trader';
-            else if (score >= 60) interpretation = 'Good Progress';
-            else if (score >= 40) interpretation = 'Average';
-            document.getElementById('score-interpretation').textContent = interpretation;
-            
-            // Summary
-            const summary = analysis.performance_summary || {};
-            document.getElementById('performance-summary').innerHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
-                    <div>Total Trades: <strong>${summary.total_trades || 0}</strong></div>
-                    <div>Win Rate: <strong>${summary.win_rate || '0%'}</strong></div>
-                    <div>Profit Factor: <strong>${summary.profit_factor || '0'}</strong></div>
-                    <div>Max Drawdown: <strong>${summary.max_drawdown || '0%'}</strong></div>
-                </div>
-            `;
-            
-            // Lists
-            const createList = (items) => items?.map(item => `<li>${item}</li>`).join('') || '<li>No data available</li>';
-            document.getElementById('strengths-list').innerHTML = createList(analysis.strengths);
-            document.getElementById('top-mistakes').innerHTML = createList(analysis.top_mistakes);
-            document.getElementById('improvement-plan').innerHTML = createList(analysis.improvement_plan?.immediate_actions);
-            
-            // Courses
-            const courses = analysis.recommended_courses || [];
-            document.getElementById('recommended-courses').innerHTML = courses.map(c => 
-                `<span class="status-badge" style="background: var(--premium); color: var(--bg-dark);">${c}</span>`
-            ).join('');
-            
-            // Advice
-            document.getElementById('mentor-advice').textContent = analysis.mentor_advice || 'No specific advice available.';
-        }
-
-        async function sendChatMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (!message) return;
-            
-            const useKnowledge = document.getElementById('knowledge-toggle').checked;
-            
-            // Add user message
-            const messagesDiv = document.getElementById('chat-messages');
-            messagesDiv.innerHTML += `
-                <div class="chat-message" style="justify-content: flex-end;">
-                    <div class="chat-bubble" style="background: var(--primary); color: white;">
-                        <strong>You:</strong> ${message}
-                    </div>
-                </div>
-            `;
-            input.value = '';
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            
-            try {
-                showLoading(true, 'AI is thinking...');
-                const response = await api.post('/chat', {
-                    message: message,
-                    include_knowledge: useKnowledge,
-                    history: chatHistory
-                });
-                
-                const result = await response.json();
-                chatHistory.push({ role: 'user', content: message });
-                chatHistory.push({ role: 'assistant', content: result.response });
-                
-                messagesDiv.innerHTML += `
-                    <div class="chat-message">
-                        <div class="chat-bubble">
-                            <strong>AI Mentor:</strong> ${result.response}
-                        </div>
-                    </div>
-                `;
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            } catch (error) {
-                showToast('Failed to get response', 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function loadChatHistory() {
-            try {
-                const response = await api.get('/chat/history?limit=20');
-                if (response.ok) {
-                    const data = await response.json();
-                    chatHistory = data.history?.map(h => [
-                        { role: 'user', content: h.message },
-                        { role: 'assistant', content: h.response }
-                    ]).flat() || [];
-                }
-            } catch (error) {
-                console.error('Error loading chat history:', error);
-            }
-        }
-
-        // ==========================================
-        // MEDIA MANAGEMENT
-        // ==========================================
-        async function handleMediaUpload(input) {
-            if (!input.files.length) return;
-            
-            const formData = new FormData();
-            for (let file of input.files) {
-                formData.append('file', file);
-            }
-            
-            try {
-                showLoading(true, 'Uploading...');
-                const response = await api.upload('/admin/media/upload', formData);
-                
-                if (response.ok) {
-                    showToast('Upload successful!', 'success');
-                    loadMediaList();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Upload failed');
-                }
-            } catch (error) {
-                showToast(error.message, 'error');
-            } finally {
-                showLoading(false);
-                input.value = '';
-            }
-        }
-
-        async function loadMediaList() {
-            try {
-                const response = await api.get('/admin/media/list?limit=50');
-                if (!response.ok) throw new Error('Failed to load media');
-                
-                const data = await response.json();
-                const container = document.getElementById('media-list');
-                
-                if (!data.files || data.files.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No files uploaded yet</p>';
-                    return;
-                }
-                
-                container.innerHTML = `<div class="media-picker-grid">
-                    ${data.files.map(f => `
-                        <div class="media-item" onclick="selectMedia(this, '${f.url}')" style="cursor: pointer;">
-                            ${f.file_type?.startsWith('image') ? 
-                                `<img src="${f.url}" style="width: 100%; height: 100%; object-fit: cover;">` : 
-                                `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary);"><i class="fas fa-file"></i></div>`
-                            }
                         </div>
                     `).join('')}
-                </div>`;
-            } catch (error) {
-                console.error('Error loading media:', error);
-            }
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error loading media:', error);
         }
+    }
 
-        function openMediaPicker(target) {
-            currentMediaTarget = target;
-            selectedMediaUrl = null;
-            document.querySelectorAll('.media-item').forEach(el => el.classList.remove('selected'));
-            loadMediaPickerGrid();
-            document.getElementById('media-picker-modal').classList.add('show');
-        }
-
-        async function loadMediaPickerGrid() {
-            try {
-                const response = await api.get('/admin/media/list?limit=50');
-                const data = await response.json();
-                const grid = document.getElementById('media-picker-grid');
-                
-                grid.innerHTML = data.files?.map(f => `
-                    <div class="media-item" onclick="selectMedia(this, '${f.url}')">
-                        <img src="${f.url}" style="width: 100%; height: 100%; object-fit: cover;">
-                    </div>
-                `).join('') || '';
-            } catch (error) {
-                console.error('Error loading media:', error);
-            }
-        }
-
-        function selectMedia(element, url) {
-            document.querySelectorAll('.media-item').forEach(el => el.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedMediaUrl = url;
-        }
-
-        function confirmMediaSelection() {
-            if (!selectedMediaUrl) {
-                showToast('Please select an image', 'error');
-                return;
-            }
-            
-            if (currentMediaTarget === 'blog-image') {
-                document.getElementById('blog-image').value = selectedMediaUrl;
-            } else if (currentMediaTarget === 'course-thumbnail') {
-                document.getElementById('course-thumbnail-input').value = selectedMediaUrl;
-            } else if (currentMediaTarget === 'editor') {
-                document.execCommand('insertImage', false, selectedMediaUrl);
-                updateEditorContent();
-            }
-            
-            closeModal('media-picker-modal');
-        }
-
-        async function handleMediaPickerUpload(input) {
-            if (!input.files[0]) return;
-            
+    async function handleMediaUpload(input) {
+        if (!input.files.length) return;
+        
+        for (let file of input.files) {
             const formData = new FormData();
-            formData.append('file', input.files[0]);
+            formData.append('file', file);
             
             try {
-                showLoading(true, 'Uploading...');
+                showLoading(true, `Uploading ${file.name}...`);
                 const response = await api.upload('/admin/media/upload', formData);
+                
                 if (response.ok) {
-                    loadMediaPickerGrid();
-                    showToast('Image uploaded!', 'success');
+                    showToast(`${file.name} uploaded`, 'success');
+                } else {
+                    showToast(`Failed to upload ${file.name}`, 'error');
                 }
             } catch (error) {
-                showToast('Upload failed', 'error');
-            } finally {
-                showLoading(false);
+                showToast(`Error uploading ${file.name}`, 'error');
             }
         }
+        
+        showLoading(false);
+        loadMediaList();
+        input.value = '';
+    }
 
-        // ==========================================
-        // INITIALIZATION
-        // ==========================================
-        document.addEventListener('DOMContentLoaded', () => {
-            validateToken();
+    async function deleteMedia(mediaId) {
+        if (!confirm('Delete this file?')) return;
+        
+        try {
+            showLoading(true, 'Deleting...');
+            const response = await api.delete(`/admin/media/${mediaId}`);
             
-            // Close modals on outside click
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) {
-                        if (modal.id === 'signal-modal') restoreSignalForm();
-                        closeModal(modal.id);
+            if (response.ok) {
+                showToast('File deleted', 'success');
+                loadMediaList();
+            } else {
+                throw new Error('Failed to delete');
+            }
+        } catch (error) {
+            showToast('Error deleting file', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function copyMediaUrl(url) {
+        navigator.clipboard.writeText(url);
+        showToast('URL copied to clipboard', 'success');
+    }
+
+    function openMediaPicker(target) {
+        currentMediaTarget = target;
+        selectedMediaUrl = null;
+        loadMediaPickerGrid();
+        document.getElementById('media-picker-modal').classList.add('show');
+    }
+
+    async function loadMediaPickerGrid() {
+        try {
+            const response = await api.get('/admin/media/list?limit=20');
+            const data = await response.json();
+            const grid = document.getElementById('media-picker-grid');
+            
+            if (!data.files || data.files.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No media available</p>';
+                return;
+            }
+
+            grid.innerHTML = data.files.map(file => `
+                <div class="media-item" onclick="selectMedia('${file.url}', this)" style="cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden;">
+                    ${file.file_type === 'image' || file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 
+                        `<img src="${file.url}" style="width: 100%; height: 120px; object-fit: cover;">` :
+                        `<div style="width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; background: var(--bg-hover);"><i class="fas fa-file fa-2x"></i></div>`
                     }
-                });
+                    <div style="padding: 8px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.filename}</div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading media picker:', error);
+        }
+    }
+
+    async function handleMediaPickerUpload(input) {
+        if (!input.files[0]) return;
+        
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        
+        try {
+            showLoading(true, 'Uploading...');
+            const response = await api.upload('/admin/media/upload', formData);
+            
+            if (response.ok) {
+                const data = await response.json();
+                showToast('Uploaded successfully', 'success');
+                loadMediaPickerGrid();
+                selectMedia(data.url, document.querySelector('.media-item:last-child'));
+            }
+        } catch (error) {
+            showToast('Upload failed', 'error');
+        } finally {
+            showLoading(false);
+            input.value = '';
+        }
+    }
+
+    function selectMedia(url, element) {
+        selectedMediaUrl = url;
+        document.querySelectorAll('.media-item').forEach(el => el.style.borderColor = 'transparent');
+        element.style.borderColor = 'var(--primary)';
+    }
+
+    function confirmMediaSelection() {
+        if (!selectedMediaUrl) {
+            showToast('Please select an image', 'error');
+            return;
+        }
+        
+        if (currentMediaTarget === 'editor') {
+            document.execCommand('insertImage', false, selectedMediaUrl);
+            updateEditorContent();
+        } else {
+            document.getElementById(currentMediaTarget).value = selectedMediaUrl;
+            if (currentMediaTarget === 'blog-image') updateSEOPreview();
+        }
+        
+        closeModal('media-picker-modal');
+    }
+
+    // ==========================================
+    // AI ANALYSIS & MENTOR
+    // ==========================================
+    function handleChartUpload(input) {
+        if (input.files && input.files[0]) {
+            chartFile = input.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('chart-preview').src = e.target.result;
+                document.getElementById('chart-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(chartFile);
+        }
+    }
+
+    async function analyzeChart() {
+        if (!chartFile) {
+            showToast('Please upload an image first', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', chartFile);
+        formData.append('pair', document.getElementById('chart-pair').value);
+        formData.append('timeframe', document.getElementById('chart-timeframe').value);
+        formData.append('additional_info', document.getElementById('chart-context').value);
+
+        try {
+            showLoading(true, 'Analyzing chart...');
+            const response = await api.upload('/analyze/chart', formData);
+            
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('chart-analysis-content').textContent = data.analysis;
+                document.getElementById('chart-analysis-result').classList.remove('hidden');
+                showToast('Analysis complete', 'success');
+            } else {
+                throw new Error('Analysis failed');
+            }
+        } catch (error) {
+            showToast('Failed to analyze chart', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function handlePerformanceUpload(input) {
+        if (input.files && input.files[0]) {
+            performanceFile = input.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('performance-preview').src = e.target.result;
+                document.getElementById('performance-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(performanceFile);
+        }
+    }
+
+    async function analyzePerformanceVision() {
+        if (!performanceFile) {
+            showToast('Please upload a statement image', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', performanceFile);
+        formData.append('account_balance', document.getElementById('vision-account-balance').value);
+        formData.append('trading_period_days', document.getElementById('vision-trading-period').value);
+
+        try {
+            showLoading(true, 'Analyzing performance... This may take a minute');
+            const response = await api.upload('/analyze/performance/vision', formData);
+            
+            if (response.ok) {
+                const data = await response.json();
+                displayPerformanceResults(data.analysis);
+                showToast('Analysis complete', 'success');
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Analysis failed');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function displayPerformanceResults(analysis) {
+        document.getElementById('analysis-results').classList.remove('hidden');
+        
+        // Animate score
+        const score = analysis.trader_score || 0;
+        document.getElementById('trader-score').textContent = score;
+        document.getElementById('score-circle').style.setProperty('--score', score);
+        
+        let interpretation = 'Needs Improvement';
+        if (score >= 80) interpretation = 'Expert Trader';
+        else if (score >= 60) interpretation = 'Proficient';
+        else if (score >= 40) interpretation = 'Developing';
+        document.getElementById('score-interpretation').textContent = interpretation;
+
+        // Performance summary
+        const summary = analysis.performance_summary || {};
+        document.getElementById('performance-summary').innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                <div style="padding: 12px; background: var(--bg-hover); border-radius: 8px;">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Total Trades</div>
+                    <div style="font-size: 24px; font-weight: 700;">${summary.total_trades || 0}</div>
+                </div>
+                <div style="padding: 12px; background: var(--bg-hover); border-radius: 8px;">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Win Rate</div>
+                    <div style="font-size: 24px; font-weight: 700;">${summary.win_rate || '0%'}</div>
+                </div>
+                <div style="padding: 12px; background: var(--bg-hover); border-radius: 8px;">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Net Pips</div>
+                    <div style="font-size: 24px; font-weight: 700; color: ${(summary.net_pips || 0) >= 0 ? 'var(--success)' : 'var(--danger)'}">${summary.net_pips || 0}</div>
+                </div>
+                <div style="padding: 12px; background: var(--bg-hover); border-radius: 8px;">
+                    <div style="font-size: 12px; color: var(--text-secondary);">Profit Factor</div>
+                    <div style="font-size: 24px; font-weight: 700;">${summary.profit_factor || 'N/A'}</div>
+                </div>
+            </div>
+        `;
+
+        // Lists
+        const renderList = (items, color) => (items || []).map(item => 
+            `<li class="improvement-item" style="border-left-color: var(${color});"><i class="fas fa-${color === '--success' ? 'check' : color === '--danger' ? 'exclamation-triangle' : 'arrow-up'}"></i> ${item}</li>`
+        ).join('');
+        
+        document.getElementById('top-mistakes').innerHTML = renderList(analysis.top_mistakes, '--danger');
+        document.getElementById('strengths-list').innerHTML = renderList(analysis.strengths, '--success');
+        
+        const plan = analysis.improvement_plan || {};
+        const planItems = [
+            ...(plan.immediate_actions || []),
+            ...(plan.strategy_improvements || []),
+            ...(plan.risk_management_fixes || [])
+        ];
+        document.getElementById('improvement-plan').innerHTML = renderList(planItems, '--warning');
+        
+        // Courses
+        const courses = analysis.recommended_courses || [];
+        document.getElementById('recommended-courses').innerHTML = courses.map(course => 
+            `<span class="status-badge" style="background: rgba(99, 102, 241, 0.2); color: var(--primary);">${course}</span>`
+        ).join('');
+        
+        // Advice
+        document.getElementById('mentor-advice').textContent = analysis.mentor_advice || 'Keep practicing and focus on risk management.';
+    }
+
+    // Chat/Mentor functions
+    async function loadChatHistory() {
+        try {
+            const response = await api.get('/chat/history?limit=20');
+            if (response.ok) {
+                const data = await response.json();
+                const container = document.getElementById('chat-messages');
+                
+                if (data.history && data.history.length > 0) {
+                    container.innerHTML = data.history.reverse().map(h => `
+                        <div class="chat-message user">
+                            <div class="chat-bubble user">${h.message}</div>
+                        </div>
+                        <div class="chat-message">
+                            <div class="chat-bubble"><strong>AI Mentor:</strong> ${h.response}</div>
+                        </div>
+                    `).join('') + container.innerHTML;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+        }
+    }
+
+    async function sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        const container = document.getElementById('chat-messages');
+        const includeKnowledge = document.getElementById('knowledge-toggle').checked;
+        
+        // Add user message
+        container.innerHTML += `
+            <div class="chat-message user">
+                <div class="chat-bubble user">${escapeHtml(message)}</div>
+            </div>
+        `;
+        input.value = '';
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            showLoading(true, 'AI is thinking...');
+            const response = await api.post('/chat', {
+                message: message,
+                include_knowledge: includeKnowledge,
+                history: []
             });
             
-            // Signal modal close button
-            const signalModalClose = document.querySelector('#signal-modal .modal-close');
-            if (signalModalClose) {
-                signalModalClose.addEventListener('click', restoreSignalForm);
+            if (response.ok) {
+                const data = await response.json();
+                container.innerHTML += `
+                    <div class="chat-message">
+                        <div class="chat-bubble"><strong>AI Mentor:</strong> ${escapeHtml(data.response)}</div>
+                    </div>
+                `;
+                container.scrollTop = container.scrollHeight;
+            } else {
+                throw new Error('Failed to get response');
             }
+        } catch (error) {
+            container.innerHTML += `
+                <div class="chat-message">
+                    <div class="chat-bubble" style="color: var(--danger);">Sorry, I encountered an error. Please try again.</div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        validateToken();
+        
+        // Drag and drop for upload areas
+        ['chart-upload-area', 'performance-upload-area', 'media-upload-area'].forEach(id => {
+            const area = document.getElementById(id);
+            if (!area) return;
+            
+            area.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                area.style.borderColor = 'var(--primary)';
+                area.style.background = 'rgba(99, 102, 241, 0.1)';
+            });
+            
+            area.addEventListener('dragleave', () => {
+                area.style.borderColor = 'var(--border)';
+                area.style.background = 'transparent';
+            });
+            
+            area.addEventListener('drop', (e) => {
+                e.preventDefault();
+                area.style.borderColor = 'var(--border)';
+                area.style.background = 'transparent';
+                
+                if (e.dataTransfer.files.length) {
+                    const input = area.querySelector('input[type="file"]');
+                    if (input) {
+                        input.files = e.dataTransfer.files;
+                        input.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
         });
-    </script>
+    });
+</script>
 </body>
 </html>

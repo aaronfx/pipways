@@ -1,6 +1,6 @@
 /**
- * Admin Dashboard Module
- * Handles content management, user management, and settings
+ * Admin Dashboard - Complete CMS
+ * Fixed: Safe checks for all data parsing
  */
 
 const admin = {
@@ -30,7 +30,7 @@ const admin = {
         document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.classList.remove('active');
         });
-        btnElement.classList.add('active');
+        if (btnElement) btnElement.classList.add('active');
         
         this.currentTab = tabName;
 
@@ -50,18 +50,30 @@ const admin = {
             case 'signals':
                 this.loadAdminSignals();
                 break;
+            case 'media':
+                this.loadMedia();
+                break;
             case 'settings':
                 this.loadSettings();
                 break;
         }
     },
 
+    // Blog Management
     async loadBlogPosts() {
         const tbody = document.getElementById('blog-table-body');
         if (!tbody) return;
 
         try {
-            const posts = await api.get('/api/blog?limit=50');
+            const data = await api.get('/api/admin/blog');
+            
+            // FIXED: Safe check
+            if (!data || !Array.isArray(data.posts)) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No posts found</td></tr>';
+                return;
+            }
+
+            const posts = data.posts;
             
             tbody.innerHTML = posts.map(post => `
                 <tr>
@@ -147,6 +159,7 @@ const admin = {
         }
     },
 
+    // User Management
     async loadUsers() {
         const tbody = document.getElementById('users-table-body');
         if (!tbody) return;
@@ -154,6 +167,12 @@ const admin = {
         try {
             const users = await api.get('/api/admin/users?limit=50');
             
+            // FIXED: Safe check
+            if (!Array.isArray(users)) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No users found</td></tr>';
+                return;
+            }
+
             tbody.innerHTML = users.map(user => `
                 <tr>
                     <td>
@@ -220,14 +239,21 @@ const admin = {
         }
     },
 
+    // Course Management
     async loadAdminCourses() {
         const container = document.getElementById('admin-courses-list');
         if (!container) return;
 
         try {
-            const courses = await api.get('/api/courses');
+            const data = await api.get('/api/admin/courses');
             
-            container.innerHTML = courses.map(course => `
+            // FIXED: Safe check
+            if (!data || !Array.isArray(data.courses)) {
+                container.innerHTML = '<p>No courses found</p>';
+                return;
+            }
+
+            container.innerHTML = data.courses.map(course => `
                 <div class="card" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <h4>${course.title} ${course.is_premium ? '<span class="badge badge-premium">Premium</span>' : ''}</h4>
@@ -313,14 +339,21 @@ const admin = {
         }
     },
 
+    // Webinar Management
     async loadAdminWebinars() {
         const container = document.getElementById('admin-webinars-list');
         if (!container) return;
 
         try {
-            const webinars = await api.get('/api/webinars');
+            const data = await api.get('/api/webinars?upcoming=false');
             
-            container.innerHTML = webinars.map(w => `
+            // FIXED: Safe check
+            if (!data || !Array.isArray(data.webinars)) {
+                container.innerHTML = '<p>No webinars found</p>';
+                return;
+            }
+
+            container.innerHTML = data.webinars.map(w => `
                 <div class="card" style="margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
                         <div>
@@ -349,14 +382,19 @@ const admin = {
 
     async editWebinar(id) {
         try {
-            const webinars = await api.get('/api/webinars');
-            const webinar = webinars.find(w => w.id === id);
+            const webinars = await api.get('/api/webinars?upcoming=false');
+            const webinar = webinars.webinars?.find(w => w.id === id);
             if (!webinar) throw new Error('Webinar not found');
 
             document.getElementById('webinar-id').value = webinar.id;
             document.getElementById('webinar-title').value = webinar.title;
             document.getElementById('webinar-description').value = webinar.description;
-            document.getElementById('webinar-scheduled').value = new Date(webinar.scheduled_at).toISOString().slice(0, 16);
+            
+            // Format date for datetime-local input
+            const date = new Date(webinar.scheduled_at);
+            const formatted = date.toISOString().slice(0, 16);
+            document.getElementById('webinar-scheduled').value = formatted;
+            
             document.getElementById('webinar-duration').value = webinar.duration_minutes;
             document.getElementById('webinar-link').value = webinar.meeting_link || '';
             document.getElementById('webinar-max').value = webinar.max_participants || 100;
@@ -412,14 +450,21 @@ const admin = {
         }
     },
 
+    // Signal Management
     async loadAdminSignals() {
         const tbody = document.getElementById('admin-signals-table-body');
         if (!tbody) return;
 
         try {
-            const signals = await api.get('/api/admin/signals');
+            const data = await api.get('/api/admin/signals');
             
-            tbody.innerHTML = signals.map(s => `
+            // FIXED: Safe check
+            if (!data || !Array.isArray(data.signals)) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No signals found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.signals.map(s => `
                 <tr>
                     <td><strong>${s.pair}</strong></td>
                     <td><span class="badge badge-${s.direction === 'buy' ? 'success' : 'danger'}">${s.direction}</span></td>
@@ -447,8 +492,9 @@ const admin = {
 
     async editSignal(id) {
         try {
-            const signals = await api.get('/api/admin/signals');
-            const signal = signals.find(s => s.id === id);
+            const data = await api.get('/api/admin/signals');
+            const signal = data.signals?.find(s => s.id === id);
+            if (!signal) throw new Error('Signal not found');
             
             document.getElementById('signal-id').value = signal.id;
             document.getElementById('signal-pair').value = signal.pair;
@@ -458,6 +504,7 @@ const admin = {
             document.getElementById('signal-tp1').value = signal.tp1 || '';
             document.getElementById('signal-tp2').value = signal.tp2 || '';
             document.getElementById('signal-analysis').value = signal.analysis || '';
+            document.getElementById('signal-status').value = signal.status || 'active';
             document.getElementById('signal-is-premium').checked = signal.is_premium || false;
             
             document.getElementById('signal-modal-title').textContent = 'Edit Signal';
@@ -478,6 +525,7 @@ const admin = {
             tp1: parseFloat(document.getElementById('signal-tp1').value) || null,
             tp2: parseFloat(document.getElementById('signal-tp2').value) || null,
             analysis: document.getElementById('signal-analysis').value,
+            status: document.getElementById('signal-status').value,
             is_premium: document.getElementById('signal-is-premium').checked
         };
 
@@ -509,6 +557,68 @@ const admin = {
         }
     },
 
+    // Media Management
+    async loadMedia() {
+        const container = document.getElementById('media-grid');
+        if (!container) return;
+
+        try {
+            const data = await api.get('/api/admin/media');
+            
+            if (!data || !Array.isArray(data.files)) {
+                container.innerHTML = '<p>No media files</p>';
+                return;
+            }
+
+            container.innerHTML = data.files.map(file => `
+                <div class="media-item" style="display: inline-block; margin: 10px; position: relative;">
+                    <img src="${file.url}" style="width: 150px; height: 150px; object-fit: cover; border-radius: 8px;">
+                    <button onclick="admin.deleteMedia(${file.id})" class="btn btn-sm btn-danger" style="position: absolute; top: 5px; right: 5px;">×</button>
+                    <button onclick="navigator.clipboard.writeText('${file.url}')" class="btn btn-sm" style="position: absolute; bottom: 5px; right: 5px;">Copy</button>
+                </div>
+            `).join('');
+            
+        } catch (error) {
+            container.innerHTML = `<p style="color: var(--danger);">Error: ${error.message}</p>`;
+        }
+    },
+
+    async handleMediaUpload(input) {
+        const files = input.files;
+        if (!files.length) return;
+
+        ui.showLoading('Uploading...');
+
+        try {
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            await api.upload('/api/admin/media/upload', formData);
+            ui.showToast('Upload successful', 'success');
+            this.loadMedia();
+            
+        } catch (error) {
+            ui.showToast('Upload failed: ' + error.message, 'error');
+        } finally {
+            ui.hideLoading();
+        }
+    },
+
+    async deleteMedia(id) {
+        if (!confirm('Delete this file?')) return;
+        
+        try {
+            await api.delete(`/api/admin/media/${id}`);
+            ui.showToast('File deleted', 'success');
+            this.loadMedia();
+        } catch (error) {
+            ui.showToast('Error: ' + error.message, 'error');
+        }
+    },
+
+    // Settings
     async loadSettings() {
         try {
             const settings = await api.get('/api/admin/settings');
@@ -543,46 +653,5 @@ const admin = {
         } catch (error) {
             ui.showToast('Error: ' + error.message, 'error');
         }
-    },
-
-    async handleMediaUpload(input) {
-        const files = input.files;
-        if (!files.length) return;
-
-        ui.showLoading('Uploading...');
-
-        try {
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('files', file);
-            }
-
-            const response = await api.upload('/api/admin/media/upload', formData);
-            ui.showToast('Upload successful', 'success');
-            
-            const container = document.getElementById('media-list');
-            container.innerHTML = (response.urls || []).map(url => `
-                <div style="display: inline-block; margin: 5px; position: relative;">
-                    <img src="${url}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 4px;">
-                    <button onclick="navigator.clipboard.writeText('${url}'); ui.showToast('URL copied')" class="btn btn-sm" style="position: absolute; bottom: 5px; right: 5px; padding: 2px 6px;">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                </div>
-            `).join('');
-            
-        } catch (error) {
-            ui.showToast('Upload failed: ' + error.message, 'error');
-        } finally {
-            ui.hideLoading();
-        }
-    },
-
-    openQuizModal() {
-        ui.openModal('quiz-modal');
-    },
-
-    async submitQuiz() {
-        ui.showToast('Quiz creation - implement based on your backend schema', 'info');
-        ui.closeModal('quiz-modal');
     }
 };

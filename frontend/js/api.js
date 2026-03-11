@@ -1,6 +1,6 @@
 /**
  * API Client Module
- * Handles all HTTP communication with the backend
+ * Fixed: Prevents double-reading response body
  */
 
 const API_BASE = window.location.origin;
@@ -36,6 +36,7 @@ const api = {
             const response = await fetch(url, config);
             const contentType = response.headers.get('content-type');
             
+            // FIXED: Clone response before reading to avoid stream already read errors
             if (!response.ok) {
                 if (response.status === 401) {
                     localStorage.removeItem('access_token');
@@ -46,11 +47,16 @@ const api = {
                 
                 let errorMessage;
                 try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.detail || errorData.message || `Request failed: ${response.status}`;
+                    // Try to parse as JSON first
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.clone().json();
+                        errorMessage = errorData.detail || errorData.message || `Request failed: ${response.status}`;
+                    } else {
+                        const text = await response.clone().text();
+                        errorMessage = `Server error (${response.status}): ${text.substring(0, 100)}`;
+                    }
                 } catch (e) {
-                    const text = await response.text();
-                    errorMessage = `Server error (${response.status}): ${text.substring(0, 100)}`;
+                    errorMessage = `Request failed: ${response.status}`;
                 }
                 throw new Error(errorMessage);
             }

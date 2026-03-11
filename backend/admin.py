@@ -8,8 +8,8 @@ import os
 import shutil
 from datetime import datetime
 
-# FIXED: Import from correct modules
-from .database import db_pool
+# FIXED: Import database module, not the variable
+from . import database
 from .security import get_admin_user, get_current_user_optional
 from .schemas import BlogPostCreate, CourseCreate, WebinarCreate, SignalCreate, UserUpdate
 
@@ -18,10 +18,10 @@ router = APIRouter()
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: dict = Depends(get_admin_user)):
     """Get dashboard statistics"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         total_users = await conn.fetchval("SELECT COUNT(*) FROM users")
         active_signals = await conn.fetchval("SELECT COUNT(*) FROM signals WHERE status = 'active'")
         vip_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE subscription_tier = 'vip'")
@@ -37,10 +37,10 @@ async def get_dashboard_stats(current_user: dict = Depends(get_admin_user)):
 @router.get("/users")
 async def get_users(limit: int = 50, offset: int = 0, current_user: dict = Depends(get_admin_user)):
     """Get all users with pagination"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         users = await conn.fetch("""
             SELECT id, email, full_name, role, subscription_tier, subscription_status, created_at 
             FROM users 
@@ -52,11 +52,10 @@ async def get_users(limit: int = 50, offset: int = 0, current_user: dict = Depen
 @router.put("/users/{user_id}")
 async def update_user(user_id: int, user_update: UserUpdate, current_user: dict = Depends(get_admin_user)):
     """Update user role or tier"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
-        # Build dynamic update query
+    async with database.db_pool.acquire() as conn:
         updates = []
         values = []
         param_count = 1
@@ -83,30 +82,30 @@ async def update_user(user_id: int, user_update: UserUpdate, current_user: dict 
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: int, current_user: dict = Depends(get_admin_user)):
     """Delete a user"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         await conn.execute("DELETE FROM users WHERE id = $1", user_id)
         return {"message": "User deleted successfully"}
 
 @router.get("/settings")
 async def get_settings(current_user: dict = Depends(get_admin_user)):
     """Get site settings"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         settings = await conn.fetchrow("SELECT * FROM site_settings WHERE id = 1")
         return dict(settings) if settings else {}
 
 @router.put("/settings")
 async def update_settings(settings: dict, current_user: dict = Depends(get_admin_user)):
     """Update site settings"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         await conn.execute("""
             UPDATE site_settings 
             SET site_name = $1, contact_email = $2, telegram_free_link = $3, 
@@ -126,7 +125,7 @@ async def update_settings(settings: dict, current_user: dict = Depends(get_admin
 @router.post("/media/upload")
 async def upload_media(files: List[UploadFile] = File(...), current_user: dict = Depends(get_admin_user)):
     """Upload media files"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     uploaded_urls = []
@@ -144,10 +143,10 @@ async def upload_media(files: List[UploadFile] = File(...), current_user: dict =
 @router.get("/signals")
 async def get_all_signals(current_user: dict = Depends(get_admin_user)):
     """Get all signals for admin"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         signals = await conn.fetch("""
             SELECT * FROM signals ORDER BY created_at DESC
         """)
@@ -156,10 +155,10 @@ async def get_all_signals(current_user: dict = Depends(get_admin_user)):
 @router.post("/signals")
 async def create_signal(signal: SignalCreate, current_user: dict = Depends(get_admin_user)):
     """Create a new signal"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         signal_id = await conn.fetchval("""
             INSERT INTO signals (pair, direction, entry_price, stop_loss, tp1, tp2, analysis, is_premium, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
@@ -173,10 +172,10 @@ async def create_signal(signal: SignalCreate, current_user: dict = Depends(get_a
 @router.put("/signals/{signal_id}")
 async def update_signal(signal_id: int, signal: SignalCreate, current_user: dict = Depends(get_admin_user)):
     """Update a signal"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         await conn.execute("""
             UPDATE signals 
             SET pair = $1, direction = $2, entry_price = $3, stop_loss = $4, 
@@ -192,9 +191,9 @@ async def update_signal(signal_id: int, signal: SignalCreate, current_user: dict
 @router.delete("/signals/{signal_id}")
 async def delete_signal(signal_id: int, current_user: dict = Depends(get_admin_user)):
     """Delete a signal"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         await conn.execute("DELETE FROM signals WHERE id = $1", signal_id)
         return {"message": "Signal deleted successfully"}

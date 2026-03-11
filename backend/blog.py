@@ -1,6 +1,6 @@
 """
 Blog Routes
-Handles blog posts and articles
+Fixed: Wrapped responses
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
@@ -41,7 +41,6 @@ async def get_posts(status: Optional[str] = "published", category: Optional[str]
         
         posts = await conn.fetch(query, *params)
         
-        # FIXED: Return wrapped response
         return {"posts": [dict(p) for p in posts]}
 
 @router.get("/{post_id}")

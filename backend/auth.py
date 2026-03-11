@@ -7,20 +7,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from datetime import timedelta
 from typing import Optional
 
-try:
-    from .database import db_pool, SECRET_KEY, ALGORITHM
-except ImportError:
-    from database import db_pool, SECRET_KEY, ALGORITHM
-
-try:
-    from .schemas import UserRegister, UserLogin, Token
-except ImportError:
-    from schemas import UserRegister, UserLogin, Token
-
-try:
-    from .security import create_access_token, create_refresh_token, get_current_user
-except ImportError:
-    from security import create_access_token, create_refresh_token, get_current_user
+# FIXED: Consistent relative imports only
+from .database import db_pool, SECRET_KEY, ALGORITHM
+from .schemas import UserRegister, UserLogin, Token
+from .security import create_access_token, create_refresh_token, get_current_user
 
 router = APIRouter()
 

@@ -1,6 +1,6 @@
 /**
  * Trading Signals Module
- * Fixed: Uses data.signals.map() instead of data.map()
+ * Fixed: Proper signal viewing with modal
  */
 
 const signals = {
@@ -16,20 +16,15 @@ const signals = {
             const url = filter ? `/api/signals?pair=${filter}` : '/api/signals';
             const data = await api.get(url);
             
-            // FIXED: Safe check for array
-            if (!data || !Array.isArray(data.signals)) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No active signals</td></tr>';
-                return;
-            }
-
-            const signalsList = data.signals;
+            // FIXED: Safe array check
+            const signalsArray = data.signals || data;
             
-            if (signalsList.length === 0) {
+            if (!Array.isArray(signalsArray) || signalsArray.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No active signals</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = signalsList.map(signal => `
+            tbody.innerHTML = signalsArray.map(signal => `
                 <tr>
                     <td><strong>${signal.pair}</strong></td>
                     <td>
@@ -59,7 +54,69 @@ const signals = {
         }
     },
 
-    viewSignal(id) {
-        ui.showToast(`Viewing signal ${id}`, 'info');
+    // FIXED: Actually fetch and display signal details
+    async viewSignal(id) {
+        try {
+            // Try to get signal details from the loaded data or fetch individually
+            // Since backend might not have individual GET, we'll show what we have
+            const response = await api.get(`/api/signals`);
+            const signalsArray = response.signals || response;
+            const signal = signalsArray.find(s => s.id === id);
+            
+            if (!signal) {
+                ui.showToast('Signal not found', 'error');
+                return;
+            }
+
+            // Create modal content
+            const modalContent = `
+                <div style="max-width: 600px;">
+                    <h2>Signal Details: ${signal.pair}</h2>
+                    <div style="margin: 20px 0; padding: 15px; background: var(--bg); border-radius: 8px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <strong>Direction:</strong> 
+                                <span class="badge badge-${signal.direction === 'buy' ? 'success' : 'danger'}">
+                                    ${signal.direction.toUpperCase()}
+                                </span>
+                            </div>
+                            <div><strong>Status:</strong> ${signal.status}</div>
+                            <div><strong>Entry Price:</strong> ${ui.formatPrice(signal.entry_price)}</div>
+                            <div><strong>Timeframe:</strong> ${signal.timeframe || 'N/A'}</div>
+                            <div><strong>Stop Loss:</strong> ${ui.formatPrice(signal.stop_loss)}</div>
+                            <div><strong>Take Profit 1:</strong> ${ui.formatPrice(signal.tp1)}</div>
+                            ${signal.tp2 ? `<div><strong>Take Profit 2:</strong> ${ui.formatPrice(signal.tp2)}</div>` : ''}
+                        </div>
+                        ${signal.analysis ? `
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                                <strong>Analysis:</strong>
+                                <p style="margin-top: 5px; line-height: 1.6;">${ui.escapeHtml(signal.analysis)}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="btn btn-secondary" onclick="ui.closeModal('signal-detail-modal')">Close</button>
+                    </div>
+                </div>
+            `;
+
+            // Check if modal exists, if not create it
+            let modal = document.getElementById('signal-detail-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'signal-detail-modal';
+                modal.className = 'modal';
+                modal.innerHTML = '<div class="modal-content" id="signal-detail-content"></div>';
+                document.body.appendChild(modal);
+            }
+            
+            const content = document.getElementById('signal-detail-content');
+            if (content) content.innerHTML = modalContent;
+            
+            ui.openModal('signal-detail-modal');
+            
+        } catch (error) {
+            ui.showToast('Error loading signal details: ' + error.message, 'error');
+        }
     }
 };

@@ -4,9 +4,14 @@
  */
 
 const api = {
-    baseURL: '',  // Empty for same-origin, or set to your API URL
+    baseURL: '',  // Empty for same-origin
     
     async request(endpoint, options = {}) {
+        // Ensure endpoint starts with /
+        if (!endpoint.startsWith('/')) {
+            endpoint = '/' + endpoint;
+        }
+        
         const url = `${this.baseURL}${endpoint}`;
         
         const config = {
@@ -31,21 +36,29 @@ const api = {
         try {
             const response = await fetch(url, config);
             
+            // Handle non-JSON responses (500 errors return HTML)
+            const contentType = response.headers.get('content-type');
+            
             if (!response.ok) {
                 if (response.status === 401) {
-                    // Token expired or invalid
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
                     window.location.reload();
                     throw new Error('Session expired. Please login again.');
                 }
                 
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || errorData.message || `Request failed: ${response.status}`);
+                // Try to parse JSON error, fallback to text
+                let errorMessage;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || errorData.message || `Request failed: ${response.status}`;
+                } catch (e) {
+                    const text = await response.text();
+                    errorMessage = `Server error (${response.status}): ${text.substring(0, 100)}`;
+                }
+                throw new Error(errorMessage);
             }
 
-            // Handle empty responses
-            const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
                 return await response.json();
             }
@@ -56,27 +69,15 @@ const api = {
         }
     },
 
-    get(endpoint) {
-        return this.request(endpoint, { method: 'GET' });
-    },
-
-    post(endpoint, body) {
-        return this.request(endpoint, { method: 'POST', body });
-    },
-
-    put(endpoint, body) {
-        return this.request(endpoint, { method: 'PUT', body });
-    },
-
-    delete(endpoint) {
-        return this.request(endpoint, { method: 'DELETE' });
-    },
-
-    upload(endpoint, formData) {
-        return this.request(endpoint, {
-            method: 'POST',
-            body: formData,
-            headers: {} // Let browser set Content-Type with boundary
-        });
+    get(endpoint) { return this.request(endpoint, { method: 'GET' }); },
+    post(endpoint, body) { return this.request(endpoint, { method: 'POST', body }); },
+    put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body }); },
+    delete(endpoint) { return this.request(endpoint, { method: 'DELETE' }); },
+    upload(endpoint, formData) { 
+        return this.request(endpoint, { 
+            method: 'POST', 
+            body: formData, 
+            headers: {} 
+        }); 
     }
 };

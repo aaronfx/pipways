@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 
+
 # ============================================================================
 # USER SCHEMAS
 # ============================================================================
@@ -32,7 +33,6 @@ class UserUpdate(BaseModel):
     
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     role: str
     subscription_tier: str
@@ -50,13 +50,14 @@ class UserMinimal(BaseModel):
     id: int
     full_name: str
 
+
 # ============================================================================
 # SIGNAL SCHEMAS
 # ============================================================================
 
 class SignalBase(BaseModel):
     pair: str
-    direction: str  # buy or sell
+    direction: str
     entry_price: Decimal
     stop_loss: Decimal
     take_profit_1: Decimal
@@ -65,7 +66,7 @@ class SignalBase(BaseModel):
     analysis: Optional[str] = None
 
 class SignalCreate(SignalBase):
-    status: Optional[str] = "active"  # active, completed, stopped, draft
+    status: Optional[str] = "active"
     
 class SignalUpdate(BaseModel):
     pair: Optional[str] = None
@@ -85,14 +86,13 @@ class SignalUpdate(BaseModel):
 
 class SignalResponse(SignalBase):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     risk_reward_ratio: Optional[str] = None
     status: str
-    tp1_hit: bool
-    tp2_hit: bool
-    tp3_hit: bool
-    sl_hit: bool
+    tp1_hit: bool = False
+    tp2_hit: bool = False
+    tp3_hit: bool = False
+    sl_hit: bool = False
     pips_gained: Optional[float] = None
     created_by: Optional[int] = None
     author_name: Optional[str] = None
@@ -102,8 +102,9 @@ class SignalListResponse(BaseModel):
     signals: List[SignalResponse]
     total: int
 
+
 # ============================================================================
-# COURSE SCHEMAS
+# COURSE SCHEMAS (FIXED - All missing classes added)
 # ============================================================================
 
 class CourseBase(BaseModel):
@@ -111,12 +112,12 @@ class CourseBase(BaseModel):
     description: str
     short_description: Optional[str] = None
     category: Optional[str] = None
-    level: Optional[str] = "beginner"  # beginner, intermediate, advanced
+    level: Optional[str] = "beginner"
     duration_minutes: Optional[int] = None
     thumbnail_url: Optional[str] = None
 
 class CourseCreate(CourseBase):
-    status: Optional[str] = "draft"  # draft, published, archived
+    status: Optional[str] = "draft"
     
 class CourseUpdate(BaseModel):
     title: Optional[str] = None
@@ -130,7 +131,6 @@ class CourseUpdate(BaseModel):
 
 class CourseResponse(CourseBase):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     instructor_id: Optional[int] = None
     instructor_name: Optional[str] = None
@@ -149,9 +149,17 @@ class LessonBase(BaseModel):
 class LessonCreate(LessonBase):
     pass
 
+# ADDED: Was missing
+class LessonUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    video_url: Optional[str] = None
+    order_index: Optional[int] = None
+    duration_minutes: Optional[int] = None
+    is_preview: Optional[bool] = None
+
 class LessonResponse(LessonBase):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     course_id: int
     created_at: Optional[datetime] = None
@@ -165,39 +173,39 @@ class QuizCreate(BaseModel):
 class QuizSubmit(BaseModel):
     answer: str
 
-# Q&A Schemas (Missing ones!)
+# ADDED: Was missing
 class QuestionCreate(BaseModel):
     lesson_id: Optional[int] = None
     question: str
 
+# ADDED: Was missing
 class AnswerCreate(BaseModel):
     question_id: int
     answer: str
 
 class QuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     course_id: int
     lesson_id: Optional[int] = None
     user_id: int
     question: str
-    is_answered: bool
+    is_answered: bool = False
     created_at: Optional[datetime] = None
 
 class EnrollmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     user_id: int
     course_id: int
-    progress_percent: int
+    progress_percent: int = 0
     enrolled_at: Optional[datetime] = None
 
 class ProgressResponse(BaseModel):
     lesson_id: int
     completed: bool
     progress_percent: int
+
 
 # ============================================================================
 # BLOG SCHEMAS
@@ -221,7 +229,7 @@ class BlogPostBase(BaseModel):
     focus_keyword: Optional[str] = None
 
 class BlogPostCreate(BlogPostBase):
-    status: Optional[str] = "draft"  # draft, published, archived
+    status: Optional[str] = "draft"
     is_featured: bool = False
 
 class BlogPostUpdate(BaseModel):
@@ -240,12 +248,11 @@ class BlogPostUpdate(BaseModel):
 
 class BlogPostResponse(BlogPostBase):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     author_id: Optional[int] = None
     author_name: Optional[str] = None
     status: str
-    is_featured: bool
+    is_featured: bool = False
     views: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -255,13 +262,13 @@ class BlogCommentCreate(BaseModel):
 
 class BlogCommentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     post_id: int
     user_id: int
     content: str
-    is_approved: bool
+    is_approved: bool = False
     created_at: Optional[datetime] = None
+
 
 # ============================================================================
 # WEBINAR SCHEMAS
@@ -289,12 +296,11 @@ class WebinarUpdate(BaseModel):
     max_participants: Optional[int] = None
     reminder_message: Optional[str] = None
     is_premium: Optional[bool] = None
-    status: Optional[str] = None  # scheduled, live, completed, cancelled
+    status: Optional[str] = None
     recording_url: Optional[str] = None
 
 class WebinarResponse(WebinarBase):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     status: str
     current_participants: int = 0
@@ -305,7 +311,6 @@ class WebinarResponse(WebinarBase):
 
 class WebinarRegistrationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
     id: int
     webinar_id: int
     user_id: int
@@ -313,6 +318,7 @@ class WebinarRegistrationResponse(BaseModel):
     attended: bool = False
     feedback_rating: Optional[int] = None
     feedback_comment: Optional[str] = None
+
 
 # ============================================================================
 # MEDIA SCHEMAS
@@ -324,6 +330,7 @@ class MediaUploadResponse(BaseModel):
     url: str
     size: int
     folder: str
+
 
 # ============================================================================
 # ADMIN/DASHBOARD SCHEMAS

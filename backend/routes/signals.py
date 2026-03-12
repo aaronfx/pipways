@@ -8,10 +8,9 @@ from decimal import Decimal
 import json
 import logging
 
-# ABSOLUTE IMPORTS (no dots)
-import database
-from schemas import SignalCreate, SignalUpdate, SignalResponse, SignalListResponse
-from security import get_current_user, get_admin_user
+from .. import database
+from ..schemas import SignalCreate, SignalUpdate, SignalResponse, SignalListResponse
+from ..security import get_current_user, get_admin_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

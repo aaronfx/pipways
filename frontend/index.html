@@ -7,8 +7,7 @@
     <meta name="description" content="Professional trading signals, AI analysis, and educational resources">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
-    <!-- Add before closing </head> -->
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <!-- Loading Overlay -->
@@ -320,7 +319,7 @@
                             <input type="file" id="chart-file" class="hidden" accept="image/*" onchange="ai.handleChartUpload(this)">
                         </div>
                         <div id="chart-preview-container" class="hidden" style="margin-top: 20px;">
-                            <img id="chart-preview" class="image-preview" style="max-height: 400px;">
+                            <img id="chart-preview" class="image-preview" style="max-height: 400px; display: block; margin: 0 auto;">
                             <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Currency Pair</label>
@@ -340,13 +339,13 @@
                                 <label class="form-label">Additional Context (Optional)</label>
                                 <input type="text" id="chart-context" class="form-input" placeholder="Any specific patterns or concerns...">
                             </div>
-                            <button class="btn btn-lg" onclick="ai.analyzeChart()" style="margin-top: 12px;">
+                            <button class="btn btn-lg" onclick="ai.analyzeChart()" style="margin-top: 12px; width: 100%;">
                                 <i class="fas fa-brain"></i> Analyze with AI
                             </button>
                         </div>
                     </div>
                     <div id="chart-analysis-result" class="hidden">
-                        <div class="analysis-result" id="chart-analysis-content" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; white-space: pre-wrap;"></div>
+                        <div class="analysis-result" id="chart-analysis-content" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; white-space: pre-wrap; line-height: 1.6;"></div>
                     </div>
                 </div>
             </div>
@@ -362,12 +361,12 @@
                         <h3 style="margin-bottom: 20px;"><i class="fas fa-camera"></i> Upload Trading Statement</h3>
                         <div class="upload-area" id="performance-upload-area" onclick="document.getElementById('performance-file').click()">
                             <i class="fas fa-file-image" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
-                            <h3>Drop image/PDF here or click to upload</h3>
+                            <h3>Drop image here or click to upload</h3>
                             <p style="color: var(--text-secondary); margin-top: 8px;">Supports: JPG, PNG, WEBP<br>Max 10MB</p>
                             <input type="file" id="performance-file" class="hidden" accept="image/*" onchange="ai.handlePerformanceUpload(this)">
                         </div>
                         <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
-                            <img id="performance-preview" class="image-preview" style="max-height: 400px;">
+                            <img id="performance-preview" class="image-preview" style="max-height: 400px; display: block; margin: 0 auto;">
                             <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Account Balance (Optional)</label>
@@ -378,7 +377,7 @@
                                     <input type="number" id="vision-trading-period" class="form-input" placeholder="30" value="30">
                                 </div>
                             </div>
-                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformanceVision()" style="margin-top: 12px;">
+                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformanceVision()" style="margin-top: 12px; width: 100%;">
                                 <i class="fas fa-brain"></i> Analyze with AI Vision
                             </button>
                         </div>
@@ -450,7 +449,7 @@
                     </div>
                     <div class="chat-input-area">
                         <input type="text" class="chat-input" id="chat-input" placeholder="Ask your trading question..." onkeypress="if(event.key==='Enter')ai.sendChatMessage()">
-                        <button class="btn btn-sm" onclick="ai.sendChatMessage()" style="width: auto;">
+                        <button class="btn btn-sm" onclick="ai.sendChatMessage()" style="width: auto; padding: 0 20px;">
                             <i class="fas fa-paper-plane"></i> Send
                         </button>
                     </div>
@@ -1040,7 +1039,7 @@
         </main>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts loaded in dependency order -->
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/auth.js"></script>

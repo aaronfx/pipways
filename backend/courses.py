@@ -1,12 +1,23 @@
-"""Enhanced LMS Routes with Lessons, Quizzes, Progress Tracking"""
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+"""
+Course Routes - Learning Management System
+Includes: Courses, Modules, Lessons, Quizzes, Progress Tracking, Q&A
+"""
+
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import json
 
 from . import database
-from .security import get_current_user, get_current_user_optional, get_admin_user
-from .schemas import CourseCreate, ModuleCreate, LessonCreate, QuizCreate, QuestionCreate
+from .security import get_current_user, get_admin_user, get_current_user_optional
+from .schemas import (
+    CourseCreate, CourseUpdate, CourseResponse, CourseDetailResponse,
+    ModuleCreate, ModuleUpdate, ModuleResponse,
+    LessonCreate, LessonUpdate, LessonResponse, LessonMinimal,
+    QuizCreate, QuizUpdate, QuizResponse, QuizSubmit, QuizResult,
+    StudentQuestionCreate, StudentQuestionResponse,
+    ProgressUpdate, ProgressResponse
+)
 
 router = APIRouter()
 
@@ -16,12 +27,15 @@ def calculate_progress(completed: int, total: int) -> int:
         return 0
     return min(100, int((completed / total) * 100))
 
-# ============ PUBLIC COURSE VIEWING ============
+# ============================================================================
+# PUBLIC COURSE VIEWING
+# ============================================================================
 
-@router.get("")
+@router.get("", response_model=List[CourseResponse])
 async def get_courses(
     search: Optional[str] = None,
     level: Optional[str] = None,
+    category: Optional[str] = None,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """Get all published courses with user progress"""
@@ -35,6 +49,10 @@ async def get_courses(
         if level:
             query += f" AND level = ${len(params)+1}"
             params.append(level)
+        
+        if category:
+            query += f" AND category = ${len(params)+1}"
+            params.append(category)
         
         if search:
             query += f" AND (title ILIKE ${len(params)+1} OR description ILIKE ${len(params)+1})"
@@ -61,6 +79,7 @@ async def get_courses(
             course_dict['modules'] = [dict(m) for m in modules]
             total_lessons = sum(m['lesson_count'] for m in course_dict['modules'])
             course_dict['total_lessons'] = total_lessons
+            course_dict['total_modules'] = len(modules)
             
             # Calculate progress for logged-in users
             if current_user:
@@ -81,9 +100,9 @@ async def get_courses(
             
             result.append(course_dict)
         
-        return {"courses": result}
+        return result
 
-@router.get("/{course_id}")
+@router.get("/{course_id}", response_model=CourseDetailResponse)
 async def get_course_detail(
     course_id: int,
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -93,20 +112,23 @@ async def get_course_detail(
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        course = await conn.fetchrow(
-            "SELECT * FROM courses WHERE id = $1 AND status = 'published'", 
-            course_id
-        )
+        course = await conn.fetchrow("""
+            SELECT c.*, u.full_name as author_name 
+            FROM courses c 
+            LEFT JOIN users u ON c.created_by = u.id 
+            WHERE c.id = $1 AND c.status = 'published'
+        """, course_id)
         
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
         course_dict = dict(course)
+        course_dict['author'] = {"id": course['created_by'], "full_name": course['author_name']} if course['created_by'] else None
         
         # Get modules with lessons
         modules = await conn.fetch("""
             SELECT * FROM course_modules 
-            WHERE course_id = $1 
+            WHERE course_id = $1 AND is_published = TRUE
             ORDER BY sort_order
         """, course_id)
         
@@ -124,7 +146,8 @@ async def get_course_detail(
                         SELECT 1 FROM student_progress 
                         WHERE user_id = $1 AND lesson_id = l.id AND completed = TRUE
                     )
-                    END as is_completed
+                    END as is_completed,
+                    (SELECT COUNT(*) FROM student_questions WHERE lesson_id = l.id AND is_answered = FALSE) as pending_questions
                 FROM lessons l
                 WHERE l.module_id = $2
                 ORDER BY l.sort_order
@@ -138,7 +161,7 @@ async def get_course_detail(
             
             # Get quiz for this module
             quiz = await conn.fetchrow("""
-                SELECT * FROM quizzes WHERE module_id = $1
+                SELECT * FROM quizzes WHERE module_id = $1 AND is_published = TRUE
             """, module['id'])
             
             if quiz:
@@ -158,9 +181,18 @@ async def get_course_detail(
         course_dict['completed_lessons'] = completed_lessons
         course_dict['progress_percent'] = calculate_progress(completed_lessons, total_lessons)
         
+        # Check enrollment
+        if current_user:
+            enrollment = await conn.fetchrow("""
+                SELECT * FROM enrollments WHERE user_id = $1 AND course_id = $2 AND is_active = TRUE
+            """, current_user['id'], course_id)
+            course_dict['is_enrolled'] = enrollment is not None
+        else:
+            course_dict['is_enrolled'] = False
+        
         return course_dict
 
-@router.get("/{course_id}/lessons/{lesson_id}")
+@router.get("/{course_id}/lessons/{lesson_id}", response_model=LessonResponse)
 async def get_lesson_detail(
     course_id: int,
     lesson_id: int,
@@ -182,6 +214,10 @@ async def get_lesson_detail(
         if not lesson:
             raise HTTPException(status_code=404, detail="Lesson not found")
         
+        # Check if premium content
+        if lesson['is_premium'] and current_user.get('subscription_tier') != 'vip':
+            raise HTTPException(status_code=403, detail="VIP access required for this lesson")
+        
         lesson_dict = dict(lesson)
         
         # Update last accessed
@@ -198,9 +234,9 @@ async def get_lesson_detail(
             FROM student_questions q
             JOIN users u ON q.user_id = u.id
             LEFT JOIN users a ON q.answered_by = a.id
-            WHERE q.lesson_id = $1
+            WHERE q.lesson_id = $1 AND (q.is_public = TRUE OR q.user_id = $2)
             ORDER BY q.created_at DESC
-        """, lesson_id)
+        """, lesson_id, current_user['id'])
         
         lesson_dict['questions'] = [dict(q) for q in questions]
         
@@ -208,19 +244,38 @@ async def get_lesson_detail(
         prev_lesson = await conn.fetchrow("""
             SELECT l.id FROM lessons l
             JOIN course_modules m ON l.module_id = m.id
-            WHERE m.course_id = $1 AND l.id < $2
-            ORDER BY l.id DESC LIMIT 1
-        """, course_id, lesson_id)
+            WHERE m.course_id = $1 AND l.sort_order < $2 AND l.module_id = $3
+            ORDER BY l.sort_order DESC LIMIT 1
+        """, course_id, lesson['sort_order'], lesson['module_id'])
         
         next_lesson = await conn.fetchrow("""
             SELECT l.id FROM lessons l
             JOIN course_modules m ON l.module_id = m.id
-            WHERE m.course_id = $1 AND l.id > $2
-            ORDER BY l.id ASC LIMIT 1
-        """, course_id, lesson_id)
+            WHERE m.course_id = $1 AND l.sort_order > $2 AND l.module_id = $3
+            ORDER BY l.sort_order ASC LIMIT 1
+        """, course_id, lesson['sort_order'], lesson['module_id'])
+        
+        if not next_lesson:
+            # Try next module
+            next_module_lesson = await conn.fetchrow("""
+                SELECT l.id FROM lessons l
+                JOIN course_modules m ON l.module_id = m.id
+                WHERE m.course_id = $1 AND m.sort_order > (
+                    SELECT sort_order FROM course_modules WHERE id = $2
+                )
+                ORDER BY m.sort_order, l.sort_order LIMIT 1
+            """, course_id, lesson['module_id'])
+            if next_module_lesson:
+                next_lesson = next_module_lesson
         
         lesson_dict['prev_lesson'] = prev_lesson['id'] if prev_lesson else None
         lesson_dict['next_lesson'] = next_lesson['id'] if next_lesson else None
+        
+        # Check completion status
+        progress = await conn.fetchrow("""
+            SELECT completed FROM student_progress WHERE user_id = $1 AND lesson_id = $2
+        """, current_user['id'], lesson_id)
+        lesson_dict['is_completed'] = progress['completed'] if progress else False
         
         return lesson_dict
 
@@ -237,7 +292,7 @@ async def mark_lesson_complete(
     async with database.db_pool.acquire() as conn:
         # Get module_id for this lesson
         lesson = await conn.fetchrow("""
-            SELECT l.id, m.id as module_id 
+            SELECT l.id, m.id as module_id, l.is_premium 
             FROM lessons l
             JOIN course_modules m ON l.module_id = m.id
             WHERE l.id = $1 AND m.course_id = $2
@@ -245,6 +300,26 @@ async def mark_lesson_complete(
         
         if not lesson:
             raise HTTPException(status_code=404, detail="Lesson not found")
+        
+        # Check quiz requirement
+        quiz = await conn.fetchrow("""
+            SELECT q.* FROM quizzes q
+            JOIN course_modules m ON q.module_id = m.id
+            JOIN lessons l ON l.module_id = m.id
+            WHERE l.id = $1 AND q.pass_mcq_required = TRUE
+        """, lesson_id)
+        
+        if quiz:
+            # Check if passed quiz
+            passed = await conn.fetchval("""
+                SELECT EXISTS(
+                    SELECT 1 FROM quiz_attempts 
+                    WHERE quiz_id = $1 AND user_id = $2 AND passed = TRUE
+                )
+            """, quiz['id'], current_user['id'])
+            
+            if not passed:
+                raise HTTPException(status_code=400, detail="Must pass module quiz before completing this lesson")
         
         await conn.execute("""
             INSERT INTO student_progress 
@@ -256,29 +331,35 @@ async def mark_lesson_complete(
         
         return {"message": "Lesson marked as complete"}
 
-@router.post("/{course_id}/lessons/{lesson_id}/questions")
-async def ask_question(
+@router.post("/{course_id}/enroll")
+async def enroll_in_course(
     course_id: int,
-    lesson_id: int,
-    question: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Student asks a question about a lesson"""
+    """Enroll user in course"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        question_id = await conn.fetchval("""
-            INSERT INTO student_questions (lesson_id, user_id, question)
-            VALUES ($1, $2, $3)
-            RETURNING id
-        """, lesson_id, current_user['id'], question)
+        course = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
         
-        return {"id": question_id, "message": "Question submitted"}
+        try:
+            await conn.execute("""
+                INSERT INTO enrollments (user_id, course_id, payment_status)
+                VALUES ($1, $2, $3)
+            """, current_user['id'], course_id, 'free' if course['price'] == 0 else 'pending')
+            
+            return {"message": "Enrolled successfully"}
+        except asyncpg.exceptions.UniqueViolationError:
+            return {"message": "Already enrolled"}
 
-# ============ QUIZZES ============
+# ============================================================================
+# QUIZZES
+# ============================================================================
 
-@router.get("/{course_id}/modules/{module_id}/quiz")
+@router.get("/{course_id}/modules/{module_id}/quiz", response_model=QuizResponse)
 async def get_quiz(
     course_id: int,
     module_id: int,
@@ -290,8 +371,10 @@ async def get_quiz(
     
     async with database.db_pool.acquire() as conn:
         quiz = await conn.fetchrow("""
-            SELECT * FROM quizzes WHERE module_id = $1
-        """, module_id)
+            SELECT q.* FROM quizzes q
+            JOIN course_modules m ON q.module_id = m.id
+            WHERE q.module_id = $1 AND m.course_id = $2 AND q.is_published = TRUE
+        """, module_id, course_id)
         
         if not quiz:
             raise HTTPException(status_code=404, detail="No quiz found for this module")
@@ -299,7 +382,7 @@ async def get_quiz(
         quiz_dict = dict(quiz)
         
         questions = await conn.fetch("""
-            SELECT id, question_text, question_type, options, points, sort_order
+            SELECT id, question_text, question_type, options, points, sort_order, image_url
             FROM quiz_questions
             WHERE quiz_id = $1
             ORDER BY sort_order
@@ -318,12 +401,11 @@ async def get_quiz(
         
         return quiz_dict
 
-@router.post("/{course_id}/modules/{module_id}/quiz/submit")
+@router.post("/{course_id}/modules/{module_id}/quiz/submit", response_model=QuizResult)
 async def submit_quiz(
     course_id: int,
     module_id: int,
-    answers: Dict[str, str],
-    time_taken: int = 0,
+    data: QuizSubmit,
     current_user: dict = Depends(get_current_user)
 ):
     """Submit quiz answers and grade"""
@@ -331,14 +413,26 @@ async def submit_quiz(
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        quiz = await conn.fetchrow("SELECT * FROM quizzes WHERE module_id = $1", module_id)
+        quiz = await conn.fetchrow("""
+            SELECT q.* FROM quizzes q
+            JOIN course_modules m ON q.module_id = m.id
+            WHERE q.module_id = $1 AND m.course_id = $2
+        """, module_id, course_id)
         
         if not quiz:
             raise HTTPException(status_code=404, detail="Quiz not found")
         
+        # Check attempt limits
+        attempt_count = await conn.fetchval("""
+            SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2
+        """, quiz['id'], current_user['id'])
+        
+        if attempt_count >= quiz['max_attempts']:
+            raise HTTPException(status_code=400, detail=f"Maximum attempts ({quiz['max_attempts']}) reached")
+        
         # Get questions with correct answers
         questions = await conn.fetch("""
-            SELECT id, correct_answer, points FROM quiz_questions WHERE quiz_id = $1
+            SELECT id, correct_answer, correct_answers, points FROM quiz_questions WHERE quiz_id = $1
         """, quiz['id'])
         
         # Calculate score
@@ -346,33 +440,35 @@ async def submit_quiz(
         max_score = 0
         for q in questions:
             max_score += q['points']
-            user_answer = answers.get(str(q['id']))
-            if user_answer and user_answer.lower() == q['correct_answer'].lower():
-                score += q['points']
+            user_answer = data.answers.get(str(q['id']))
+            
+            if user_answer:
+                # Handle multiple correct answers
+                correct = [q['correct_answer']]
+                if q['correct_answers']:
+                    correct = json.loads(q['correct_answers']) if isinstance(q['correct_answers'], str) else q['correct_answers']
+                
+                if user_answer.lower() in [c.lower() for c in correct]:
+                    score += q['points']
         
         percentage = (score / max_score * 100) if max_score > 0 else 0
         passed = percentage >= quiz['passing_score']
         
-        # Check attempt number
-        prev_attempts = await conn.fetchval("""
-            SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = $1 AND user_id = $2
-        """, quiz['id'], current_user['id'])
-        
         attempt_id = await conn.fetchval("""
             INSERT INTO quiz_attempts 
-            (quiz_id, user_id, answers, score, max_score, percentage, passed, attempt_number, time_taken_seconds)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            (quiz_id, user_id, answers, score, max_score, percentage, passed, attempt_number, time_taken_seconds, completed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
             RETURNING id
         """, 
             quiz['id'], 
             current_user['id'], 
-            json.dumps(answers),
+            json.dumps(data.answers),
             score, 
             max_score, 
-            percentage,
+            round(percentage, 2),
             passed,
-            prev_attempts + 1,
-            time_taken
+            attempt_count + 1,
+            data.time_taken
         )
         
         return {
@@ -381,61 +477,134 @@ async def submit_quiz(
             "max_score": max_score,
             "percentage": round(percentage, 2),
             "passed": passed,
-            "attempt_number": prev_attempts + 1
+            "attempt_number": attempt_count + 1
         }
 
-# ============ ADMIN COURSE MANAGEMENT ============
+# ============================================================================
+# STUDENT Q&A
+# ============================================================================
 
-@router.post("")
-async def create_course(course: CourseCreate, current_user: dict = Depends(get_admin_user)):
-    """Create new course"""
+@router.post("/{course_id}/lessons/{lesson_id}/questions")
+async def ask_question(
+    course_id: int,
+    lesson_id: int,
+    question: StudentQuestionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Student asks a question about a lesson"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        course_id = await conn.fetchval("""
-            INSERT INTO courses (title, description, level, duration_hours, is_premium, status, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        question_id = await conn.fetchval("""
+            INSERT INTO student_questions (lesson_id, user_id, question, question_type)
+            VALUES ($1, $2, $3, $4)
             RETURNING id
-        """, 
-            course.title, 
-            course.description, 
-            course.level,
-            course.duration_hours,
-            course.is_premium,
-            course.status,
-            current_user['id']
-        )
+        """, lesson_id, current_user['id'], question.question, question.question_type)
         
-        return {"id": course_id, "message": "Course created successfully"}
+        return {"id": question_id, "message": "Question submitted"}
 
-@router.put("/{course_id}")
-async def update_course(
-    course_id: int,
-    course: CourseCreate,
+@router.get("/questions/pending")
+async def get_pending_questions(current_user: dict = Depends(get_admin_user)):
+    """Get all unanswered questions (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        questions = await conn.fetch("""
+            SELECT q.*, u.full_name as student_name, l.title as lesson_title, c.title as course_title
+            FROM student_questions q
+            JOIN users u ON q.user_id = u.id
+            JOIN lessons l ON q.lesson_id = l.id
+            JOIN course_modules m ON l.module_id = m.id
+            JOIN courses c ON m.course_id = c.id
+            WHERE q.is_answered = FALSE
+            ORDER BY q.created_at DESC
+        """)
+        
+        return [dict(q) for q in questions]
+
+@router.post("/questions/{question_id}/answer")
+async def answer_question(
+    question_id: int,
+    answer: str,
     current_user: dict = Depends(get_admin_user)
 ):
-    """Update course"""
+    """Admin answers a student question"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
         await conn.execute("""
-            UPDATE courses 
-            SET title = $1, description = $2, level = $3, duration_hours = $4,
-                is_premium = $5, status = $6, thumbnail = $7, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $8
-        """, 
-            course.title, course.description, course.level,
-            course.duration_hours, course.is_premium, course.status,
-            course.thumbnail, course_id
+            UPDATE student_questions 
+            SET answer = $1, answered_by = $2, is_answered = TRUE, answered_at = CURRENT_TIMESTAMP
+            WHERE id = $3
+        """, answer, current_user['id'], question_id)
+        
+        return {"message": "Answer submitted"}
+
+# ============================================================================
+# ADMIN COURSE MANAGEMENT
+# ============================================================================
+
+@router.post("", response_model=CourseResponse)
+async def create_course(course: CourseCreate, current_user: dict = Depends(get_admin_user)):
+    """Create new course (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        course_id = await conn.fetchval("""
+            INSERT INTO courses (title, description, short_description, thumbnail, level, duration_hours, 
+                is_premium, status, price, currency, category, tags, prerequisites, learning_outcomes, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            RETURNING id
+        """,
+            course.title, course.description, course.short_description, course.thumbnail,
+            course.level, course.duration_hours, course.is_premium, course.status,
+            course.price, course.currency, course.category, course.tags,
+            course.prerequisites, course.learning_outcomes, current_user['id']
         )
         
-        return {"message": "Course updated successfully"}
+        return await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+
+@router.put("/{course_id}")
+async def update_course(
+    course_id: int,
+    course: CourseUpdate,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Update course (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        existing = await conn.fetchrow("SELECT * FROM courses WHERE id = $1", course_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        # Build dynamic update
+        updates = []
+        values = []
+        for field, value in course.dict(exclude_unset=True).items():
+            if value is not None:
+                updates.append(f"{field} = ${len(values)+1}")
+                values.append(value)
+        
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(course_id)
+        
+        query = f"UPDATE courses SET {', '.join(updates)} WHERE id = ${len(values)} RETURNING *"
+        row = await conn.fetchrow(query, *values)
+        
+        return dict(row)
 
 @router.delete("/{course_id}")
 async def delete_course(course_id: int, current_user: dict = Depends(get_admin_user)):
-    """Delete course"""
+    """Delete course (Admin only)"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
@@ -449,21 +618,20 @@ async def create_module(
     module: ModuleCreate,
     current_user: dict = Depends(get_admin_user)
 ):
-    """Add module to course"""
+    """Add module to course (Admin only)"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        # Get next sort order
         max_order = await conn.fetchval("""
             SELECT COALESCE(MAX(sort_order), 0) FROM course_modules WHERE course_id = $1
         """, course_id)
         
         module_id = await conn.fetchval("""
-            INSERT INTO course_modules (course_id, title, description, sort_order, is_premium)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO course_modules (course_id, title, description, sort_order, is_premium, is_published)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
-        """, course_id, module.title, module.description, max_order + 1, module.is_premium)
+        """, course_id, module.title, module.description, max_order + 1, module.is_premium, module.is_published)
         
         return {"id": module_id, "message": "Module created successfully"}
 
@@ -474,11 +642,19 @@ async def create_lesson(
     lesson: LessonCreate,
     current_user: dict = Depends(get_admin_user)
 ):
-    """Add lesson to module"""
+    """Add lesson to module (Admin only)"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
+        # Verify module belongs to course
+        module = await conn.fetchrow("""
+            SELECT id FROM course_modules WHERE id = $1 AND course_id = $2
+        """, module_id, course_id)
+        
+        if not module:
+            raise HTTPException(status_code=404, detail="Module not found in this course")
+        
         max_order = await conn.fetchval("""
             SELECT COALESCE(MAX(sort_order), 0) FROM lessons WHERE module_id = $1
         """, module_id)
@@ -486,14 +662,15 @@ async def create_lesson(
         lesson_id = await conn.fetchval("""
             INSERT INTO lessons (
                 module_id, title, content, video_url, video_type, pdf_url, 
-                images, duration_minutes, is_premium, sort_order
+                images, duration_minutes, is_premium, is_preview, pass_mcq_required, sort_order
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
-        """, 
+        """,
             module_id, lesson.title, lesson.content, lesson.video_url,
             lesson.video_type, lesson.pdf_url, lesson.images,
-            lesson.duration_minutes, lesson.is_premium, max_order + 1
+            lesson.duration_minutes, lesson.is_premium, lesson.is_preview,
+            lesson.pass_mcq_required, max_order + 1
         )
         
         return {"id": lesson_id, "message": "Lesson created successfully"}
@@ -505,27 +682,33 @@ async def create_quiz(
     quiz: QuizCreate,
     current_user: dict = Depends(get_admin_user)
 ):
-    """Create quiz for module"""
+    """Create quiz for module (Admin only)"""
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
         quiz_id = await conn.fetchval("""
-            INSERT INTO quizzes (module_id, title, description, passing_score, time_limit_minutes, max_attempts)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO quizzes (module_id, title, description, instructions, passing_score, 
+                time_limit_minutes, max_attempts, shuffle_questions, show_correct_answers, is_published)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
-        """, module_id, quiz.title, quiz.description, quiz.passing_score, quiz.time_limit_minutes, quiz.max_attempts)
+        """, module_id, quiz.title, quiz.description, quiz.instructions,
+            quiz.passing_score, quiz.time_limit_minutes, quiz.max_attempts,
+            quiz.shuffle_questions, quiz.show_correct_answers, quiz.is_published)
         
         # Add questions
         for idx, q in enumerate(quiz.questions):
             await conn.execute("""
                 INSERT INTO quiz_questions 
-                (quiz_id, question_text, question_type, options, correct_answer, explanation, points, sort_order)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            """, 
+                (quiz_id, question_text, question_type, options, correct_answer, correct_answers, 
+                 explanation, hint, points, sort_order, image_url)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            """,
                 quiz_id, q.question_text, q.question_type, 
-                json.dumps(q.options), q.correct_answer,
-                q.explanation, q.points, idx
+                json.dumps(q.options) if q.options else None,
+                q.correct_answer,
+                json.dumps(q.correct_answers) if q.correct_answers else None,
+                q.explanation, q.hint, q.points, idx, q.image_url
             )
         
         return {"id": quiz_id, "message": "Quiz created successfully"}
@@ -544,7 +727,7 @@ async def get_course_stats(current_user: dict = Depends(get_admin_user)):
                 (SELECT COUNT(*) FROM course_modules) as total_modules,
                 (SELECT COUNT(*) FROM lessons) as total_lessons,
                 (SELECT COUNT(*) FROM quizzes) as total_quizzes,
-                (SELECT COUNT(DISTINCT user_id) FROM student_progress WHERE completed = TRUE) as total_students,
+                (SELECT COUNT(DISTINCT user_id) FROM enrollments) as total_students,
                 (SELECT COUNT(*) FROM student_questions WHERE is_answered = FALSE) as pending_questions
         """)
         

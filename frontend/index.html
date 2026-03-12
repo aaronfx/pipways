@@ -350,24 +350,44 @@
                 </div>
             </div>
 
-            <!-- Performance Analyzer Section -->
+                       <!-- Performance Analyzer Section -->
             <div class="section" id="performance-section">
                 <div class="page-header">
                     <h2><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> AI Performance Analyzer</h2>
-                    <p>Upload trading statements for AI extraction and analysis</p>
+                    <p>Upload trading statements in any format: CSV, Excel, PDF, or Screenshot</p>
                 </div>
                 <div class="analyzer-container">
                     <div class="content-card" style="margin-bottom: 30px;">
-                        <h3 style="margin-bottom: 20px;"><i class="fas fa-camera"></i> Upload Trading Statement</h3>
-                        <div class="upload-area" id="performance-upload-area" onclick="document.getElementById('performance-file').click()">
-                            <i class="fas fa-file-image" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
-                            <h3>Drop image here or click to upload</h3>
-                            <p style="color: var(--text-secondary); margin-top: 8px;">Supports: JPG, PNG, WEBP<br>Max 10MB</p>
-                            <input type="file" id="performance-file" class="hidden" accept="image/*" onchange="ai.handlePerformanceUpload(this)">
+                        <h3 style="margin-bottom: 20px;"><i class="fas fa-upload"></i> Upload Trading Statement</h3>
+                        <div class="upload-area" id="performance-upload-area" onclick="document.getElementById('performance-file').click()" 
+                             style="transition: all 0.3s ease; cursor: pointer;">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Drop file here or click to upload</h3>
+                            <p style="color: var(--text-secondary); margin-top: 8px; margin-bottom: 16px;">
+                                Supports: CSV, Excel, PDF, JPG, PNG<br>
+                                <small>Export from MT4/MT5 or upload screenshots</small>
+                            </p>
+                            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px;">
+                                <span style="background: var(--bg-hover); padding: 4px 12px; border-radius: 4px; font-size: 12px;">
+                                    <i class="fas fa-file-csv" style="color: var(--success);"></i> CSV
+                                </span>
+                                <span style="background: var(--bg-hover); padding: 4px 12px; border-radius: 4px; font-size: 12px;">
+                                    <i class="fas fa-file-excel" style="color: var(--success);"></i> Excel
+                                </span>
+                                <span style="background: var(--bg-hover); padding: 4px 12px; border-radius: 4px; font-size: 12px;">
+                                    <i class="fas fa-file-pdf" style="color: var(--danger);"></i> PDF
+                                </span>
+                                <span style="background: var(--bg-hover); padding: 4px 12px; border-radius: 4px; font-size: 12px;">
+                                    <i class="fas fa-file-image" style="color: var(--primary);"></i> Image
+                                </span>
+                            </div>
+                            <input type="file" id="performance-file" class="hidden" 
+                                   accept=".csv,.xls,.xlsx,.pdf,.jpg,.jpeg,.png,.webp,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,image/*,text/csv" 
+                                   onchange="ai.handlePerformanceUpload(this)">
                         </div>
                         <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
-                            <img id="performance-preview" class="image-preview" style="max-height: 400px; display: block; margin: 0 auto;">
-                            <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+                            <img id="performance-preview" class="image-preview" style="max-height: 400px; display: block; margin: 0 auto; border-radius: 8px;">
+                            <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Account Balance (Optional)</label>
                                     <input type="number" id="vision-account-balance" class="form-input" placeholder="10000" step="0.01">
@@ -377,53 +397,11 @@
                                     <input type="number" id="vision-trading-period" class="form-input" placeholder="30" value="30">
                                 </div>
                             </div>
-                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformanceVision()" style="margin-top: 12px; width: 100%;">
-                                <i class="fas fa-brain"></i> Analyze with AI Vision
+                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformanceVision()" style="margin-top: 16px; width: 100%;">
+                                <i class="fas fa-brain"></i> Analyze with AI
                             </button>
                         </div>
                     </div>
-
-                    <div id="analysis-results" class="hidden">
-                        <div class="score-display">
-                            <div class="score-circle" id="score-circle" style="--score: 0;">
-                                <div class="score-value" id="trader-score">0</div>
-                            </div>
-                            <h2>Trading Performance Score</h2>
-                            <p style="color: var(--text-secondary); margin-top: 8px;" id="score-interpretation">Analysis complete</p>
-                        </div>
-
-                        <div class="analysis-grid">
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-chart-bar" style="color: var(--primary);"></i> Performance Summary</h3>
-                                <div id="performance-summary"></div>
-                            </div>
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i> Key Issues</h3>
-                                <ul class="improvement-list" id="top-mistakes"></ul>
-                            </div>
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-check-circle" style="color: var(--success);"></i> Strengths</h3>
-                                <ul class="improvement-list" id="strengths-list"></ul>
-                            </div>
-                            <div class="analysis-card">
-                                <h3><i class="fas fa-arrow-up" style="color: var(--warning);"></i> Improvement Plan</h3>
-                                <ul class="improvement-list" id="improvement-plan"></ul>
-                            </div>
-                        </div>
-
-                        <div class="analysis-card" style="margin-top: 20px;">
-                            <h3><i class="fas fa-graduation-cap" style="color: var(--premium);"></i> Recommended Courses</h3>
-                            <div id="recommended-courses" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
-                        </div>
-
-                        <div class="analysis-card" style="margin-top: 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);">
-                            <h3><i class="fas fa-user-tie" style="color: var(--primary);"></i> Mentor Advice</h3>
-                            <p id="mentor-advice" style="margin-top: 12px; line-height: 1.8; font-style: italic;"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- AI Mentor Section -->
             <div class="section" id="mentor-section">
                 <div class="page-header">

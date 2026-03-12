@@ -1,6 +1,6 @@
 """
 Pipways Trading Platform - Main Application
-Serves both API and Frontend
+Serves both API and Frontend SPA
 """
 
 import sys
@@ -22,10 +22,15 @@ from security import get_admin_user, get_current_user, get_current_user_optional
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 
 # Import routes using absolute imports (for Render deployment)
-from routes import auth, blog, courses, signals, webinars, media
+import auth
+import blog
+import courses
+import signals
+import webinars
+import media
 
 # Logging setup
 logging.basicConfig(
@@ -84,17 +89,17 @@ app.add_middleware(
 for d in ["uploads", "uploads/blog", "uploads/courses", "uploads/signals", "uploads/avatars", "uploads/webinars"]:
     os.makedirs(d, exist_ok=True)
 
-# Mount uploads
+# Mount uploads directory (must be before static files to avoid conflicts)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Mount frontend static files (CSS, JS, images) - MUST be before HTML routes
+# Mount frontend static files (CSS, JS, images) - must be before HTML routes
 if os.path.exists(frontend_path):
     logger.info(f"Mounting frontend from: {frontend_path}")
     
-    # Mount static subdirectories
     css_path = os.path.join(frontend_path, "css")
     js_path = os.path.join(frontend_path, "js")
     images_path = os.path.join(frontend_path, "images")
+    assets_path = os.path.join(frontend_path, "assets")
     
     if os.path.exists(css_path):
         app.mount("/css", StaticFiles(directory=css_path), name="css")
@@ -102,10 +107,12 @@ if os.path.exists(frontend_path):
         app.mount("/js", StaticFiles(directory=js_path), name="js")
     if os.path.exists(images_path):
         app.mount("/images", StaticFiles(directory=images_path), name="images")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 else:
     logger.warning(f"Frontend path not found: {frontend_path}")
 
-# Include all API routers - prefixes defined here ONLY
+# Include all API routers with prefixes
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/signals", tags=["Trading Signals"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Learning Management System"])
@@ -129,82 +136,34 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={"detail": exc.detail, "error_code": f"HTTP_{exc.status_code}"}
     )
 
-# Serve specific HTML pages
-@app.get("/{page}.html", response_class=HTMLResponse)
-async def serve_html_page(page: str):
-    """Serve HTML pages from frontend folder"""
-    page_path = os.path.join(frontend_path, f"{page}.html")
-    
-    if os.path.exists(page_path):
-        with open(page_path, "r", encoding="utf-8") as f:
+# SPA Serving Logic
+def get_dashboard_html():
+    """Read and return the dashboard HTML file"""
+    dashboard_path = os.path.join(frontend_path, "dashboard.html")
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
             return f.read()
-    
-    raise HTTPException(status_code=404, detail="Page not found")
+    return None
 
-# Serve index.html at root
+# Root route serves dashboard
 @app.get("/", response_class=HTMLResponse)
 async def serve_root():
-    """Serve the frontend application at root"""
-    index_path = os.path.join(frontend_path, "index.html")
-    
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            return f.read()
-    
-    # Fallback to API docs if no frontend
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Pipways Trading Platform API</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #0f172a; color: #e2e8f0; }
-            h1 { color: #60a5fa; }
-            .endpoint { background: #1e293b; padding: 10px; margin: 10px 0; border-radius: 5px; }
-            a { color: #60a5fa; text-decoration: none; }
-        </style>
-    </head>
-    <body>
-        <h1>🚀 Pipways Trading Platform API</h1>
-        <p>Version 2.0.0 - Professional trading education platform</p>
-        
-        <h2>📚 Documentation</h2>
-        <div class="endpoint">
-            <strong>Swagger UI:</strong> <a href="/api/docs">/api/docs</a>
-        </div>
-        <div class="endpoint">
-            <strong>ReDoc:</strong> <a href="/api/redoc">/api/redoc</a>
-        </div>
-    </body>
-    </html>
-    """
+    """Serve the main dashboard SPA"""
+    html = get_dashboard_html()
+    if html:
+        return html
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Dashboard not found. Please ensure frontend/dashboard.html exists."}
+    )
 
-# Catch-all for frontend routes (SPA support) - MUST be last
-@app.get("/{full_path:path}", response_class=HTMLResponse)
-async def catch_all(full_path: str):
-    """Catch-all route for frontend SPA routing"""
-    # Skip API routes
-    if full_path.startswith(("api/", "docs", "redoc", "openapi")):
-        raise HTTPException(status_code=404)
-    
-    # Skip static files
-    if full_path.startswith(("css/", "js/", "images/", "uploads/")):
-        raise HTTPException(status_code=404)
-    
-    # Try to serve the specific HTML file first
-    file_path = os.path.join(frontend_path, full_path)
-    if os.path.exists(file_path) and file_path.endswith('.html'):
-        with open(file_path, "r", encoding="utf-8") as f:
-            return f.read()
-    
-    # Default to index.html for SPA routing (client-side routing)
-    index_path = os.path.join(frontend_path, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            return f.read()
-    
-    raise HTTPException(status_code=404, detail="Not found")
+# Explicit dashboard route
+@app.get("/dashboard.html", response_class=HTMLResponse)
+async def serve_dashboard():
+    """Serve dashboard explicitly"""
+    return await serve_root()
 
+# Health check endpoint
 @app.get("/health", tags=["System"])
 async def health_check():
     """System health check including database connectivity"""
@@ -216,6 +175,156 @@ async def health_check():
         "version": "2.0.0",
         "timestamp": datetime.now().isoformat()
     }
+
+# API Admin Dashboard endpoint (used by frontend)
+@app.get("/api/admin/dashboard", tags=["Admin"])
+async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
+    """Get comprehensive dashboard statistics for admin panel"""
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    try:
+        async with db_pool.acquire() as conn:
+            user_stats = await conn.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_users,
+                    COUNT(CASE WHEN subscription_tier = 'vip' THEN 1 END) as vip_users,
+                    COUNT(CASE WHEN created_at > NOW() - INTERVAL '7 days' THEN 1 END) as new_this_week
+                FROM users
+            """)
+            
+            signal_stats = await conn.fetchrow("""
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
+                    COUNT(CASE WHEN tp1_hit = TRUE THEN 1 END) as tp1_hits,
+                    COALESCE(AVG(pips_gained), 0) as avg_pips
+                FROM signals
+                WHERE created_at > NOW() - INTERVAL '30 days'
+            """)
+            
+            course_stats = await conn.fetchrow("""
+                SELECT 
+                    (SELECT COUNT(*) FROM courses) as total_courses,
+                    (SELECT COUNT(*) FROM lessons) as total_lessons,
+                    (SELECT COUNT(*) FROM quizzes) as total_quizzes,
+                    (SELECT COUNT(*) FROM enrollments) as total_enrollments
+            """)
+            
+            blog_stats = await conn.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_posts,
+                    COALESCE(SUM(views), 0) as total_views
+                FROM blog_posts
+            """)
+            
+            webinar_stats = await conn.fetchrow("""
+                SELECT 
+                    COUNT(*) as total_webinars,
+                    (SELECT COUNT(*) FROM webinar_registrations) as total_registrations
+                FROM webinars
+            """)
+            
+            pending_questions = await conn.fetchval("""
+                SELECT COUNT(*) FROM student_questions WHERE is_answered = FALSE
+            """)
+            
+            recent_activities = await conn.fetch("""
+                SELECT a.*, u.full_name as user_name 
+                FROM activity_log a 
+                LEFT JOIN users u ON a.user_id = u.id 
+                ORDER BY a.created_at DESC LIMIT 10
+            """)
+            
+            return {
+                "users": {
+                    "total": user_stats['total_users'] or 0,
+                    "vip": user_stats['vip_users'] or 0,
+                    "new_this_week": user_stats['new_this_week'] or 0
+                },
+                "signals": {
+                    "total_30d": signal_stats['total'] or 0,
+                    "active": signal_stats['active'] or 0,
+                    "tp1_hits": signal_stats['tp1_hits'] or 0,
+                    "avg_pips": round(float(signal_stats['avg_pips'] or 0), 2)
+                },
+                "courses": {
+                    "total": course_stats['total_courses'] or 0,
+                    "lessons": course_stats['total_lessons'] or 0,
+                    "quizzes": course_stats['total_quizzes'] or 0,
+                    "enrollments": course_stats['total_enrollments'] or 0
+                },
+                "blog": {
+                    "total_posts": blog_stats['total_posts'] or 0,
+                    "total_views": int(blog_stats['total_views'] or 0)
+                },
+                "webinars": {
+                    "total": webinar_stats['total_webinars'] or 0,
+                    "registrations": webinar_stats['total_registrations'] or 0
+                },
+                "support": {
+                    "pending_questions": pending_questions or 0
+                },
+                "recent_activities": [
+                    {
+                        "id": a['id'],
+                        "action": a['action'],
+                        "entity_type": a['entity_type'],
+                        "user": a['user_name'],
+                        "time": a['created_at'].isoformat() if a['created_at'] else None
+                    }
+                    for a in recent_activities
+                ] if recent_activities else []
+            }
+    except Exception as e:
+        logger.error(f"Dashboard error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to load dashboard: {str(e)}")
+
+# Public settings endpoint
+@app.get("/api/settings", tags=["System"])
+async def get_public_settings():
+    """Get public site settings"""
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    keys = ['site_name', 'site_url', 'telegram_free_link', 'vip_price', 'vip_price_currency']
+    settings = {}
+    for key in keys:
+        try:
+            value = await get_setting(key)
+            if value is not None:
+                settings[key] = value
+        except Exception as e:
+            logger.warning(f"Failed to get setting {key}: {e}")
+    
+    return settings
+
+# SPA Catch-all - MUST BE LAST
+# This serves dashboard.html for all non-API, non-static routes
+# allowing the React/Vue-like router in dashboard.html to handle client-side routing
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def spa_catch_all(full_path: str):
+    """Catch-all route for SPA - serves dashboard.html for all frontend routes"""
+    
+    # Skip API routes
+    if full_path.startswith(("api/", "docs", "redoc", "openapi")):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    # Skip static files (should be caught by mounted StaticFiles, but just in case)
+    if full_path.startswith(("css/", "js/", "images/", "assets/", "uploads/")):
+        raise HTTPException(status_code=404, detail="Static file not found")
+    
+    # Serve dashboard.html for all other routes (signals, blog, admin, etc.)
+    # The frontend router will handle showing the correct section
+    html = get_dashboard_html()
+    if html:
+        return html
+    
+    # Fallback if no dashboard.html
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Page not found", "error_code": "HTTP_404"}
+    )
 
 if __name__ == "__main__":
     import uvicorn

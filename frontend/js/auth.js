@@ -4,7 +4,7 @@
  */
 
 const Auth = {
-    // API Base URL - Adjust if needed
+    // API Base URL - MUST match backend router prefix
     API_URL: '/api/auth',
     
     // Token storage keys
@@ -15,8 +15,9 @@ const Auth = {
      * Initialize auth module
      */
     init() {
-        this.checkAuthStatus();
+        console.log('Auth module initialized');
         this.bindAuthForms();
+        this.checkAuthStatus();
     },
     
     /**
@@ -78,15 +79,12 @@ const Auth = {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.detail || 'Login failed');
+                throw new Error(data.detail || `Login failed: ${response.status}`);
             }
             
             // Store token and user data
             this.setToken(data.access_token);
-            this.setUser({
-                email: email,
-                ...data
-            });
+            this.setUser(data.user || { email: email });
             
             // Redirect to dashboard
             window.location.href = '/dashboard.html';
@@ -145,6 +143,10 @@ const Auth = {
                 throw new Error(data.detail || 'Registration failed');
             }
             
+            // Store credentials temporarily for auto-login
+            document.getElementById('email').value = email;
+            document.getElementById('password').value = password;
+            
             // Auto-login after registration
             await this.handleLogin();
             
@@ -161,10 +163,16 @@ const Auth = {
      */
     async checkAuthStatus() {
         const token = this.getToken();
+        const currentPage = window.location.pathname;
+        
+        // Skip auth check on login page
+        if (currentPage.includes('index.html') || currentPage === '/' || currentPage === '') {
+            return;
+        }
         
         if (!token) {
             this.redirectToLogin();
-            return false;
+            return;
         }
         
         try {
@@ -179,22 +187,18 @@ const Auth = {
             if (!response.ok) {
                 if (response.status === 401) {
                     this.logout();
-                    return false;
+                    return;
                 }
                 throw new Error('Auth check failed');
             }
             
             const userData = await response.json();
             this.setUser(userData);
-            
-            // Update UI with user info
             this.updateUserUI(userData);
-            
-            return true;
             
         } catch (error) {
             console.error('Auth check failed:', error);
-            return false;
+            // Don't logout on network errors, just log
         }
     },
     
@@ -256,8 +260,8 @@ const Auth = {
      * Redirect to login page
      */
     redirectToLogin() {
-        if (!window.location.pathname.includes('index.html') && 
-            !window.location.pathname.includes('login')) {
+        const currentPage = window.location.pathname;
+        if (!currentPage.includes('index.html') && !currentPage.includes('login')) {
             window.location.href = '/index.html';
         }
     },
@@ -307,39 +311,6 @@ const Auth = {
             registerBtn.disabled = show;
             registerBtn.textContent = show ? 'Loading...' : 'Create Account';
         }
-    },
-    
-    /**
-     * Make authenticated API request
-     */
-    async apiRequest(url, options = {}) {
-        const token = this.getToken();
-        
-        const defaultOptions = {
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : '',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        };
-        
-        const mergedOptions = {
-            ...defaultOptions,
-            ...options,
-            headers: {
-                ...defaultOptions.headers,
-                ...options.headers
-            }
-        };
-        
-        const response = await fetch(url, mergedOptions);
-        
-        if (response.status === 401) {
-            this.logout();
-            throw new Error('Session expired. Please login again.');
-        }
-        
-        return response;
     }
 };
 
@@ -348,5 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
     Auth.init();
 });
 
-// Export for use in other modules
+// Export for use in other modules - BOTH cases for compatibility
 window.Auth = Auth;
+window.auth = Auth;  // This fixes the "auth is not defined" error

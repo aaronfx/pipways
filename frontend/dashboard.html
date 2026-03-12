@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Pipways</title>
+    <meta name="description" content="Professional trading signals, AI analysis, and educational resources">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <i class="fas fa-exclamation-circle"></i>
+        <span id="toast-message">Error message</span>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" class="app-container">
+        
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700;">
+                <i class="fas fa-chart-line" style="color: var(--primary);"></i>
+                <span>Pipways</span>
+            </div>
+            <button onclick="ui.toggleSidebar()" style="width: 40px; height: 40px; background: var(--bg-hover); border: none; border-radius: 10px; color: var(--text-primary); font-size: 20px; cursor: pointer;">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Pipways</span>
+                </div>
+            </div>
+
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <button class="nav-link active" onclick="app.showSection('home', this)">
+                        <i class="fas fa-home"></i>
+                        <span>Overview</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="window.location.href='/signals.html'">
+                        <i class="fas fa-satellite-dish"></i>
+                        <span>Trading Signals</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('analysis', this)">
+                        <i class="fas fa-robot"></i>
+                        <span>AI Analysis</span>
+                        <span class="premium-badge" style="position: static; margin-left: auto;">PRO</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('performance', this)">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Performance AI</span>
+                        <span class="premium-badge" style="position: static; margin-left: auto;">NEW</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('mentor', this)">
+                        <i class="fas fa-comments"></i>
+                        <span>AI Mentor</span>
+                        <span class="premium-badge" style="position: static; margin-left: auto;">PRO</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="window.location.href='/course-player.html'">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Courses</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="app.showSection('webinars', this)">
+                        <i class="fas fa-video"></i>
+                        <span>Webinars</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" onclick="window.location.href='/blog-editor.html'">
+                        <i class="fas fa-newspaper"></i>
+                        <span>Blog</span>
+                    </button>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">A</div>
+                    <div>
+                        <div style="font-weight: 600;" id="user-name">Admin User</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);" id="user-email">admin@pipways.com</div>
+                        <span class="admin-badge hidden" id="admin-badge">ADMIN</span>
+                    </div>
+                </div>
+                <button class="btn btn-danger" onclick="auth.logout()" style="width: 100%;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Home Section -->
+            <div class="section active" id="home-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-home"></i> Dashboard Overview</h2>
+                    <p>Welcome to your professional trading command center</p>
+                </div>
+                
+                <div class="content-grid">
+                    <div class="content-card">
+                        <h3><i class="fas fa-signal" style="color: var(--primary);"></i> Latest Signals</h3>
+                        <p>Access real-time buy/sell signals for forex, crypto, and commodities.</p>
+                        <button class="btn btn-sm" onclick="window.location.href='/signals.html'" style="margin-top: 12px;">View Signals</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> Performance Analysis</h3>
+                        <p>Upload your trading history for AI-powered feedback.</p>
+                        <button class="btn btn-sm btn-success" onclick="app.showSection('performance', document.querySelectorAll('.nav-link')[4])" style="margin-top: 12px;">Analyze Now</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h3>
+                        <p>Upload any chart image for instant pattern recognition.</p>
+                        <button class="btn btn-sm" onclick="app.showSection('analysis', document.querySelectorAll('.nav-link')[3])" style="margin-top: 12px;">Analyze Chart</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-graduation-cap" style="color: var(--premium);"></i> Trading Courses</h3>
+                        <p>Master the markets with structured curriculum.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="window.location.href='/course-player.html'" style="margin-top: 12px;">Start Learning</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-video" style="color: var(--primary);"></i> Live Webinars</h3>
+                        <p>Join interactive live sessions with professional traders.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="app.showSection('webinars', document.querySelectorAll('.nav-link')[7])" style="margin-top: 12px;">View Schedule</button>
+                    </div>
+                    <div class="content-card">
+                        <h3><i class="fas fa-newspaper" style="color: var(--secondary);"></i> Trading Blog</h3>
+                        <p>Daily market insights and strategy breakdowns.</p>
+                        <button class="btn btn-sm btn-secondary" onclick="window.location.href='/blog-editor.html'" style="margin-top: 12px;">Read Articles</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signals Section -->
+            <div class="section" id="signals-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-satellite-dish"></i> Trading Signals</h2>
+                    <p>Professional trading signals with technical analysis</p>
+                </div>
+                <div style="text-align: center; padding: 40px;">
+                    <a href="/signals.html" class="btn btn-primary">Open Signals Page</a>
+                </div>
+            </div>
+
+            <!-- AI Chart Analysis Section -->
+            <div class="section" id="analysis-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-robot" style="color: var(--warning);"></i> AI Chart Analysis</h2>
+                    <p>Upload your chart screenshot for instant AI-powered technical analysis</p>
+                </div>
+                <div class="analyzer-container">
+                    <div class="content-card" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;">Upload Chart Image</h3>
+                        <div class="upload-area" id="chart-upload-area" onclick="document.getElementById('chart-file').click()">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Drop image here or click to upload</h3>
+                            <p style="color: var(--text-secondary); margin-top: 8px;">Supports: JPG, PNG, WEBP</p>
+                            <input type="file" id="chart-file" class="hidden" accept="image/*" onchange="ai.handleChartUpload(this)">
+                        </div>
+                        <div id="chart-preview-container" class="hidden" style="margin-top: 20px;">
+                            <img id="chart-preview" class="image-preview" style="max-height: 400px;">
+                            <div style="display: flex; gap: 12px; margin-top: 12px;">
+                                <input type="text" id="chart-pair" class="form-input" placeholder="EURUSD" value="EURUSD">
+                                <button class="btn" onclick="ai.analyzeChart()">Analyze with AI</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chart-analysis-result" class="hidden">
+                        <div id="chart-analysis-content" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Analyzer Section -->
+            <div class="section" id="performance-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-chart-pie" style="color: var(--secondary);"></i> AI Performance Analyzer</h2>
+                    <p>Upload trading statements for AI extraction and analysis</p>
+                </div>
+                <div class="analyzer-container">
+                    <div class="content-card" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px;">Upload Trading Statement</h3>
+                        <div class="upload-area" onclick="document.getElementById('performance-file').click()">
+                            <i class="fas fa-file-image" style="font-size: 48px; color: var(--primary); margin-bottom: 16px;"></i>
+                            <h3>Drop image/PDF here or click to upload</h3>
+                            <input type="file" id="performance-file" class="hidden" accept="image/*" onchange="ai.handlePerformanceUpload(this)">
+                        </div>
+                        <button class="btn btn-lg btn-success hidden" id="analyze-btn" onclick="ai.analyzePerformance()" style="margin-top: 12px;">
+                            Analyze Performance
+                        </button>
+                    </div>
+                    <div id="analysis-results" class="hidden">
+                        <h3>Analysis Results</h3>
+                        <div id="analysis-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Mentor Section -->
+            <div class="section" id="mentor-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-comments" style="color: var(--primary);"></i> AI Trading Mentor</h2>
+                    <p>Get personalized trading advice from our AI mentor</p>
+                </div>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message">
+                            <div class="chat-bubble">
+                                <strong>AI Mentor:</strong> Hello! I'm your personal trading mentor. Ask me anything about trading strategies, risk management, or market analysis.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="Ask your trading question..." onkeypress="if(event.key==='Enter')ai.sendChatMessage()">
+                        <button class="btn btn-sm" onclick="ai.sendChatMessage()" style="width: auto;">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Courses Section -->
+            <div class="section" id="courses-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-graduation-cap"></i> Trading Courses</h2>
+                    <p>Master the markets with our comprehensive curriculum</p>
+                </div>
+                <div style="text-align: center; padding: 40px;">
+                    <a href="/course-player.html" class="btn btn-primary">Open Course Player</a>
+                </div>
+            </div>
+
+            <!-- Webinars Section -->
+            <div class="section" id="webinars-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-video"></i> Live Webinars</h2>
+                    <p>Join our expert-led live trading sessions</p>
+                </div>
+                <div class="content-grid" id="webinars-grid">
+                    <div class="content-card">
+                        <p style="text-align: center; color: var(--text-secondary);">Loading webinars...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blog Section -->
+            <div class="section" id="blog-section">
+                <div class="page-header">
+                    <h2><i class="fas fa-newspaper"></i> Trading Blog</h2>
+                    <p>Latest insights, strategies, and market analysis</p>
+                </div>
+                <div style="text-align: center; padding: 40px;">
+                    <a href="/blog-editor.html" class="btn btn-primary">Open Blog Editor</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Load user data
+        document.addEventListener('DOMContentLoaded', () => {
+            const user = Auth.getUser();
+            if (user) {
+                document.getElementById('user-name').textContent = user.full_name || 'User';
+                document.getElementById('user-email').textContent = user.email || '';
+                document.getElementById('user-avatar').textContent = (user.full_name || 'U')[0].toUpperCase();
+                if (user.role === 'admin') {
+                    document.getElementById('admin-badge')?.classList.remove('hidden');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

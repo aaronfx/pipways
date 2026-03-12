@@ -5,15 +5,13 @@ Handles login, register, and token management
 
 import bcrypt
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import timedelta
 
-from . import database
-from .database import SECRET_KEY, ALGORITHM
-from .schemas import UserRegister, UserLogin, Token
-from .security import create_access_token, create_refresh_token, get_current_user
+import database
+from database import SECRET_KEY, ALGORITHM
+from schemas import UserRegister, UserLogin, Token
+from security import create_access_token, create_refresh_token, get_current_user
 
-# IMPORTANT: Add prefix so frontend /api/auth works
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter()
 
 
 @router.post("/register", response_model=Token)

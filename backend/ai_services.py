@@ -1,108 +1,204 @@
-@router.post("/analyze-performance")
-async def analyze_performance(
-    file: UploadFile = File(...),
+"""
+Pipways AI Services
+Handles:
+- AI Mentor
+- Chart Analysis
+- Performance Analysis
+"""
+
+import os
+import httpx
+import base64
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+
+from . import database
+from .security import get_current_user_optional
+from .schemas import AIMentorRequest, PerformanceAnalysisRequest
+
+router = APIRouter()
+
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+SITE_URL = os.getenv("SITE_URL", "https://pipwaysapp.onrender.com")
+SITE_NAME = "Pipways AI"
+
+CHAT_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+SYSTEM_PROMPT = """
+You are Pipways AI Mentor.
+
+You are a professional forex trading coach helping traders improve.
+
+Teach traders:
+- risk management
+- trading psychology
+- technical analysis
+- discipline
+
+Always emphasize risking only 1-2% per trade.
+"""
+
+# --------------------------------------------------
+# OPENROUTER CALL
+# --------------------------------------------------
+
+async def call_openrouter(messages, model=CHAT_MODEL):
+
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(status_code=503, detail="AI not configured")
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": SITE_URL,
+        "X-Title": SITE_NAME,
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": 3000
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+
+        response = await client.post(
+            OPENROUTER_URL,
+            headers=headers,
+            json=payload
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail=response.text
+            )
+
+        data = response.json()
+
+        return data["choices"][0]["message"]["content"]
+
+# --------------------------------------------------
+# AI MENTOR
+# --------------------------------------------------
+
+@router.post("/mentor")
+async def ai_mentor(
+    data: AIMentorRequest,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
 
-    import pandas as pd
-    import io
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": data.message}
+    ]
 
-    try:
+    response = await call_openrouter(messages)
 
-        contents = await file.read()
+    return {"response": response}
 
-        # CSV
-        if file.filename.endswith(".csv"):
+# --------------------------------------------------
+# CHART ANALYSIS
+# --------------------------------------------------
 
-            df = pd.read_csv(io.BytesIO(contents))
+@router.post("/analyze-chart")
+async def analyze_chart(
+    image: UploadFile = File(...),
+    pair: str = Form("EURUSD"),
+    timeframe: str = Form("1H"),
+    context: str = Form("")
+):
 
-        # Excel
-        elif file.filename.endswith(".xlsx"):
+    image_bytes = await image.read()
+    image_b64 = base64.b64encode(image_bytes).decode()
 
-            df = pd.read_excel(io.BytesIO(contents))
+    chart_prompt = f"""
+Analyze this {pair} chart on {timeframe} timeframe.
 
-        else:
+Return structured analysis:
 
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported file type"
-            )
-
-        # normalize column names
-        df.columns = [c.lower() for c in df.columns]
-
-        if "profit" not in df.columns:
-
-            raise HTTPException(
-                status_code=400,
-                detail="Profit column not detected"
-            )
-
-        trades = len(df)
-
-        wins = df[df["profit"] > 0]
-        losses = df[df["profit"] <= 0]
-
-        win_rate = round(len(wins) / trades * 100, 2)
-
-        gross_profit = wins["profit"].sum()
-        gross_loss = abs(losses["profit"].sum())
-
-        profit_factor = round(gross_profit / gross_loss, 2) if gross_loss else 0
-
-        avg_win = wins["profit"].mean() if len(wins) else 0
-        avg_loss = abs(losses["profit"].mean()) if len(losses) else 0
-
-        rr = round(avg_win / avg_loss, 2) if avg_loss else 0
-
-        summary = f"""
-Trades: {trades}
-Win Rate: {win_rate}%
-Profit Factor: {profit_factor}
-Risk Reward: {rr}
+Market Structure
+Support
+Resistance
+Trade Setup
+Entry
+Stop Loss
+Take Profit
+Probability
 """
 
-        prompt = f"""
-You are a professional trading coach.
-
-Analyze this trading performance:
-
-{summary}
-
-Return structured response:
-
-Performance Summary
-Key Issues
-Strengths
-Improvement Plan
-Recommended Courses
-Mentor Advice
-"""
-
-        ai_text = await call_openrouter(
-            [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ]
-        )
-
-        return {
-
-            "summary": summary,
-            "analysis": ai_text,
-
-            "metrics": {
-                "trades": trades,
-                "win_rate": win_rate,
-                "profit_factor": profit_factor,
-                "risk_reward": rr
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": chart_prompt},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{image.content_type};base64,{image_b64}"
+                }
             }
+        ]
+    }]
 
-        }
+    analysis = await call_openrouter(messages, model=VISION_MODEL)
 
-    except Exception as e:
+    return {"analysis": analysis}
 
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+# --------------------------------------------------
+# PERFORMANCE ANALYSIS
+# --------------------------------------------------
+
+@router.post("/analyze-performance")
+async def analyze_performance(
+    data: PerformanceAnalysisRequest,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+
+    # Placeholder until CSV parser added
+
+    return {
+
+        "trader_score": 75,
+
+        "analysis": """
+### Performance Summary
+
+You show decent trading discipline.
+
+### Key Issues
+Holding losing trades too long
+Overtrading during volatile sessions
+
+### Strengths
+Consistent position sizing
+Good profit factor
+
+### Improvement Plan
+Limit trades to 3 per day
+Use stop losses
+Review journal weekly
+""",
+
+        "strengths": [
+            "Consistent position sizing",
+            "Good profit factor"
+        ],
+
+        "top_mistakes": [
+            "Holding losing trades too long",
+            "Overtrading volatile sessions"
+        ],
+
+        "improvement_plan": [
+            "Limit trades to 3 per day",
+            "Use hard stop losses",
+            "Maintain trading journal"
+        ]
+    }

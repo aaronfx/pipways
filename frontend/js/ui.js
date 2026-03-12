@@ -1,13 +1,17 @@
 /**
  * UI Utilities Module
- * Added: Mobile responsive helpers
+ * Added: Mobile responsive helpers and fixed loading overlay
  */
 
 const ui = {
+    loadingCount: 0,
+
     init() {
         this.setupEventListeners();
         this.updateTheme();
         this.setupMobileMenu();
+        // Ensure loading is hidden on init
+        this.hideLoading();
     },
 
     setupEventListeners() {
@@ -72,6 +76,7 @@ const ui = {
     },
 
     showLoading(text = 'Processing...') {
+        this.loadingCount++;
         const loadingText = document.getElementById('loading-text');
         const overlay = document.getElementById('loading-overlay');
         if (loadingText) loadingText.textContent = text;
@@ -79,6 +84,15 @@ const ui = {
     },
 
     hideLoading() {
+        this.loadingCount = Math.max(0, this.loadingCount - 1);
+        if (this.loadingCount === 0) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+    },
+
+    forceHideLoading() {
+        this.loadingCount = 0;
         const overlay = document.getElementById('loading-overlay');
         if (overlay) overlay.classList.add('hidden');
     },
@@ -118,7 +132,9 @@ const ui = {
     },
 
     formatPrice(price) {
-        if (price === null || price === undefined) return '-';
-        return parseFloat(price).toFixed(5);
+        if (price === null || price === undefined || price === '') return '-';
+        const num = parseFloat(price);
+        if (isNaN(num)) return '-';
+        return num.toFixed(5);
     }
 };

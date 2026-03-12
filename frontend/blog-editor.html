@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog Editor - Pipways</title>
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+        .editor-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+        }
+        .main-editor {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 30px;
+        }
+        .editor-header {
+            margin-bottom: 30px;
+        }
+        .editor-title {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #f8fafc;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #94a3b8;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .seo-sidebar {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        .seo-title {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0 auto 20px;
+            border: 4px solid;
+        }
+        .score-green {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+        .score-orange {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+        .score-red {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        .seo-section {
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #334155;
+        }
+        .seo-section:last-child {
+            border-bottom: none;
+        }
+        .seo-label {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .seo-value {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .recommendation-list {
+            list-style: none;
+        }
+        .recommendation-item {
+            padding: 10px 0;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .rec-icon {
+            font-size: 1.1rem;
+        }
+        .rec-good { color: #22c55e; }
+        .rec-warning { color: #f59e0b; }
+        .rec-error { color: #ef4444; }
+        
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-success {
+            background: #22c55e;
+            color: white;
+        }
+        .btn-secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+        
+        .editor-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #334155;
+        }
+        
+        .tox-tinymce {
+            border-radius: 8px !important;
+            border: 1px solid #334155 !important;
+        }
+        
+        .meta-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        @media (max-width: 1024px) {
+            .editor-container {
+                grid-template-columns: 1fr;
+            }
+            .seo-sidebar {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="main-editor">
+            <div class="editor-header">
+                <h1 class="editor-title">📝 Blog Editor</h1>
+                
+                <div class="form-group">
+                    <label class="form-label">Post Title</label>
+                    <input type="text" class="form-input" id="postTitle" placeholder="Enter compelling title..." oninput="updateSEO()">
+                </div>
+                
+                <div class="meta-fields">
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select class="form-input" id="postCategory">
+                            <option>General</option>
+                            <option>Trading Strategies</option>
+                            <option>Forex Basics</option>
+                            <option>Technical Analysis</option>
+                            <option>Risk Management</option>
+                            <option>Market News</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-input" id="postStatus">
+                            <option value="draft">Draft</option>
+                            <option value="published">Published</option>
+                            <option value="scheduled">Scheduled</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Focus Keyword</label>
+                    <input type="text" class="form-input" id="focusKeyword" placeholder="Enter main keyword (e.g., 'forex trading')" oninput="updateSEO()">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">SEO Title</label>
+                    <input type="text" class="form-input" id="seoTitle" placeholder="Optimized title for search engines" oninput="updateSEO()">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Meta Description</label>
+                    <input type="text" class="form-input" id="metaDescription" placeholder="Brief description (150-160 chars recommended)" maxlength="160" oninput="updateSEO()">
+                </div>
+            </div>
+            
+            <div class="editor-toolbar">
+                <button class="btn btn-secondary" onclick="insertImage()">🖼️ Insert Image</button>
+                <button class="btn btn-secondary" onclick="showMediaLibrary()">📚 Media Library</button>
+            </div>
+            
+            <textarea id="editor"></textarea>
+            
+            <div style="margin-top: 30px; display: flex; gap: 15px;">
+                <button class="btn btn-success" onclick="savePost()">💾 Save Post</button>
+                <button class="btn btn-primary" onclick="previewPost()">👁️ Preview</button>
+                <button class="btn btn-secondary" onclick="window.location.href='/blog'">❌ Cancel</button>
+            </div>
+        </div>
+        
+        <div class="seo-sidebar">
+            <div class="seo-title">
+                🔍 SEO Analysis
+                <button class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem; margin: 0;" onclick="updateSEO()">Refresh</button>
+            </div>
+            
+            <div id="seoScoreCircle" class="score-circle score-red">
+                0
+            </div>
+            
+            <div class="seo-section">
+                <div class="seo-label">
+                    <span>SEO Score</span>
+                    <span id="seoScoreText" class="seo-value">Poor</span>
+                </div>
+                <p style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">
+                    Optimize your content to rank higher in search results.
+                </p>
+            </div>
+            
+            <div class="seo-section">
+                <div class="seo-label">
+                    <span>Keyword Density</span>
+                    <span id="keywordDensity" class="seo-value">0%</span>
+                </div>
+                <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;">
+                    <div id="densityBar" style="width: 0%; height: 100%; background: #3b82f6; border-radius: 3px; transition: width 0.3s;"></div>
+                </div>
+            </div>
+            
+            <div class="seo-section">
+                <div class="seo-label">Content Stats</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem;">
+                    <div>
+                        <span style="color: #64748b;">Words:</span>
+                        <span id="wordCount" style="color: #e2e8f0; font-weight: 600;">0</span>
+                    </div>
+                    <div>
+                        <span style="color: #64748b;">Reading time:</span>
+                        <span id="readingTime" style="color: #e2e8f0; font-weight: 600;">0 min</span>
+                    </div>
+                    <div>
+                        <span style="color: #64748b;">Headings:</span>
+                        <span id="headingCount" style="color: #e2e8f0; font-weight: 600;">0</span>
+                    </div>
+                    <div>
+                        <span style="color: #64748b;">Images:</span>
+                        <span id="imageCount" style="color: #e2e8f0; font-weight: 600;">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="seo-section">
+                <div class="seo-label">Recommendations</div>
+                <ul class="recommendation-list" id="recommendations">
+                    <li class="recommendation-item">
+                        <span class="rec-icon rec-warning">⚠️</span>
+                        <span>Enter a focus keyword to see recommendations</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editor;
+        let currentPostId = null;
+        
+        // Initialize TinyMCE
+        tinymce.init({
+            selector: '#editor',
+            height: 600,
+            plugins: [
+                'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount', 'emoticons'
+            ],
+            toolbar: 'undo redo | formatselect | bold italic underline strikethrough | \
+                alignleft aligncenter alignright alignjustify | \
+                bullist numlist outdent indent | removeformat | image media link | \
+                code fullscreen preview | help',
+            content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; color: #333; }',
+            skin: 'oxide-dark',
+            content_css: 'dark',
+            images_upload_url: '/api/media/upload',
+            automatic_uploads: true,
+            setup: function(ed) {
+                editor = ed;
+                ed.on('keyup change NodeChange', function() {
+                    updateSEO();
+                });
+            }
+        });
+        
+        function updateSEO() {
+            const content = editor ? editor.getContent() : '';
+            const textContent = content.replace(/<[^>]+>/g, '');
+            const title = document.getElementById('postTitle').value;
+            const seoTitle = document.getElementById('seoTitle').value || title;
+            const metaDesc = document.getElementById('metaDescription').value;
+            const keyword = document.getElementById('focusKeyword').value;
+            
+            // Calculate metrics
+            const wordCount = textContent.trim().split(/\s+/).filter(w => w.length > 0).length;
+            const readingTime = Math.ceil(wordCount / 200);
+            const h2Count = (content.match(/<h2/g) || []).length;
+            const h3Count = (content.match(/<h3/g) || []).length;
+            const imgCount = (content.match(/<img/g) || []).length;
+            
+            // Update stats
+            document.getElementById('wordCount').textContent = wordCount;
+            document.getElementById('readingTime').textContent = readingTime + ' min';
+            document.getElementById('headingCount').textContent = h2Count + h3Count;
+            document.getElementById('imageCount').textContent = imgCount;
+            
+            if (!keyword) {
+                document.getElementById('seoScoreCircle').textContent = '0';
+                document.getElementById('seoScoreCircle').className = 'score-circle score-red';
+                document.getElementById('seoScoreText').textContent = 'Poor';
+                document.getElementById('keywordDensity').textContent = '0%';
+                document.getElementById('densityBar').style.width = '0%';
+                document.getElementById('recommendations').innerHTML = `
+                    <li class="recommendation-item">
+                        <span class="rec-icon rec-warning">⚠️</span>
+                        <span>Enter a focus keyword to see recommendations</span>
+                    </li>
+                `;
+                return;
+            }
+            
+            // Calculate keyword density
+            const keywordRegex = new RegExp(keyword, 'gi');
+            const keywordMatches = (textContent.match(keywordRegex) || []).length;
+            const density = wordCount > 0 ? ((keywordMatches / wordCount) * 100).toFixed(1) : 0;
+            
+            document.getElementById('keywordDensity').textContent = density + '%';
+            document.getElementById('densityBar').style.width = Math.min(density * 20, 100) + '%';
+            
+            // Calculate SEO score
+            let score = 0;
+            const recommendations = [];
+            
+            // Title checks (20 points)
+            if (seoTitle.toLowerCase().includes(keyword.toLowerCase())) {
+                score += 15;
+                if (seoTitle.toLowerCase().startsWith(keyword.toLowerCase())) {
+                    score += 5;
+                }
+            } else {
+                recommendations.push({ type: 'error', text: 'Add focus keyword to SEO title' });
+            }
+            
+            // Meta description (10 points)
+            if (metaDesc && metaDesc.toLowerCase().includes(keyword.toLowerCase())) {
+                score += 10;
+            } else {
+                recommendations.push({ type: 'warning', text: 'Add keyword to meta description' });
+            }
+            
+            // Content length (20 points)
+            if (wordCount >= 1000) score += 20;
+            else if (wordCount >= 600) score += 15;
+            else if (wordCount >= 300) score += 10;
+            else {
+                score += 5;
+                recommendations.push({ type: 'error', text: `Content too short (${wordCount} words). Aim for 300+` });
+            }
+            
+            // Keyword density (15 points)
+            if (density >= 0.5 && density <= 2.5) score += 15;
+            else if (density > 2.5) {
+                score += 5;
+                recommendations.push({ type: 'warning', text: 'Keyword density too high (>2.5%)' });
+            } else {
+                score += 5;
+                recommendations.push({ type: 'warning', text: 'Keyword density too low (<0.5%)' });
+            }
+            
+            // Headings (15 points)
+            if (h2Count > 0) score += 10;
+            else recommendations.push({ type: 'error', text: 'Add H2 headings' });
+            if (h3Count > 0) score += 5;
+            
+            // Images (10 points)
+            if (imgCount > 0) score += 10;
+            else recommendations.push({ type: 'warning', text: 'Add images to content' });
+            
+            // Internal links (10 points)
+            const internalLinks = (content.match(/href="\/[^"]*"/g) || []).length;
+            if (internalLinks >= 2) score += 10;
+            else recommendations.push({ type: 'warning', text: `Add more internal links (${internalLinks}/2)` });
+            
+            // Meta length check
+            if (metaDesc) {
+                if (metaDesc.length < 120) recommendations.push({ type: 'warning', text: 'Meta description too short' });
+                else if (metaDesc.length > 160) recommendations.push({ type: 'warning', text: 'Meta description too long' });
+            }
+            
+            // Update score display
+            const scoreCircle = document.getElementById('seoScoreCircle');
+            scoreCircle.textContent = score;
+            
+            let scoreClass = 'score-red';
+            let scoreText = 'Poor';
+            if (score >= 80) {
+                scoreClass = 'score-green';
+                scoreText = 'Excellent';
+            } else if (score >= 50) {
+                scoreClass = 'score-orange';
+                scoreText = 'Average';
+            }
+            
+            scoreCircle.className = 'score-circle ' + scoreClass;
+            document.getElementById('seoScoreText').textContent = scoreText;
+            
+            // Update recommendations
+            const recList = document.getElementById('recommendations');
+            if (recommendations.length === 0) {
+                recList.innerHTML = `
+                    <li class="recommendation-item">
+                        <span class="rec-icon rec-good">✅</span>
+                        <span>Great job! Your SEO looks good.</span>
+                    </li>
+                `;
+            } else {
+                recList.innerHTML = recommendations.map(rec => `
+                    <li class="recommendation-item">
+                        <span class="rec-icon ${rec.type === 'error' ? 'rec-error' : 'rec-warning'}">
+                            ${rec.type === 'error' ? '❌' : '⚠️'}
+                        </span>
+                        <span>${rec.text}</span>
+                    </li>
+                `).join('');
+            }
+        }
+        
+        async function savePost() {
+            const title = document.getElementById('postTitle').value;
+            const content = editor.getContent();
+            const category = document.getElementById('postCategory').value;
+            const status = document.getElementById('postStatus').value;
+            const seoTitle = document.getElementById('seoTitle').value;
+            const metaDesc = document.getElementById('metaDescription').value;
+            const keyword = document.getElementById('focusKeyword').value;
+            
+            if (!title || !content) {
+                alert('Please enter title and content');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('category', category);
+            formData.append('status', status);
+            formData.append('seo_title', seoTitle);
+            formData.append('meta_description', metaDesc);
+            formData.append('focus_keyword', keyword);
+            
+            try {
+                const url = currentPostId ? `/api/blog/${currentPostId}` : '/api/blog';
+                const method = currentPostId ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: formData
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    alert('Post saved successfully!');
+                    if (!currentPostId) {
+                        currentPostId = data.id;
+                    }
+                } else {
+                    throw new Error('Failed to save');
+                }
+            } catch (e) {
+                console.error('Error saving post:', e);
+                alert('Failed to save post');
+            }
+        }
+        
+        function previewPost() {
+            const content = editor.getContent();
+            const title = document.getElementById('postTitle').value;
+            
+            const previewWindow = window.open('', '_blank');
+            previewWindow.document.write(`
+                <html>
+                <head>
+                    <title>Preview: ${title}</title>
+                    <style>
+                        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+                        h1 { color: #333; }
+                    </style>
+                </head>
+                <body>
+                    <h1>${title}</h1>
+                    <div>${content}</div>
+                </body>
+                </html>
+            `);
+        }
+        
+        function insertImage() {
+            editor.execCommand('mceImage');
+        }
+        
+        function showMediaLibrary() {
+            alert('Media library would open here');
+        }
+        
+        // Load post if editing
+        async function loadPost(id) {
+            try {
+                const res = await fetch(`/api/blog/${id}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                
+                if (res.ok) {
+                    const post = await res.json();
+                    currentPostId = post.id;
+                    document.getElementById('postTitle').value = post.title;
+                    document.getElementById('postCategory').value = post.category;
+                    document.getElementById('postStatus').value = post.status;
+                    editor.setContent(post.content);
+                    
+                    if (post.seo) {
+                        document.getElementById('seoTitle').value = post.seo.seo_title || '';
+                        document.getElementById('metaDescription').value = post.seo.meta_description || '';
+                        document.getElementById('focusKeyword').value = post.seo.focus_keyword || '';
+                    }
+                    
+                    updateSEO();
+                }
+            } catch (e) {
+                console.error('Error loading post:', e);
+            }
+        }
+        
+        // Check for post ID in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('id');
+        if (editId) {
+            loadPost(editId);
+        }
+    </script>
+</body>
+</html>

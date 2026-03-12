@@ -6,7 +6,7 @@ PostgreSQL + asyncpg implementation
 import asyncpg
 import asyncio
 import logging
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, AsyncGenerator
 from datetime import datetime
 import os
 import json
@@ -41,9 +41,19 @@ async def init_db_pool():
     try:
         dsn = os.getenv('DATABASE_URL')
         if dsn:
-            db_pool = await asyncpg.create_pool(dsn, **DB_CONFIG)
+            db_pool = await asyncpg.create_pool(dsn, min_size=5, max_size=20, command_timeout=60)
         else:
-            db_pool = await asyncpg.create_pool(**DB_CONFIG)
+            db_pool = await asyncpg.create_pool(
+                host=DB_CONFIG['host'],
+                port=DB_CONFIG['port'],
+                user=DB_CONFIG['user'],
+                password=DB_CONFIG['password'],
+                database=DB_CONFIG['database'],
+                min_size=DB_CONFIG['min_size'],
+                max_size=DB_CONFIG['max_size'],
+                command_timeout=DB_CONFIG['command_timeout'],
+                server_settings=DB_CONFIG['server_settings']
+            )
         
         logger.info("Database pool initialized")
         return db_pool
@@ -91,18 +101,46 @@ async def fetchval(query: str, *args):
     async with get_connection() as conn:
         return await conn.fetchval(query, *args)
 
+# ============================================================================
+# LIFESPAN CONTEXT MANAGER (for FastAPI startup/shutdown)
+# ============================================================================
+
+@asynccontextmanager
+async def lifespan(app) -> AsyncGenerator:
+    """
+    FastAPI lifespan context manager.
+    Handles database initialization on startup and cleanup on shutdown.
+    """
+    # Startup
+    logger.info("Starting up database...")
+    try:
+        await init_db_pool()
+        await init_db()
+        logger.info("Database startup complete")
+    except Exception as e:
+        logger.error(f"Database startup failed: {e}")
+        raise
+    
+    yield  # Application runs here
+    
+    # Shutdown
+    logger.info("Shutting down database...")
+    await close_db_pool()
+    logger.info("Database shutdown complete")
+
+# ============================================================================
+# DATABASE INITIALIZATION
+# ============================================================================
+
 async def init_db():
     """Initialize all database tables with indexes"""
     if not db_pool:
         await init_db_pool()
     
     async with db_pool.acquire() as conn:
-        # Set timezone
         await conn.execute("SET timezone TO 'UTC'")
         
-        # =========================================================================
         # 1. USERS TABLE
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -132,9 +170,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_users_subscription ON users(subscription_tier);
         """)
         
-        # =========================================================================
         # 2. SIGNALS TABLE (Enhanced)
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (
                 id SERIAL PRIMARY KEY,
@@ -158,7 +194,7 @@ async def init_db():
                 tp3_hit BOOLEAN DEFAULT FALSE,
                 sl_hit BOOLEAN DEFAULT FALSE,
                 pips_gained DECIMAL(10,2),
-                accuracy_rating DECIMAL(3,2), -- 0.00 to 1.00
+                accuracy_rating DECIMAL(3,2),
                 created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -173,12 +209,9 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
             CREATE INDEX IF NOT EXISTS idx_signals_created_at ON signals(created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_signals_premium ON signals(is_premium);
-            CREATE INDEX IF NOT EXISTS idx_signals_created_by ON signals(created_by);
         """)
         
-        # =========================================================================
         # 3. COURSES TABLE
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS courses (
                 id SERIAL PRIMARY KEY,
@@ -203,15 +236,7 @@ async def init_db():
             )
         """)
         
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_courses_status ON courses(status);
-            CREATE INDEX IF NOT EXISTS idx_courses_level ON courses(level);
-            CREATE INDEX IF NOT EXISTS idx_courses_premium ON courses(is_premium);
-        """)
-        
-        # =========================================================================
         # 4. COURSE MODULES
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS course_modules (
                 id SERIAL PRIMARY KEY,
@@ -231,9 +256,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_modules_order ON course_modules(sort_order);
         """)
         
-        # =========================================================================
         # 5. LESSONS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS lessons (
                 id SERIAL PRIMARY KEY,
@@ -264,9 +287,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_lessons_order ON lessons(sort_order);
         """)
         
-        # =========================================================================
         # 6. STUDENT PROGRESS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS student_progress (
                 id SERIAL PRIMARY KEY,
@@ -290,9 +311,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_progress_lesson ON student_progress(lesson_id);
         """)
         
-        # =========================================================================
         # 7. ENROLLMENTS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS enrollments (
                 id SERIAL PRIMARY KEY,
@@ -309,9 +328,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
         # 8. QUIZZES
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS quizzes (
                 id SERIAL PRIMARY KEY,
@@ -330,9 +347,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
         # 9. QUIZ QUESTIONS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS quiz_questions (
                 id SERIAL PRIMARY KEY,
@@ -353,9 +368,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
         # 10. QUIZ ATTEMPTS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS quiz_attempts (
                 id SERIAL PRIMARY KEY,
@@ -380,9 +393,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_attempts_user ON quiz_attempts(user_id);
         """)
         
-        # =========================================================================
         # 11. STUDENT QUESTIONS (Q&A)
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS student_questions (
                 id SERIAL PRIMARY KEY,
@@ -401,9 +412,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
         # 12. BLOG POSTS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_posts (
                 id SERIAL PRIMARY KEY,
@@ -435,9 +444,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(is_featured);
         """)
         
-        # =========================================================================
         # 13. BLOG MEDIA
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_media (
                 id SERIAL PRIMARY KEY,
@@ -455,9 +462,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
         # 14. BLOG SEO DATA
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS blog_seo_data (
                 id SERIAL PRIMARY KEY,
@@ -481,9 +486,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_seo_slug ON blog_seo_data(slug);
         """)
         
-        # =========================================================================
         # 15. WEBINARS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinars (
                 id SERIAL PRIMARY KEY,
@@ -505,9 +508,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
         # 16. WEBINAR REGISTRATIONS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS webinar_registrations (
                 id SERIAL PRIMARY KEY,
@@ -523,9 +524,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
-        # 17. MEDIA FILES (General)
-        # =========================================================================
+        # 17. MEDIA FILES
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS media_files (
                 id SERIAL PRIMARY KEY,
@@ -534,16 +533,14 @@ async def init_db():
                 url VARCHAR(500) NOT NULL,
                 mime_type VARCHAR(100),
                 file_size_bytes INTEGER,
-                entity_type VARCHAR(50), -- 'course', 'lesson', 'blog', 'signal', etc.
+                entity_type VARCHAR(50),
                 entity_id INTEGER,
                 uploaded_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
-        # =========================================================================
         # 18. SETTINGS
-        # =========================================================================
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 id SERIAL PRIMARY KEY,
@@ -557,9 +554,7 @@ async def init_db():
             )
         """)
         
-        # =========================================================================
-        # 19. ACTIVITY LOG (Audit Trail)
-        # =========================================================================
+        # 19. ACTIVITY LOG
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS activity_log (
                 id SERIAL PRIMARY KEY,
@@ -581,9 +576,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
         """)
         
-        # =========================================================================
         # INSERT DEFAULT SETTINGS
-        # =========================================================================
         default_settings = [
             ('site_name', 'Pipways', 'string', 'general', 'Platform name', True),
             ('site_url', 'https://pipways.com', 'string', 'general', 'Main site URL', True),
@@ -605,23 +598,28 @@ async def init_db():
                 ON CONFLICT (key) DO NOTHING
             """, *setting)
         
-        # =========================================================================
-        # CREATE ADMIN USER IF NONE EXISTS
-        # =========================================================================
+        # CREATE DEFAULT ADMIN IF NONE EXISTS
         admin_exists = await conn.fetchval("SELECT id FROM users WHERE role = 'admin' LIMIT 1")
         if not admin_exists:
-            from passlib.context import CryptContext
-            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-            hashed = pwd_context.hash('admin123')
-            
-            await conn.execute("""
-                INSERT INTO users (email, hashed_password, full_name, role, subscription_tier, is_active)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            """, 'admin@pipways.com', hashed, 'System Administrator', 'admin', 'vip', True)
-            
-            logger.info("Default admin created: admin@pipways.com / admin123")
+            try:
+                from passlib.context import CryptContext
+                pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+                hashed = pwd_context.hash('admin123')
+                
+                await conn.execute("""
+                    INSERT INTO users (email, hashed_password, full_name, role, subscription_tier, is_active)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, 'admin@pipways.com', hashed, 'System Administrator', 'admin', 'vip', True)
+                
+                logger.info("Default admin created: admin@pipways.com / admin123")
+            except ImportError:
+                logger.warning("passlib not installed, skipping default admin creation")
         
         logger.info("Database initialization complete")
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
 async def check_connection() -> bool:
     """Check if database connection is alive"""
@@ -640,7 +638,6 @@ async def get_setting(key: str, default: Any = None) -> Any:
         if value is None:
             return default
         
-        # Parse based on data_type
         type_row = await fetchrow("SELECT data_type FROM settings WHERE key = $1", key)
         if not type_row:
             return value
@@ -654,7 +651,7 @@ async def get_setting(key: str, default: Any = None) -> Any:
         elif data_type == 'json':
             return json.loads(value)
         elif data_type == 'array':
-            return value.split(',')
+            return value.split(',') if value else []
         return value
     except Exception as e:
         logger.error(f"Error getting setting {key}: {e}")
@@ -698,7 +695,6 @@ async def log_activity(
     except Exception as e:
         logger.error(f"Failed to log activity: {e}")
 
-# Helper class for transactions
 class Transaction:
     """Transaction context manager"""
     def __init__(self):

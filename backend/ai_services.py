@@ -9,6 +9,14 @@ import httpx
 import base64
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
+# Try relative imports first, fall back to absolute for flexibility
+try:
+    from .performance_parser import parse_statement
+    from .trading_metrics import calculate_metrics
+except ImportError:
+    from performance_parser import parse_statement
+    from trading_metrics import calculate_metrics
+
 router = APIRouter()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -178,10 +186,6 @@ async def analyze_performance_file(file: UploadFile = File(...)):
 async def analyze_structured_data(file_bytes: bytes, filename: str):
     """Analyze CSV/Excel files using traditional parsing"""
     try:
-        # Import here to handle missing dependencies gracefully
-        from .services.performance_parser import parse_statement
-        from .services.trading_metrics import calculate_metrics
-        
         df = parse_statement(file_bytes, filename)
         metrics = calculate_metrics(df)
         

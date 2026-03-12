@@ -6,10 +6,9 @@ from typing import Optional, List
 from datetime import datetime
 import json
 
-# ABSOLUTE IMPORTS (no dots)
-import database
-from schemas import BlogPostCreate, BlogPostUpdate, BlogPostResponse, SEOMetadata
-from security import get_current_user, get_admin_user, get_current_user_optional
+from .. import database
+from ..schemas import BlogPostCreate, BlogPostUpdate, BlogPostResponse, SEOMetadata
+from ..security import get_current_user, get_admin_user, get_current_user_optional
 
 router = APIRouter()
 
@@ -53,11 +52,9 @@ async def get_blog_posts(
             query += f" AND (bp.title ILIKE ${len(params)+1} OR bp.content ILIKE ${len(params)+1})"
             params.append(f"%{search}%")
         
-        # Get total count
         count_query = query.replace("SELECT bp.*, u.full_name as author_name", "SELECT COUNT(*)")
         total = await conn.fetchval(count_query, *params)
         
-        # Add pagination
         query += f" ORDER BY bp.published_at DESC LIMIT ${len(params)+1} OFFSET ${len(params)+2}"
         params.extend([limit, offset])
         
@@ -90,12 +87,10 @@ async def get_blog_post(
         if not post:
             raise HTTPException(status_code=404, detail="Blog post not found")
         
-        # Increment views
         await conn.execute("""
             UPDATE blog_posts SET views = views + 1 WHERE id = $1
         """, post['id'])
         
-        # Get comments
         comments = await conn.fetch("""
             SELECT bc.*, u.full_name as author_name
             FROM blog_comments bc
@@ -119,10 +114,8 @@ async def create_blog_post(
         raise HTTPException(status_code=503, detail="Database not connected")
     
     async with database.db_pool.acquire() as conn:
-        # Generate slug if not provided
         slug = post.slug or post.title.lower().replace(" ", "-")
         
-        # Check slug uniqueness
         existing = await conn.fetchval("SELECT id FROM blog_posts WHERE slug = $1", slug)
         if existing:
             slug = f"{slug}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -135,19 +128,10 @@ async def create_blog_post(
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, CURRENT_TIMESTAMP)
             RETURNING id
         """,
-            post.title,
-            slug,
-            post.content,
-            post.excerpt,
-            post.featured_image,
-            post.category,
-            post.tags,
-            post.meta_title or post.title,
-            post.meta_description or post.excerpt,
-            post.focus_keyword,
-            current_user['id'],
-            post.status or 'draft',
-            post.is_featured or False
+            post.title, slug, post.content, post.excerpt, post.featured_image,
+            post.category, post.tags, post.meta_title or post.title,
+            post.meta_description or post.excerpt, post.focus_keyword,
+            current_user['id'], post.status or 'draft', post.is_featured or False
         )
         
         return await conn.fetchrow("SELECT * FROM blog_posts WHERE id = $1", post_id)

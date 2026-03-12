@@ -1,9 +1,10 @@
 """
 Pydantic Schemas for Pipways Trading Platform
 Complete request/response models for all API endpoints
+Compatible with Pydantic v2
 """
 
-from pydantic import BaseModel, EmailStr, Field, validator, root_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, date
 from decimal import Decimal
@@ -95,7 +96,8 @@ class UserBase(BaseModel):
 class UserRegister(UserBase):
     password: str = Field(..., min_length=8, max_length=100)
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def password_strength(cls, v):
         if not any(c.isupper() for c in v):
             raise ValueError('Password must contain at least one uppercase letter')
@@ -136,7 +138,7 @@ class UserResponse(UserBase):
     last_login: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserMinimal(BaseModel):
     id: int
@@ -144,7 +146,7 @@ class UserMinimal(BaseModel):
     email: EmailStr
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # SIGNAL SCHEMAS
@@ -204,7 +206,7 @@ class SignalResponse(SignalBase):
     author: Optional[UserMinimal] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class SignalListResponse(BaseModel):
     signals: List[SignalResponse]
@@ -263,7 +265,7 @@ class CourseResponse(CourseBase):
     enrolled_count: Optional[int] = 0
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CourseDetailResponse(CourseResponse):
     modules: List['ModuleResponse'] = []
@@ -303,7 +305,7 @@ class ModuleResponse(ModuleBase):
     quiz: Optional['QuizMinimal'] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ModuleMinimal(BaseModel):
     id: int
@@ -311,7 +313,7 @@ class ModuleMinimal(BaseModel):
     sort_order: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # LESSON SCHEMAS
@@ -366,7 +368,7 @@ class LessonMinimal(BaseModel):
     is_completed: Optional[bool] = False
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class LessonResponse(LessonBase):
     id: int
@@ -379,7 +381,7 @@ class LessonResponse(LessonBase):
     questions: List['StudentQuestionResponse'] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # QUIZ SCHEMAS
@@ -403,7 +405,7 @@ class QuestionResponse(QuestionCreate):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class QuizBase(BaseModel):
     title: str = Field(..., max_length=255)
@@ -438,7 +440,7 @@ class QuizMinimal(BaseModel):
     max_attempts: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class QuizResponse(QuizBase):
     id: int
@@ -449,7 +451,7 @@ class QuizResponse(QuizBase):
     attempts: List['QuizAttemptResponse'] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class QuizSubmit(BaseModel):
     answers: Dict[str, str]  # {question_id: answer}
@@ -470,7 +472,7 @@ class QuizAttemptResponse(BaseModel):
     completed_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class QuizResult(BaseModel):
     attempt_id: int
@@ -503,7 +505,7 @@ class ProgressResponse(BaseModel):
     notes: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # ENROLLMENT SCHEMAS
@@ -525,7 +527,7 @@ class EnrollmentResponse(BaseModel):
     price_paid: Optional[Decimal] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # STUDENT QUESTION SCHEMAS
@@ -556,7 +558,7 @@ class StudentQuestionResponse(BaseModel):
     answered_by_name: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # BLOG SCHEMAS
@@ -579,7 +581,7 @@ class BlogMediaResponse(BlogMediaBase):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BlogSEOBase(BaseModel):
     seo_title: Optional[str] = None
@@ -600,7 +602,7 @@ class BlogSEOResponse(BlogSEOBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BlogPostBase(BaseModel):
     title: str = Field(..., max_length=255)
@@ -652,7 +654,7 @@ class BlogPostMinimal(BaseModel):
     slug: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BlogPostResponse(BlogPostBase):
     id: int
@@ -669,7 +671,7 @@ class BlogPostResponse(BlogPostBase):
     related_posts: List[BlogPostMinimal] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BlogListResponse(BaseModel):
     posts: List[BlogPostMinimal]
@@ -718,7 +720,7 @@ class WebinarResponse(WebinarBase):
     is_registered: Optional[bool] = False
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class WebinarRegistrationResponse(BaseModel):
     id: int
@@ -732,7 +734,7 @@ class WebinarRegistrationResponse(BaseModel):
     feedback_comment: Optional[str] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # SETTINGS SCHEMAS
@@ -741,8 +743,8 @@ class WebinarRegistrationResponse(BaseModel):
 class SettingBase(BaseModel):
     key: str = Field(..., max_length=255)
     value: str
-    data_type: str = Field(default='string', regex='^(string|integer|boolean|json|array)$')
-    category: str = Field(default='general', regex='^(general|email|payment|telegram|security)$')
+    data_type: str = Field(default='string', pattern=r'^(string|integer|boolean|json|array)$')
+    category: str = Field(default='general', pattern=r'^(general|email|payment|telegram|security)$')
     description: Optional[str] = None
     is_editable: bool = True
 
@@ -754,7 +756,7 @@ class SettingResponse(SettingBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # ACTIVITY LOG SCHEMAS
@@ -773,7 +775,7 @@ class ActivityLogResponse(BaseModel):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ============================================================================
 # GENERIC RESPONSE SCHEMAS
@@ -793,6 +795,10 @@ class PaginatedResponse(BaseModel):
     page: int
     pages: int
     per_page: int
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -815,7 +821,7 @@ class DashboardStats(BaseModel):
     recent_activities: List[ActivityLogResponse] = []
 
 # Forward references for nested models
-CourseDetailResponse.update_forward_refs()
-ModuleResponse.update_forward_refs()
-LessonResponse.update_forward_refs()
-QuizResponse.update_forward_refs()
+CourseDetailResponse.model_rebuild()
+ModuleResponse.model_rebuild()
+LessonResponse.model_rebuild()
+QuizResponse.model_rebuild()

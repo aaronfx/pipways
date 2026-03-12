@@ -40,7 +40,15 @@ class UserResponse(UserBase):
     avatar_url: Optional[str] = None
     created_at: Optional[datetime] = None
     
+class Token(BaseModel):
+    """Token response with user data - Used by auth routes"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: dict  # Contains id, email, full_name, role, subscription_tier
+    
 class TokenResponse(BaseModel):
+    """Alternative token response format"""
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -149,7 +157,6 @@ class LessonBase(BaseModel):
 class LessonCreate(LessonBase):
     pass
 
-# ADDED: Was missing
 class LessonUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
@@ -173,12 +180,10 @@ class QuizCreate(BaseModel):
 class QuizSubmit(BaseModel):
     answer: str
 
-# ADDED: Was missing
 class QuestionCreate(BaseModel):
     lesson_id: Optional[int] = None
     question: str
 
-# ADDED: Was missing
 class AnswerCreate(BaseModel):
     question_id: int
     answer: str

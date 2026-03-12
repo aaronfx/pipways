@@ -1,17 +1,16 @@
 """
 Webinar Routes - Live Trading Sessions & Training
-Includes: Registration, reminders, recordings, feedback
 """
-
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import Optional, List
 from datetime import datetime, timedelta
 import os
 
-from database import db_pool, log_activity, fetch, fetchrow, fetchval, execute
+# ABSOLUTE IMPORTS (no dots)
+import database
 from schemas import (
     WebinarCreate, WebinarUpdate, WebinarResponse, 
-    WebinarRegistrationResponse, UserMinimal
+    WebinarRegistrationResponse
 )
 from security import get_current_user, get_current_user_optional, get_admin_user
 
@@ -27,15 +26,11 @@ async def get_webinars(
     upcoming: bool = False,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """
-    Get webinars list.
-    - Public access (with premium check)
-    - Shows registration status for logged-in users
-    """
-    if not db_pool:
+    """Get webinars list"""
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         query = """
             SELECT w.*, u.full_name as author_name 
             FROM webinars w
@@ -44,15 +39,13 @@ async def get_webinars(
         """
         params = []
         
-        # Filter by status
         if status:
             query += f" AND w.status = ${len(params)+1}"
             params.append(status)
         
-        # Show only upcoming webinars (next 30 days)
         if upcoming:
-            query += f" AND w.scheduled_at > CURRENT_TIMESTAMP"
-            query += f" AND w.scheduled_at < CURRENT_TIMESTAMP + INTERVAL '30 days'"
+            query += " AND w.scheduled_at > CURRENT_TIMESTAMP"
+            query += " AND w.scheduled_at < CURRENT_TIMESTAMP + INTERVAL '30 days'"
         
         # Hide premium webinars from non-VIP users
         if not current_user or current_user.get('subscription_tier') != 'vip':
@@ -69,13 +62,13 @@ async def get_webinars(
             
             # Check if current user is registered
             if current_user:
-                is_registered = await conn.fetchval("""
+                is_registered = await conn.fetchrow("""
                     SELECT EXISTS(
                         SELECT 1 FROM webinar_registrations 
                         WHERE webinar_id = $1 AND user_id = $2
                     )
                 """, row['id'], current_user['id'])
-                webinar_dict['is_registered'] = is_registered
+                webinar_dict['is_registered'] = is_registered[0] if is_registered else False
             else:
                 webinar_dict['is_registered'] = False
             
@@ -85,7 +78,7 @@ async def get_webinars(
 
 @router.get("/upcoming")
 async def get_upcoming_webinars(current_user: Optional[dict] = Depends(get_current_user_optional)):
-    """Get only upcoming webinars (next 7 days)"""
+    """Get only upcoming webinars"""
     return await get_webinars(status='scheduled', upcoming=True, current_user=current_user)
 
 @router.get("/{webinar_id}", response_model=WebinarResponse)
@@ -94,10 +87,10 @@ async def get_webinar(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """Get single webinar details"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         webinar = await conn.fetchrow("""
             SELECT w.*, u.full_name as author_name 
             FROM webinars w
@@ -126,14 +119,6 @@ async def get_webinar(
                 )
             """, webinar_id, current_user['id'])
             webinar_dict['is_registered'] = is_registered
-            
-            # Get user's registration details if registered
-            if is_registered:
-                reg = await conn.fetchrow("""
-                    SELECT * FROM webinar_registrations 
-                    WHERE webinar_id = $1 AND user_id = $2
-                """, webinar_id, current_user['id'])
-                webinar_dict['registration'] = dict(reg)
         else:
             webinar_dict['is_registered'] = False
         
@@ -145,10 +130,10 @@ async def register_for_webinar(
     current_user: dict = Depends(get_current_user)
 ):
     """User registers for a webinar"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         webinar = await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
         
         if not webinar:
@@ -185,7 +170,7 @@ async def register_for_webinar(
         """, webinar_id)
         
         # Log activity
-        await log_activity(
+        await database.log_activity(
             user_id=current_user['id'],
             action='webinar_register',
             entity_type='webinar',
@@ -200,42 +185,6 @@ async def register_for_webinar(
                            current_user.get('subscription_tier') == 'vip' else None
         }
 
-@router.post("/{webinar_id}/feedback")
-async def submit_feedback(
-    webinar_id: int,
-    rating: int,
-    comment: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """Submit feedback for attended webinar"""
-    if not db_pool:
-        raise HTTPException(status_code=503, detail="Database not connected")
-    
-    if not 1 <= rating <= 5:
-        raise HTTPException(status_code=400, detail="Rating must be between 1-5")
-    
-    async with db_pool.acquire() as conn:
-        # Verify registration and attendance
-        registration = await conn.fetchrow("""
-            SELECT * FROM webinar_registrations 
-            WHERE webinar_id = $1 AND user_id = $2
-        """, webinar_id, current_user['id'])
-        
-        if not registration:
-            raise HTTPException(status_code=404, detail="Registration not found")
-        
-        if not registration['attended']:
-            raise HTTPException(status_code=400, detail="You must attend the webinar before submitting feedback")
-        
-        # Update feedback
-        await conn.execute("""
-            UPDATE webinar_registrations 
-            SET feedback_rating = $1, feedback_comment = $2
-            WHERE webinar_id = $3 AND user_id = $4
-        """, rating, comment, webinar_id, current_user['id'])
-        
-        return {"message": "Feedback submitted successfully"}
-
 # ============================================================================
 # ADMIN ENDPOINTS
 # ============================================================================
@@ -246,10 +195,10 @@ async def create_webinar(
     current_user: dict = Depends(get_admin_user)
 ):
     """Create new webinar (Admin only)"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         webinar_id = await conn.fetchval("""
             INSERT INTO webinars (
                 title, description, scheduled_at, duration_minutes,
@@ -270,15 +219,6 @@ async def create_webinar(
             current_user['id']
         )
         
-        # Log activity
-        await log_activity(
-            user_id=current_user['id'],
-            action='create_webinar',
-            entity_type='webinar',
-            entity_id=webinar_id,
-            new_values={"title": webinar.title, "scheduled": str(webinar.scheduled_at)}
-        )
-        
         return await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
 
 @router.put("/{webinar_id}")
@@ -288,15 +228,14 @@ async def update_webinar(
     current_user: dict = Depends(get_admin_user)
 ):
     """Update webinar details (Admin only)"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         existing = await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Webinar not found")
         
-        # Build update fields
         updates = []
         values = []
         
@@ -319,19 +258,134 @@ async def update_webinar(
         query = f"UPDATE webinars SET {', '.join(updates)} WHERE id = ${len(values)} RETURNING *"
         row = await conn.fetchrow(query, *values)
         
-        # Log activity
-        await log_activity(
-            user_id=current_user['id'],
-            action='update_webinar',
-            entity_type='webinar',
-            entity_id=webinar_id,
-            old_values={"status": existing['status']},
-            new_values={"status": row['status']}
-        )
-        
         return dict(row)
 
 @router.delete("/{webinar_id}")
 async def delete_webinar(
     webinar_id: int,
-    current_user: dict
+    current_user: dict = Depends(get_admin_user)
+):
+    """Delete webinar (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM webinars WHERE id = $1", webinar_id)
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Webinar not found")
+        
+        return {"message": "Webinar deleted successfully"}
+
+@router.get("/admin/registrations/{webinar_id}")
+async def get_webinar_registrations(
+    webinar_id: int,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Get all registrations for a webinar (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        registrations = await conn.fetch("""
+            SELECT wr.*, u.email, u.full_name, u.telegram_username
+            FROM webinar_registrations wr
+            JOIN users u ON wr.user_id = u.id
+            WHERE wr.webinar_id = $1
+            ORDER BY wr.registered_at DESC
+        """, webinar_id)
+        
+        return [dict(r) for r in registrations]
+
+@router.post("/admin/{webinar_id}/mark-attended")
+async def mark_attendance(
+    webinar_id: int,
+    user_id: int,
+    attended: bool = True,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Mark user as attended (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE webinar_registrations 
+            SET attended = $1, attended_at = CASE WHEN $1 THEN CURRENT_TIMESTAMP ELSE NULL END
+            WHERE webinar_id = $2 AND user_id = $3
+        """, attended, webinar_id, user_id)
+        
+        return {"message": f"Attendance {'marked' if attended else 'unmarked'}"}
+
+@router.post("/admin/{webinar_id}/send-reminder")
+async def send_reminder(
+    webinar_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_admin_user)
+):
+    """Send reminder to all registered users (Admin only)"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        webinar = await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
+        if not webinar:
+            raise HTTPException(status_code=404, detail="Webinar not found")
+        
+        # Get all registered users who haven't been reminded
+        registrations = await conn.fetch("""
+            SELECT wr.*, u.email, u.telegram_username
+            FROM webinar_registrations wr
+            JOIN users u ON wr.user_id = u.id
+            WHERE wr.webinar_id = $1 AND wr.reminder_sent = FALSE
+        """, webinar_id)
+        
+        # Mark reminders as sent
+        await conn.execute("""
+            UPDATE webinar_registrations 
+            SET reminder_sent = TRUE 
+            WHERE webinar_id = $1
+        """, webinar_id)
+        
+        await database.log_activity(
+            user_id=current_user['id'],
+            action='send_webinar_reminders',
+            entity_type='webinar',
+            entity_id=webinar_id,
+            new_values={"recipients_count": len(registrations)}
+        )
+        
+        return {
+            "message": f"Reminders sent to {len(registrations)} participants",
+            "webinar_title": webinar['title'],
+            "meeting_link": webinar['meeting_link']
+        }
+
+@router.get("/admin/dashboard-stats")
+async def get_webinar_stats(current_user: dict = Depends(get_admin_user)):
+    """Get webinar statistics for admin dashboard"""
+    if not database.db_pool:
+        raise HTTPException(status_code=503, detail="Database not connected")
+    
+    async with database.db_pool.acquire() as conn:
+        stats = await conn.fetchrow("""
+            SELECT 
+                COUNT(*) as total_webinars,
+                COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as upcoming,
+                COUNT(CASE WHEN status = 'live' THEN 1 END) as live_now,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+                (SELECT COUNT(*) FROM webinar_registrations) as total_registrations,
+                (SELECT COUNT(*) FROM webinar_registrations WHERE attended = TRUE) as total_attendees,
+                (SELECT AVG(feedback_rating) FROM webinar_registrations WHERE feedback_rating IS NOT NULL) as avg_rating
+            FROM webinars
+            WHERE created_at > NOW() - INTERVAL '90 days'
+        """)
+        
+        return {
+            "total_webinars": stats['total_webinars'] or 0,
+            "upcoming": stats['upcoming'] or 0,
+            "live_now": stats['live_now'] or 0,
+            "completed": stats['completed'] or 0,
+            "total_registrations": stats['total_registrations'] or 0,
+            "total_attendees": stats['total_attendees'] or 0,
+            "average_rating": round(stats['avg_rating'], 1) if stats['avg_rating'] else 0
+        }

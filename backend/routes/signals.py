@@ -8,9 +8,9 @@ from decimal import Decimal
 import json
 import logging
 
-from .. import database
-from ..schemas import SignalCreate, SignalUpdate, SignalResponse, SignalListResponse
-from ..security import get_current_user, get_admin_user
+import database
+from schemas import SignalCreate, SignalUpdate, SignalResponse, SignalListResponse
+from security import get_current_user, get_admin_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -63,7 +63,6 @@ async def get_signals(
             query += f" AND s.direction = ${len(params)+1}"
             params.append(direction)
         
-        # Hide draft signals from non-admins
         if not current_user or current_user.get('role') not in ['admin', 'moderator']:
             query += " AND s.status != 'draft'"
         
@@ -105,7 +104,6 @@ async def create_signal(
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    # Calculate risk/reward
     rr_ratio = calculate_risk_reward(
         signal.entry_price, 
         signal.stop_loss, 
@@ -122,20 +120,11 @@ async def create_signal(
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
             RETURNING id
         """,
-            signal.pair,
-            signal.direction,
-            signal.entry_price,
-            signal.stop_loss,
-            signal.take_profit_1,
-            signal.take_profit_2,
-            signal.take_profit_3,
-            rr_ratio,
-            signal.analysis,
-            signal.status or 'active',
-            current_user['id']
+            signal.pair, signal.direction, signal.entry_price, signal.stop_loss,
+            signal.take_profit_1, signal.take_profit_2, signal.take_profit_3,
+            rr_ratio, signal.analysis, signal.status or 'active', current_user['id']
         )
         
-        # Log activity
         await database.log_activity(
             user_id=current_user['id'],
             action='create_signal',
@@ -161,7 +150,6 @@ async def update_signal(
         if not existing:
             raise HTTPException(status_code=404, detail="Signal not found")
         
-        # Build updates
         updates = []
         values = []
         

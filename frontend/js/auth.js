@@ -1,6 +1,6 @@
 /**
  * Authentication Module
- * Fixed: Admin button visibility, role checking, and auth flow
+ * Fixed: Admin button visibility, role checking, auth flow, and loading overlay
  */
 
 const auth = {
@@ -204,7 +204,7 @@ const auth = {
                 errorDiv.style.display = 'block';
             }
         } finally {
-            ui.hideLoading();
+            ui.forceHideLoading(); // Force hide to ensure overlay is removed
             this.isLoading = false;
         }
     },
@@ -299,7 +299,7 @@ const auth = {
                 errorDiv.style.display = 'block';
             }
         } finally {
-            ui.hideLoading();
+            ui.forceHideLoading(); // Force hide to ensure overlay is removed
             this.isLoading = false;
         }
     },

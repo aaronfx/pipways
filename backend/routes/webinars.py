@@ -6,13 +6,12 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 import os
 
-# ABSOLUTE IMPORTS (no dots)
-import database
-from schemas import (
+from .. import database
+from ..schemas import (
     WebinarCreate, WebinarUpdate, WebinarResponse, 
     WebinarRegistrationResponse
 )
-from security import get_current_user, get_current_user_optional, get_admin_user
+from ..security import get_current_user, get_current_user_optional, get_admin_user
 
 router = APIRouter()
 

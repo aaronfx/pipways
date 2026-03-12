@@ -1,100 +1,42 @@
 /**
- * Pipways Authentication Module
+ * Pipways Authentication Module v3.5
  * Handles login, registration, and token management
  */
 
 const Auth = {
-    // API Base URL - Adjust if needed
-    API_URL: '/api/auth',
-    
-    // Token storage keys
+    API_URL: '/auth',
     TOKEN_KEY: 'pipways_token',
     USER_KEY: 'pipways_user',
-    
-    // Guard against duplicate initialization
-    _initialized: false,
     
     /**
      * Initialize auth module
      */
     init() {
-        // Prevent duplicate initialization
-        if (this._initialized) {
-            console.log('Auth already initialized, skipping...');
-            return;
-        }
-        this._initialized = true;
-        
         console.log('Auth module initialized');
-        
-        // Pre-fill form from URL params before binding handlers
-        this.prefillFromURL();
-        
-        // Only check auth status if not on login page with creds in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        if (!urlParams.has('email')) {
-            this.checkAuthStatus();
-        }
-        
         this.bindAuthForms();
-    },
-    
-    /**
-     * Pre-fill login form from URL query parameters
-     */
-    prefillFromURL() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const email = urlParams.get('email');
-        const password = urlParams.get('password');
-        
-        const emailField = document.getElementById('email');
-        const passwordField = document.getElementById('password');
-        
-        if (emailField && email) {
-            emailField.value = decodeURIComponent(email);
-        }
-        if (passwordField && password) {
-            passwordField.value = decodeURIComponent(password);
-        }
-        
-        // Auto-submit if both present and on login page
-        if (email && password && document.getElementById('loginForm')) {
-            console.log('Auto-submitting login from URL params');
-            // Small delay to ensure DOM is fully ready
-            setTimeout(() => this.handleLogin(), 100);
-        }
+        this.checkAuthStatus();
     },
     
     /**
      * Bind login and register form handlers
      */
     bindAuthForms() {
-        // Login form
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
-            // Remove existing listeners to prevent duplicates
-            const newLoginForm = loginForm.cloneNode(true);
-            loginForm.parentNode.replaceChild(newLoginForm, loginForm);
-            
-            newLoginForm.addEventListener('submit', async (e) => {
+            loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleLogin();
             });
         }
         
-        // Register form
         const registerForm = document.getElementById('registerForm');
         if (registerForm) {
-            const newRegisterForm = registerForm.cloneNode(true);
-            registerForm.parentNode.replaceChild(newRegisterForm, registerForm);
-            
-            newRegisterForm.addEventListener('submit', async (e) => {
+            registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleRegister();
             });
         }
         
-        // Logout button
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
@@ -102,15 +44,24 @@ const Auth = {
     },
     
     /**
-     * Handle user login
+     * Handle user login - READS DIRECTLY FROM FORM INPUTS ONLY
      */
     async handleLogin() {
+        // Read credentials directly from form input fields only
         const emailField = document.getElementById('email');
         const passwordField = document.getElementById('password');
         
-        const email = emailField?.value?.trim();
-        const password = passwordField?.value;
+        // Validate elements exist
+        if (!emailField || !passwordField) {
+            this.showError('Login form elements not found');
+            return;
+        }
         
+        // Get values and trim whitespace
+        const email = emailField.value.trim();
+        const password = passwordField.value;
+        
+        // Validate fields are not empty
         if (!email || !password) {
             this.showError('Please enter both email and password');
             return;
@@ -119,6 +70,7 @@ const Auth = {
         try {
             this.showLoading(true);
             
+            // Send login request to backend
             const response = await fetch(`${this.API_URL}/login`, {
                 method: 'POST',
                 headers: {
@@ -137,12 +89,7 @@ const Auth = {
                 throw new Error(data.detail || 'Login failed');
             }
             
-            // Clear URL params after successful login
-            if (window.history.replaceState) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-            
-            // Store token and user data
+            // Store token in localStorage
             this.setToken(data.access_token);
             this.setUser({
                 email: email,
@@ -247,8 +194,6 @@ const Auth = {
             
             const userData = await response.json();
             this.setUser(userData);
-            
-            // Update UI with user info
             this.updateUserUI(userData);
             
             return true;
@@ -298,22 +243,6 @@ const Auth = {
     },
     
     /**
-     * Check if user is admin/moderator
-     */
-    isAdmin() {
-        const user = this.getUser();
-        return user && (user.role === 'admin' || user.role === 'moderator');
-    },
-    
-    /**
-     * Check if user has VIP access
-     */
-    isVIP() {
-        const user = this.getUser();
-        return user && (user.subscription_tier === 'vip' || this.isAdmin());
-    },
-    
-    /**
      * Redirect to login page
      */
     redirectToLogin() {
@@ -344,10 +273,8 @@ const Auth = {
         if (errorEl) {
             errorEl.textContent = message;
             errorEl.style.display = 'block';
-            errorEl.classList.add('show');
             setTimeout(() => {
                 errorEl.style.display = 'none';
-                errorEl.classList.remove('show');
             }, 5000);
         } else {
             alert(message);
@@ -370,48 +297,13 @@ const Auth = {
             registerBtn.disabled = show;
             registerBtn.textContent = show ? 'Loading...' : 'Create Account';
         }
-    },
-    
-    /**
-     * Make authenticated API request
-     */
-    async apiRequest(url, options = {}) {
-        const token = this.getToken();
-        
-        const defaultOptions = {
-            headers: {
-                'Authorization': token ? `Bearer ${token}` : '',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        };
-        
-        const mergedOptions = {
-            ...defaultOptions,
-            ...options,
-            headers: {
-                ...defaultOptions.headers,
-                ...options.headers
-            }
-        };
-        
-        const response = await fetch(url, mergedOptions);
-        
-        if (response.status === 401) {
-            this.logout();
-            throw new Error('Session expired. Please login again.');
-        }
-        
-        return response;
     }
 };
 
-// Initialize auth when DOM is ready - use {once: true} to prevent duplicate binding
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => Auth.init(), {once: true});
-} else {
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
     Auth.init();
-}
+});
 
 // Export for use in other modules
 window.Auth = Auth;

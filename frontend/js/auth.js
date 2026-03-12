@@ -4,20 +4,65 @@
  */
 
 const Auth = {
-    // API Base URL - MUST match backend router prefix
+    // API Base URL - Adjust if needed
     API_URL: '/api/auth',
     
     // Token storage keys
     TOKEN_KEY: 'pipways_token',
     USER_KEY: 'pipways_user',
     
+    // Guard against duplicate initialization
+    _initialized: false,
+    
     /**
      * Initialize auth module
      */
     init() {
+        // Prevent duplicate initialization
+        if (this._initialized) {
+            console.log('Auth already initialized, skipping...');
+            return;
+        }
+        this._initialized = true;
+        
         console.log('Auth module initialized');
+        
+        // Pre-fill form from URL params before binding handlers
+        this.prefillFromURL();
+        
+        // Only check auth status if not on login page with creds in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('email')) {
+            this.checkAuthStatus();
+        }
+        
         this.bindAuthForms();
-        this.checkAuthStatus();
+    },
+    
+    /**
+     * Pre-fill login form from URL query parameters
+     */
+    prefillFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const email = urlParams.get('email');
+        const password = urlParams.get('password');
+        
+        const emailField = document.getElementById('email');
+        const passwordField = document.getElementById('password');
+        
+        if (emailField && email) {
+            emailField.value = decodeURIComponent(email);
+        }
+        if (passwordField && password) {
+            passwordField.value = decodeURIComponent(password);
+        }
+        
+        // Auto-submit if both present and on login page
+        if (email && password && document.getElementById('loginForm')) {
+            console.log('Auto-submitting login from URL params');
+            // Small delay to ensure DOM is fully ready
+            setTimeout(() => this.handleLogin(), 100);
+        }
     },
     
     /**
@@ -27,7 +72,11 @@ const Auth = {
         // Login form
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
+            // Remove existing listeners to prevent duplicates
+            const newLoginForm = loginForm.cloneNode(true);
+            loginForm.parentNode.replaceChild(newLoginForm, loginForm);
+            
+            newLoginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleLogin();
             });
@@ -36,7 +85,10 @@ const Auth = {
         // Register form
         const registerForm = document.getElementById('registerForm');
         if (registerForm) {
-            registerForm.addEventListener('submit', async (e) => {
+            const newRegisterForm = registerForm.cloneNode(true);
+            registerForm.parentNode.replaceChild(newRegisterForm, registerForm);
+            
+            newRegisterForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleRegister();
             });
@@ -53,8 +105,11 @@ const Auth = {
      * Handle user login
      */
     async handleLogin() {
-        const email = document.getElementById('email')?.value;
-        const password = document.getElementById('password')?.value;
+        const emailField = document.getElementById('email');
+        const passwordField = document.getElementById('password');
+        
+        const email = emailField?.value?.trim();
+        const password = passwordField?.value;
         
         if (!email || !password) {
             this.showError('Please enter both email and password');
@@ -79,12 +134,20 @@ const Auth = {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.detail || `Login failed: ${response.status}`);
+                throw new Error(data.detail || 'Login failed');
+            }
+            
+            // Clear URL params after successful login
+            if (window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
             
             // Store token and user data
             this.setToken(data.access_token);
-            this.setUser(data.user || { email: email });
+            this.setUser({
+                email: email,
+                ...data
+            });
             
             // Redirect to dashboard
             window.location.href = '/dashboard.html';
@@ -101,8 +164,8 @@ const Auth = {
      * Handle user registration
      */
     async handleRegister() {
-        const fullName = document.getElementById('fullName')?.value;
-        const email = document.getElementById('email')?.value;
+        const fullName = document.getElementById('fullName')?.value?.trim();
+        const email = document.getElementById('email')?.value?.trim();
         const password = document.getElementById('password')?.value;
         const confirmPassword = document.getElementById('confirmPassword')?.value;
         
@@ -143,10 +206,6 @@ const Auth = {
                 throw new Error(data.detail || 'Registration failed');
             }
             
-            // Store credentials temporarily for auto-login
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = password;
-            
             // Auto-login after registration
             await this.handleLogin();
             
@@ -163,16 +222,10 @@ const Auth = {
      */
     async checkAuthStatus() {
         const token = this.getToken();
-        const currentPage = window.location.pathname;
-        
-        // Skip auth check on login page
-        if (currentPage.includes('index.html') || currentPage === '/' || currentPage === '') {
-            return;
-        }
         
         if (!token) {
             this.redirectToLogin();
-            return;
+            return false;
         }
         
         try {
@@ -187,18 +240,22 @@ const Auth = {
             if (!response.ok) {
                 if (response.status === 401) {
                     this.logout();
-                    return;
+                    return false;
                 }
                 throw new Error('Auth check failed');
             }
             
             const userData = await response.json();
             this.setUser(userData);
+            
+            // Update UI with user info
             this.updateUserUI(userData);
+            
+            return true;
             
         } catch (error) {
             console.error('Auth check failed:', error);
-            // Don't logout on network errors, just log
+            return false;
         }
     },
     
@@ -260,8 +317,8 @@ const Auth = {
      * Redirect to login page
      */
     redirectToLogin() {
-        const currentPage = window.location.pathname;
-        if (!currentPage.includes('index.html') && !currentPage.includes('login')) {
+        if (!window.location.pathname.includes('index.html') && 
+            !window.location.pathname.includes('login')) {
             window.location.href = '/index.html';
         }
     },
@@ -287,8 +344,10 @@ const Auth = {
         if (errorEl) {
             errorEl.textContent = message;
             errorEl.style.display = 'block';
+            errorEl.classList.add('show');
             setTimeout(() => {
                 errorEl.style.display = 'none';
+                errorEl.classList.remove('show');
             }, 5000);
         } else {
             alert(message);
@@ -311,14 +370,48 @@ const Auth = {
             registerBtn.disabled = show;
             registerBtn.textContent = show ? 'Loading...' : 'Create Account';
         }
+    },
+    
+    /**
+     * Make authenticated API request
+     */
+    async apiRequest(url, options = {}) {
+        const token = this.getToken();
+        
+        const defaultOptions = {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        };
+        
+        const mergedOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...options.headers
+            }
+        };
+        
+        const response = await fetch(url, mergedOptions);
+        
+        if (response.status === 401) {
+            this.logout();
+            throw new Error('Session expired. Please login again.');
+        }
+        
+        return response;
     }
 };
 
-// Initialize auth when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize auth when DOM is ready - use {once: true} to prevent duplicate binding
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => Auth.init(), {once: true});
+} else {
     Auth.init();
-});
+}
 
-// Export for use in other modules - BOTH cases for compatibility
+// Export for use in other modules
 window.Auth = Auth;
-window.auth = Auth;  // This fixes the "auth is not defined" error

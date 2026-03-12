@@ -1,346 +1,329 @@
-/**
- * Pipways AI Module
- * Handles:
- * - AI Mentor Chat
- * - Chart Analysis
- * - Performance Vision Analysis
- */
+/*
+Pipways AI Module
+Handles:
+- AI Mentor
+- Chart Analysis
+- Performance Vision Analysis
+*/
 
 const ai = {
 
-    chatHistory: [],
-    currentChartFile: null,
-    currentChartImage: null,
-    currentPerformanceImage: null,
+chatHistory: [],
+currentChartFile: null,
+currentChartImage: null,
+currentPerformanceImage: null,
 
-    /*
-    ================================
-    AI MENTOR CHAT
-    ================================
-    */
 
-    async sendChatMessage() {
+/* ===============================
+AI MENTOR
+================================*/
 
-        const input = document.getElementById('chat-input');
-        const messages = document.getElementById('chat-messages');
+async sendChatMessage() {
 
-        if (!input || !messages) return;
+const input = document.getElementById("chat-input");
+const messages = document.getElementById("chat-messages");
 
-        const message = input.value.trim();
-        if (!message) return;
+if (!input || !messages) return;
 
-        const userMsg = document.createElement('div');
-        userMsg.className = 'chat-message user';
-        userMsg.innerHTML =
-            `<div class="chat-bubble"><strong>You:</strong> ${message}</div>`;
+const message = input.value.trim();
+if (!message) return;
 
-        messages.appendChild(userMsg);
-        messages.scrollTop = messages.scrollHeight;
+const userBubble = document.createElement("div");
+userBubble.className = "chat-message user";
+userBubble.innerHTML =
+`<div class="chat-bubble"><strong>You:</strong> ${message}</div>`;
 
-        input.value = "";
+messages.appendChild(userBubble);
+messages.scrollTop = messages.scrollHeight;
 
-        this.chatHistory.push({
-            role: "user",
-            content: message
-        });
+input.value = "";
 
-        try {
+this.chatHistory.push({
+role: "user",
+content: message
+});
 
-            const response = await api.post('/api/ai/mentor', {
+try {
 
-                message: message,
-                history: this.chatHistory
+const response = await api.post("/api/ai/mentor", {
+message: message,
+history: this.chatHistory
+});
 
-            });
+const text = response.response || "No response";
 
-            const text = response.response || "No response";
+this.chatHistory.push({
+role: "assistant",
+content: text
+});
 
-            this.chatHistory.push({
-                role: "assistant",
-                content: text
-            });
+const aiBubble = document.createElement("div");
+aiBubble.className = "chat-message";
 
-            const aiMsg = document.createElement('div');
-            aiMsg.className = 'chat-message';
+aiBubble.innerHTML =
+`<div class="chat-bubble"><strong>AI Mentor:</strong> ${marked.parse(text)}</div>`;
 
-            aiMsg.innerHTML =
-                `<div class="chat-bubble"><strong>AI Mentor:</strong> ${marked.parse(text)}</div>`;
+messages.appendChild(aiBubble);
+messages.scrollTop = messages.scrollHeight;
 
-            messages.appendChild(aiMsg);
-            messages.scrollTop = messages.scrollHeight;
+}
+catch(error){
 
-        }
-        catch (error) {
+console.error("AI mentor error:", error);
+ui.showToast("AI mentor unavailable","error");
 
-            console.error("AI mentor error:", error);
+}
 
-            ui.showToast("AI mentor unavailable", "error");
+},
 
-        }
 
-    },
+/* ===============================
+CHART IMAGE UPLOAD
+================================*/
 
+handleChartUpload(input){
 
-    /*
-    ================================
-    CHART IMAGE UPLOAD
-    ================================
-    */
+const file = input.files[0];
+if(!file) return;
 
-    handleChartUpload(input) {
+if(file.size > 10*1024*1024){
 
-        const file = input.files[0];
-        if (!file) return;
+ui.showToast("Image too large (10MB max)","error");
+return;
 
-        if (file.size > 10 * 1024 * 1024) {
+}
 
-            ui.showToast("Image too large (10MB max)", "error");
-            return;
+this.currentChartFile = file;
 
-        }
+const reader = new FileReader();
 
-        this.currentChartFile = file;
+reader.onload = (e)=>{
 
-        const reader = new FileReader();
+this.currentChartImage = e.target.result;
 
-        reader.onload = (e) => {
+const preview = document.getElementById("chart-preview");
+const container = document.getElementById("chart-preview-container");
 
-            this.currentChartImage = e.target.result;
+if(preview) preview.src = e.target.result;
 
-            const preview = document.getElementById("chart-preview");
-            const container = document.getElementById("chart-preview-container");
+if(container) container.classList.remove("hidden");
 
-            if (preview) preview.src = e.target.result;
+};
 
-            if (container)
-                container.classList.remove("hidden");
+reader.readAsDataURL(file);
 
-        };
+},
 
-        reader.readAsDataURL(file);
 
-    },
+/* ===============================
+CHART ANALYSIS
+================================*/
 
+async analyzeChart(){
 
-    /*
-    ================================
-    CHART ANALYSIS
-    ================================
-    */
+if(!this.currentChartFile){
 
-    async analyzeChart() {
+ui.showToast("Upload chart first","error");
+return;
 
-        if (!this.currentChartFile) {
+}
 
-            ui.showToast("Upload chart first", "error");
-            return;
+ui.showLoading("Analyzing chart...");
 
-        }
+try{
 
-        ui.showLoading("Analyzing chart...");
+const pair =
+document.getElementById("chart-pair")?.value || "EURUSD";
 
-        try {
+const timeframe =
+document.getElementById("chart-timeframe")?.value || "1H";
 
-            const pair =
-                document.getElementById("chart-pair")?.value || "EURUSD";
+const context =
+document.getElementById("chart-context")?.value || "";
 
-            const timeframe =
-                document.getElementById("chart-timeframe")?.value || "1H";
+const formData = new FormData();
 
-            const context =
-                document.getElementById("chart-context")?.value || "";
+formData.append("image", this.currentChartFile);
+formData.append("pair", pair);
+formData.append("timeframe", timeframe);
+formData.append("context", context);
 
-            const formData = new FormData();
+const response =
+await api.upload("/api/ai/analyze-chart", formData);
 
-            formData.append("image", this.currentChartFile);
-            formData.append("pair", pair);
-            formData.append("timeframe", timeframe);
-            formData.append("context", context);
+const content =
+document.getElementById("chart-analysis-content");
 
-            const response =
-                await api.upload("/api/ai/analyze-chart", formData);
+const result =
+document.getElementById("chart-analysis-result");
 
-            const content =
-                document.getElementById("chart-analysis-content");
+if(content){
 
-            const result =
-                document.getElementById("chart-analysis-result");
+const text =
+response.analysis ||
+"No analysis returned";
 
-            if (content) {
+content.innerHTML = marked.parse(text);
 
-                const text =
-                    response.analysis ||
-                    "No analysis returned";
+}
 
-                content.innerHTML = marked.parse(text);
+if(result)
+result.classList.remove("hidden");
 
-            }
+}
+catch(error){
 
-            if (result)
-                result.classList.remove("hidden");
+console.error("Chart AI error:", error);
+ui.showToast("Chart analysis failed","error");
 
-        }
-        catch (error) {
+}
+finally{
 
-            console.error("Chart AI error:", error);
+ui.hideLoading();
 
-            ui.showToast("Chart analysis failed", "error");
+}
 
-        }
-        finally {
+},
 
-            ui.hideLoading();
 
-        }
+/* ===============================
+PERFORMANCE IMAGE UPLOAD
+================================*/
 
-    },
+handlePerformanceUpload(input){
 
+const file = input.files[0];
+if(!file) return;
 
-    /*
-    ================================
-    PERFORMANCE IMAGE UPLOAD
-    ================================
-    */
+const reader = new FileReader();
 
-    handlePerformanceUpload(input) {
+reader.onload = (e)=>{
 
-        const file = input.files[0];
-        if (!file) return;
+this.currentPerformanceImage = e.target.result;
 
-        const reader = new FileReader();
+const preview =
+document.getElementById("performance-preview");
 
-        reader.onload = (e) => {
+const container =
+document.getElementById("performance-preview-container");
 
-            this.currentPerformanceImage = e.target.result;
+if(preview) preview.src = e.target.result;
 
-            const preview =
-                document.getElementById("performance-preview");
+if(container) container.classList.remove("hidden");
 
-            const container =
-                document.getElementById("performance-preview-container");
+};
 
-            if (preview) preview.src = e.target.result;
+reader.readAsDataURL(file);
 
-            if (container)
-                container.classList.remove("hidden");
+},
 
-        };
 
-        reader.readAsDataURL(file);
+/* ===============================
+PERFORMANCE ANALYSIS
+================================*/
 
-    },
+async analyzePerformanceVision(){
 
+if(!this.currentPerformanceImage){
 
-    /*
-    ================================
-    PERFORMANCE ANALYSIS
-    ================================
-    */
+ui.showToast("Upload statement image first","error");
+return;
 
-    async analyzePerformanceVision() {
+}
 
-        if (!this.currentPerformanceImage) {
+ui.showLoading("Analyzing performance...");
 
-            ui.showToast("Upload statement image first", "error");
-            return;
+try{
 
-        }
+const balance =
+parseFloat(
+document.getElementById("vision-account-balance")?.value
+) || 0;
 
-        ui.showLoading("Analyzing performance...");
+const period =
+parseInt(
+document.getElementById("vision-trading-period")?.value
+) || 30;
 
-        try {
+const response =
+await api.post("/api/ai/analyze-performance",{
 
-            const balance =
-                parseFloat(
-                    document.getElementById("vision-account-balance")?.value
-                ) || 0;
+image: this.currentPerformanceImage,
+account_balance: balance,
+trading_period_days: period
 
-            const period =
-                parseInt(
-                    document.getElementById("vision-trading-period")?.value
-                ) || 30;
+});
 
-            const response =
-                await api.post("/api/ai/analyze-vision", {
+this.displayPerformanceResults(response);
 
-                    image: this.currentPerformanceImage,
-                    account_balance: balance,
-                    trading_period_days: period
+}
+catch(error){
 
-                });
+console.error("Performance AI error:", error);
+ui.showToast("Performance analysis failed","error");
 
-            this.displayPerformanceResults(response);
+}
+finally{
 
-        }
-        catch (error) {
+ui.hideLoading();
 
-            console.error("Performance AI error:", error);
+}
 
-            ui.showToast("Performance analysis failed", "error");
+},
 
-        }
-        finally {
 
-            ui.hideLoading();
+/* ===============================
+DISPLAY RESULTS
+================================*/
 
-        }
+displayPerformanceResults(data){
 
-    },
+const container =
+document.getElementById("analysis-results");
 
+if(!container) return;
 
-    /*
-    ================================
-    DISPLAY PERFORMANCE RESULTS
-    ================================
-    */
+container.classList.remove("hidden");
 
-    displayPerformanceResults(data) {
 
-        const container =
-            document.getElementById("analysis-results");
+const score =
+document.getElementById("trader-score");
 
-        if (!container) return;
+if(score)
+score.textContent = data.trader_score || 0;
 
-        container.classList.remove("hidden");
 
-        const score =
-            document.getElementById("trader-score");
+const analysis =
+document.getElementById("performance-analysis-text");
 
-        if (score)
-            score.textContent = data.trader_score || 0;
+if(analysis && data.analysis)
+analysis.innerHTML =
+marked.parse(data.analysis);
 
 
-        const analysis =
-            document.getElementById("performance-analysis-text");
+const strengths =
+document.getElementById("strengths-list");
 
-        if (analysis && data.analysis)
-            analysis.innerHTML =
-                marked.parse(data.analysis);
+if(strengths && data.strengths)
+strengths.innerHTML =
+data.strengths.map(s=>`<li>${s}</li>`).join("");
 
 
-        const strengths =
-            document.getElementById("strengths-list");
+const mistakes =
+document.getElementById("top-mistakes");
 
-        if (strengths && data.strengths)
-            strengths.innerHTML =
-                data.strengths.map(s => `<li>${s}</li>`).join("");
+if(mistakes && data.top_mistakes)
+mistakes.innerHTML =
+data.top_mistakes.map(m=>`<li>${m}</li>`).join("");
 
 
-        const mistakes =
-            document.getElementById("top-mistakes");
+const plan =
+document.getElementById("improvement-plan");
 
-        if (mistakes && data.top_mistakes)
-            mistakes.innerHTML =
-                data.top_mistakes.map(m => `<li>${m}</li>`).join("");
+if(plan && data.improvement_plan)
+plan.innerHTML =
+data.improvement_plan.map(p=>`<li>${p}</li>`).join("");
 
-
-        const plan =
-            document.getElementById("improvement-plan");
-
-        if (plan && data.improvement_plan)
-            plan.innerHTML =
-                data.improvement_plan.map(p => `<li>${p}</li>`).join("");
-
-    }
+}
 
 };

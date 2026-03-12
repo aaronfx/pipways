@@ -24,13 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
 
-# Import routes using absolute imports (for Render deployment)
-import auth
-import blog
-import courses
-import signals
-import webinars
-import media
+# Import routes from the routes package (NOT direct imports)
+from routes import auth, blog, courses, signals, webinars, media
 
 # Logging setup
 logging.basicConfig(
@@ -89,10 +84,10 @@ app.add_middleware(
 for d in ["uploads", "uploads/blog", "uploads/courses", "uploads/signals", "uploads/avatars", "uploads/webinars"]:
     os.makedirs(d, exist_ok=True)
 
-# Mount uploads directory (must be before static files to avoid conflicts)
+# Mount uploads directory
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Mount frontend static files (CSS, JS, images) - must be before HTML routes
+# Mount frontend static files (CSS, JS, images)
 if os.path.exists(frontend_path):
     logger.info(f"Mounting frontend from: {frontend_path}")
     
@@ -112,7 +107,7 @@ if os.path.exists(frontend_path):
 else:
     logger.warning(f"Frontend path not found: {frontend_path}")
 
-# Include all API routers with prefixes
+# Include all API routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/signals", tags=["Trading Signals"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Learning Management System"])
@@ -136,7 +131,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={"detail": exc.detail, "error_code": f"HTTP_{exc.status_code}"}
     )
 
-# SPA Serving Logic
 def get_dashboard_html():
     """Read and return the dashboard HTML file"""
     dashboard_path = os.path.join(frontend_path, "dashboard.html")
@@ -176,7 +170,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-# API Admin Dashboard endpoint (used by frontend)
+# API Admin Dashboard endpoint
 @app.get("/api/admin/dashboard", tags=["Admin"])
 async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
     """Get comprehensive dashboard statistics for admin panel"""
@@ -300,8 +294,6 @@ async def get_public_settings():
     return settings
 
 # SPA Catch-all - MUST BE LAST
-# This serves dashboard.html for all non-API, non-static routes
-# allowing the React/Vue-like router in dashboard.html to handle client-side routing
 @app.get("/{full_path:path}", response_class=HTMLResponse)
 async def spa_catch_all(full_path: str):
     """Catch-all route for SPA - serves dashboard.html for all frontend routes"""
@@ -310,17 +302,15 @@ async def spa_catch_all(full_path: str):
     if full_path.startswith(("api/", "docs", "redoc", "openapi")):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     
-    # Skip static files (should be caught by mounted StaticFiles, but just in case)
+    # Skip static files
     if full_path.startswith(("css/", "js/", "images/", "assets/", "uploads/")):
         raise HTTPException(status_code=404, detail="Static file not found")
     
-    # Serve dashboard.html for all other routes (signals, blog, admin, etc.)
-    # The frontend router will handle showing the correct section
+    # Serve dashboard.html for all other routes
     html = get_dashboard_html()
     if html:
         return html
     
-    # Fallback if no dashboard.html
     return JSONResponse(
         status_code=404,
         content={"detail": "Page not found", "error_code": "HTTP_404"}

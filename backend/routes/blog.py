@@ -6,9 +6,9 @@ from typing import Optional, List
 from datetime import datetime
 import json
 
-from .. import database
-from ..schemas import BlogPostCreate, BlogPostUpdate, BlogPostResponse, SEOMetadata
-from ..security import get_current_user, get_admin_user, get_current_user_optional
+import database
+from schemas import BlogPostCreate, BlogPostUpdate, BlogPostResponse, SEOMetadata
+from security import get_current_user, get_admin_user, get_current_user_optional
 
 router = APIRouter()
 

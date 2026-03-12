@@ -1,7 +1,7 @@
 """
 Database Module - Complete Setup for Pipways Trading Platform
 PostgreSQL + asyncpg implementation
-"""
+
 
 import asyncpg
 import asyncio

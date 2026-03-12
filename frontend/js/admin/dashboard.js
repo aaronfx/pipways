@@ -5,10 +5,18 @@
 
 const adminDashboard = {
     charts: {},
+    dataLoaded: false,
     
     async loadStats() {
+        // Don't load if not authenticated
+        if(!auth.currentUser) {
+            console.log('Not authenticated, skipping dashboard load');
+            return;
+        }
+        
         try {
             const stats = await api.get('/api/admin/dashboard/stats');
+            this.dataLoaded = true;
             
             // Update stat cards
             this.updateStat('stat-total-users', stats.total_users || 0);
@@ -20,15 +28,19 @@ const adminDashboard = {
             this.updateStat('stat-published-count', stats.published_posts || 0);
             this.updateStat('stat-premium-courses', stats.premium_courses || '-');
             
-            // Initialize charts
-            this.initCharts();
+            // Initialize charts only if canvas exists
+            setTimeout(() => this.initCharts(), 100);
             
             // Load recent activity
             this.loadActivity();
             
         } catch (error) {
             console.error('Failed to load dashboard stats:', error);
-            ui.showToast('Failed to load dashboard data', 'error');
+            if(error.message && error.message.includes('403')) {
+                ui.showToast('Admin access required', 'error');
+            } else {
+                ui.showToast('Failed to load dashboard data', 'error');
+            }
         }
     },
     
@@ -42,93 +54,105 @@ const adminDashboard = {
     initCharts() {
         // User Growth Chart (Canvas)
         const userCtx = document.getElementById('userGrowthChart');
-        if(userCtx) {
+        if(userCtx && userCtx.getContext) {
             this.drawLineChart(userCtx, [12, 19, 25, 32, 45, 58, 72], 'Users');
         }
         
         // Signal Performance Chart
         const signalCtx = document.getElementById('signalPerformanceChart');
-        if(signalCtx) {
+        if(signalCtx && signalCtx.getContext) {
             this.drawBarChart(signalCtx, [65, 78, 90, 81, 96, 85, 92], 'Win Rate %');
         }
     },
     
     drawLineChart(canvas, data, label) {
-        const ctx = canvas.getContext('2d');
-        const width = canvas.parentElement.clientWidth;
-        const height = 250;
-        canvas.width = width;
-        canvas.height = height;
-        
-        ctx.clearRect(0, 0, width, height);
-        
-        const padding = 40;
-        const chartWidth = width - (padding * 2);
-        const chartHeight = height - (padding * 2);
-        const maxValue = Math.max(...data) * 1.2;
-        
-        ctx.beginPath();
-        ctx.strokeStyle = '#6366f1';
-        ctx.lineWidth = 3;
-        
-        data.forEach((value, index) => {
-            const x = padding + (index / (data.length - 1)) * chartWidth;
-            const y = height - padding - (value / maxValue) * chartHeight;
+        try {
+            const ctx = canvas.getContext('2d');
+            if(!ctx) return;
             
-            if(index === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        });
-        
-        ctx.stroke();
-        
-        ctx.lineTo(padding + chartWidth, height - padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.closePath();
-        
-        const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
-        gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        
-        data.forEach((value, index) => {
-            const x = padding + (index / (data.length - 1)) * chartWidth;
-            const y = height - padding - (value / maxValue) * chartHeight;
+            const width = canvas.parentElement ? canvas.parentElement.clientWidth : 300;
+            const height = 250;
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            const padding = 40;
+            const chartWidth = width - (padding * 2);
+            const chartHeight = height - (padding * 2);
+            const maxValue = Math.max(...data) * 1.2;
             
             ctx.beginPath();
-            ctx.fillStyle = '#6366f1';
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.strokeStyle = '#6366f1';
+            ctx.lineWidth = 3;
+            
+            data.forEach((value, index) => {
+                const x = padding + (index / (data.length - 1)) * chartWidth;
+                const y = height - padding - (value / maxValue) * chartHeight;
+                
+                if(index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+            
+            ctx.lineTo(padding + chartWidth, height - padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.closePath();
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+            ctx.fillStyle = gradient;
             ctx.fill();
-        });
+            
+            data.forEach((value, index) => {
+                const x = padding + (index / (data.length - 1)) * chartWidth;
+                const y = height - padding - (value / maxValue) * chartHeight;
+                
+                ctx.beginPath();
+                ctx.fillStyle = '#6366f1';
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        } catch(e) {
+            console.error('Chart error:', e);
+        }
     },
     
     drawBarChart(canvas, data, label) {
-        const ctx = canvas.getContext('2d');
-        const width = canvas.parentElement.clientWidth;
-        const height = 250;
-        canvas.width = width;
-        canvas.height = height;
-        
-        ctx.clearRect(0, 0, width, height);
-        
-        const padding = 40;
-        const chartWidth = width - (padding * 2);
-        const chartHeight = height - (padding * 2);
-        const maxValue = 100;
-        const barWidth = (chartWidth / data.length) * 0.6;
-        const spacing = (chartWidth / data.length) * 0.4;
-        
-        data.forEach((value, index) => {
-            const x = padding + (index * (barWidth + spacing)) + (spacing / 2);
-            const barHeight = (value / maxValue) * chartHeight;
-            const y = height - padding - barHeight;
+        try {
+            const ctx = canvas.getContext('2d');
+            if(!ctx) return;
             
-            ctx.fillStyle = '#10b981';
-            ctx.fillRect(x, y, barWidth, barHeight);
-        });
+            const width = canvas.parentElement ? canvas.parentElement.clientWidth : 300;
+            const height = 250;
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            const padding = 40;
+            const chartWidth = width - (padding * 2);
+            const chartHeight = height - (padding * 2);
+            const maxValue = 100;
+            const barWidth = (chartWidth / data.length) * 0.6;
+            const spacing = (chartWidth / data.length) * 0.4;
+            
+            data.forEach((value, index) => {
+                const x = padding + (index * (barWidth + spacing)) + (spacing / 2);
+                const barHeight = (value / maxValue) * chartHeight;
+                const y = height - padding - barHeight;
+                
+                ctx.fillStyle = '#10b981';
+                ctx.fillRect(x, y, barWidth, barHeight);
+            });
+        } catch(e) {
+            console.error('Chart error:', e);
+        }
     },
     
     async loadActivity() {

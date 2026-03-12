@@ -1,11 +1,12 @@
 /**
  * Authentication Module
- * Fixed: Admin button visibility, role checking, auth flow, and loading overlay
+ * Fixed: Auth state persistence, admin detection, and token handling
  */
 
 const auth = {
     currentUser: null,
     isLoading: false,
+    authCheckComplete: false,
 
     init() {
         this.checkAuth();
@@ -13,7 +14,9 @@ const auth = {
 
     async checkAuth() {
         const token = localStorage.getItem('access_token');
+        
         if (!token) {
+            this.authCheckComplete = true;
             this.showAuthWall();
             return;
         }
@@ -31,17 +34,19 @@ const auth = {
             
             const user = await response.json();
             this.currentUser = user;
+            this.authCheckComplete = true;
             this.hideAuthWall();
             this.updateUI();
             
-            // Initialize app data after successful auth
-            if (window.app) {
+            // Initialize app data only after auth is confirmed
+            if (window.app && app.initUserData) {
                 app.initUserData();
             }
         } catch (e) {
             console.error('Auth check failed:', e);
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
+            this.authCheckComplete = true;
             this.showAuthWall();
         }
     },
@@ -52,7 +57,6 @@ const auth = {
         if (authWall) authWall.classList.remove('hidden');
         if (mainApp) mainApp.classList.add('hidden');
         
-        // Reset current user
         this.currentUser = null;
         this.updateAdminUI();
     },
@@ -65,27 +69,17 @@ const auth = {
     },
 
     showRegister() {
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
-        const loginError = document.getElementById('login-error');
-        const registerError = document.getElementById('register-error');
-        
-        if (loginForm) loginForm.classList.add('hidden');
-        if (registerForm) registerForm.classList.remove('hidden');
-        if (loginError) loginError.style.display = 'none';
-        if (registerError) registerError.style.display = 'none';
+        document.getElementById('login-form')?.classList.add('hidden');
+        document.getElementById('register-form')?.classList.remove('hidden');
+        document.getElementById('login-error') && (document.getElementById('login-error').style.display = 'none');
+        document.getElementById('register-error') && (document.getElementById('register-error').style.display = 'none');
     },
 
     showLogin() {
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
-        const loginError = document.getElementById('login-error');
-        const registerError = document.getElementById('register-error');
-        
-        if (registerForm) registerForm.classList.add('hidden');
-        if (loginForm) loginForm.classList.remove('hidden');
-        if (loginError) loginError.style.display = 'none';
-        if (registerError) registerError.style.display = 'none';
+        document.getElementById('register-form')?.classList.add('hidden');
+        document.getElementById('login-form')?.classList.remove('hidden');
+        document.getElementById('login-error') && (document.getElementById('login-error').style.display = 'none');
+        document.getElementById('register-error') && (document.getElementById('register-error').style.display = 'none');
     },
 
     updateUI() {
@@ -119,8 +113,8 @@ const auth = {
     },
 
     updateAdminUI() {
-        // Determine if user is admin
-        const isAdmin = this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator');
+        const isAdmin = this.currentUser && 
+                       (this.currentUser.role === 'admin' || this.currentUser.role === 'moderator');
         
         // Update admin badge in sidebar
         const adminBadge = document.getElementById('admin-badge');
@@ -170,8 +164,7 @@ const auth = {
 
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                throw new Error('Server returned non-JSON response');
+                throw new Error('Server returned invalid response');
             }
 
             const data = await response.json();
@@ -193,7 +186,7 @@ const auth = {
             ui.showToast('Login successful!', 'success');
             
             // Initialize app data
-            if (window.app) {
+            if (window.app && app.initUserData) {
                 setTimeout(() => app.initUserData(), 100);
             }
             
@@ -204,7 +197,7 @@ const auth = {
                 errorDiv.style.display = 'block';
             }
         } finally {
-            ui.forceHideLoading(); // Force hide to ensure overlay is removed
+            ui.hideLoading();
             this.isLoading = false;
         }
     },
@@ -288,7 +281,7 @@ const auth = {
             ui.showToast('Account created successfully!', 'success');
             
             // Initialize app data
-            if (window.app) {
+            if (window.app && app.initUserData) {
                 setTimeout(() => app.initUserData(), 100);
             }
             
@@ -299,7 +292,7 @@ const auth = {
                 errorDiv.style.display = 'block';
             }
         } finally {
-            ui.forceHideLoading(); // Force hide to ensure overlay is removed
+            ui.hideLoading();
             this.isLoading = false;
         }
     },
@@ -357,47 +350,6 @@ const auth = {
         return true;
     },
 
-    // Token refresh handler
-    async refreshToken() {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) {
-            this.logout();
-            return null;
-        }
-
-        try {
-            const response = await fetch(`${window.location.origin}/auth/refresh`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${refreshToken}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Token refresh failed');
-            }
-
-            const data = await response.json();
-            localStorage.setItem('access_token', data.access_token);
-            return data.access_token;
-        } catch (error) {
-            console.error('Token refresh error:', error);
-            this.logout();
-            return null;
-        }
-    },
-
-    // Get current auth token
-    getToken() {
-        return localStorage.getItem('access_token');
-    },
-
-    // Check if user has specific role
-    hasRole(role) {
-        return this.currentUser && this.currentUser.role === role;
-    },
-
-    // Check if user is VIP
     isVip() {
         return this.currentUser && this.currentUser.subscription_tier === 'vip';
     }

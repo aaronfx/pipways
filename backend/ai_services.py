@@ -1,15 +1,13 @@
 """
 Pipways AI Services
-Handles:
-- AI Mentor
-- Chart Analysis
-- Performance Analysis
 """
 
 import os
 import httpx
 import base64
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from .services.performance_parser import parse_statement
+from .services.trading_metrics import calculate_metrics
 
 router = APIRouter()
 
@@ -19,27 +17,24 @@ OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-
 SYSTEM_PROMPT = """
 You are Pipways AI Trading Mentor.
 
-Guide traders with professional advice about:
-- risk management
-- trading psychology
-- discipline
-- technical analysis
+Provide professional trading insights about:
 
-Always emphasize risking only 1-2% per trade.
+• risk management
+• trading psychology
+• discipline
+• technical analysis
+
+Always emphasize risking only 1–2% per trade.
 """
 
 
 async def call_openrouter(messages, model):
-    """
-    Calls OpenRouter AI API
-    """
 
     if not OPENROUTER_API_KEY:
-        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
+        raise HTTPException(500, "OpenRouter API key not configured")
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -61,19 +56,16 @@ async def call_openrouter(messages, model):
         )
 
         if response.status_code != 200:
-            raise HTTPException(
-                status_code=500,
-                detail=response.text
-            )
+            raise HTTPException(500, response.text)
 
         data = response.json()
 
         return data["choices"][0]["message"]["content"]
 
 
-# ---------------------------------------------------
-# AI MENTOR
-# ---------------------------------------------------
+# ------------------------------
+# AI MENTOR (UNCHANGED)
+# ------------------------------
 
 @router.post("/mentor")
 async def ai_mentor(data: dict):
@@ -88,9 +80,9 @@ async def ai_mentor(data: dict):
     return {"response": response}
 
 
-# ---------------------------------------------------
-# CHART ANALYSIS
-# ---------------------------------------------------
+# ------------------------------
+# CHART ANALYZER (UNCHANGED)
+# ------------------------------
 
 @router.post("/analyze-chart")
 async def analyze_chart(
@@ -101,6 +93,7 @@ async def analyze_chart(
 ):
 
     image_bytes = await image.read()
+
     image_b64 = base64.b64encode(image_bytes).decode()
 
     prompt = f"""
@@ -136,49 +129,55 @@ Probability
     return {"analysis": analysis}
 
 
-# ---------------------------------------------------
-# PERFORMANCE ANALYSIS
-# ---------------------------------------------------
+# ------------------------------
+# NEW ADVANCED PERFORMANCE ANALYZER
+# ------------------------------
 
-@router.post("/analyze-performance")
-async def analyze_performance(data: dict):
+@router.post("/analyze-performance-file")
+async def analyze_performance_file(file: UploadFile = File(...)):
+
+    file_bytes = await file.read()
+
+    df = parse_statement(file_bytes, file.filename)
+
+    metrics = calculate_metrics(df)
+
+    metrics_text = f"""
+Trades: {metrics['trades']}
+Win Rate: {metrics['win_rate']}%
+Profit Factor: {metrics['profit_factor']}
+Risk Reward: {metrics['risk_reward']}
+Expectancy: {metrics['expectancy']}
+"""
+
+    prompt = f"""
+You are a hedge fund trading performance coach.
+
+Analyze the following trading statistics.
+
+{metrics_text}
+
+Return insights in these sections:
+
+Performance Summary
+Key Issues
+Strengths
+Improvement Plan
+Recommended Courses
+Mentor Advice
+Risk Management Score
+Discipline Score
+"""
+
+    ai_analysis = await call_openrouter(
+        [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ],
+        OPENROUTER_MODEL
+    )
 
     return {
-
-        "trader_score": 75,
-
-        "analysis": """
-### Performance Summary
-Your trading shows moderate consistency.
-
-### Key Issues
-Holding losing trades too long
-Overtrading during volatile sessions
-
-### Strengths
-Consistent position sizing
-Good profit factor
-
-### Improvement Plan
-Limit trades to 3 per day
-Use stop losses
-Review journal weekly
-""",
-
-        "strengths": [
-            "Consistent position sizing",
-            "Good profit factor"
-        ],
-
-        "top_mistakes": [
-            "Holding losing trades too long",
-            "Overtrading volatile sessions"
-        ],
-
-        "improvement_plan": [
-            "Limit trades to 3 per day",
-            "Use stop losses",
-            "Maintain trading journal"
-        ]
-
+        "metrics": metrics,
+        "analysis": ai_analysis
     }

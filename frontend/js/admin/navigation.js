@@ -5,12 +5,25 @@
 
 const adminNav = {
     currentTab: 'dashboard',
+    initialized: false,
     
     init() {
+        if(this.initialized) return;
+        if(!auth.currentUser) {
+            console.log('Cannot init admin nav - not authenticated');
+            return;
+        }
         this.switchTab('dashboard');
+        this.initialized = true;
     },
     
     switchTab(tabName) {
+        // Check auth before switching
+        if(!auth.currentUser) {
+            ui.showToast('Please login to access admin features', 'error');
+            return;
+        }
+        
         // Update tab buttons
         document.querySelectorAll('.admin-nav-tab').forEach(tab => {
             tab.classList.remove('active');
@@ -36,6 +49,12 @@ const adminNav = {
     },
     
     loadTabData(tabName) {
+        // Verify admin access before loading any data
+        if(!auth.currentUser || (auth.currentUser.role !== 'admin' && auth.currentUser.role !== 'moderator')) {
+            console.log('Admin access required for tab:', tabName);
+            return;
+        }
+        
         switch(tabName) {
             case 'dashboard':
                 adminDashboard.loadStats();

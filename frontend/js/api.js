@@ -23,7 +23,7 @@ const api = {
             ...options
         };
 
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('pipways_token'); // Use correct key
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
         }
@@ -34,7 +34,7 @@ const api = {
 
         // Add timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         config.signal = controller.signal;
 
         try {
@@ -45,8 +45,8 @@ const api = {
             
             if (!response.ok) {
                 if (response.status === 401) {
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
+                    localStorage.removeItem('pipways_token');
+                    localStorage.removeItem('pipways_user');
                     // Redirect to login instead of calling undefined auth object
                     window.location.href = '/index.html';
                     throw new Error('Session expired. Please login again.');
@@ -97,3 +97,6 @@ const api = {
         }); 
     }
 };
+
+// Expose globally
+window.api = api;

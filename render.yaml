@@ -4,60 +4,31 @@ services:
     runtime: python
     plan: standard
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: PYTHONPATH
+        value: /opt/render/project/src
       - key: DATABASE_URL
         fromDatabase:
           name: pipways-db
           property: connectionString
       - key: SECRET_KEY
-        sync: false
+        generateValue: true  # Auto-generate if not set, or set manually in dashboard
       - key: OPENAI_API_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "https://yourdomain.com,https://www.yourdomain.com"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: ALLOWED_ORIGINS
-        value: "https://yourdomain.com,https://www.yourdomain.com"
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: pipways-redis
-          property: connectionString
     healthCheckPath: /health
-
-  - type: worker
-    name: pipways-worker
-    runtime: python
-    plan: standard
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A backend.tasks worker --loglevel=info
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: pipways-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: pipways-redis
-          property: connectionString
 
 databases:
   - name: pipways-db
     databaseName: pipways
     plan: standard
     ipAllowList: []
-
-redis:
-  - name: pipways-redis
-    plan: standard
-    maxmemoryPolicy: allkeys-lru

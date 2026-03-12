@@ -1,34 +1,21 @@
 /**
  * Pipways AI Engine
  * Production-Ready Namespaced Module
- * Prevents duplicate declaration errors via IIFE encapsulation
+ * Supports: CSV, Excel, PDF, and Images
  */
 
 (function() {
     'use strict';
     
-    // Prevent double initialization
-    if (window.ai && window.ai.__initialized) {
-        console.log('AI module already initialized');
-        return;
-    }
+    if (window.ai && window.ai.__initialized) return;
     
-    // Local constants - no global scope pollution
     const API_BASE = "/api/ai";
     
-    // Temporary storage for uploaded files
     let currentChartFile = null;
     let currentPerformanceFile = null;
     
-    /* ===============================
-       PRIVATE API HELPERS
-    ================================ */
     async function apiRequest(endpoint, method = "POST", body = null) {
-        const options = {
-            method: method,
-            headers: {}
-        };
-
+        const options = { method: method, headers: {} };
         if (body instanceof FormData) {
             options.body = body;
         } else if (body) {
@@ -37,31 +24,21 @@
         }
 
         const response = await fetch(`${API_BASE}${endpoint}`, options);
-
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error);
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP ${response.status}`);
         }
-
         return response.json();
     }
 
     function appendChat(role, text) {
         const chatBox = document.getElementById("chat-messages");
         if (!chatBox) return;
-
         const msg = document.createElement("div");
         msg.className = "chat-message";
-        
         const bubble = document.createElement("div");
         bubble.className = role === "user" ? "chat-bubble user" : "chat-bubble ai";
-        
-        if (role === "ai") {
-            bubble.innerHTML = `<strong>AI Mentor:</strong> ${text}`;
-        } else {
-            bubble.textContent = text;
-        }
-        
+        bubble.innerHTML = role === "ai" ? `<strong>AI Mentor:</strong> ${text}` : text;
         msg.appendChild(bubble);
         chatBox.appendChild(msg);
         chatBox.scrollTop = chatBox.scrollHeight;
@@ -69,38 +46,39 @@
 
     function formatList(text) {
         if (!text) return "<li>No data available.</li>";
-        
-        const lines = text
-            .split("\n")
-            .map(l => l.trim())
-            .filter(l => l.length > 0);
-            
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         let html = "";
         lines.forEach(line => {
-            // Remove bullet markers
             const cleanLine = line.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '');
-            if (cleanLine && !cleanLine.match(/^Key Issues|^Strengths|^Improvement|^Recommended|^Mentor/i)) {
+            if (cleanLine && !cleanLine.match(/^Key Issues|^Strengths|^Improvement|^Recommended|^Mentor|^Performance|^Risk|^Discipline|^Overall/i)) {
                 html += `<li>${cleanLine}</li>`;
             }
         });
-        
         return html || "<li>No specific items listed.</li>";
     }
 
-    /* ===============================
-       PUBLIC API (window.ai namespace)
-    ================================ */
+    function getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        if (['csv', 'xls', 'xlsx'].includes(ext)) return 'fa-file-csv';
+        if (['pdf'].includes(ext)) return 'fa-file-pdf';
+        if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'fa-file-image';
+        return 'fa-file';
+    }
+
+    function getFileColor(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        if (['csv', 'xls', 'xlsx'].includes(ext)) return 'var(--success)';
+        if (['pdf'].includes(ext)) return 'var(--danger)';
+        if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'var(--primary)';
+        return 'var(--text-secondary)';
+    }
+
     window.ai = {
         __initialized: true,
         
-        /**
-         * AI Mentor Chat - Send message
-         * Corresponds to: id="chat-input", id="chat-messages"
-         */
         sendChatMessage: async function() {
             const input = document.getElementById("chat-input");
             if (!input) return;
-
             const message = input.value.trim();
             if (!message) return;
 
@@ -116,32 +94,22 @@
             }
         },
 
-        /**
-         * Handle Chart Image Upload
-         * Stores file and displays preview
-         */
         handleChartUpload: function(input) {
             if (!input?.files?.[0]) return;
-            
             currentChartFile = input.files[0];
-            
             const preview = document.getElementById("chart-preview");
             const container = document.getElementById("chart-preview-container");
-            
             if (preview && container) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     preview.src = e.target.result;
+                    preview.style.display = 'block';
                     container.classList.remove("hidden");
                 };
                 reader.readAsDataURL(currentChartFile);
             }
         },
 
-        /**
-         * Analyze Chart with AI
-         * Uses stored file from handleChartUpload
-         */
         analyzeChart: async function() {
             if (!currentChartFile) {
                 alert("Please upload a chart image first.");
@@ -161,62 +129,104 @@
             const resultBox = document.getElementById("chart-analysis-content");
             const resultContainer = document.getElementById("chart-analysis-result");
             
-            if (resultBox) {
-                resultBox.innerHTML = "<p><i class='fas fa-spinner fa-spin'></i> Analyzing chart with AI...</p>";
-            }
-            if (resultContainer) {
-                resultContainer.classList.remove("hidden");
-            }
+            if (resultBox) resultBox.innerHTML = "<p><i class='fas fa-spinner fa-spin'></i> Analyzing chart with AI...</p>";
+            if (resultContainer) resultContainer.classList.remove("hidden");
 
             try {
                 const res = await apiRequest("/analyze-chart", "POST", formData);
-                if (resultBox) {
-                    // Preserve line breaks from AI response
-                    resultBox.innerHTML = res.analysis.replace(/\n/g, '<br>');
-                }
+                if (resultBox) resultBox.innerHTML = res.analysis.replace(/\n/g, '<br>');
             } catch (error) {
                 console.error("Chart analysis error:", error);
-                if (resultBox) {
-                    resultBox.innerHTML = "<p style='color: var(--danger);'>Chart analysis failed. Please ensure the image is clear and try again.</p>";
-                }
+                if (resultBox) resultBox.innerHTML = "<p style='color: var(--danger);'>Chart analysis failed. Please try again.</p>";
             }
         },
 
         /**
-         * Handle Performance Statement Upload
+         * Handle Performance File Upload (CSV/Excel/PDF/Image)
          */
         handlePerformanceUpload: function(input) {
             if (!input?.files?.[0]) return;
             
             const file = input.files[0];
-            const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+            const allowedTypes = [
+                // Spreadsheets
+                "text/csv",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/csv",
+                // PDF
+                "application/pdf",
+                // Images
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/jpg",
+                "image/gif"
+            ];
             
-            if (!allowed.includes(file.type)) {
-                alert("Supported formats: JPG, PNG, WEBP only");
+            const allowedExts = ['.csv', '.xls', '.xlsx', '.pdf', '.jpg', '.jpeg', '.png', '.webp', '.gif'];
+            const hasValidExt = allowedExts.some(ext => file.name.toLowerCase().endsWith(ext));
+            const hasValidType = allowedTypes.includes(file.type);
+            
+            if (!hasValidType && !hasValidExt) {
+                alert("Supported formats: CSV, Excel, PDF, or Images (JPG, PNG, WEBP)");
+                input.value = '';
                 return;
             }
             
             currentPerformanceFile = file;
             
-            const preview = document.getElementById("performance-preview");
             const container = document.getElementById("performance-preview-container");
+            const preview = document.getElementById("performance-preview");
             
-            if (preview && container) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    container.classList.remove("hidden");
-                };
-                reader.readAsDataURL(currentPerformanceFile);
+            if (container) {
+                container.classList.remove("hidden");
+                
+                // Remove old file info if exists
+                const oldInfo = document.getElementById("performance-file-info");
+                if (oldInfo) oldInfo.remove();
+                
+                const fileIcon = getFileIcon(file.name);
+                const fileColor = getFileColor(file.name);
+                
+                // Create file info display
+                const fileInfo = document.createElement("div");
+                fileInfo.id = "performance-file-info";
+                fileInfo.style.cssText = "text-align: center; padding: 30px; background: var(--bg-hover); border-radius: 12px; margin-bottom: 16px; border: 2px dashed var(--border);";
+                fileInfo.innerHTML = `
+                    <i class="fas ${fileIcon}" style="font-size: 64px; color: ${fileColor}; margin-bottom: 16px;"></i>
+                    <div style="font-weight: 600; font-size: 16px; margin-bottom: 8px;">${file.name}</div>
+                    <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
+                        ${(file.size/1024).toFixed(1)} KB • ${file.type || 'Document'}
+                    </div>
+                `;
+                
+                if (preview && preview.parentNode) {
+                    preview.parentNode.insertBefore(fileInfo, preview);
+                }
+                
+                // Handle image preview if it's an image
+                if (file.type.startsWith('image/')) {
+                    if (preview) {
+                        preview.style.display = 'block';
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            preview.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                } else {
+                    if (preview) preview.style.display = 'none';
+                }
             }
         },
 
         /**
-         * Analyze Performance with AI Vision
+         * Analyze Performance (Multi-Format)
          */
         analyzePerformanceVision: async function() {
             if (!currentPerformanceFile) {
-                alert("Please upload a trading statement image first.");
+                alert("Please upload a trading statement (CSV, Excel, PDF, or Image).");
                 return;
             }
 
@@ -226,7 +236,6 @@
             const container = document.getElementById("analysis-results");
             if (container) {
                 container.classList.remove("hidden");
-                // Show loading state while preserving structure
                 const scoreEl = document.getElementById("trader-score");
                 if (scoreEl) scoreEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             }
@@ -236,28 +245,35 @@
                 this.renderPerformance(result);
             } catch (error) {
                 console.error("Performance analysis error:", error);
+                const container = document.getElementById("analysis-results");
                 if (container) {
-                    container.innerHTML = "<p style='color: var(--danger); text-align: center; padding: 40px;'>Analysis failed. Please try a clearer image.</p>";
+                    container.innerHTML = `<div style='color: var(--danger); text-align: center; padding: 40px; background: var(--bg-card); border-radius: 12px; margin: 20px;'>
+                        <i class="fas fa-exclamation-circle" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                        <strong>Analysis Failed</strong><br>
+                        ${error.message || 'Unable to process file. Ensure it is a valid trading statement.'}
+                    </div>`;
                 }
             }
         },
 
-        /**
-         * Render Performance Metrics to DOM
-         */
         renderPerformance: function(data) {
-            if (!data?.metrics) return;
+            if (!data) return;
             
-            const metrics = data.metrics;
+            const metrics = data.metrics || {};
+            const isVision = data.source === 'vision_ocr';
             
-            // Update Score
+            // Update Score Display
             const scoreEl = document.getElementById("trader-score");
             const scoreCircle = document.getElementById("score-circle");
             const scoreInterp = document.getElementById("score-interpretation");
             
             if (scoreEl) {
-                const score = Math.round(metrics.overall_score || (metrics.win_rate * metrics.profit_factor) || 0);
-                scoreEl.textContent = score;
+                // Use overall_score for vision, calculated for structured
+                let score = metrics.overall_score || Math.round((metrics.win_rate * metrics.profit_factor) / 10) || 0;
+                if (score > 100) score = 100;
+                if (score < 0) score = 0;
+                
+                scoreEl.textContent = isNaN(score) ? 0 : score;
                 if (scoreCircle) scoreCircle.style.setProperty('--score', score);
                 
                 if (scoreInterp) {
@@ -268,10 +284,14 @@
                 }
             }
 
-            // Update Summary Metrics
+            // Source badge
             const summaryEl = document.getElementById("performance-summary");
             if (summaryEl) {
-                summaryEl.innerHTML = `
+                const sourceBadge = isVision ? 
+                    `<span style="background: var(--warning); color: var(--bg-dark); padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 12px; display: inline-block;"><i class="fas fa-eye"></i> AI Vision Analysis</span>` :
+                    `<span style="background: var(--success); color: white; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 12px; display: inline-block;"><i class="fas fa-table"></i> Structured Data</span>`;
+                
+                summaryEl.innerHTML = sourceBadge + `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
                         <div class="metric-box" style="background: var(--bg-hover); padding: 12px; border-radius: 8px;">
                             <div style="font-size: 12px; color: var(--text-secondary);">Total Trades</div>
@@ -293,15 +313,11 @@
                 `;
             }
 
-            // Process AI Analysis Sections
             if (data.analysis) {
                 this.splitAnalysis(data.analysis);
             }
         },
 
-        /**
-         * Split AI Analysis text into sections
-         */
         splitAnalysis: function(text) {
             if (!text) return;
             
@@ -317,21 +333,17 @@
                 const el = document.getElementById(elementId);
                 if (!el) continue;
 
-                // Extract section using regex (handles multiline)
                 const regex = new RegExp(`${sectionName}[\\s:]*([\\s\\S]*?)(?=\\n[A-Z][a-zA-Z\\s]+[\\s:]|\\n\\n[A-Z]|$)`, "i");
                 const match = text.match(regex);
                 
                 if (match?.[1]) {
                     const content = match[1].trim();
-                    
                     if (elementId === "recommended-courses") {
-                        // Create tag buttons for courses
-                        const courses = content.split(/[,\n]/).map(c => c.replace(/^[-•*]\s*/, '').trim()).filter(c => c);
+                        const courses = content.split(/[,\n]/).map(c => c.replace(/^[-•*]\s*/, '').trim()).filter(c => c && c.length > 2);
                         el.innerHTML = courses.map(c => `<span class="tag" style="background: var(--primary); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; margin: 4px; display: inline-block;">${c}</span>`).join('');
                     } else if (elementId === "mentor-advice") {
                         el.innerHTML = content.replace(/\n/g, '<br>');
                     } else {
-                        // List items for UL elements
                         el.innerHTML = formatList(content);
                     }
                 } else {
@@ -345,5 +357,5 @@
         }
     };
     
-    console.log('Pipways AI Engine v2.0 initialized successfully');
+    console.log('Pipways AI Engine v2.1 (Multi-Format) initialized successfully');
 })();

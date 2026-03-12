@@ -60,7 +60,7 @@
                 <label class="form-label">Password</label>
                 <input type="password" name="password" class="form-input" required minlength="8">
                 <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
-                    Min 8 chars, uppercase, lowercase, number, special char
+                    Min 8 chars, uppercase, lowercase, number
                 </small>
             </div>
             <div id="register-error" style="color: var(--danger); margin-bottom: 16px; display: none;"></div>
@@ -368,7 +368,6 @@
                             <input type="file" id="performance-file" class="hidden" accept="image/*" onchange="ai.handlePerformanceUpload(this)">
                         </div>
                         <div id="performance-preview-container" class="hidden" style="margin-top: 20px;">
-                            <img id="performance-preview" class="image-preview" style="max-height: 400px;">
                             <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label class="form-label">Account Balance (Optional)</label>
@@ -379,8 +378,8 @@
                                     <input type="number" id="vision-trading-period" class="form-input" placeholder="30" value="30">
                                 </div>
                             </div>
-                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformanceVision()" style="margin-top: 12px;">
-                                <i class="fas fa-brain"></i> Analyze with AI Vision
+                            <button class="btn btn-lg btn-success" onclick="ai.analyzePerformance()" style="margin-top: 12px;">
+                                <i class="fas fa-brain"></i> Analyze Performance
                             </button>
                         </div>
                     </div>
@@ -547,7 +546,7 @@
                 </div>
             </div>
 
-            <!-- NEW: Professional Admin Dashboard Section -->
+            <!-- Admin Dashboard Section -->
             <div class="section" id="admin-section">
                 <!-- Admin Header -->
                 <div class="admin-header">
@@ -822,7 +821,7 @@
                         <div class="header-actions">
                             <div class="search-box">
                                 <i class="fas fa-search"></i>
-                                <input type="text" id="blog-search" placeholder="Search posts..." oninput="adminBlog.search()">
+                                <input type="text" id="blog-search-admin" placeholder="Search posts..." oninput="adminBlog.search()">
                             </div>
                             <select class="form-select" id="blog-category-filter" onchange="adminBlog.load()">
                                 <option value="">All Categories</option>
@@ -868,7 +867,7 @@
                         <div class="header-actions">
                             <div class="search-box">
                                 <i class="fas fa-search"></i>
-                                <input type="text" id="course-search" placeholder="Search courses..." oninput="adminLMS.search()">
+                                <input type="text" id="course-search-admin" placeholder="Search courses..." oninput="adminLMS.search()">
                             </div>
                             <button class="btn btn-success" onclick="adminLMS.openCourseModal()">
                                 <i class="fas fa-plus"></i> New Course
@@ -1173,7 +1172,7 @@
         </main>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts - Load Order Critical -->
     <script src="js/api.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/auth.js"></script>
@@ -1182,8 +1181,6 @@
     <script src="js/webinars.js"></script>
     <script src="js/blog.js"></script>
     <script src="js/ai.js"></script>
-    
-    <!-- Admin Modules - Create js/admin/ folder and place these files there -->
     <script src="js/admin/navigation.js"></script>
     <script src="js/admin/dashboard.js"></script>
     <script src="js/admin/signals.js"></script>
@@ -1192,7 +1189,6 @@
     <script src="js/admin/lms.js"></script>
     <script src="js/admin/webinars.js"></script>
     <script src="js/admin/settings.js"></script>
-    
     <script src="js/app.js"></script>
 </body>
 </html>

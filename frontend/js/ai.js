@@ -1,14 +1,14 @@
 /*
-Pipways AI Services
-Complete Stable Version
+Pipways AI Engine
+Stable Production Version
 */
 
 const API_BASE = "/api/ai";
 
 
-/* --------------------------------
-API REQUEST HELPER
--------------------------------- */
+/* ===============================
+   API REQUEST
+================================ */
 
 async function apiRequest(endpoint, method = "POST", body = null) {
 
@@ -18,11 +18,8 @@ async function apiRequest(endpoint, method = "POST", body = null) {
     };
 
     if (body instanceof FormData) {
-
         options.body = body;
-
     } else if (body) {
-
         options.headers["Content-Type"] = "application/json";
         options.body = JSON.stringify(body);
     }
@@ -30,9 +27,8 @@ async function apiRequest(endpoint, method = "POST", body = null) {
     const response = await fetch(`${API_BASE}${endpoint}`, options);
 
     if (!response.ok) {
-
-        const text = await response.text();
-        throw new Error(text);
+        const error = await response.text();
+        throw new Error(error);
     }
 
     return response.json();
@@ -40,63 +36,60 @@ async function apiRequest(endpoint, method = "POST", body = null) {
 
 
 
-/* --------------------------------
-AI MENTOR
--------------------------------- */
+/* ===============================
+   AI MENTOR
+================================ */
 
 async function sendMentorMessage() {
 
     const input = document.getElementById("mentorInput");
+    const chatBox = document.getElementById("mentorChat");
 
-    if (!input) return;
+    if (!input || !chatBox) return;
 
     const message = input.value.trim();
-
     if (!message) return;
 
     appendChat("user", message);
-
     input.value = "";
 
     try {
 
-        const result = await apiRequest("/mentor", "POST", {
+        const res = await apiRequest("/mentor", "POST", {
             message: message
         });
 
-        appendChat("ai", result.response);
+        appendChat("ai", res.response);
 
-    } catch (err) {
+    } catch (error) {
 
-        appendChat("ai", "AI mentor temporarily unavailable.");
+        appendChat("ai", "AI mentor unavailable.");
     }
 }
 
 
 function appendChat(role, text) {
 
-    const container = document.getElementById("mentorChat");
+    const chatBox = document.getElementById("mentorChat");
+    if (!chatBox) return;
 
-    if (!container) return;
+    const msg = document.createElement("div");
 
-    const div = document.createElement("div");
-
-    div.className = role === "user"
+    msg.className = role === "user"
         ? "chat-user"
         : "chat-ai";
 
-    div.innerText = text;
+    msg.innerText = text;
 
-    container.appendChild(div);
-
-    container.scrollTop = container.scrollHeight;
+    chatBox.appendChild(msg);
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 
 
-/* --------------------------------
-AI CHART ANALYZER
--------------------------------- */
+/* ===============================
+   AI CHART ANALYZER
+================================ */
 
 async function analyzeChart() {
 
@@ -104,7 +97,7 @@ async function analyzeChart() {
 
     if (!fileInput || !fileInput.files.length) {
 
-        alert("Upload chart image");
+        alert("Please upload chart image.");
         return;
     }
 
@@ -125,27 +118,24 @@ async function analyzeChart() {
 
     try {
 
-        const data = await apiRequest("/analyze-chart", "POST", formData);
+        const res = await apiRequest("/analyze-chart", "POST", formData);
 
-        if (resultBox) {
+        if (resultBox) resultBox.innerText = res.analysis;
 
-            resultBox.innerText = data.analysis;
-        }
+    } catch (error) {
 
-    } catch (err) {
+        console.error(error);
 
-        if (resultBox) {
-
+        if (resultBox)
             resultBox.innerText = "Chart analysis failed.";
-        }
     }
 }
 
 
 
-/* --------------------------------
-AI PERFORMANCE ANALYZER
--------------------------------- */
+/* ===============================
+   PERFORMANCE ANALYZER
+================================ */
 
 async function analyzePerformance() {
 
@@ -174,13 +164,9 @@ async function analyzePerformance() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const summaryBox = document.getElementById("performanceSummary");
-    const issuesBox = document.getElementById("keyIssues");
-    const strengthBox = document.getElementById("strengths");
-    const planBox = document.getElementById("improvementPlan");
-    const adviceBox = document.getElementById("mentorAdvice");
+    const summary = document.getElementById("performanceSummary");
 
-    if (summaryBox) summaryBox.innerHTML = "Analyzing trading performance...";
+    if (summary) summary.innerHTML = "Analyzing trading performance...";
 
     try {
 
@@ -192,60 +178,46 @@ async function analyzePerformance() {
 
         renderPerformance(result);
 
-    } catch (err) {
+    } catch (error) {
 
-        console.error(err);
+        console.error(error);
 
-        if (summaryBox) {
-
-            summaryBox.innerHTML =
-                "Performance analysis failed.";
-        }
+        if (summary)
+            summary.innerHTML = "Performance analysis failed.";
     }
 }
 
 
 
-/* --------------------------------
-RENDER PERFORMANCE RESULTS
--------------------------------- */
+/* ===============================
+   RENDER PERFORMANCE DATA
+================================ */
 
 function renderPerformance(data) {
 
     const metrics = data.metrics;
-    const analysis = data.analysis || "";
 
-    const summaryBox = document.getElementById("performanceSummary");
+    const summary = document.getElementById("performanceSummary");
 
-    if (summaryBox) {
+    if (summary) {
 
-        summaryBox.innerHTML = `
-        <div class="metric">
-            Trades: ${metrics.trades}
-        </div>
-        <div class="metric">
-            Win Rate: ${metrics.win_rate}%
-        </div>
-        <div class="metric">
-            Profit Factor: ${metrics.profit_factor}
-        </div>
-        <div class="metric">
-            Risk Reward: ${metrics.risk_reward}
-        </div>
-        <div class="metric">
-            Expectancy: ${metrics.expectancy}
-        </div>
+        summary.innerHTML = `
+            <div>Trades: ${metrics.trades}</div>
+            <div>Win Rate: ${metrics.win_rate}%</div>
+            <div>Profit Factor: ${metrics.profit_factor}</div>
+            <div>Risk Reward: ${metrics.risk_reward}</div>
+            <div>Expectancy: ${metrics.expectancy}</div>
         `;
     }
 
-    splitAnalysis(analysis);
+    splitAnalysis(data.analysis);
 }
 
 
 
-/* --------------------------------
-SPLIT AI RESPONSE INTO SECTIONS
--------------------------------- */
+/* ===============================
+   SPLIT AI RESPONSE
+================================ */
 
 function splitAnalysis(text) {
 
@@ -257,10 +229,9 @@ function splitAnalysis(text) {
         "Mentor Advice": "mentorAdvice"
     };
 
-    for (let title in sections) {
+    for (const title in sections) {
 
         const id = sections[title];
-
         const box = document.getElementById(id);
 
         if (!box) continue;
@@ -271,9 +242,7 @@ function splitAnalysis(text) {
 
         if (match) {
 
-            const content = match[1].trim();
-
-            box.innerHTML = formatList(content);
+            box.innerHTML = formatList(match[1]);
 
         } else {
 
@@ -284,15 +253,15 @@ function splitAnalysis(text) {
 
 
 
-/* --------------------------------
-FORMAT BULLET LIST
--------------------------------- */
+/* ===============================
+   FORMAT BULLET LIST
+================================ */
 
 function formatList(text) {
 
     const lines = text
         .split("\n")
-        .filter(l => l.trim().length > 0);
+        .filter(l => l.trim() !== "");
 
     let html = "<ul>";
 
@@ -308,9 +277,9 @@ function formatList(text) {
 
 
 
-/* --------------------------------
-FILE DRAG & DROP SUPPORT
--------------------------------- */
+/* ===============================
+   DRAG DROP SUPPORT
+================================ */
 
 function setupDragDrop() {
 
@@ -331,21 +300,17 @@ function setupDragDrop() {
 
         const input = document.getElementById("performanceFile");
 
-        if (input) {
-
-            input.files = files;
-        }
+        if (input) input.files = files;
     });
 }
 
 
 
-/* --------------------------------
-INIT
--------------------------------- */
+/* ===============================
+   INIT
+================================ */
 
 document.addEventListener("DOMContentLoaded", () => {
 
     setupDragDrop();
-
 });

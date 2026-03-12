@@ -2,12 +2,14 @@
 Authentication Routes - User registration, login, token management
 """
 
+import os
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime, timedelta
 from typing import Optional
 
-from database import db_pool, execute, fetchrow, fetchval, log_activity
+# ABSOLUTE IMPORTS (no dots)
+import database
 from schemas import UserRegister, UserLogin, UserResponse, TokenResponse, UserUpdate
 from security import (
     verify_password, 
@@ -23,16 +25,15 @@ security = HTTPBearer()
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserRegister):
     """Register new user"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     # Check if registration is enabled
-    from database import get_setting
-    reg_enabled = await get_setting('enable_registration', 'true')
+    reg_enabled = await database.get_setting('enable_registration', 'true')
     if reg_enabled == 'false':
         raise HTTPException(status_code=403, detail="Registration is currently disabled")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         # Check if email exists
         existing = await conn.fetchval("SELECT id FROM users WHERE email = $1", user_data.email)
         if existing:
@@ -55,10 +56,10 @@ async def register(user_data: UserRegister):
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
     """Authenticate user and return JWT tokens"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         # Get user by email
         user = await conn.fetchrow("""
             SELECT id, email, hashed_password, full_name, role, subscription_tier, is_active 
@@ -92,7 +93,7 @@ async def login(credentials: UserLogin):
         refresh_token = create_refresh_token(token_data)
         
         # Log activity
-        await log_activity(
+        await database.log_activity(
             user_id=user['id'],
             action='login',
             entity_type='user',
@@ -111,10 +112,10 @@ async def login(credentials: UserLogin):
 @router.post("/refresh")
 async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Refresh access token using refresh token"""
-    from jose import jwt, JWTError
+    from jose import jwt as jose_jwt, JWTError
     
     try:
-        payload = jwt.decode(credentials.credentials, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        payload = jose_jwt.decode(credentials.credentials, os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production-min-32-chars"), algorithms=["HS256"])
         
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
@@ -147,10 +148,10 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 @router.put("/me")
 async def update_profile(update_data: UserUpdate, current_user: dict = Depends(get_current_user)):
     """Update current user profile"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         # Build update fields
         updates = []
         values = []
@@ -192,10 +193,10 @@ async def change_password(
     current_user: dict = Depends(get_current_user)
 ):
     """Change user password"""
-    if not db_pool:
+    if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with db_pool.acquire() as conn:
+    async with database.db_pool.acquire() as conn:
         # Get current password hash
         user = await conn.fetchrow(
             "SELECT hashed_password FROM users WHERE id = $1", 
@@ -213,5 +214,3 @@ async def change_password(
         )
         
         return {"message": "Password updated successfully"}
-
-import os

@@ -1,6 +1,6 @@
 /**
  * Main Application Module
- * Handles routing, initialization, and global event handlers
+ * Updated to support modular admin dashboard
  */
 
 const app = {
@@ -10,8 +10,13 @@ const app = {
         ui.init();
         auth.init();
         
-        if (auth.currentUser) {
+        if(auth.currentUser) {
             this.initUserData();
+        }
+        
+        // Initialize admin navigation if on admin page
+        if(document.getElementById('admin-section')) {
+            adminNav.init();
         }
     },
 
@@ -21,33 +26,46 @@ const app = {
         webinars.loadWebinars();
         blog.loadBlogPosts();
         
-        if (auth.currentUser && (auth.currentUser.role === 'admin' || auth.currentUser.role === 'moderator')) {
-            admin.loadStats();
+        // Initialize admin data if admin
+        if(auth.currentUser && (auth.currentUser.role === 'admin' || auth.currentUser.role === 'moderator')) {
+            // Show admin nav item
+            const adminNavItem = document.getElementById('admin-nav-item');
+            if(adminNavItem) adminNavItem.classList.remove('hidden');
+            
+            // Load admin stats if on admin page
+            if(document.getElementById('admin-section')) {
+                adminDashboard.loadStats();
+            }
         }
     },
 
     showSection(sectionName, navElement) {
+        // Hide all sections
         document.querySelectorAll('.section').forEach(section => {
             section.classList.remove('active');
         });
         
+        // Show target section
         const targetSection = document.getElementById(`${sectionName}-section`);
-        if (targetSection) {
+        if(targetSection) {
             targetSection.classList.add('active');
             this.currentSection = sectionName;
         }
 
-        if (navElement) {
+        // Update nav active state
+        if(navElement) {
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.remove('active');
             });
             navElement.classList.add('active');
         }
 
-        if (window.innerWidth <= 1024) {
+        // Mobile sidebar close
+        if(window.innerWidth <= 1024) {
             document.getElementById('sidebar').classList.remove('open');
         }
 
+        // Section specific loading
         switch(sectionName) {
             case 'signals':
                 signals.loadSignals();
@@ -62,9 +80,9 @@ const app = {
                 blog.loadBlogPosts();
                 break;
             case 'admin':
-                if (auth.requireAdmin()) {
-                    admin.loadStats();
-                    admin.loadBlogPosts();
+                if(auth.requireAdmin()) {
+                    adminDashboard.loadStats();
+                    adminNav.switchTab('dashboard');
                 }
                 break;
         }

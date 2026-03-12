@@ -3,19 +3,38 @@ Pipways Trading Platform - Main Application
 FastAPI entry point with all modules mounted
 """
 
+import sys
+import os
+from pathlib import Path
+from contextlib import asynccontextmanager
+import logging
+
+# Add parent directory to path for imports (Render compatibility)
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# Now import from current directory (backend)
+from database import init_db_pool, close_db_pool, init_db, check_connection, get_setting, db_pool
+from schemas import DashboardStats
+from security import get_admin_user, get_current_user, get_current_user_optional
+
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import logging
-import os
 
-# Relative imports as per project requirements
-from . import database
-from .routes import signals, courses, blog, media, auth
-from .schemas import DashboardStats, MessageResponse
-from .security import get_admin_user, get_current_user
+# Import routes directly from files (avoiding package issues)
+try:
+    from routes import signals, courses, blog, media, auth
+except ImportError:
+    # Fallback to direct import for Render
+    import routes.signals as signals
+    import routes.courses as courses
+    import routes.blog as blog
+    import routes.media as media
+    import routes.auth as auth
 
 # Configure logging
 logging.basicConfig(
@@ -31,20 +50,23 @@ async def lifespan(app: FastAPI):
     Handles database initialization on startup and cleanup on shutdown
     """
     # Startup
+    logger.info("=" * 50)
     logger.info("Starting up Pipways Trading Platform...")
+    logger.info("=" * 50)
+    
     try:
-        await database.init_db_pool()
-        await database.init_db()
+        await init_db_pool()
+        await init_db()
         logger.info("✅ Database initialized successfully")
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
-        raise
+        # Don't raise - let app start but show degraded status
     
     yield  # Application runs here
     
     # Shutdown
     logger.info("Shutting down Pipways Trading Platform...")
-    await database.close_db_pool()
+    await close_db_pool()
     logger.info("✅ Database connections closed")
 
 # Initialize FastAPI app
@@ -61,58 +83,26 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production (e.g., ["https://pipways.com"])
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"]
 )
 
-# Create uploads directory if it doesn't exist
-os.makedirs("uploads", exist_ok=True)
-os.makedirs("uploads/blog", exist_ok=True)
-os.makedirs("uploads/courses", exist_ok=True)
-os.makedirs("uploads/signals", exist_ok=True)
-os.makedirs("uploads/avatars", exist_ok=True)
+# Create uploads directories
+for directory in ["uploads", "uploads/blog", "uploads/courses", "uploads/signals", "uploads/avatars"]:
+    os.makedirs(directory, exist_ok=True)
 
-# Mount static files for uploads
+# Mount static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Include routers with prefixes
-app.include_router(
-    auth.router,
-    prefix="/api/auth",
-    tags=["Authentication"],
-    responses={404: {"description": "Not found"}}
-)
-
-app.include_router(
-    signals.router,
-    prefix="/api/signals",
-    tags=["Trading Signals"],
-    dependencies=[]  # Public access with optional auth for premium content
-)
-
-app.include_router(
-    courses.router,
-    prefix="/api/courses",
-    tags=["Learning Management System"],
-    dependencies=[]  # Public access with auth for enrollment/progress
-)
-
-app.include_router(
-    blog.router,
-    prefix="/api/blog",
-    tags=["Blog & SEO CMS"],
-    dependencies=[]  # Public access with auth for premium posts
-)
-
-app.include_router(
-    media.router,
-    prefix="/api/media",
-    tags=["Media Uploads"],
-    dependencies=[]  # Auth handled within routes
-)
+# Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(signals.router, prefix="/api/signals", tags=["Trading Signals"])
+app.include_router(courses.router, prefix="/api/courses", tags=["Learning Management System"])
+app.include_router(blog.router, prefix="/api/blog", tags=["Blog & SEO CMS"])
+app.include_router(media.router, prefix="/api/media", tags=["Media Uploads"])
 
 # Exception handlers
 @app.exception_handler(Exception)
@@ -130,11 +120,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={"detail": exc.detail, "error_code": f"HTTP_{exc.status_code}"}
     )
 
-# Health check endpoint
+# Health check
 @app.get("/health", tags=["System"])
 async def health_check():
-    """System health check including database connectivity"""
-    db_status = await database.check_connection()
+    db_status = await check_connection()
     return {
         "status": "healthy" if db_status else "degraded",
         "database": "connected" if db_status else "disconnected",
@@ -145,23 +134,23 @@ async def health_check():
 # Root endpoint
 @app.get("/", tags=["System"])
 async def root():
-    """API root with available endpoints"""
     return {
         "message": "Welcome to Pipways Trading Platform API",
         "documentation": "/api/docs",
         "version": "2.0.0",
-        "modules": ["signals", "courses", "blog", "media", "auth"],
         "health_check": "/health"
     }
 
-# Admin dashboard stats (aggregated from all modules)
-@app.get("/api/admin/dashboard", response_model=DashboardStats, tags=["Admin"])
+# Admin dashboard
+@app.get("/api/admin/dashboard", tags=["Admin"])
 async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
-    """Get comprehensive dashboard statistics for admin panel"""
-    if not database.db_pool:
+    """Get comprehensive dashboard statistics"""
+    if not db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
-    async with database.db_pool.acquire() as conn:
+    import asyncpg
+    
+    async with db_pool.acquire() as conn:
         # User stats
         total_users = await conn.fetchval("SELECT COUNT(*) FROM users")
         
@@ -184,14 +173,10 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
         """)
         
         # Blog stats
-        blog_stats = await conn.fetchrow("""
-            SELECT COUNT(*) as total FROM blog_posts
-        """)
+        blog_stats = await conn.fetchrow("SELECT COUNT(*) as total FROM blog_posts")
         
-        # Webinar stats (if implemented)
-        webinar_stats = await conn.fetchrow("""
-            SELECT COUNT(*) as total FROM webinars
-        """)
+        # Webinar stats
+        webinar_stats = await conn.fetchrow("SELECT COUNT(*) as total FROM webinars")
         
         # Enrollment stats
         total_enrollments = await conn.fetchval("SELECT COUNT(*) FROM enrollments")
@@ -209,45 +194,38 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
         """)
         
         return {
-            "total_users": total_users,
-            "total_signals": signal_stats['total'],
-            "active_signals": signal_stats['active'],
-            "total_courses": course_stats['total'],
-            "published_courses": course_stats['published'],
-            "total_lessons": course_stats['lessons'],
-            "total_quizzes": course_stats['quizzes'],
-            "total_blog_posts": blog_stats['total'],
+            "total_users": total_users or 0,
+            "total_signals": signal_stats['total'] if signal_stats else 0,
+            "active_signals": signal_stats['active'] if signal_stats else 0,
+            "total_courses": course_stats['total'] if course_stats else 0,
+            "published_courses": course_stats['published'] if course_stats else 0,
+            "total_lessons": course_stats['lessons'] if course_stats else 0,
+            "total_quizzes": course_stats['quizzes'] if course_stats else 0,
+            "total_blog_posts": blog_stats['total'] if blog_stats else 0,
             "total_webinars": webinar_stats['total'] if webinar_stats else 0,
-            "total_enrollments": total_enrollments,
-            "pending_questions": pending_questions,
-            "recent_activities": [dict(a) for a in recent_activities]
+            "total_enrollments": total_enrollments or 0,
+            "pending_questions": pending_questions or 0,
+            "recent_activities": [dict(a) for a in recent_activities] if recent_activities else []
         }
 
-# Global settings endpoint
+# Public settings
 @app.get("/api/settings", tags=["System"])
 async def get_public_settings():
     """Get public site settings"""
-    if not database.db_pool:
+    if not db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
     
     settings = {}
     keys = ['site_name', 'site_url', 'telegram_free_link', 'vip_price', 'vip_price_currency']
     
     for key in keys:
-        value = await database.get_setting(key)
+        value = await get_setting(key)
         if value:
             settings[key] = value
     
     return settings
 
-# Server startup verification
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Starting Uvicorn server...")
-    uvicorn.run(
-        "app.main:app",  # Adjust "app" to your package name
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", 8000)),
-        reload=os.getenv("DEBUG", "false").lower() == "true",
-        log_level="info"
-    )
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

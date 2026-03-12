@@ -759,6 +759,87 @@ class SettingResponse(SettingBase):
         from_attributes = True
 
 # ============================================================================
+# PERFORMANCE ANALYSIS SCHEMAS
+# ============================================================================
+
+class TradeEntry(BaseModel):
+    date: datetime
+    pair: str
+    direction: SignalDirection
+    entry_price: Decimal
+    exit_price: Decimal
+    stop_loss: Optional[Decimal] = None
+    take_profit: Optional[Decimal] = None
+    position_size: Optional[Decimal] = None
+    pips: Optional[Decimal] = None
+    profit_loss: Optional[Decimal] = None
+    profit_loss_percent: Optional[Decimal] = None
+    result: str  # 'win', 'loss', 'breakeven'
+    exit_reason: Optional[str] = None  # 'tp', 'sl', 'manual', 'trailing'
+    notes: Optional[str] = None
+
+class PerformanceMetrics(BaseModel):
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    breakeven_trades: int
+    win_rate: float  # percentage
+    loss_rate: float  # percentage
+    average_profit: Decimal
+    average_loss: Decimal
+    profit_factor: float
+    expectancy: Decimal
+    average_risk_reward: float
+    total_pips: Decimal
+    total_profit_loss: Decimal
+    total_profit_loss_percent: float
+    max_consecutive_wins: int
+    max_consecutive_losses: int
+    max_drawdown_percent: float
+    max_drawdown_amount: Decimal
+    sharpe_ratio: Optional[float] = None
+    calmar_ratio: Optional[float] = None
+    volatility: Optional[float] = None
+
+class MonthlyPerformance(BaseModel):
+    month: str  # YYYY-MM format
+    total_trades: int
+    wins: int
+    losses: int
+    pips: Decimal
+    profit_loss: Decimal
+    win_rate: float
+
+class PairPerformance(BaseModel):
+    pair: str
+    total_trades: int
+    wins: int
+    losses: int
+    win_rate: float
+    pips: Decimal
+    profit_loss: Decimal
+
+class PerformanceAnalysisRequest(BaseModel):
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    pairs: Optional[List[str]] = None  # Filter by specific pairs
+    timeframes: Optional[List[str]] = None  # Filter by timeframes
+    signal_sources: Optional[List[str]] = None  # Filter by signal provider
+    initial_balance: Decimal = Decimal('10000.00')
+    risk_per_trade_percent: Decimal = Decimal('1.0')
+
+class PerformanceAnalysisResponse(BaseModel):
+    period: str
+    metrics: PerformanceMetrics
+    monthly_breakdown: List[MonthlyPerformance]
+    pair_breakdown: List[PairPerformance]
+    trades: List[TradeEntry]
+    equity_curve: List[Dict[str, Any]]  # [{date, balance, drawdown}]
+    winning_streaks: List[Dict[str, Any]]
+    losing_streaks: List[Dict[str, Any]]
+    recommendations: List[str]  # AI-generated suggestions
+
+# ============================================================================
 # ACTIVITY LOG SCHEMAS
 # ============================================================================
 

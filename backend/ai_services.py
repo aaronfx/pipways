@@ -1,96 +1,110 @@
 """
 Pipways AI Services
+Handles:
+- AI Mentor
+- Chart Analysis
+- Performance Analysis
 """
 
 import os
 import httpx
 import base64
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from typing import Optional
 
 router = APIRouter()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL","anthropic/claude-3.5-sonnet")
-OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL","anthropic/claude-3.5-sonnet")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+OPENROUTER_VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 SYSTEM_PROMPT = """
-You are Pipways AI trading mentor.
+You are Pipways AI Trading Mentor.
 
-Guide traders on:
+Guide traders with professional advice about:
 - risk management
-- psychology
+- trading psychology
 - discipline
-- strategy
+- technical analysis
 
-Always emphasize:
-risking only 1-2% per trade.
+Always emphasize risking only 1-2% per trade.
 """
 
 
 async def call_openrouter(messages, model):
+    """
+    Calls OpenRouter AI API
+    """
 
-headers = {
-"Authorization": f"Bearer {OPENROUTER_API_KEY}",
-"Content-Type":"application/json"
-}
+    if not OPENROUTER_API_KEY:
+        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
 
-payload = {
-"model": model,
-"messages": messages,
-"max_tokens":2000
-}
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-async with httpx.AsyncClient(timeout=30) as client:
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": 2000
+    }
 
-response = await client.post(
-OPENROUTER_URL,
-headers=headers,
-json=payload
-)
+    async with httpx.AsyncClient(timeout=30) as client:
 
-if response.status_code != 200:
+        response = await client.post(
+            OPENROUTER_URL,
+            headers=headers,
+            json=payload
+        )
 
-raise HTTPException(
-status_code=500,
-detail=response.text
-)
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail=response.text
+            )
 
-data = response.json()
+        data = response.json()
 
-return data["choices"][0]["message"]["content"]
+        return data["choices"][0]["message"]["content"]
 
+
+# ---------------------------------------------------
+# AI MENTOR
+# ---------------------------------------------------
 
 @router.post("/mentor")
-async def ai_mentor(data:dict):
+async def ai_mentor(data: dict):
 
-messages = [
-{"role":"system","content":SYSTEM_PROMPT},
-{"role":"user","content":data["message"]}
-]
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": data.get("message")}
+    ]
 
-response = await call_openrouter(messages, OPENROUTER_MODEL)
+    response = await call_openrouter(messages, OPENROUTER_MODEL)
 
-return {"response":response}
+    return {"response": response}
 
+
+# ---------------------------------------------------
+# CHART ANALYSIS
+# ---------------------------------------------------
 
 @router.post("/analyze-chart")
 async def analyze_chart(
-image: UploadFile = File(...),
-pair: str = Form("EURUSD"),
-timeframe: str = Form("1H"),
-context: str = Form("")
+    image: UploadFile = File(...),
+    pair: str = Form("EURUSD"),
+    timeframe: str = Form("1H"),
+    context: str = Form("")
 ):
 
-image_bytes = await image.read()
+    image_bytes = await image.read()
+    image_b64 = base64.b64encode(image_bytes).decode()
 
-image_b64 = base64.b64encode(image_bytes).decode()
-
-prompt = f"""
-Analyze this {pair} chart on {timeframe} timeframe.
+    prompt = f"""
+Analyze this {pair} chart on the {timeframe} timeframe.
 
 Return:
 
@@ -104,32 +118,36 @@ Take Profit
 Probability
 """
 
-messages = [{
-"role":"user",
-"content":[
-{"type":"text","text":prompt},
-{
-"type":"image_url",
-"image_url":{
-"url":f"data:{image.content_type};base64,{image_b64}"
-}
-}
-]
-}]
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{image.content_type};base64,{image_b64}"
+                }
+            }
+        ]
+    }]
 
-analysis = await call_openrouter(messages, OPENROUTER_VISION_MODEL)
+    analysis = await call_openrouter(messages, OPENROUTER_VISION_MODEL)
 
-return {"analysis":analysis}
+    return {"analysis": analysis}
 
+
+# ---------------------------------------------------
+# PERFORMANCE ANALYSIS
+# ---------------------------------------------------
 
 @router.post("/analyze-performance")
-async def analyze_performance(data:dict):
+async def analyze_performance(data: dict):
 
-return {
+    return {
 
-"trader_score":75,
+        "trader_score": 75,
 
-"analysis":"""
+        "analysis": """
 ### Performance Summary
 Your trading shows moderate consistency.
 
@@ -147,20 +165,20 @@ Use stop losses
 Review journal weekly
 """,
 
-"strengths":[
-"Consistent position sizing",
-"Good profit factor"
-],
+        "strengths": [
+            "Consistent position sizing",
+            "Good profit factor"
+        ],
 
-"top_mistakes":[
-"Holding losing trades too long",
-"Overtrading volatile sessions"
-],
+        "top_mistakes": [
+            "Holding losing trades too long",
+            "Overtrading volatile sessions"
+        ],
 
-"improvement_plan":[
-"Limit trades to 3 per day",
-"Use stop losses",
-"Maintain trading journal"
-]
+        "improvement_plan": [
+            "Limit trades to 3 per day",
+            "Use stop losses",
+            "Maintain trading journal"
+        ]
 
-}
+    }

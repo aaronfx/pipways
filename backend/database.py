@@ -1,7 +1,7 @@
 """
 Database Module - Complete Setup for Pipways Trading Platform
 PostgreSQL + asyncpg implementation
-
+"""
 
 import asyncpg
 import asyncio
@@ -23,24 +23,6 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
-
-# ... rest of database.py continues ...
-"""
-Database Module - Complete Setup for Pipways Trading Platform
-PostgreSQL + asyncpg implementation
-"""
-
-import asyncpg
-import asyncio
-import logging
-from typing import Optional, List, Dict, Any, Union, AsyncGenerator
-from datetime import datetime
-import os
-import json
-from contextlib import asynccontextmanager
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Global connection pool
 db_pool: Optional[asyncpg.Pool] = None

@@ -7,11 +7,18 @@ const Auth = {
     API_URL: '/auth',
     TOKEN_KEY: 'pipways_token',
     USER_KEY: 'pipways_user',
+    _initialized: false,
     
     /**
      * Initialize auth module
      */
     init() {
+        // Guard against double initialization (app.js also calls this)
+        if (this._initialized) {
+            return;
+        }
+        this._initialized = true;
+        
         console.log('Auth module initialized');
         this.bindAuthForms();
         this.checkAuthStatus();
@@ -47,21 +54,21 @@ const Auth = {
      * Handle user login - READS DIRECTLY FROM FORM INPUTS ONLY
      */
     async handleLogin() {
-        // Read credentials directly from form input fields only
+        // Read credentials directly from form fields only - NO URL PARAMS
         const emailField = document.getElementById('email');
         const passwordField = document.getElementById('password');
         
         // Validate elements exist
         if (!emailField || !passwordField) {
-            this.showError('Login form elements not found');
+            this.showError('Login form not found');
             return;
         }
         
-        // Get values and trim whitespace
+        // Get values directly from inputs
         const email = emailField.value.trim();
         const password = passwordField.value;
         
-        // Validate fields are not empty
+        // Validate fields
         if (!email || !password) {
             this.showError('Please enter both email and password');
             return;
@@ -70,7 +77,7 @@ const Auth = {
         try {
             this.showLoading(true);
             
-            // Send login request to backend
+            // POST to /auth/login
             const response = await fetch(`${this.API_URL}/login`, {
                 method: 'POST',
                 headers: {
@@ -89,7 +96,7 @@ const Auth = {
                 throw new Error(data.detail || 'Login failed');
             }
             
-            // Store token in localStorage
+            // Store token and user data
             this.setToken(data.access_token);
             this.setUser({
                 email: email,

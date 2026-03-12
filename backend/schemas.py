@@ -1,59 +1,52 @@
-"""
-Pydantic Models for Request/Response Validation
-"""
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str
-    full_name: str
+# ... existing schemas ...
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-class Token(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str
-
-class BlogPostCreate(BaseModel):
-    title: str
-    content: str
-    excerpt: Optional[str] = None
-    category: Optional[str] = None
-    featured_image: Optional[str] = None
-    is_premium: bool = False
-    status: str = "published"
-
+# Course Schemas
 class CourseCreate(BaseModel):
     title: str
-    description: str
-    content: Optional[str] = None
+    description: Optional[str] = None
     level: str = "beginner"
     duration_hours: Optional[float] = None
+    is_premium: bool = False
+    status: str = "draft"
     thumbnail: Optional[str] = None
+
+class ModuleCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
     is_premium: bool = False
 
-class CourseModuleCreate(BaseModel):
+class LessonCreate(BaseModel):
     title: str
     content: Optional[str] = None
     video_url: Optional[str] = None
+    video_type: str = "upload"  # upload, youtube, vimeo
+    pdf_url: Optional[str] = None
+    images: Optional[List[str]] = []
+    duration_minutes: Optional[int] = None
     is_premium: bool = False
-    sort_order: int = 0
 
-class WebinarCreate(BaseModel):
+# Quiz Schemas
+class QuestionCreate(BaseModel):
+    question_text: str
+    question_type: str = "multiple_choice"
+    options: List[str]
+    correct_answer: str
+    explanation: Optional[str] = None
+    points: int = 1
+
+class QuizCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    scheduled_at: datetime
-    duration_minutes: int = 60
-    meeting_link: Optional[str] = None
-    is_premium: bool = False
-    max_participants: int = 100
-    reminder_message: Optional[str] = None
+    passing_score: int = 70
+    time_limit_minutes: Optional[int] = None
+    max_attempts: int = 3
+    questions: List[QuestionCreate]
 
+# Signal Schemas (updated)
 class SignalCreate(BaseModel):
     pair: str
     direction: str
@@ -61,25 +54,8 @@ class SignalCreate(BaseModel):
     stop_loss: Optional[float] = None
     tp1: Optional[float] = None
     tp2: Optional[float] = None
+    tp3: Optional[float] = None
+    timeframe: Optional[str] = None
     analysis: Optional[str] = None
     is_premium: bool = False
     status: str = "active"
-
-class UserUpdate(BaseModel):
-    role: Optional[str] = None
-    subscription_tier: Optional[str] = None
-
-class AIAnalyzeRequest(BaseModel):
-    pair: str
-    timeframe: str
-    context: Optional[str] = None
-
-class AIMentorRequest(BaseModel):
-    message: str
-    history: Optional[List[dict]] = []
-    use_knowledge: bool = True
-
-class PerformanceAnalysisRequest(BaseModel):
-    image: str  # base64 encoded image
-    account_balance: float
-    trading_period_days: int

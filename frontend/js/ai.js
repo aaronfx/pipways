@@ -1,329 +1,351 @@
 /*
-Pipways AI Module
-Handles:
-- AI Mentor
-- Chart Analysis
-- Performance Vision Analysis
+Pipways AI Services
+Complete Stable Version
 */
 
-const ai = {
-
-chatHistory: [],
-currentChartFile: null,
-currentChartImage: null,
-currentPerformanceImage: null,
+const API_BASE = "/api/ai";
 
 
-/* ===============================
+/* --------------------------------
+API REQUEST HELPER
+-------------------------------- */
+
+async function apiRequest(endpoint, method = "POST", body = null) {
+
+    const options = {
+        method: method,
+        headers: {}
+    };
+
+    if (body instanceof FormData) {
+
+        options.body = body;
+
+    } else if (body) {
+
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${API_BASE}${endpoint}`, options);
+
+    if (!response.ok) {
+
+        const text = await response.text();
+        throw new Error(text);
+    }
+
+    return response.json();
+}
+
+
+
+/* --------------------------------
 AI MENTOR
-================================*/
+-------------------------------- */
 
-async sendChatMessage() {
+async function sendMentorMessage() {
 
-const input = document.getElementById("chat-input");
-const messages = document.getElementById("chat-messages");
+    const input = document.getElementById("mentorInput");
 
-if (!input || !messages) return;
+    if (!input) return;
 
-const message = input.value.trim();
-if (!message) return;
+    const message = input.value.trim();
 
-const userBubble = document.createElement("div");
-userBubble.className = "chat-message user";
-userBubble.innerHTML =
-`<div class="chat-bubble"><strong>You:</strong> ${message}</div>`;
+    if (!message) return;
 
-messages.appendChild(userBubble);
-messages.scrollTop = messages.scrollHeight;
+    appendChat("user", message);
 
-input.value = "";
+    input.value = "";
 
-this.chatHistory.push({
-role: "user",
-content: message
+    try {
+
+        const result = await apiRequest("/mentor", "POST", {
+            message: message
+        });
+
+        appendChat("ai", result.response);
+
+    } catch (err) {
+
+        appendChat("ai", "AI mentor temporarily unavailable.");
+    }
+}
+
+
+function appendChat(role, text) {
+
+    const container = document.getElementById("mentorChat");
+
+    if (!container) return;
+
+    const div = document.createElement("div");
+
+    div.className = role === "user"
+        ? "chat-user"
+        : "chat-ai";
+
+    div.innerText = text;
+
+    container.appendChild(div);
+
+    container.scrollTop = container.scrollHeight;
+}
+
+
+
+/* --------------------------------
+AI CHART ANALYZER
+-------------------------------- */
+
+async function analyzeChart() {
+
+    const fileInput = document.getElementById("chartImage");
+
+    if (!fileInput || !fileInput.files.length) {
+
+        alert("Upload chart image");
+        return;
+    }
+
+    const pair = document.getElementById("pair")?.value || "EURUSD";
+    const timeframe = document.getElementById("timeframe")?.value || "1H";
+    const context = document.getElementById("context")?.value || "";
+
+    const formData = new FormData();
+
+    formData.append("image", fileInput.files[0]);
+    formData.append("pair", pair);
+    formData.append("timeframe", timeframe);
+    formData.append("context", context);
+
+    const resultBox = document.getElementById("chartResult");
+
+    if (resultBox) resultBox.innerHTML = "Analyzing chart...";
+
+    try {
+
+        const data = await apiRequest("/analyze-chart", "POST", formData);
+
+        if (resultBox) {
+
+            resultBox.innerText = data.analysis;
+        }
+
+    } catch (err) {
+
+        if (resultBox) {
+
+            resultBox.innerText = "Chart analysis failed.";
+        }
+    }
+}
+
+
+
+/* --------------------------------
+AI PERFORMANCE ANALYZER
+-------------------------------- */
+
+async function analyzePerformance() {
+
+    const fileInput = document.getElementById("performanceFile");
+
+    if (!fileInput || !fileInput.files.length) {
+
+        alert("Upload trading statement");
+        return;
+    }
+
+    const file = fileInput.files[0];
+
+    const allowed = [
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ];
+
+    if (!allowed.includes(file.type)) {
+
+        alert("Supported formats: CSV or Excel");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const summaryBox = document.getElementById("performanceSummary");
+    const issuesBox = document.getElementById("keyIssues");
+    const strengthBox = document.getElementById("strengths");
+    const planBox = document.getElementById("improvementPlan");
+    const adviceBox = document.getElementById("mentorAdvice");
+
+    if (summaryBox) summaryBox.innerHTML = "Analyzing trading performance...";
+
+    try {
+
+        const result = await apiRequest(
+            "/analyze-performance-file",
+            "POST",
+            formData
+        );
+
+        renderPerformance(result);
+
+    } catch (err) {
+
+        console.error(err);
+
+        if (summaryBox) {
+
+            summaryBox.innerHTML =
+                "Performance analysis failed.";
+        }
+    }
+}
+
+
+
+/* --------------------------------
+RENDER PERFORMANCE RESULTS
+-------------------------------- */
+
+function renderPerformance(data) {
+
+    const metrics = data.metrics;
+    const analysis = data.analysis || "";
+
+    const summaryBox = document.getElementById("performanceSummary");
+
+    if (summaryBox) {
+
+        summaryBox.innerHTML = `
+        <div class="metric">
+            Trades: ${metrics.trades}
+        </div>
+        <div class="metric">
+            Win Rate: ${metrics.win_rate}%
+        </div>
+        <div class="metric">
+            Profit Factor: ${metrics.profit_factor}
+        </div>
+        <div class="metric">
+            Risk Reward: ${metrics.risk_reward}
+        </div>
+        <div class="metric">
+            Expectancy: ${metrics.expectancy}
+        </div>
+        `;
+    }
+
+    splitAnalysis(analysis);
+}
+
+
+
+/* --------------------------------
+SPLIT AI RESPONSE INTO SECTIONS
+-------------------------------- */
+
+function splitAnalysis(text) {
+
+    const sections = {
+        "Key Issues": "keyIssues",
+        "Strengths": "strengths",
+        "Improvement Plan": "improvementPlan",
+        "Recommended Courses": "recommendedCourses",
+        "Mentor Advice": "mentorAdvice"
+    };
+
+    for (let title in sections) {
+
+        const id = sections[title];
+
+        const box = document.getElementById(id);
+
+        if (!box) continue;
+
+        const regex = new RegExp(`${title}([\\s\\S]*?)(?=\\n[A-Z]|$)`, "i");
+
+        const match = text.match(regex);
+
+        if (match) {
+
+            const content = match[1].trim();
+
+            box.innerHTML = formatList(content);
+
+        } else {
+
+            box.innerHTML = "No data available.";
+        }
+    }
+}
+
+
+
+/* --------------------------------
+FORMAT BULLET LIST
+-------------------------------- */
+
+function formatList(text) {
+
+    const lines = text
+        .split("\n")
+        .filter(l => l.trim().length > 0);
+
+    let html = "<ul>";
+
+    lines.forEach(line => {
+
+        html += `<li>${line.replace("-", "").trim()}</li>`;
+    });
+
+    html += "</ul>";
+
+    return html;
+}
+
+
+
+/* --------------------------------
+FILE DRAG & DROP SUPPORT
+-------------------------------- */
+
+function setupDragDrop() {
+
+    const drop = document.getElementById("performanceDrop");
+
+    if (!drop) return;
+
+    drop.addEventListener("dragover", e => {
+
+        e.preventDefault();
+    });
+
+    drop.addEventListener("drop", e => {
+
+        e.preventDefault();
+
+        const files = e.dataTransfer.files;
+
+        const input = document.getElementById("performanceFile");
+
+        if (input) {
+
+            input.files = files;
+        }
+    });
+}
+
+
+
+/* --------------------------------
+INIT
+-------------------------------- */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    setupDragDrop();
+
 });
-
-try {
-
-const response = await api.post("/api/ai/mentor", {
-message: message,
-history: this.chatHistory
-});
-
-const text = response.response || "No response";
-
-this.chatHistory.push({
-role: "assistant",
-content: text
-});
-
-const aiBubble = document.createElement("div");
-aiBubble.className = "chat-message";
-
-aiBubble.innerHTML =
-`<div class="chat-bubble"><strong>AI Mentor:</strong> ${marked.parse(text)}</div>`;
-
-messages.appendChild(aiBubble);
-messages.scrollTop = messages.scrollHeight;
-
-}
-catch(error){
-
-console.error("AI mentor error:", error);
-ui.showToast("AI mentor unavailable","error");
-
-}
-
-},
-
-
-/* ===============================
-CHART IMAGE UPLOAD
-================================*/
-
-handleChartUpload(input){
-
-const file = input.files[0];
-if(!file) return;
-
-if(file.size > 10*1024*1024){
-
-ui.showToast("Image too large (10MB max)","error");
-return;
-
-}
-
-this.currentChartFile = file;
-
-const reader = new FileReader();
-
-reader.onload = (e)=>{
-
-this.currentChartImage = e.target.result;
-
-const preview = document.getElementById("chart-preview");
-const container = document.getElementById("chart-preview-container");
-
-if(preview) preview.src = e.target.result;
-
-if(container) container.classList.remove("hidden");
-
-};
-
-reader.readAsDataURL(file);
-
-},
-
-
-/* ===============================
-CHART ANALYSIS
-================================*/
-
-async analyzeChart(){
-
-if(!this.currentChartFile){
-
-ui.showToast("Upload chart first","error");
-return;
-
-}
-
-ui.showLoading("Analyzing chart...");
-
-try{
-
-const pair =
-document.getElementById("chart-pair")?.value || "EURUSD";
-
-const timeframe =
-document.getElementById("chart-timeframe")?.value || "1H";
-
-const context =
-document.getElementById("chart-context")?.value || "";
-
-const formData = new FormData();
-
-formData.append("image", this.currentChartFile);
-formData.append("pair", pair);
-formData.append("timeframe", timeframe);
-formData.append("context", context);
-
-const response =
-await api.upload("/api/ai/analyze-chart", formData);
-
-const content =
-document.getElementById("chart-analysis-content");
-
-const result =
-document.getElementById("chart-analysis-result");
-
-if(content){
-
-const text =
-response.analysis ||
-"No analysis returned";
-
-content.innerHTML = marked.parse(text);
-
-}
-
-if(result)
-result.classList.remove("hidden");
-
-}
-catch(error){
-
-console.error("Chart AI error:", error);
-ui.showToast("Chart analysis failed","error");
-
-}
-finally{
-
-ui.hideLoading();
-
-}
-
-},
-
-
-/* ===============================
-PERFORMANCE IMAGE UPLOAD
-================================*/
-
-handlePerformanceUpload(input){
-
-const file = input.files[0];
-if(!file) return;
-
-const reader = new FileReader();
-
-reader.onload = (e)=>{
-
-this.currentPerformanceImage = e.target.result;
-
-const preview =
-document.getElementById("performance-preview");
-
-const container =
-document.getElementById("performance-preview-container");
-
-if(preview) preview.src = e.target.result;
-
-if(container) container.classList.remove("hidden");
-
-};
-
-reader.readAsDataURL(file);
-
-},
-
-
-/* ===============================
-PERFORMANCE ANALYSIS
-================================*/
-
-async analyzePerformanceVision(){
-
-if(!this.currentPerformanceImage){
-
-ui.showToast("Upload statement image first","error");
-return;
-
-}
-
-ui.showLoading("Analyzing performance...");
-
-try{
-
-const balance =
-parseFloat(
-document.getElementById("vision-account-balance")?.value
-) || 0;
-
-const period =
-parseInt(
-document.getElementById("vision-trading-period")?.value
-) || 30;
-
-const response =
-await api.post("/api/ai/analyze-performance",{
-
-image: this.currentPerformanceImage,
-account_balance: balance,
-trading_period_days: period
-
-});
-
-this.displayPerformanceResults(response);
-
-}
-catch(error){
-
-console.error("Performance AI error:", error);
-ui.showToast("Performance analysis failed","error");
-
-}
-finally{
-
-ui.hideLoading();
-
-}
-
-},
-
-
-/* ===============================
-DISPLAY RESULTS
-================================*/
-
-displayPerformanceResults(data){
-
-const container =
-document.getElementById("analysis-results");
-
-if(!container) return;
-
-container.classList.remove("hidden");
-
-
-const score =
-document.getElementById("trader-score");
-
-if(score)
-score.textContent = data.trader_score || 0;
-
-
-const analysis =
-document.getElementById("performance-analysis-text");
-
-if(analysis && data.analysis)
-analysis.innerHTML =
-marked.parse(data.analysis);
-
-
-const strengths =
-document.getElementById("strengths-list");
-
-if(strengths && data.strengths)
-strengths.innerHTML =
-data.strengths.map(s=>`<li>${s}</li>`).join("");
-
-
-const mistakes =
-document.getElementById("top-mistakes");
-
-if(mistakes && data.top_mistakes)
-mistakes.innerHTML =
-data.top_mistakes.map(m=>`<li>${m}</li>`).join("");
-
-
-const plan =
-document.getElementById("improvement-plan");
-
-if(plan && data.improvement_plan)
-plan.innerHTML =
-data.improvement_plan.map(p=>`<li>${p}</li>`).join("");
-
-}
-
-};

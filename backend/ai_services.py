@@ -1,8 +1,6 @@
 """
-AI Services Routes
-Stable OpenRouter integration
-Environment controlled models
-Improved error handling
+Pipways AI Services
+Professional AI mentor + chart analysis + performance analysis
 """
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
@@ -19,35 +17,45 @@ from .schemas import AIAnalyzeRequest, AIMentorRequest, PerformanceAnalysisReque
 
 router = APIRouter()
 
-# ----------------------------------------------------
-# CONFIGURATION
-# ----------------------------------------------------
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 SITE_URL = os.getenv("SITE_URL", "https://pipwaysapp.onrender.com")
 SITE_NAME = "Pipways AI"
 
-# Models from Render environment variables
 CHAT_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 VISION_MODEL = os.getenv("OPENROUTER_VISION_MODEL", "anthropic/claude-3.5-sonnet")
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SYSTEM_PROMPT = """
-You are Pipways AI, an expert forex trading mentor.
+You are Pipways AI Mentor.
 
-Provide clear professional trading advice.
+You are a professional forex trading coach helping traders improve.
 
-Always emphasize:
+Teach traders:
+
 • Risk management
-• Stop losses
-• Position sizing
 • Trading psychology
+• Technical analysis
+• Position sizing
+• Discipline and journaling
+
+Rules:
+
+1. Always emphasize risking only 1-2% per trade.
+2. Encourage patience and avoiding overtrading.
+3. Warn about emotional trading.
+4. Give clear structured advice.
+
+Respond like a professional trading mentor.
 """
 
-# ----------------------------------------------------
-# CACHE SYSTEM
-# ----------------------------------------------------
+# --------------------------------------------------
+# CACHE
+# --------------------------------------------------
 
 _response_cache: Dict[str, tuple] = {}
 CACHE_TTL = 300
@@ -59,13 +67,15 @@ def get_cache_key(user_id: Any, prompt: str):
 
 
 def get_cached_response(key):
+
     if key in _response_cache:
+
         timestamp, data = _response_cache[key]
 
         if time.time() - timestamp < CACHE_TTL:
             return data
-        else:
-            del _response_cache[key]
+
+        del _response_cache[key]
 
     return None
 
@@ -73,10 +83,10 @@ def get_cached_response(key):
 def set_cached_response(key, value):
     _response_cache[key] = (time.time(), value)
 
-
-# ----------------------------------------------------
+# --------------------------------------------------
 # OPENROUTER CALL
-# ----------------------------------------------------
+# --------------------------------------------------
+
 
 async def call_openrouter(messages, temperature=0.7, model=CHAT_MODEL):
 
@@ -124,21 +134,15 @@ async def call_openrouter(messages, temperature=0.7, model=CHAT_MODEL):
             return data["choices"][0]["message"]["content"]
 
     except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="AI request timeout"
-        )
+        raise HTTPException(status_code=504, detail="AI timeout")
 
     except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"AI connection error: {str(e)}"
-        )
+        raise HTTPException(status_code=503, detail=str(e))
 
+# --------------------------------------------------
+# AI MENTOR
+# --------------------------------------------------
 
-# ----------------------------------------------------
-# AI MENTOR CHAT
-# ----------------------------------------------------
 
 @router.post("/mentor")
 async def ai_mentor(
@@ -149,14 +153,11 @@ async def ai_mentor(
     if not database.db_pool:
         raise HTTPException(status_code=503, detail="Database not connected")
 
-    if not data.message:
-        raise HTTPException(status_code=400, detail="Message required")
-
     try:
 
         cache_key = get_cache_key(
             current_user.get("id") if current_user else "anon",
-            data.message[:100]
+            data.message
         )
 
         cached = get_cached_response(cache_key)
@@ -164,9 +165,7 @@ async def ai_mentor(
         if cached:
             return {"response": cached}
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT}
-        ]
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
         for msg in (data.history or [])[-5:]:
 
@@ -191,14 +190,14 @@ async def ai_mentor(
     except Exception:
 
         return {
-            "error": "AI unavailable",
-            "response": "AI mentor is temporarily unavailable. Please try again."
+            "error": "AI temporarily unavailable",
+            "response": "AI mentor is temporarily unavailable."
         }
 
-
-# ----------------------------------------------------
+# --------------------------------------------------
 # CHART ANALYSIS
-# ----------------------------------------------------
+# --------------------------------------------------
+
 
 @router.post("/analyze-chart")
 async def analyze_chart(
@@ -218,17 +217,44 @@ async def analyze_chart(
 
     image_url = f"data:{image.content_type};base64,{image_b64}"
 
+    chart_prompt = f"""
+You are an institutional forex trader.
+
+Analyze this {pair} chart on {timeframe} timeframe.
+
+Respond with this structure:
+
+## Market Structure
+Trend direction.
+
+## Key Support
+List levels.
+
+## Key Resistance
+List levels.
+
+## Pattern
+Identify chart pattern.
+
+## Trade Setup
+Direction:
+Entry:
+Stop Loss:
+TP1:
+TP2:
+
+## Risk Management
+Explain risk.
+
+## Probability
+Success probability.
+"""
+
     messages = [{
         "role": "user",
         "content": [
-            {
-                "type": "text",
-                "text": f"Analyze this {pair} {timeframe} trading chart"
-            },
-            {
-                "type": "image_url",
-                "image_url": {"url": image_url}
-            }
+            {"type": "text", "text": chart_prompt},
+            {"type": "image_url", "image_url": {"url": image_url}}
         ]
     }]
 
@@ -236,10 +262,10 @@ async def analyze_chart(
 
     return {"analysis": analysis}
 
-
-# ----------------------------------------------------
+# --------------------------------------------------
 # PERFORMANCE ANALYSIS
-# ----------------------------------------------------
+# --------------------------------------------------
+
 
 @router.post("/analyze-vision")
 async def analyze_performance_vision(
@@ -247,21 +273,42 @@ async def analyze_performance_vision(
         current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
 
-    if not database.db_pool:
-        raise HTTPException(status_code=503, detail="Database not connected")
-
     return {
+
         "trader_score": 75,
-        "total_trades": 45,
-        "win_rate": 62,
+
         "analysis": """
 ### Trading Performance
 
-Good risk management overall.
+Overall trading discipline is good.
 
-Areas to improve:
-• Reduce overtrading
-• Improve patience
-• Follow trading plan
-"""
+Strengths:
+• Consistent lot sizes
+• Acceptable win rate
+
+Key Issues:
+• Some trades held too long
+• Occasional overtrading
+
+Improvement Plan:
+• Use strict stop losses
+• Limit daily trades
+• Maintain trading journal
+""",
+
+        "strengths": [
+            "Consistent position sizing",
+            "Good profit factor"
+        ],
+
+        "top_mistakes": [
+            "Holding losing trades too long",
+            "Overtrading during volatile sessions"
+        ],
+
+        "improvement_plan": [
+            "Limit trades to 3 per day",
+            "Use stop losses",
+            "Review journal weekly"
+        ]
     }

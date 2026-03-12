@@ -1,6 +1,6 @@
 """
 Pipways Trading Platform - Main Application
-FastAPI entry point with all modules mounted
+Serves both API and Frontend
 """
 
 import sys
@@ -10,21 +10,21 @@ from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 
-# Add backend directory to Python path (critical for Render)
+# Add backend directory to Python path
 backend_dir = Path(__file__).parent.resolve()
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-# Core imports (absolute only - no dots)
+# Core imports
 from database import init_db_pool, close_db_pool, init_db, check_connection, get_setting, db_pool
 from security import get_admin_user, get_current_user, get_current_user_optional
 
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 
-# Import routes with absolute imports
+# Import routes
 import routes.auth as auth
 import routes.signals as signals
 import routes.courses as courses
@@ -38,6 +38,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Frontend path (one level up from backend)
+frontend_path = os.path.join(os.path.dirname(backend_dir), "frontend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -86,9 +89,19 @@ app.add_middleware(
 for d in ["uploads", "uploads/blog", "uploads/courses", "uploads/signals", "uploads/avatars", "uploads/webinars"]:
     os.makedirs(d, exist_ok=True)
 
+# Mount uploads
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Include all routers
+# Mount frontend static files (CSS, JS, images)
+if os.path.exists(frontend_path):
+    app.mount("/css", StaticFiles(directory=os.path.join(frontend_path, "css")), name="css")
+    app.mount("/js", StaticFiles(directory=os.path.join(frontend_path, "js")), name="js")
+    if os.path.exists(os.path.join(frontend_path, "images")):
+        app.mount("/images", StaticFiles(directory=os.path.join(frontend_path, "images")), name="images")
+    if os.path.exists(os.path.join(frontend_path, "assets")):
+        app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
+
+# Include all API routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/signals", tags=["Trading Signals"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Learning Management System"])
@@ -112,21 +125,17 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={"detail": exc.detail, "error_code": f"HTTP_{exc.status_code}"}
     )
 
-@app.get("/health", tags=["System"])
-async def health_check():
-    """System health check including database connectivity"""
-    db_status = await check_connection()
-    return {
-        "status": "healthy" if db_status else "degraded",
-        "database": "connected" if db_status else "disconnected",
-        "service": "pipways-api",
-        "version": "2.0.0",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/", tags=["System"], response_class=HTMLResponse)
-async def root():
-    """API root with HTML documentation"""
+# Serve frontend index.html at root
+@app.get("/", response_class=HTMLResponse)
+async def serve_frontend():
+    """Serve the frontend application"""
+    index_path = os.path.join(frontend_path, "index.html")
+    
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    # Fallback to API docs if no frontend
     return """
     <!DOCTYPE html>
     <html>
@@ -173,6 +182,56 @@ async def root():
     </html>
     """
 
+# Serve other frontend HTML pages
+@app.get("/{page}.html", response_class=HTMLResponse)
+async def serve_html_page(page: str):
+    """Serve HTML pages from frontend folder"""
+    page_path = os.path.join(frontend_path, f"{page}.html")
+    
+    if os.path.exists(page_path):
+        with open(page_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    raise HTTPException(status_code=404, detail="Page not found")
+
+# Catch-all for frontend routes (SPA support)
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def catch_all(full_path: str):
+    """Catch-all route for frontend SPA routing"""
+    # Skip API routes
+    if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("redoc") or full_path.startswith("openapi"):
+        raise HTTPException(status_code=404)
+    
+    # Skip static files that should be handled by mounted directories
+    if full_path.startswith(("css/", "js/", "images/", "assets/", "uploads/")):
+        raise HTTPException(status_code=404)
+    
+    # Try to serve the specific HTML file first
+    file_path = os.path.join(frontend_path, full_path)
+    if os.path.exists(file_path) and file_path.endswith('.html'):
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    # Default to index.html for SPA routing
+    index_path = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    raise HTTPException(status_code=404, detail="Not found")
+
+@app.get("/health", tags=["System"])
+async def health_check():
+    """System health check including database connectivity"""
+    db_status = await check_connection()
+    return {
+        "status": "healthy" if db_status else "degraded",
+        "database": "connected" if db_status else "disconnected",
+        "service": "pipways-api",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.get("/api/admin/dashboard", tags=["Admin"])
 async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
     """Get comprehensive dashboard statistics for admin panel"""
@@ -181,7 +240,6 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
     
     try:
         async with db_pool.acquire() as conn:
-            # User stats
             user_stats = await conn.fetchrow("""
                 SELECT 
                     COUNT(*) as total_users,
@@ -190,7 +248,6 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
                 FROM users
             """)
             
-            # Signal stats
             signal_stats = await conn.fetchrow("""
                 SELECT 
                     COUNT(*) as total,
@@ -201,7 +258,6 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
                 WHERE created_at > NOW() - INTERVAL '30 days'
             """)
             
-            # Course stats
             course_stats = await conn.fetchrow("""
                 SELECT 
                     (SELECT COUNT(*) FROM courses) as total_courses,
@@ -210,7 +266,6 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
                     (SELECT COUNT(*) FROM enrollments) as total_enrollments
             """)
             
-            # Blog stats
             blog_stats = await conn.fetchrow("""
                 SELECT 
                     COUNT(*) as total_posts,
@@ -218,7 +273,6 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
                 FROM blog_posts
             """)
             
-            # Webinar stats
             webinar_stats = await conn.fetchrow("""
                 SELECT 
                     COUNT(*) as total_webinars,
@@ -226,12 +280,10 @@ async def admin_dashboard(current_user: dict = Depends(get_admin_user)):
                 FROM webinars
             """)
             
-            # Pending questions
             pending_questions = await conn.fetchval("""
                 SELECT COUNT(*) FROM student_questions WHERE is_answered = FALSE
             """)
             
-            # Recent activity
             recent_activities = await conn.fetch("""
                 SELECT a.*, u.full_name as user_name 
                 FROM activity_log a 

@@ -1,6 +1,6 @@
 /**
  * Main Application Module
- * Updated to support modular admin dashboard
+ * Updated to support modular admin dashboard with proper auth flow
  */
 
 const app = {
@@ -10,13 +10,9 @@ const app = {
         ui.init();
         auth.init();
         
+        // Don't init admin here - wait for auth
         if(auth.currentUser) {
             this.initUserData();
-        }
-        
-        // Initialize admin navigation if on admin page
-        if(document.getElementById('admin-section')) {
-            adminNav.init();
         }
     },
 
@@ -26,16 +22,15 @@ const app = {
         webinars.loadWebinars();
         blog.loadBlogPosts();
         
-        // Initialize admin data if admin
+        // Initialize admin features only if user is admin
         if(auth.currentUser && (auth.currentUser.role === 'admin' || auth.currentUser.role === 'moderator')) {
             // Show admin nav item
             const adminNavItem = document.getElementById('admin-nav-item');
             if(adminNavItem) adminNavItem.classList.remove('hidden');
             
-            // Load admin stats if on admin page
-            if(document.getElementById('admin-section')) {
-                adminDashboard.loadStats();
-            }
+            // Show admin badge
+            const adminBadge = document.getElementById('admin-badge');
+            if(adminBadge) adminBadge.classList.remove('hidden');
         }
     },
 
@@ -65,7 +60,12 @@ const app = {
             document.getElementById('sidebar').classList.remove('open');
         }
 
-        // Section specific loading
+        // Section specific loading - ONLY if authenticated
+        if(!auth.currentUser) {
+            ui.showToast('Please login to access this feature', 'error');
+            return;
+        }
+
         switch(sectionName) {
             case 'signals':
                 signals.loadSignals();
@@ -81,8 +81,10 @@ const app = {
                 break;
             case 'admin':
                 if(auth.requireAdmin()) {
-                    adminDashboard.loadStats();
-                    adminNav.switchTab('dashboard');
+                    // Only init admin nav and load data when explicitly entering admin section
+                    if(typeof adminNav !== 'undefined') {
+                        adminNav.init();
+                    }
                 }
                 break;
         }

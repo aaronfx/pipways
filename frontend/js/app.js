@@ -1,100 +1,172 @@
 /**
- * Main Application Module
- * Fixed: Auth check timing, loading states, and section switching
+ * Pipways Main Application Module
+ * Handles app initialization and global functionality
  */
 
 const app = {
-    currentSection: 'home',
-    dataInitialized: false,
-
+    /**
+     * Initialize the application
+     */
     init() {
-        ui.init();
-        auth.init();
-        // Don't init user data here - wait for auth check in auth.js
-    },
-
-    initUserData() {
-        if (this.dataInitialized || !auth.currentUser) return;
+        console.log('Pipways App v3.5 initialized');
         
-        try {
-            // Load all data
-            if (typeof signals !== 'undefined' && signals.loadSignals) {
-                signals.loadSignals().catch(err => console.error('Signals load failed:', err));
-            }
-            if (typeof courses !== 'undefined' && courses.loadCourses) {
-                courses.loadCourses().catch(err => console.error('Courses load failed:', err));
-            }
-            if (typeof webinars !== 'undefined' && webinars.loadWebinars) {
-                webinars.loadWebinars().catch(err => console.error('Webinars load failed:', err));
-            }
-            if (typeof blog !== 'undefined' && blog.loadBlogPosts) {
-                blog.loadBlogPosts().catch(err => console.error('Blog load failed:', err));
-            }
-            
-            this.dataInitialized = true;
-        } catch (error) {
-            console.error('Error loading user data:', error);
+        // Initialize Auth module (using correct case)
+        if (typeof Auth !== 'undefined') {
+            Auth.init();
+        } else if (typeof auth !== 'undefined') {
+            auth.init();
+        } else {
+            console.error('Auth module not loaded!');
         }
-    },
-
-    showSection(sectionName, navElement) {
-        // Check auth for protected sections
-        const protectedSections = ['signals', 'courses', 'webinars', 'blog', 'analysis', 'performance', 'mentor', 'admin'];
         
-        if (protectedSections.includes(sectionName) && !auth.currentUser) {
-            ui.showToast('Please login to access this feature', 'error');
-            auth.showAuthWall();
-            return;
+        // Initialize other modules
+        this.initNavigation();
+        this.initUI();
+    },
+    
+    /**
+     * Initialize navigation
+     */
+    initNavigation() {
+        // Mobile menu toggle
+        const menuToggle = document.getElementById('menuToggle');
+        const navMenu = document.getElementById('navMenu');
+        
+        if (menuToggle && navMenu) {
+            menuToggle.addEventListener('click', () => {
+                navMenu.classList.toggle('active');
+            });
         }
-
-        // Hide all sections
-        document.querySelectorAll('.section').forEach(section => {
-            section.classList.remove('active');
+        
+        // Active nav item highlighting
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.nav-link');
+        
+        navLinks.forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    },
+    
+    /**
+     * Initialize UI components
+     */
+    initUI() {
+        // Initialize tooltips
+        this.initTooltips();
+        
+        // Initialize modals
+        this.initModals();
+        
+        // Check auth status for protected pages
+        this.checkPageAccess();
+    },
+    
+    /**
+     * Initialize tooltips
+     */
+    initTooltips() {
+        const tooltips = document.querySelectorAll('[data-tooltip]');
+        tooltips.forEach(tooltip => {
+            tooltip.addEventListener('mouseenter', (e) => {
+                const text = e.target.getAttribute('data-tooltip');
+                // Simple tooltip implementation
+                console.log('Tooltip:', text);
+            });
+        });
+    },
+    
+    /**
+     * Initialize modals
+     */
+    initModals() {
+        const modalTriggers = document.querySelectorAll('[data-modal]');
+        modalTriggers.forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                const modalId = e.target.getAttribute('data-modal');
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.add('active');
+                }
+            });
         });
         
-        // Show target section
-        const targetSection = document.getElementById(`${sectionName}-section`);
-        if(targetSection) {
-            targetSection.classList.add('active');
-            this.currentSection = sectionName;
-        }
-
-        // Update nav active state
-        if(navElement) {
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('active');
-            });
-            navElement.classList.add('active');
-        }
-
-        // Mobile sidebar close
-        if(window.innerWidth <= 1024) {
-            document.getElementById('sidebar')?.classList.remove('open');
-        }
-
-        // Section specific loading
-        switch(sectionName) {
-            case 'signals':
-                if (typeof signals !== 'undefined') signals.loadSignals();
-                break;
-            case 'courses':
-                if (typeof courses !== 'undefined') courses.loadCourses();
-                break;
-            case 'webinars':
-                if (typeof webinars !== 'undefined') webinars.loadWebinars();
-                break;
-            case 'blog':
-                if (typeof blog !== 'undefined') blog.loadBlogPosts();
-                break;
-            case 'admin':
-                if(auth.requireAdmin()) {
-                    if(typeof adminNav !== 'undefined') adminNav.init();
+        // Close modal on outside click
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('active');
+            }
+        });
+    },
+    
+    /**
+     * Check page access permissions
+     */
+    checkPageAccess() {
+        const currentPage = window.location.pathname;
+        
+        // Pages that require authentication
+        const protectedPages = [
+            '/dashboard.html',
+            '/courses.html',
+            '/signals.html',
+            '/webinars.html',
+            '/profile.html'
+        ];
+        
+        // Admin only pages
+        const adminPages = [
+            '/admin.html',
+            '/admin-dashboard.html'
+        ];
+        
+        const isProtected = protectedPages.some(page => currentPage.includes(page));
+        const isAdminPage = adminPages.some(page => currentPage.includes(page));
+        
+        if (isProtected || isAdminPage) {
+            const token = localStorage.getItem('pipways_token');
+            
+            if (!token) {
+                window.location.href = '/index.html';
+                return;
+            }
+            
+            if (isAdminPage) {
+                const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+                if (user.role !== 'admin' && user.role !== 'moderator') {
+                    alert('Admin access required');
+                    window.location.href = '/dashboard.html';
                 }
-                break;
+            }
         }
+    },
+    
+    /**
+     * Show notification
+     */
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 };
 
+// Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
+
+// Export for global access
+window.app = app;

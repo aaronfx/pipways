@@ -6,18 +6,11 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 import os
 
-from .. import database
-from ..schemas import (
-    WebinarCreate, WebinarUpdate, WebinarResponse, 
-    WebinarRegistrationResponse
-)
-from ..security import get_current_user, get_current_user_optional, get_admin_user
+import database
+from schemas import WebinarCreate, WebinarUpdate, WebinarResponse, WebinarRegistrationResponse
+from security import get_current_user, get_current_user_optional, get_admin_user
 
 router = APIRouter()
-
-# ============================================================================
-# PUBLIC ENDPOINTS
-# ============================================================================
 
 @router.get("/", response_model=List[WebinarResponse])
 async def get_webinars(
@@ -46,7 +39,6 @@ async def get_webinars(
             query += " AND w.scheduled_at > CURRENT_TIMESTAMP"
             query += " AND w.scheduled_at < CURRENT_TIMESTAMP + INTERVAL '30 days'"
         
-        # Hide premium webinars from non-VIP users
         if not current_user or current_user.get('subscription_tier') != 'vip':
             query += " AND w.is_premium = FALSE"
         
@@ -59,13 +51,9 @@ async def get_webinars(
             webinar_dict = dict(row)
             webinar_dict['author'] = {"id": row['created_by'], "full_name": row['author_name']} if row['created_by'] else None
             
-            # Check if current user is registered
             if current_user:
                 is_registered = await conn.fetchrow("""
-                    SELECT EXISTS(
-                        SELECT 1 FROM webinar_registrations 
-                        WHERE webinar_id = $1 AND user_id = $2
-                    )
+                    SELECT EXISTS(SELECT 1 FROM webinar_registrations WHERE webinar_id = $1 AND user_id = $2)
                 """, row['id'], current_user['id'])
                 webinar_dict['is_registered'] = is_registered[0] if is_registered else False
             else:
@@ -100,7 +88,6 @@ async def get_webinar(
         if not webinar:
             raise HTTPException(status_code=404, detail="Webinar not found")
         
-        # Check premium access
         if webinar['is_premium']:
             if not current_user or (current_user.get('role') not in ['admin', 'moderator'] and 
                                    current_user.get('subscription_tier') != 'vip'):
@@ -109,13 +96,9 @@ async def get_webinar(
         webinar_dict = dict(webinar)
         webinar_dict['author'] = {"id": webinar['created_by'], "full_name": webinar['author_name']} if webinar['created_by'] else None
         
-        # Check registration status
         if current_user:
             is_registered = await conn.fetchval("""
-                SELECT EXISTS(
-                    SELECT 1 FROM webinar_registrations 
-                    WHERE webinar_id = $1 AND user_id = $2
-                )
+                SELECT EXISTS(SELECT 1 FROM webinar_registrations WHERE webinar_id = $1 AND user_id = $2)
             """, webinar_id, current_user['id'])
             webinar_dict['is_registered'] = is_registered
         else:
@@ -141,34 +124,26 @@ async def register_for_webinar(
         if webinar['status'] != 'scheduled':
             raise HTTPException(status_code=400, detail="Registration closed for this webinar")
         
-        # Check if already registered
         existing = await conn.fetchval("""
-            SELECT id FROM webinar_registrations 
-            WHERE webinar_id = $1 AND user_id = $2
+            SELECT id FROM webinar_registrations WHERE webinar_id = $1 AND user_id = $2
         """, webinar_id, current_user['id'])
         
         if existing:
             return {"message": "Already registered", "registration_id": existing}
         
-        # Check capacity
         if webinar['max_participants'] and webinar['current_participants'] >= webinar['max_participants']:
             raise HTTPException(status_code=400, detail="Webinar is full")
         
-        # Create registration
         registration_id = await conn.fetchval("""
             INSERT INTO webinar_registrations (webinar_id, user_id, registered_at)
             VALUES ($1, $2, CURRENT_TIMESTAMP)
             RETURNING id
         """, webinar_id, current_user['id'])
         
-        # Increment participant count
         await conn.execute("""
-            UPDATE webinars 
-            SET current_participants = current_participants + 1 
-            WHERE id = $1
+            UPDATE webinars SET current_participants = current_participants + 1 WHERE id = $1
         """, webinar_id)
         
-        # Log activity
         await database.log_activity(
             user_id=current_user['id'],
             action='webinar_register',
@@ -183,10 +158,6 @@ async def register_for_webinar(
             "meeting_link": webinar['meeting_link'] if not webinar['is_premium'] or 
                            current_user.get('subscription_tier') == 'vip' else None
         }
-
-# ============================================================================
-# ADMIN ENDPOINTS
-# ============================================================================
 
 @router.post("/", response_model=WebinarResponse)
 async def create_webinar(
@@ -206,16 +177,9 @@ async def create_webinar(
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
             RETURNING id
         """,
-            webinar.title,
-            webinar.description,
-            webinar.scheduled_at,
-            webinar.duration_minutes,
-            webinar.meeting_link,
-            webinar.max_participants,
-            webinar.reminder_message,
-            webinar.is_premium,
-            'scheduled',
-            current_user['id']
+            webinar.title, webinar.description, webinar.scheduled_at, webinar.duration_minutes,
+            webinar.meeting_link, webinar.max_participants, webinar.reminder_message,
+            webinar.is_premium, 'scheduled', current_user['id']
         )
         
         return await conn.fetchrow("SELECT * FROM webinars WHERE id = $1", webinar_id)
@@ -330,7 +294,6 @@ async def send_reminder(
         if not webinar:
             raise HTTPException(status_code=404, detail="Webinar not found")
         
-        # Get all registered users who haven't been reminded
         registrations = await conn.fetch("""
             SELECT wr.*, u.email, u.telegram_username
             FROM webinar_registrations wr
@@ -338,11 +301,8 @@ async def send_reminder(
             WHERE wr.webinar_id = $1 AND wr.reminder_sent = FALSE
         """, webinar_id)
         
-        # Mark reminders as sent
         await conn.execute("""
-            UPDATE webinar_registrations 
-            SET reminder_sent = TRUE 
-            WHERE webinar_id = $1
+            UPDATE webinar_registrations SET reminder_sent = TRUE WHERE webinar_id = $1
         """, webinar_id)
         
         await database.log_activity(

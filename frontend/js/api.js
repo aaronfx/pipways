@@ -1,6 +1,6 @@
 /**
  * API Client Module
- * Fixed: Added timeout, better error handling, and auth header management
+ * Fixed: Removed undefined auth references, proper error handling
  */
 
 const API_BASE = window.location.origin;
@@ -47,8 +47,8 @@ const api = {
                 if (response.status === 401) {
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
-                    auth.currentUser = null;
-                    auth.showAuthWall();
+                    // Redirect to login instead of calling undefined auth object
+                    window.location.href = '/index.html';
                     throw new Error('Session expired. Please login again.');
                 }
                 

@@ -8,9 +8,8 @@ import uuid
 import aiofiles
 from datetime import datetime
 
-# ABSOLUTE IMPORTS (no dots)
-import database
-from security import get_current_user, get_admin_user
+from .. import database
+from ..security import get_current_user, get_admin_user
 
 router = APIRouter()
 

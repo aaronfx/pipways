@@ -3,9 +3,10 @@ Course Routes - Learning Management System
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
-from .. import database
-from ..schemas import CourseCreate, CourseUpdate, LessonCreate, LessonUpdate, QuestionCreate
-from ..security import get_current_user, get_admin_user, get_current_user_optional
+
+import database
+from schemas import CourseCreate, CourseUpdate, LessonCreate, LessonUpdate, QuestionCreate
+from security import get_current_user, get_admin_user, get_current_user_optional
 
 router = APIRouter()
 

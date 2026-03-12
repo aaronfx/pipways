@@ -1,6 +1,5 @@
 """
-Security Module - JWT Authentication, Password Hashing & Authorization
-For Pipways Trading Platform
+Security Module - JWT Authentication & Authorization
 """
 
 import os
@@ -11,7 +10,7 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-# Try to import database, handle if not available (for startup checks)
+# Import database at runtime to avoid circular imports
 try:
     from database import db_pool
 except ImportError:
@@ -25,13 +24,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Security scheme for Bearer tokens
 security = HTTPBearer(auto_error=False)
-
-# ============================================================================
-# PASSWORD UTILITIES
-# ============================================================================
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hash"""
@@ -44,19 +37,9 @@ def get_password_hash(password: str) -> str:
     """Generate password hash"""
     return pwd_context.hash(password)
 
-# ============================================================================
-# TOKEN UTILITIES
-# ============================================================================
-
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Create JWT access token
-    Args:
-        data: Dictionary containing user info (must include 'sub' for user_id)
-        expires_delta: Optional custom expiration time
-    """
+    """Create JWT access token"""
     to_encode = data.copy()
-    
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -67,48 +50,29 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
         "iat": datetime.utcnow(),
         "type": "access"
     })
-    
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
-    """
-    Create JWT refresh token (longer lived)
-    """
+    """Create JWT refresh token"""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    
     to_encode.update({
         "exp": expire,
         "iat": datetime.utcnow(),
         "type": "refresh"
     })
-    
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Decode and validate JWT token
-    Returns payload if valid, None if invalid
-    """
+    """Decode and validate JWT token"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except JWTError:
         return None
 
-# ============================================================================
-# DEPENDENCIES (for FastAPI routes)
-# ============================================================================
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> Dict[str, Any]:
-    """
-    FastAPI dependency to get current authenticated user
-    Raises HTTPException if not authenticated
-    """
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    """FastAPI dependency to get current authenticated user"""
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -126,7 +90,6 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check token type
     if payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -142,9 +105,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Verify user exists in database
     if db_pool is None:
-        # If we can't check DB, trust the token but include basic info
         return {
             "id": int(user_id),
             "email": payload.get("email", ""),
@@ -175,24 +136,17 @@ async def get_current_user(
                 )
             
             return dict(user)
-            
     except HTTPException:
         raise
     except Exception as e:
-        # Log error but don't expose details
         print(f"Database error in get_current_user: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication service unavailable"
         )
 
-async def get_current_user_optional(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> Optional[Dict[str, Any]]:
-    """
-    FastAPI dependency for optional authentication
-    Returns user dict if authenticated, None otherwise (does not raise)
-    """
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[Dict[str, Any]]:
+    """FastAPI dependency for optional authentication"""
     if credentials is None:
         return None
     
@@ -204,9 +158,7 @@ async def get_current_user_optional(
         return None
 
 async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """
-    FastAPI dependency to verify user is admin or moderator
-    """
+    """Verify user is admin or moderator"""
     if current_user.get("role") not in ["admin", "moderator"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -215,9 +167,7 @@ async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user
     return current_user
 
 async def get_vip_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """
-    FastAPI dependency to verify user has VIP subscription or is admin
-    """
+    """Verify user has VIP subscription or is admin"""
     if current_user.get("role") in ["admin", "moderator"]:
         return current_user
     
@@ -227,28 +177,6 @@ async def get_vip_user(current_user: Dict[str, Any] = Depends(get_current_user))
             detail="VIP subscription required"
         )
     return current_user
-
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
-
-def generate_secure_token(length: int = 32) -> str:
-    """Generate cryptographically secure random token"""
-    import secrets
-    return secrets.token_urlsafe(length)
-
-def mask_email(email: str) -> str:
-    """Mask email for privacy (e.g., for logs)"""
-    if "@" not in email:
-        return email
-    parts = email.split("@")
-    if len(parts[0]) > 2:
-        return f"{parts[0][:2]}***@{parts[1]}"
-    return f"***@{parts[1]}"
-
-# ============================================================================
-# EXPORTS
-# ============================================================================
 
 __all__ = [
     "verify_password",
@@ -262,7 +190,5 @@ __all__ = [
     "get_vip_user",
     "security",
     "SECRET_KEY",
-    "ALGORITHM",
-    "generate_secure_token",
-    "mask_email"
+    "ALGORITHM"
 ]

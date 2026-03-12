@@ -141,6 +141,16 @@ async def lifespan(app) -> AsyncGenerator:
 # DATABASE INITIALIZATION
 # ============================================================================
 
+async def column_exists(conn, table: str, column: str) -> bool:
+    """Check if a column exists in a table"""
+    result = await conn.fetchval("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = $1 AND column_name = $2
+        )
+    """, table, column)
+    return result
+
 async def init_db():
     """Initialize all database tables with indexes"""
     if not db_pool:
@@ -470,6 +480,11 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        
+        # MIGRATION: Add is_featured column if it doesn't exist
+        if not await column_exists(conn, 'blog_media', 'is_featured'):
+            await conn.execute("ALTER TABLE blog_media ADD COLUMN is_featured BOOLEAN DEFAULT FALSE")
+            logger.info("Added is_featured column to blog_media")
         
         # 14. BLOG SEO DATA
         await conn.execute("""

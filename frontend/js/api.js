@@ -1,6 +1,6 @@
 /**
  * API Client Module
- * Fixed: Prevents double-reading response body
+ * Fixed: Added timeout, better error handling, and auth header management
  */
 
 const API_BASE = window.location.origin;
@@ -32,19 +32,23 @@ const api = {
             config.body = JSON.stringify(config.body);
         }
 
+        // Add timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        config.signal = controller.signal;
+
         try {
             const response = await fetch(url, config);
+            clearTimeout(timeoutId);
+            
             const contentType = response.headers.get('content-type');
             
-            // FIXED: Clone response before reading to avoid stream already read errors
             if (!response.ok) {
                 if (response.status === 401) {
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
-                    if (window.auth) {
-                        auth.currentUser = null;
-                        auth.showAuthWall();
-                    }
+                    auth.currentUser = null;
+                    auth.showAuthWall();
                     throw new Error('Session expired. Please login again.');
                 }
                 
@@ -54,7 +58,6 @@ const api = {
                 
                 let errorMessage;
                 try {
-                    // Try to parse as JSON first
                     if (contentType && contentType.includes('application/json')) {
                         const errorData = await response.clone().json();
                         errorMessage = errorData.detail || errorData.message || `Request failed: ${response.status}`;
@@ -73,6 +76,10 @@ const api = {
             }
             return await response.text();
         } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout - server took too long to respond');
+            }
             console.error('API Error:', error);
             throw error;
         }

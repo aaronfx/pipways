@@ -151,6 +151,16 @@ async def column_exists(conn, table: str, column: str) -> bool:
     """, table, column)
     return result
 
+async def table_exists(conn, table: str) -> bool:
+    """Check if a table exists"""
+    result = await conn.fetchval("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_name = $1
+        )
+    """, table)
+    return result
+
 async def init_db():
     """Initialize all database tables with indexes"""
     if not db_pool:
@@ -460,8 +470,18 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_blog_status ON blog_posts(status);
             CREATE INDEX IF NOT EXISTS idx_blog_category ON blog_posts(category);
             CREATE INDEX IF NOT EXISTS idx_blog_created ON blog_posts(created_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(is_featured);
         """)
+        
+        # Add is_featured column to blog_posts if it doesn't exist
+        if not await column_exists(conn, 'blog_posts', 'is_featured'):
+            await conn.execute("ALTER TABLE blog_posts ADD COLUMN is_featured BOOLEAN DEFAULT FALSE")
+            logger.info("Added is_featured column to blog_posts")
+        
+        # Now create the index (safely)
+        try:
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(is_featured)")
+        except Exception as e:
+            logger.warning(f"Could not create idx_blog_featured: {e}")
         
         # 13. BLOG MEDIA
         await conn.execute("""
@@ -476,12 +496,11 @@ async def init_db():
                 file_size_bytes INTEGER,
                 dimensions VARCHAR(50),
                 sort_order INTEGER DEFAULT 0,
-                is_featured BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
-        # MIGRATION: Add is_featured column if it doesn't exist
+        # Add is_featured column to blog_media if it doesn't exist
         if not await column_exists(conn, 'blog_media', 'is_featured'):
             await conn.execute("ALTER TABLE blog_media ADD COLUMN is_featured BOOLEAN DEFAULT FALSE")
             logger.info("Added is_featured column to blog_media")

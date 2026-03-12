@@ -24,13 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 
-# Import routes
-import routes.auth as auth
-import routes.signals as signals
-import routes.courses as courses
-import routes.blog as blog
-import routes.media as media
-import routes.webinars as webinars
+# Import routes using package imports (fixed)
+from routes import auth, blog, courses, signals, webinars, media
 
 # Logging setup
 logging.basicConfig(
@@ -101,7 +96,7 @@ if os.path.exists(frontend_path):
     if os.path.exists(os.path.join(frontend_path, "assets")):
         app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
 
-# Include all API routers
+# Include all API routers - prefixes defined here ONLY, not in route files
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/api/signals", tags=["Trading Signals"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Learning Management System"])

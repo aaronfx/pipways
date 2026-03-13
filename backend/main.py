@@ -11,10 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 # RELATIVE imports from sibling modules (not via __init__.py)
-from .database import database, metadata, users
+from .database import database, metadata, users, get_available_columns
 from .security import get_password_hash, get_current_user
 
 # Import routers DIRECTLY from modules (avoiding __init__.py circular imports)
@@ -69,7 +69,11 @@ else:
 async def create_default_admin():
     """Create default admin user if no admin exists."""
     try:
-        # Check if admin exists using safe query
+        # Get available columns to avoid schema errors
+        available_cols = get_available_columns()
+        print(f"Available DB columns: {available_cols}", flush=True)
+        
+        # Check if admin exists
         query = select(users.c.email).where(users.c.email == "admin@pipways.com")
         existing = await database.fetch_one(query)
         
@@ -81,21 +85,24 @@ async def create_default_admin():
                 "created_at": datetime.utcnow()
             }
             
-            # Only add columns if they exist in the table
-            if hasattr(users.c, 'full_name'):
+            # Only add columns if they exist in the actual table
+            if "full_name" in available_cols:
                 admin_data["full_name"] = "System Administrator"
-            if hasattr(users.c, 'is_active'):
+            if "is_active" in available_cols:
                 admin_data["is_active"] = True
-            if hasattr(users.c, 'is_admin'):
+            if "is_admin" in available_cols:
                 admin_data["is_admin"] = True
-            if hasattr(users.c, 'role'):
+            if "role" in available_cols:
                 admin_data["role"] = "admin"
+            if "subscription_tier" in available_cols:
+                admin_data["subscription_tier"] = "admin"
             
             # Insert with only available columns
             query = users.insert().values(**admin_data)
             await database.execute(query)
             
             print("✓ Default admin created: admin@pipways.com / admin123", flush=True)
+            print(f"  Used columns: {list(admin_data.keys())}", flush=True)
         else:
             print("✓ Admin user already exists", flush=True)
             
@@ -118,7 +125,7 @@ async def shutdown():
     await database.disconnect()
     print("✓ Database disconnected", flush=True)
 
-# Health check endpoint (must be BEFORE root route)
+# Health check endpoint
 @app.get("/health")
 async def health_check():
     """Health check for Render monitoring."""
@@ -138,50 +145,7 @@ async def api_info():
         "version": "2.0.0",
         "status": "operational",
         "docs": "/docs",
-        "health": "/health",
-        "features": [
-            "Trading Signals",
-            "Course Management", 
-            "Blog & Content",
-            "Webinars",
-            "AI Market Analysis",
-            "AI Mentor",
-            "Chart Pattern Recognition",
-            "Performance Analytics",
-            "Risk Calculator"
-        ],
-        "endpoints": {
-            "auth": "/auth",
-            "signals": "/signals",
-            "courses": "/courses",
-            "blog": "/blog",
-            "webinars": "/webinars",
-            "admin": "/admin",
-            "notifications": "/notifications",
-            "payments": "/payments",
-            "risk": "/risk",
-            "ai": {
-                "market_analysis": "/ai/analyze",
-                "batch_screening": "/ai/batch-screen",
-                "sentiment": "/ai/sentiment/{symbol}",
-                "signal_validation": "/ai/validate-signal",
-                "mentor": {
-                    "ask": "/ai/mentor/ask",
-                    "learning_path": "/ai/mentor/learning-path",
-                    "trade_review": "/ai/mentor/review-trade",
-                    "daily_wisdom": "/ai/mentor/daily-wisdom"
-                },
-                "chart": {
-                    "analyze_image": "/ai/chart/analyze",
-                    "patterns": "/ai/chart/pattern-library",
-                    "multichart": "/ai/chart/scan-multichart"
-                },
-                "performance": {
-                    "analyze_journal": "/ai/performance/analyze-journal",
-                    "dashboard": "/ai/performance/dashboard-stats"
-                }
-            }
-        }
+        "health": "/health"
     }
 
 # Serve frontend files
@@ -195,8 +159,7 @@ async def serve_index():
         return {
             "error": "Frontend not found",
             "path": str(index_file),
-            "api_docs": "/docs",
-            "api_endpoints": "/api"
+            "api_docs": "/docs"
         }
 
 @app.get("/dashboard.html")
@@ -208,28 +171,19 @@ async def serve_dashboard():
     else:
         return {"error": "Dashboard not found", "path": str(dashboard_file)}
 
-# Include all API routers with explicit prefixes
-# Auth router (prefix already included in router)
+# Include all API routers
 app.include_router(auth_router)
-
-# Core feature routers
 app.include_router(signals_router, prefix="/signals", tags=["signals"])
 app.include_router(courses_router, prefix="/courses", tags=["courses"])
 app.include_router(blog_router, prefix="/blog", tags=["blog"])
 app.include_router(webinars_router, prefix="/webinars", tags=["webinars"])
 app.include_router(media_router, prefix="/media", tags=["media"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
-
-# Utility routers
 app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 app.include_router(payments_router, prefix="/payments", tags=["payments"])
 app.include_router(risk_router, prefix="/risk", tags=["risk"])
-
-# Enhanced feature routers
 app.include_router(blog_enhanced_router, prefix="/blog-enhanced", tags=["blog-enhanced"])
 app.include_router(courses_enhanced_router, prefix="/courses-enhanced", tags=["courses-enhanced"])
-
-# AI Feature routers
 app.include_router(ai_screening_router, prefix="/ai", tags=["ai"])
 app.include_router(ai_mentor_router, prefix="/ai/mentor", tags=["ai-mentor"])
 app.include_router(chart_analysis_router, prefix="/ai/chart", tags=["chart-analysis"])

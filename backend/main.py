@@ -1,190 +1,146 @@
 """
-Main FastAPI application entry point.
-Uses RELATIVE imports to work as a Python package.
-Run with: uvicorn backend.main:app (from root directory)
+Pipways Trading Platform - Main Application
+PRODUCTION READY - With Enhanced Features
 """
 import os
-import sys
-from datetime import datetime
-from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from contextlib import asynccontextmanager
 
-# RELATIVE imports from sibling modules (not via __init__.py)
-from .database import database, metadata, users, get_available_columns
-from .security import get_password_hash, get_current_user
+from .database import database, init_database
 
-# Import routers DIRECTLY from modules (avoiding __init__.py circular imports)
-from .auth import router as auth_router
-from .signals import router as signals_router
-from .courses import router as courses_router
-from .blog import router as blog_router
-from .webinars import router as webinars_router
-from .media import router as media_router
-from .admin import router as admin_router
-from .notifications import router as notifications_router
-from .payments import router as payments_router
-from .risk_calculator import router as risk_router
-from .ai_screening import router as ai_screening_router
-from .blog_enhanced import router as blog_enhanced_router
-from .courses_enhanced import router as courses_enhanced_router
+# Import all routers
+from . import auth
+from . import signals
+from . import courses
+from . import webinars
+from . import blog
+from . import ai_screening
+from . import performance
+from . import admin
+from . import blog_enhanced      # ENHANCED: Blog with comments/tags/SEO
+from . import courses_enhanced  # ENHANCED: Progress tracking & certificates
 
-# NEW AI modules - import routers directly
-from .ai_mentor import router as ai_mentor_router
-from .chart_analysis import router as chart_analysis_router
-from .performance_analyzer import router as performance_router
+# Environment configuration
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events"""
+    # Startup
+    print(f"[STARTUP] Environment: {ENVIRONMENT}", flush=True)
+    try:
+        await init_database()
+        print("[STARTUP] Database connected", flush=True)
+    except Exception as e:
+        print(f"[STARTUP ERROR] Database connection failed: {e}", flush=True)
+        # Continue anyway - graceful degradation
+    
+    yield
+    
+    # Shutdown
+    try:
+        await database.disconnect()
+        print("[SHUTDOWN] Database disconnected", flush=True)
+    except:
+        pass
 
 # Create FastAPI app
 app = FastAPI(
-    title="Pipways Trading Platform API",
-    description="Professional trading signals and analysis platform with AI features",
-    version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    title="Pipways Trading Platform",
+    description="Professional trading signals and AI analysis platform",
+    version="2.1.0",
+    lifespan=lifespan
 )
 
 # CORS Configuration
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080,https://pipwaysapp.onrender.com").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[FRONTEND_URL] if FRONTEND_URL != "*" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Determine the correct path to frontend directory
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+# ==========================================
+# API ROUTES - CORE
+# ==========================================
 
-# Mount static files FIRST (before routes)
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
-    print(f"✓ Mounted static files from: {FRONTEND_DIR}", flush=True)
-else:
-    print(f"⚠ Frontend directory not found at: {FRONTEND_DIR}", flush=True)
-
-async def create_default_admin():
-    """Create default admin user if no admin exists."""
-    try:
-        # Get available columns to avoid schema errors
-        available_cols = get_available_columns()
-        print(f"Available DB columns: {available_cols}", flush=True)
-        
-        # Check if admin exists
-        query = select(users.c.email).where(users.c.email == "admin@pipways.com")
-        existing = await database.fetch_one(query)
-        
-        if not existing:
-            # Build admin data dynamically based on available columns
-            admin_data = {
-                "email": "admin@pipways.com",
-                "password_hash": get_password_hash("admin123"),
-                "created_at": datetime.utcnow()
-            }
-            
-            # Only add columns if they exist in the actual table
-            if "full_name" in available_cols:
-                admin_data["full_name"] = "System Administrator"
-            if "is_active" in available_cols:
-                admin_data["is_active"] = True
-            if "is_admin" in available_cols:
-                admin_data["is_admin"] = True
-            if "role" in available_cols:
-                admin_data["role"] = "admin"
-            if "subscription_tier" in available_cols:
-                admin_data["subscription_tier"] = "admin"
-            
-            # Insert with only available columns
-            query = users.insert().values(**admin_data)
-            await database.execute(query)
-            
-            print("✓ Default admin created: admin@pipways.com / admin123", flush=True)
-            print(f"  Used columns: {list(admin_data.keys())}", flush=True)
-        else:
-            print("✓ Admin user already exists", flush=True)
-            
-    except Exception as e:
-        print(f"⚠ Admin initialization error: {e}", flush=True)
-        # Log but don't crash - app can still work without admin
-
-@app.on_event("startup")
-async def startup():
-    """Connect to database and initialize admin user."""
-    await database.connect()
-    print("✓ Database connected", flush=True)
-    
-    # Initialize admin user (handles missing columns gracefully)
-    await create_default_admin()
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Disconnect from database on shutdown."""
-    await database.disconnect()
-    print("✓ Database disconnected", flush=True)
-
-# Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check for Render monitoring."""
+    """System health check endpoint"""
+    try:
+        await database.fetch_one("SELECT 1")
+        db_status = "connected"
+    except:
+        db_status = "disconnected"
+    
     return {
-        "status": "healthy",
-        "service": "pipways-api",
-        "version": "2.0.0",
-        "timestamp": str(datetime.utcnow())
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "database": db_status,
+        "version": "2.1.0",
+        "environment": ENVIRONMENT,
+        "features": ["core", "enhanced_blog", "enhanced_courses"]
     }
 
-# API info endpoint
-@app.get("/api")
-async def api_info():
-    """API info and available endpoints."""
+# Core routers
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(signals.router, prefix="/signals", tags=["Trading Signals"])
+app.include_router(courses.router, prefix="/courses", tags=["Courses"])
+app.include_router(webinars.router, prefix="/webinars", tags=["Webinars"])
+app.include_router(blog.router, prefix="/blog", tags=["Blog"])
+app.include_router(ai_screening.router, prefix="/ai", tags=["AI Services"])
+app.include_router(performance.router, prefix="/ai/performance", tags=["Performance Analytics"])
+app.include_router(admin.router, prefix="/admin", tags=["Administration"])
+
+# ==========================================
+# API ROUTES - ENHANCED FEATURES
+# ==========================================
+
+# Enhanced Blog (SEO, comments, tags)
+app.include_router(blog_enhanced.router, prefix="/blog", tags=["Blog Enhanced"])
+
+# Enhanced Courses (progress tracking, certificates)
+app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses Enhanced"])
+
+# ==========================================
+# STATIC FILES & SPA ROUTING
+# ==========================================
+
+# Mount static files directory
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except RuntimeError:
+    print("[WARNING] Static directory not found, skipping mount", flush=True)
+
+# Serve frontend SPA - catch all routes and serve index.html
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """
+    Serve Single Page Application (SPA).
+    Returns index.html for all non-API routes.
+    """
+    # Don't interfere with API routes
+    if full_path.startswith(("api/", "auth/", "signals/", "courses/", 
+                            "webinars/", "blog/", "ai/", "admin/", "health")):
+        raise HTTPException(404, "Not found")
+    
+    # Check for static file first
+    static_file = f"static/{full_path}"
+    if os.path.exists(static_file) and os.path.isfile(static_file):
+        return FileResponse(static_file)
+    
+    # Serve index.html for all other routes (SPA routing)
+    index_path = "static/index.html"
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    
+    # Fallback if no frontend files
     return {
-        "message": "Welcome to Pipways Trading Platform API",
-        "version": "2.0.0",
-        "status": "operational",
-        "docs": "/docs",
-        "health": "/health"
+        "message": "Pipways API Server",
+        "status": "running",
+        "docs": "/docs"
     }
-
-# Serve frontend files
-@app.get("/")
-async def serve_index():
-    """Serve the login landing page."""
-    index_file = FRONTEND_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file))
-    else:
-        return {
-            "error": "Frontend not found",
-            "path": str(index_file),
-            "api_docs": "/docs"
-        }
-
-@app.get("/dashboard.html")
-async def serve_dashboard():
-    """Serve the main dashboard app."""
-    dashboard_file = FRONTEND_DIR / "dashboard.html"
-    if dashboard_file.exists():
-        return FileResponse(str(dashboard_file))
-    else:
-        return {"error": "Dashboard not found", "path": str(dashboard_file)}
-
-# Include all API routers
-app.include_router(auth_router)
-app.include_router(signals_router, prefix="/signals", tags=["signals"])
-app.include_router(courses_router, prefix="/courses", tags=["courses"])
-app.include_router(blog_router, prefix="/blog", tags=["blog"])
-app.include_router(webinars_router, prefix="/webinars", tags=["webinars"])
-app.include_router(media_router, prefix="/media", tags=["media"])
-app.include_router(admin_router, prefix="/admin", tags=["admin"])
-app.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
-app.include_router(payments_router, prefix="/payments", tags=["payments"])
-app.include_router(risk_router, prefix="/risk", tags=["risk"])
-app.include_router(blog_enhanced_router, prefix="/blog-enhanced", tags=["blog-enhanced"])
-app.include_router(courses_enhanced_router, prefix="/courses-enhanced", tags=["courses-enhanced"])
-app.include_router(ai_screening_router, prefix="/ai", tags=["ai"])
-app.include_router(ai_mentor_router, prefix="/ai/mentor", tags=["ai-mentor"])
-app.include_router(chart_analysis_router, prefix="/ai/chart", tags=["chart-analysis"])
-app.include_router(performance_router, prefix="/ai/performance", tags=["performance"])

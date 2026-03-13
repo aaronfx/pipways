@@ -1,103 +1,85 @@
-const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000' 
-    : 'https://pipwaysapp.onrender.com';
+const API_BASE = window.location.origin;
 
-class ApiClient {
-    constructor() {
-        this.baseURL = API_BASE_URL;
-        this.defaultHeaders = {
-            'Content-Type': 'application/json'
-        };
-    }
-
+const API = {
     async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
-        const token = Store.getToken(); // Use Store method
-
+        const token = Store.getToken();
         const headers = {
-            ...this.defaultHeaders,
+            'Content-Type': 'application/json',
             ...(token && { 'Authorization': `Bearer ${token}` }),
             ...options.headers
         };
-
+        
         if (options.body instanceof FormData) {
             delete headers['Content-Type'];
         }
-
-        try {
-            Store.setState('loading', true);
-            
-            const response = await fetch(url, {
-                ...options,
-                headers
-            });
-
-            if (!response.ok) {
-                let errorMessage = `Error ${response.status}`;
-                try {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const errorData = await response.json();
-                        errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
-                    } else {
-                        const text = await response.text();
-                        if (text && text.length < 200 && !text.includes('<')) {
-                            errorMessage = text;
-                        }
-                    }
-                } catch (e) {
-                    // Ignore parse errors
-                }
-                throw new Error(errorMessage);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return await response.json();
-            }
-            return await response.text();
-            
-        } catch (error) {
-            if (error.message === 'Failed to fetch') {
-                throw new Error('Network error. Please check your connection.');
-            }
-            throw error;
-        } finally {
-            Store.setState('loading', false);
+        
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            headers
+        });
+        
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Error ${res.status}`);
         }
-    }
-
-    // Auth endpoints
-    async register(data) {
+        
+        return res.json();
+    },
+    
+    // Auth
+    login(username, password) {
+        const form = new FormData();
+        form.append('username', username);
+        form.append('password', password);
+        return fetch(`${API_BASE}/auth/token`, {
+            method: 'POST',
+            body: form
+        }).then(r => r.json());
+    },
+    
+    register(data) {
         return this.request('/auth/register', {
             method: 'POST',
             body: JSON.stringify(data)
         });
-    }
-
-    async login(username, password) {
-        const formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', password);
-
-        const response = await fetch(`${this.baseURL}/auth/token`, {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Login failed');
-        }
-
-        return response.json();
-    }
-
-    async getMe() {
+    },
+    
+    getMe() {
         return this.request('/auth/me');
+    },
+    
+    // Signals
+    getSignals(params = {}) {
+        const qs = new URLSearchParams(params).toString();
+        return this.request(`/signals/active?${qs}`);
+    },
+    
+    // AI Mentor
+    askMentor(question, skillLevel = 'intermediate') {
+        return this.request('/ai/mentor/ask', {
+            method: 'POST',
+            body: JSON.stringify({ question, skill_level: skillLevel })
+        });
+    },
+    
+    // Chart Analysis
+    analyzeChart(file, symbol, timeframe) {
+        const form = new FormData();
+        form.append('file', file);
+        if (symbol) form.append('symbol', symbol);
+        if (timeframe) form.append('timeframe', timeframe);
+        return this.request('/ai/chart/analyze', {
+            method: 'POST',
+            headers: {},
+            body: form
+        });
+    },
+    
+    // Performance
+    analyzeJournal(trades) {
+        return this.request('/ai/performance/analyze-journal', {
+            method: 'POST',
+            body: JSON.stringify(trades)
+        });
     }
-
-    // ... (keep all other existing methods)
-}
-
-const API = new ApiClient();
+};

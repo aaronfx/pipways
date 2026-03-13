@@ -1,4 +1,5 @@
-// Global State Store
+// Global State Store - Preserved
+
 const Store = {
     state: {
         user: JSON.parse(localStorage.getItem('pipways_user') || 'null'),

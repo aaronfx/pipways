@@ -4,80 +4,202 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Pipways</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f3f4f6;
+        }
+        
+        .glass-sidebar {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav-item {
+            transition: all 0.3s ease;
+            border-radius: 0.5rem;
+            margin: 0.25rem 0.5rem;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .gradient-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .gradient-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .content-area {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            min-height: calc(100vh - 80px);
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+    </style>
 </head>
-<body>
-    <nav class="navbar">
-        <div class="nav-brand">
-            <h1>Pipways</h1>
-        </div>
-        <div class="nav-links">
-            <a href="#/dashboard" class="nav-link active">Home</a>
-            <a href="#/signals" class="nav-link">Signals</a>
-            <a href="#/courses" class="nav-link">Courses</a>
-            <a href="#/blog" class="nav-link">Blog</a>
-            <a href="#/webinars" class="nav-link">Webinars</a>
-            <div class="nav-dropdown">
-                <a href="#/ai-tools" class="nav-link">AI Tools ▼</a>
-                <div class="dropdown-content">
-                    <a href="#/ai-mentor">AI Mentor</a>
-                    <a href="#/chart-analysis">Chart Analysis</a>
-                    <a href="#/performance">Performance</a>
+<body class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="glass-sidebar w-64 flex flex-col text-white">
+        <div class="p-6 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">Pipways</h1>
+                    <p class="text-xs text-gray-400">Pro Trading</p>
                 </div>
             </div>
-            <a href="#/admin" class="nav-link" id="adminLink" style="display:none">Admin</a>
         </div>
-        <div class="nav-user">
-            <span id="userEmail" style="margin-right: 1rem; color: var(--gray-300);"></span>
-            <button onclick="logout()" class="btn btn-secondary btn-sm">Logout</button>
+        
+        <nav class="flex-1 overflow-y-auto sidebar-scroll py-4">
+            <div class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase">Main</div>
+            
+            <a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item active flex items-center gap-3 px-4 py-3 text-sm font-medium">
+                <i class="fas fa-home w-5"></i>
+                Dashboard
+            </a>
+            
+            <a href="#" onclick="showPage('journal')" id="nav-journal" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
+                <i class="fas fa-book w-5"></i>
+                Trading Journal
+            </a>
+            
+            <a href="#" onclick="showPage('analysis')" id="nav-analysis" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
+                <i class="fas fa-chart-pie w-5"></i>
+                Chart Analysis
+            </a>
+            
+            <a href="#" onclick="showPage('trade-analysis')" id="nav-trade-analysis" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
+                <i class="fas fa-robot w-5"></i>
+                Trade Analysis
+            </a>
+            
+            <a href="#" onclick="showPage('mentor')" id="nav-mentor" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
+                <i class="fas fa-graduation-cap w-5"></i>
+                AI Mentor
+            </a>
+            
+            <a href="#" onclick="showPage('blog')" id="nav-blog" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
+                <i class="fas fa-newspaper w-5"></i>
+                Blog
+            </a>
+            
+            <div class="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase">Admin</div>
+            
+            <a href="#" onclick="showPage('admin')" id="nav-admin" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hidden">
+                <i class="fas fa-cog w-5"></i>
+                Admin Panel
+            </a>
+        </nav>
+        
+        <div class="p-4 border-t border-white/10">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-semibold" id="user-avatar">
+                    U
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate" id="user-name">User</p>
+                    <p class="text-xs text-gray-400 truncate" id="user-email">user@pipways.com</p>
+                </div>
+            </div>
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors text-sm font-medium">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </button>
         </div>
-    </nav>
-
-    <main id="app" style="padding: 2rem; max-width: 1280px; margin: 0 auto; min-height: calc(100vh - 80px);"></main>
-
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
-
-    <!-- Core -->
-    <script src="/static/js/store.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/ui.js"></script>
-    <script src="/static/js/router.js"></script>
+    </aside>
     
-    <!-- Modules -->
-    <script src="/static/js/modules/dashboard.js"></script>
-    <script src="/static/js/modules/signals.js"></script>
-    <script src="/static/js/modules/courses.js"></script>
-    <script src="/static/js/modules/blog.js"></script>
-    <script src="/static/js/modules/webinars.js"></script>
-    <script src="/static/js/modules/ai_mentor.js"></script>
-    <script src="/static/js/modules/chart_analysis.js"></script>
-    <script src="/static/js/modules/performance.js"></script>
-    <script src="/static/js/modules/admin.js"></script>
-    
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-gray-800">Dashboard</h2>
+                <p class="text-sm text-gray-500">Welcome back to your trading dashboard</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="glass-card px-4 py-2 rounded-full flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span class="text-sm font-medium text-gray-700">System Online</span>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Dynamic Content -->
+        <main id="content" class="content-area flex-1 overflow-y-auto p-8">
+            <!-- Content injected by JavaScript -->
+        </main>
+    </div>
+
+    <script src="js/store.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
     <script>
-        // Check auth
-        if (!localStorage.getItem('pipways_token')) {
-            window.location.href = '/';
-        }
-        
-        // Show user
-        const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
-        document.getElementById('userEmail').textContent = user.email || '';
-        if (user.is_admin) {
-            document.getElementById('adminLink').style.display = 'inline-block';
-        }
-        
-        function logout() {
-            localStorage.removeItem('pipways_token');
-            localStorage.removeItem('pipways_user');
-            window.location.href = '/';
-        }
-        
-        // Initialize
+        // Initialize user info
         document.addEventListener('DOMContentLoaded', () => {
-            UI.init();
-            Router.init();
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            if (user.email) {
+                document.getElementById('user-email').textContent = user.email;
+                document.getElementById('user-name').textContent = user.full_name || user.email.split('@')[0];
+                document.getElementById('user-avatar').textContent = (user.full_name || user.email)[0].toUpperCase();
+                
+                if (user.is_admin) {
+                    document.getElementById('nav-admin').classList.remove('hidden');
+                }
+            }
+            
+            // Initial page load
+            showPage('dashboard');
         });
     </script>
 </body>

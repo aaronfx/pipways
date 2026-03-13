@@ -7,6 +7,9 @@ import os
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
 
 # RELATIVE imports (from .module)
 from .database import database, metadata
@@ -26,7 +29,7 @@ app = FastAPI(
 )
 
 # CORS Configuration
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080").split(",")
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080,https://pipwaysapp.onrender.com").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -47,10 +50,32 @@ async def shutdown():
     await database.disconnect()
     print("✓ Database disconnected", flush=True)
 
-# ROOT ENDPOINT - Fixes "Not Found" error
-@app.get("/")
-async def root():
-    """Root endpoint - API info and health status."""
+# Determine the correct path to frontend directory
+# When running from project root with uvicorn backend.main:app
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+
+# Mount static files - THIS MUST COME BEFORE the root route
+if FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+    print(f"✓ Mounted static files from: {FRONTEND_DIR}", flush=True)
+else:
+    print(f"⚠ Frontend directory not found at: {FRONTEND_DIR}", flush=True)
+
+# Health check endpoint (keep this before root)
+@app.get("/health")
+async def health_check():
+    """Health check for Render monitoring."""
+    return {
+        "status": "healthy",
+        "service": "pipways-api",
+        "version": "1.0.0",
+        "timestamp": str(datetime.utcnow())
+    }
+
+# API info endpoint (moved from root to /api)
+@app.get("/api")
+async def api_info():
+    """API info and available endpoints."""
     return {
         "message": "Welcome to Pipways Trading Platform API",
         "version": "1.0.0",
@@ -71,18 +96,23 @@ async def root():
         }
     }
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check for Render monitoring."""
-    return {
-        "status": "healthy",
-        "service": "pipways-api",
-        "version": "1.0.0",
-        "timestamp": str(datetime.utcnow())
-    }
+# ROOT ENDPOINT - Serves frontend (must be AFTER specific API routes)
+@app.get("/")
+async def serve_frontend():
+    """Serve the frontend index.html at root path."""
+    index_file = FRONTEND_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    else:
+        return {
+            "error": "Frontend not found",
+            "message": "The frontend files are not deployed",
+            "expected_path": str(index_file),
+            "api_docs": "/docs",
+            "api_endpoints": "/api"
+        }
 
-# Include all routers
+# Include all API routers (these have their own prefixes)
 app.include_router(auth.router)
 app.include_router(signals.router, prefix="/signals", tags=["signals"])
 app.include_router(courses.router, prefix="/courses", tags=["courses"])

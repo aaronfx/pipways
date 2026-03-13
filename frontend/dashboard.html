@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Pipways</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -59,16 +60,6 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
         }
         
-        .gradient-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            transition: all 0.3s ease;
-        }
-        
-        .gradient-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-        }
-        
         .sidebar-overlay {
             display: none;
             position: fixed;
@@ -89,7 +80,6 @@
             .sidebar.mobile-open { transform: translateX(0); }
         }
         
-        /* Feature Card Hover Effects */
         .feature-card {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -106,31 +96,6 @@
             transform: scale(1.1) rotate(5deg);
         }
         
-        /* Toast Notifications */
-        .toast {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: white;
-            border-left: 4px solid #3b82f6;
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            z-index: 9999;
-            animation: slideIn 0.3s ease-out;
-            max-width: 400px;
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        .toast.success { border-left-color: #10b981; }
-        .toast.error { border-left-color: #ef4444; }
-        .toast.warning { border-left-color: #f59e0b; }
-        
-        /* Loading Spinner */
         .spinner {
             width: 40px;
             height: 40px;
@@ -140,11 +105,25 @@
             animation: spin 1s linear infinite;
         }
         
+        .spinner.small {
+            width: 20px;
+            height: 20px;
+            border-width: 2px;
+        }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
         
-        /* Custom Scrollbar */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .toast {
+            animation: slideIn 0.3s ease-out;
+        }
+        
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -162,6 +141,27 @@
         
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b;
+        }
+        
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        @media (hover: none) {
+            .sidebar-link:hover { background: transparent; }
+            .sidebar-link:active { background: rgba(255, 255, 255, 0.1); }
+            .feature-card:hover { transform: none; }
+            .feature-card:active { transform: scale(0.98); }
         }
     </style>
 </head>
@@ -234,8 +234,9 @@
                 <span>Blog</span>
             </a>
             
+            <!-- Admin Section - Hidden by default -->
             <div id="admin-nav-section" class="hidden">
-                <div class="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</div>
+                <div class="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</div>
                 <a onclick="showPage('admin')" id="nav-admin" class="sidebar-link">
                     <i class="fas fa-shield-alt w-5 text-center"></i>
                     <span>Admin Dashboard</span>
@@ -270,11 +271,11 @@
                 </button>
                 <div>
                     <h2 id="page-title" class="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h2>
-                    <p class="text-sm text-gray-500 hidden sm:block">Welcome back to your trading dashboard</p>
+                    <p class="text-sm text-gray-500 hidden sm:block">Professional Trading Platform</p>
                 </div>
             </div>
             <div class="flex items-center gap-4">
-                <div class="glass-card px-3 sm:px-4 py-2 rounded-full flex items-center gap-2">
+                <div id="system-status" class="glass-card px-3 sm:px-4 py-2 rounded-full flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     <span class="text-xs sm:text-sm font-medium text-gray-700 hidden sm:inline">System Online</span>
                 </div>
@@ -286,23 +287,22 @@
             <!-- Content injected by JavaScript -->
         </main>
     </div>
-
-    <!-- Toast Container -->
-    <div id="toast-container"></div>
-
-    <!-- Scripts loaded in correct order -->
-    <script src="store.js"></script>
-    <script src="api.js"></script>
-    <script src="ui.js"></script>
-    <script src="auth.js"></script>
     
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
     <script>
         // ==========================================
-        // CORE NAVIGATION & UI FUNCTIONS
+        // CONFIGURATION
         // ==========================================
-        
         const API_BASE = window.location.origin;
         let currentPage = 'dashboard';
+        let currentUser = null;
+        let chartInstances = {};
+        
+        // ==========================================
+        // NAVIGATION & UI
+        // ==========================================
         
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -320,7 +320,6 @@
         function showPage(page) {
             currentPage = page;
             
-            // Close mobile sidebar
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
             if (sidebar && sidebar.classList.contains('mobile-open')) {
@@ -328,17 +327,9 @@
                 overlay.classList.remove('active');
             }
             
-            // Update sidebar active state
-            document.querySelectorAll('.sidebar-link').forEach(el => {
-                el.classList.remove('active');
-            });
+            document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + page)?.classList.add('active');
             
-            const activeNav = document.getElementById('nav-' + page);
-            if (activeNav) {
-                activeNav.classList.add('active');
-            }
-            
-            // Update page title
             const titles = {
                 'dashboard': 'Dashboard',
                 'signals': 'Trading Signals',
@@ -351,254 +342,37 @@
                 'blog': 'Trading Blog',
                 'admin': 'Admin Dashboard'
             };
-            const titleEl = document.getElementById('page-title');
-            if (titleEl) {
-                titleEl.textContent = titles[page] || page;
-            }
+            document.getElementById('page-title').textContent = titles[page] || page;
             
-            // Render content
             const content = document.getElementById('content');
-            if (!content) return;
-            
             content.innerHTML = `
                 <div class="flex items-center justify-center h-64">
                     <div class="spinner"></div>
                 </div>
             `;
             
-            switch(page) {
-                case 'dashboard':
-                    renderDashboard();
-                    break;
-                case 'signals':
-                    renderSignals();
-                    break;
-                case 'journal':
-                    renderJournal();
-                    break;
-                case 'analysis':
-                    renderChartAnalysis();
-                    break;
-                case 'trade-analysis':
-                    renderTradeAnalysis();
-                    break;
-                case 'courses':
-                    renderCourses();
-                    break;
-                case 'webinars':
-                    renderWebinars();
-                    break;
-                case 'mentor':
-                    renderMentor();
-                    break;
-                case 'blog':
-                    renderBlog();
-                    break;
-                case 'admin':
-                    renderAdmin();
-                    break;
-                default:
-                    renderDashboard();
+            const renderers = {
+                'dashboard': renderDashboard,
+                'signals': renderSignals,
+                'journal': renderJournal,
+                'analysis': renderChartAnalysis,
+                'trade-analysis': renderTradeAnalysis,
+                'courses': renderCourses,
+                'webinars': renderWebinars,
+                'mentor': renderMentor,
+                'blog': renderBlog,
+                'admin': renderAdmin
+            };
+            
+            if (renderers[page]) {
+                renderers[page]();
+            } else {
+                renderDashboard();
             }
         }
         
         // ==========================================
-        // DASHBOARD OVERVIEW - FEATURE CARDS
-        // ==========================================
-        
-        function renderDashboard() {
-            const content = document.getElementById('content');
-            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
-            
-            content.innerHTML = `
-                <div class="space-y-8 max-w-7xl mx-auto">
-                    <!-- Welcome Banner -->
-                    <div class="glass-card rounded-2xl p-6 sm:p-8 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white shadow-lg relative overflow-hidden">
-                        <div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-                        <div class="absolute bottom-0 left-0 -ml-10 -mb-10 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-                        <div class="relative z-10">
-                            <h3 class="text-2xl sm:text-3xl font-bold mb-2">Welcome back, ${user.full_name || user.email || 'Trader'}!</h3>
-                            <p class="text-blue-100 text-sm sm:text-base">Your complete trading command center. Select a tool below to get started.</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Feature Overview Grid -->
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <i class="fas fa-th-large text-blue-600"></i>
-                            Platform Features
-                        </h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                            
-                            <!-- Trading Signals -->
-                            <div onclick="showPage('signals')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-blue-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-signal text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">Live</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Trading Signals</h4>
-                                <p class="text-sm text-gray-600 mb-4">Real-time buy/sell signals with precise entry, stop loss and take profit levels.</p>
-                                <button class="text-sm font-semibold text-blue-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    View Signals <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- AI Mentor -->
-                            <div onclick="showPage('mentor')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-purple-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-robot text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded-full">AI</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">AI Mentor</h4>
-                                <p class="text-sm text-gray-600 mb-4">Get personalized trading advice, strategy feedback, and market analysis 24/7.</p>
-                                <button class="text-sm font-semibold text-purple-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    Ask AI Mentor <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Chart Analysis -->
-                            <div onclick="showPage('analysis')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-green-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-chart-bar text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Vision</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Chart Analysis</h4>
-                                <p class="text-sm text-gray-600 mb-4">Upload charts for instant pattern recognition and technical analysis.</p>
-                                <button class="text-sm font-semibold text-green-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    Analyze Chart <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Trading Journal -->
-                            <div onclick="showPage('journal')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-orange-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-book text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">Log</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Trading Journal</h4>
-                                <p class="text-sm text-gray-600 mb-4">Record trades with AI-powered performance insights and psychology analysis.</p>
-                                <button class="text-sm font-semibold text-orange-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    Open Journal <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Performance Analytics -->
-                            <div onclick="showPage('trade-analysis')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-red-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-chart-line text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full">Stats</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Performance Analytics</h4>
-                                <p class="text-sm text-gray-600 mb-4">Detailed statistics, win rates, profit factors, and trading psychology insights.</p>
-                                <button class="text-sm font-semibold text-red-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    View Analytics <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Courses -->
-                            <div onclick="showPage('courses')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-teal-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-teal-100 flex items-center justify-center text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-graduation-cap text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-teal-600 bg-teal-50 px-2 py-1 rounded-full">Learn</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Trading Courses</h4>
-                                <p class="text-sm text-gray-600 mb-4">Master trading with comprehensive video courses and interactive quizzes.</p>
-                                <button class="text-sm font-semibold text-teal-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    Browse Courses <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Webinars -->
-                            <div onclick="showPage('webinars')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-pink-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-pink-100 flex items-center justify-center text-pink-600 group-hover:bg-pink-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-video text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-pink-600 bg-pink-50 px-2 py-1 rounded-full">Live</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Live Webinars</h4>
-                                <p class="text-sm text-gray-600 mb-4">Join live trading sessions and access recorded educational content.</p>
-                                <button class="text-sm font-semibold text-pink-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    View Schedule <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Blog -->
-                            <div onclick="showPage('blog')" class="glass-card feature-card rounded-xl p-6 cursor-pointer border-l-4 border-indigo-500 group">
-                                <div class="flex items-start justify-between mb-4">
-                                    <div class="feature-icon w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                        <i class="fas fa-newspaper text-xl"></i>
-                                    </div>
-                                    <span class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">Read</span>
-                                </div>
-                                <h4 class="font-bold text-gray-800 mb-2">Trading Blog</h4>
-                                <p class="text-sm text-gray-600 mb-4">Latest market insights, trading guides, and educational articles.</p>
-                                <button class="text-sm font-semibold text-indigo-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                    Read Blog <i class="fas fa-arrow-right text-xs"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Recent Activity Section -->
-                    <div class="glass-card rounded-xl p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                <i class="fas fa-bolt text-yellow-500"></i>
-                                Recent Signals
-                            </h3>
-                            <button onclick="showPage('signals')" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1">
-                                View All <i class="fas fa-arrow-right text-xs"></i>
-                            </button>
-                        </div>
-                        <div id="recent-signals-list" class="space-y-3">
-                            <div class="animate-pulse flex space-x-4">
-                                <div class="flex-1 space-y-4 py-1">
-                                    <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Quick Stats Row -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="glass-card rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-blue-600" id="dash-signal-count">--</div>
-                            <div class="text-xs text-gray-600">Active Signals</div>
-                        </div>
-                        <div class="glass-card rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-purple-600" id="dash-course-count">--</div>
-                            <div class="text-xs text-gray-600">Courses</div>
-                        </div>
-                        <div class="glass-card rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-green-600" id="dash-webinar-count">--</div>
-                            <div class="text-xs text-gray-600">Upcoming Webinars</div>
-                        </div>
-                        <div class="glass-card rounded-xl p-4 text-center">
-                            <div class="text-2xl font-bold text-orange-600" id="dash-account-type">--</div>
-                            <div class="text-xs text-gray-600">Account Type</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            loadDashboardData();
-        }
-        
-        // ==========================================
-        // API DEFINITIONS
+        // API CLIENT
         // ==========================================
         
         const API = {
@@ -614,24 +388,17 @@
                     delete headers['Content-Type'];
                 }
                 
-                try {
-                    const res = await fetch(`${API_BASE}${endpoint}`, {
-                        ...options,
-                        headers
-                    });
-                    
-                    if (!res.ok) {
-                        const err = await res.json().catch(() => ({}));
-                        throw new Error(err.detail || `Error ${res.status}`);
-                    }
-                    
-                    return res.json();
-                } catch (error) {
-                    if (error.message === 'Failed to fetch') {
-                        throw new Error('Network error. Please check your connection.');
-                    }
-                    throw error;
+                const res = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || `Error ${res.status}`);
                 }
+                
+                return res.json();
             },
             
             getSignals(params = {}) {
@@ -645,6 +412,11 @@
             
             getWebinars(upcoming = true) {
                 return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
+            },
+            
+            getBlogPosts(params = {}) {
+                const qs = new URLSearchParams(params).toString();
+                return this.request(`/blog/posts?${qs}`);
             },
             
             askMentor(question, skillLevel = 'intermediate') {
@@ -664,7 +436,10 @@
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('pipways_token')}` },
                     body: formData
-                }).then(r => r.json());
+                }).then(r => {
+                    if (!r.ok) throw new Error('Analysis failed');
+                    return r.json();
+                });
             },
             
             analyzeJournal(trades) {
@@ -674,90 +449,178 @@
                 });
             },
             
+            uploadJournalFile(file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                return fetch(`${API_BASE}/ai/performance/analyze-journal`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pipways_token')}` },
+                    body: formData
+                }).then(r => {
+                    if (!r.ok) throw new Error('Upload failed');
+                    return r.json();
+                });
+            },
+            
             getPerformanceStats(days = 30) {
                 return this.request(`/ai/performance/dashboard-stats?days=${days}`);
             },
             
-            getBlogPosts(params = {}) {
-                const qs = new URLSearchParams(params).toString();
-                return this.request(`/blog/posts?${qs}`);
-            },
-            
             getAdminStats() {
                 return this.request('/admin/users');
-            },
-            
-            calculateRisk(data) {
-                return this.request('/risk/calculate', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
             }
         };
+        
+        // ==========================================
+        // UTILITY FUNCTIONS
+        // ==========================================
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'border-green-500 text-green-800 bg-white',
+                error: 'border-red-500 text-red-800 bg-white',
+                warning: 'border-yellow-500 text-yellow-800 bg-white',
+                info: 'border-blue-500 text-blue-800 bg-white'
+            };
+            
+            toast.className = `toast border-l-4 ${colors[type]} p-4 rounded shadow-lg min-w-[300px] flex justify-between items-center`;
+            toast.innerHTML = `
+                <span class="font-medium">${message}</span>
+                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 ml-4">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+        
+        function checkAdminAccess() {
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            const isAdmin = user.role === 'admin' || user.role === 'moderator' || user.is_admin === true;
+            
+            if (isAdmin) {
+                document.getElementById('admin-nav-section')?.classList.remove('hidden');
+            }
+        }
         
         // ==========================================
         // PAGE RENDERERS
         // ==========================================
         
-        async function loadDashboardData() {
+        function renderDashboard() {
             const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
             
-            // Update stats
-            document.getElementById('dash-account-type').textContent = user.subscription_tier || 'Free';
+            document.getElementById('content').innerHTML = `
+                <div class="space-y-8 max-w-7xl mx-auto">
+                    <div class="glass-card rounded-2xl p-6 sm:p-8 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white shadow-lg">
+                        <h3 class="text-2xl sm:text-3xl font-bold mb-2">Welcome back, ${user.full_name || user.email || 'Trader'}!</h3>
+                        <p class="text-blue-100">Your professional trading command center</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                        ${renderFeatureCard('signals', 'Trading Signals', 'Real-time buy/sell signals', 'fa-signal', 'blue')}
+                        ${renderFeatureCard('mentor', 'AI Mentor', '24/7 trading guidance', 'fa-robot', 'purple')}
+                        ${renderFeatureCard('analysis', 'Chart Analysis', 'AI-powered pattern recognition', 'fa-chart-pie', 'green')}
+                        ${renderFeatureCard('journal', 'Trading Journal', 'Track and analyze trades', 'fa-book', 'orange')}
+                        ${renderFeatureCard('trade-analysis', 'Performance', 'Detailed analytics', 'fa-chart-line', 'red')}
+                        ${renderFeatureCard('courses', 'Courses', 'Professional training', 'fa-graduation-cap', 'teal')}
+                        ${renderFeatureCard('webinars', 'Webinars', 'Live sessions', 'fa-video', 'pink')}
+                        ${renderFeatureCard('blog', 'Blog', 'Market insights', 'fa-newspaper', 'indigo')}
+                    </div>
+                    
+                    <div class="glass-card rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">Recent Signals</h3>
+                            <button onclick="showPage('signals')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                View All <i class="fas fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                        <div id="recent-signals-list" class="space-y-3">
+                            <div class="spinner mx-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
             
+            loadRecentSignals();
+        }
+        
+        function renderFeatureCard(page, title, desc, icon, color) {
+            const colors = {
+                blue: 'border-blue-500 hover:bg-blue-50',
+                purple: 'border-purple-500 hover:bg-purple-50',
+                green: 'border-green-500 hover:bg-green-50',
+                orange: 'border-orange-500 hover:bg-orange-50',
+                red: 'border-red-500 hover:bg-red-50',
+                teal: 'border-teal-500 hover:bg-teal-50',
+                pink: 'border-pink-500 hover:bg-pink-50',
+                indigo: 'border-indigo-500 hover:bg-indigo-50'
+            };
+            
+            return `
+                <div onclick="showPage('${page}')" class="glass-card rounded-xl p-6 cursor-pointer border-l-4 ${colors[color]} transition-all hover:-translate-y-1 hover:shadow-lg group">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-12 h-12 rounded-lg bg-${color}-100 flex items-center justify-center text-${color}-600 group-hover:scale-110 transition-transform">
+                            <i class="fas ${icon} text-xl"></i>
+                        </div>
+                    </div>
+                    <h4 class="font-bold text-gray-800 mb-1">${title}</h4>
+                    <p class="text-sm text-gray-600">${desc}</p>
+                </div>
+            `;
+        }
+        
+        async function loadRecentSignals() {
             try {
                 const signals = await API.getSignals({ limit: 5 });
-                document.getElementById('dash-signal-count').textContent = signals.length || 0;
-                
                 const container = document.getElementById('recent-signals-list');
-                if (signals && signals.length > 0) {
-                    container.innerHTML = signals.slice(0, 3).map(s => `
-                        <div onclick="showPage('signals')" class="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border-l-4 ${s.direction === 'BUY' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'} hover:shadow-md transition-shadow cursor-pointer">
-                            <div class="mb-2 sm:mb-0">
-                                <div class="flex items-center gap-2">
-                                    <strong class="text-lg text-gray-800">${s.symbol}</strong>
-                                    <span class="px-2 py-1 rounded text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}">${s.direction}</span>
-                                </div>
-                                <div class="text-sm text-gray-600 mt-1">
-                                    Entry: ${s.entry_price} | SL: ${s.stop_loss} | TP: ${s.take_profit}
-                                </div>
+                
+                if (!signals || signals.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">No active signals available</p>';
+                    return;
+                }
+                
+                container.innerHTML = signals.slice(0, 3).map(s => `
+                    <div onclick="showPage('signals')" class="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border-l-4 ${s.direction === 'BUY' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'} hover:shadow-md transition-shadow cursor-pointer">
+                        <div class="mb-2 sm:mb-0">
+                            <div class="flex items-center gap-2">
+                                <strong class="text-lg text-gray-800">${s.symbol}</strong>
+                                <span class="px-2 py-1 rounded text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}">${s.direction}</span>
                             </div>
-                            <div class="text-right text-sm text-gray-500">
-                                ${new Date(s.created_at).toLocaleDateString()}
+                            <div class="text-sm text-gray-600 mt-1">
+                                Entry: ${s.entry_price} | SL: ${s.stop_loss} | TP: ${s.take_profit}
                             </div>
                         </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<p class="text-gray-500 text-center py-4">No active signals available</p>';
-                }
+                        <div class="text-right text-sm text-gray-500">
+                            ${new Date(s.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                `).join('');
             } catch (e) {
-                console.error('Failed to load signals:', e);
-                document.getElementById('recent-signals-list').innerHTML = '<p class="text-red-500 text-center py-4">Failed to load signals</p>';
-            }
-            
-            try {
-                const courses = await API.getCourses();
-                document.getElementById('dash-course-count').textContent = courses?.length || 0;
-            } catch (e) {
-                document.getElementById('dash-course-count').textContent = '0';
-            }
-            
-            try {
-                const webinars = await API.getWebinars(true);
-                document.getElementById('dash-webinar-count').textContent = webinars?.length || 0;
-            } catch (e) {
-                document.getElementById('dash-webinar-count').textContent = '0';
+                document.getElementById('recent-signals-list').innerHTML = `
+                    <p class="text-red-500 text-center py-4">Failed to load signals: ${e.message}</p>
+                `;
             }
         }
         
-        function renderSignals() {
+        async function renderSignals() {
             const content = document.getElementById('content');
             content.innerHTML = `
                 <div class="max-w-6xl mx-auto">
                     <div class="glass-card rounded-xl p-6 sm:p-8">
                         <div class="flex justify-between items-center mb-6">
                             <h3 class="text-xl sm:text-2xl font-bold text-gray-800">Active Trading Signals</h3>
-                            <button onclick="showPage('signals')" class="text-blue-600 hover:text-blue-800 text-sm">
+                            <button onclick="renderSignals()" class="text-blue-600 hover:text-blue-800 text-sm">
                                 <i class="fas fa-sync-alt mr-1"></i> Refresh
                             </button>
                         </div>
@@ -770,10 +633,6 @@
                 </div>
             `;
             
-            loadSignalsData();
-        }
-        
-        async function loadSignalsData() {
             try {
                 const signals = await API.getSignals();
                 const grid = document.getElementById('signals-grid');
@@ -783,7 +642,7 @@
                         <div class="col-span-full text-center py-12 text-gray-500">
                             <i class="fas fa-signal text-4xl mb-4 text-gray-300"></i>
                             <p>No active signals available</p>
-                            <p class="text-sm">Check back later for new opportunities</p>
+                            <p class="text-sm mt-2">Check back later for new opportunities</p>
                         </div>
                     `;
                     return;
@@ -798,22 +657,10 @@
                             </span>
                         </div>
                         <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Entry Price:</span>
-                                <span class="font-semibold">${s.entry_price}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Stop Loss:</span>
-                                <span class="font-semibold text-red-600">${s.stop_loss}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Take Profit:</span>
-                                <span class="font-semibold text-green-600">${s.take_profit}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Timeframe:</span>
-                                <span class="font-semibold">${s.timeframe || 'N/A'}</span>
-                            </div>
+                            <div class="flex justify-between"><span class="text-gray-600">Entry:</span><span class="font-semibold">${s.entry_price}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Stop Loss:</span><span class="font-semibold text-red-600">${s.stop_loss}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Take Profit:</span><span class="font-semibold text-green-600">${s.take_profit}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Timeframe:</span><span class="font-semibold">${s.timeframe || 'N/A'}</span></div>
                         </div>
                         <div class="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
                             <span class="text-xs text-gray-500">${new Date(s.created_at).toLocaleString()}</span>
@@ -826,153 +673,40 @@
                     <div class="col-span-full text-center py-12 text-red-500">
                         <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
                         <p>Failed to load signals</p>
-                        <p class="text-sm">${e.message}</p>
+                        <p class="text-sm mt-2">${e.message}</p>
                     </div>
                 `;
-            }
-        }
-        
-        function renderJournal() {
-            const content = document.getElementById('content');
-            content.innerHTML = `
-                <div class="max-w-4xl mx-auto space-y-6">
-                    <div class="glass-card rounded-xl p-6 sm:p-8">
-                        <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                            <i class="fas fa-book text-orange-500"></i>
-                            Trading Journal
-                        </h3>
-                        <p class="text-gray-600 mb-6">Record and analyze your trading history. Paste your trade data below for AI analysis.</p>
-                        
-                        <div class="space-y-4">
-                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Trade Data (JSON Format)</label>
-                                <textarea id="journal-input" rows="8" class="w-full p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm" placeholder='[
-  {
-    "entry_date": "2024-01-01",
-    "symbol": "EURUSD",
-    "direction": "BUY",
-    "entry_price": 1.0850,
-    "exit_price": 1.0900,
-    "pnl": 50.00,
-    "outcome": "win"
-  }
-]'></textarea>
-                                <p class="text-xs text-gray-500 mt-2">Format: Array of trade objects with entry_date, symbol, direction, prices, pnl, and outcome.</p>
-                            </div>
-                            
-                            <div class="flex flex-col sm:flex-row gap-4">
-                                <button onclick="analyzeJournal()" class="gradient-btn px-6 py-3 rounded-lg text-white font-semibold shadow-lg flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-opacity">
-                                    <i class="fas fa-brain"></i>
-                                    Analyze with AI
-                                </button>
-                                <button onclick="showPage('trade-analysis')" class="px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold hover:border-blue-500 hover:text-blue-600 transition-colors cursor-pointer">
-                                    Advanced Analysis
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="journal-results" class="hidden glass-card rounded-xl p-6 sm:p-8"></div>
-                </div>
-            `;
-        }
-        
-        async function analyzeJournal() {
-            const input = document.getElementById('journal-input');
-            const resultsDiv = document.getElementById('journal-results');
-            
-            if (!input || !input.value.trim()) {
-                showToast('Please enter trade data', 'warning');
-                return;
-            }
-            
-            try {
-                const trades = JSON.parse(input.value);
-                resultsDiv.classList.remove('hidden');
-                resultsDiv.innerHTML = `
-                    <div class="flex items-center justify-center py-8">
-                        <div class="spinner mr-3"></div>
-                        <span class="text-gray-600">Analyzing your trading performance...</span>
-                    </div>
-                `;
-                
-                const analysis = await API.analyzeJournal(trades);
-                
-                resultsDiv.innerHTML = `
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <h4 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            <i class="fas fa-chart-pie text-blue-600"></i>
-                            Analysis Results
-                        </h4>
-                        <span class="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold">
-                            Grade: ${analysis.overall_grade || 'N/A'}
-                        </span>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                        <div class="text-center p-4 bg-blue-50 rounded-lg">
-                            <div class="text-2xl font-bold text-blue-600">${analysis.statistics?.win_rate || 0}%</div>
-                            <div class="text-xs text-gray-600">Win Rate</div>
-                        </div>
-                        <div class="text-center p-4 bg-green-50 rounded-lg">
-                            <div class="text-2xl font-bold text-green-600">${analysis.statistics?.profit_factor || 0}</div>
-                            <div class="text-xs text-gray-600">Profit Factor</div>
-                        </div>
-                        <div class="text-center p-4 bg-purple-50 rounded-lg">
-                            <div class="text-2xl font-bold text-purple-600">$${analysis.statistics?.expectancy || 0}</div>
-                            <div class="text-xs text-gray-600">Expectancy</div>
-                        </div>
-                        <div class="text-center p-4 bg-orange-50 rounded-lg">
-                            <div class="text-2xl font-bold text-orange-600">${analysis.statistics?.total_trades || 0}</div>
-                            <div class="text-xs text-gray-600">Total Trades</div>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-3">
-                        <h5 class="font-semibold text-gray-800 flex items-center gap-2">
-                            <i class="fas fa-lightbulb text-yellow-500"></i>
-                            Recommendations
-                        </h5>
-                        ${analysis.improvements?.map(i => `
-                            <div class="p-3 bg-blue-50 rounded-lg text-sm text-blue-800 border-l-4 border-blue-500">
-                                ${i}
-                            </div>
-                        `).join('') || '<p class="text-gray-500">No specific recommendations - keep up the good work!</p>'}
-                    </div>
-                `;
-            } catch (e) {
-                showToast('Invalid JSON format: ' + e.message, 'error');
             }
         }
         
         function renderChartAnalysis() {
-            const content = document.getElementById('content');
-            content.innerHTML = `
+            document.getElementById('content').innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
                     <div class="glass-card rounded-xl p-6 sm:p-8">
                         <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <i class="fas fa-chart-bar text-green-500"></i>
                             AI Chart Analysis
                         </h3>
-                        <p class="text-gray-600 mb-6">Upload your chart images for instant pattern recognition and trade setup validation.</p>
+                        <p class="text-gray-600 mb-6">Upload your chart for AI pattern recognition with visual annotations.</p>
                         
-                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer bg-gray-50" onclick="document.getElementById('chartUpload').click()">
+                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer bg-gray-50" 
+                             onclick="document.getElementById('chartUpload').click()" id="upload-area">
                             <input type="file" id="chartUpload" accept="image/*" class="hidden" onchange="handleChartUpload(this.files[0])">
                             <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-2xl">
                                 <i class="fas fa-cloud-upload-alt"></i>
                             </div>
                             <p class="text-gray-800 font-medium mb-1">Drop chart image here</p>
-                            <p class="text-sm text-gray-500">or click to browse (PNG, JPG, max 5MB)</p>
+                            <p class="text-sm text-gray-500">PNG, JPG up to 10MB</p>
                         </div>
                         
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
-                                <input type="text" id="chart-symbol" placeholder="EURUSD" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                <input type="text" id="chart-symbol" placeholder="EURUSD" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Timeframe</label>
-                                <select id="chart-timeframe" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                <select id="chart-timeframe" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500">
                                     <option value="">Auto-detect</option>
                                     <option value="5M">5M</option>
                                     <option value="15M">15M</option>
@@ -985,7 +719,7 @@
                     </div>
                     
                     <div id="chart-results" class="glass-card rounded-xl p-6 sm:p-8 hidden">
-                        <p class="text-gray-500 text-center">Upload a chart to see AI analysis results</p>
+                        <p class="text-gray-500 text-center">Upload a chart to see AI analysis with visual preview</p>
                     </div>
                 </div>
             `;
@@ -994,57 +728,69 @@
         async function handleChartUpload(file) {
             if (!file) return;
             
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('File too large (max 5MB)', 'error');
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('File too large (max 10MB)', 'error');
                 return;
             }
             
             const resultsDiv = document.getElementById('chart-results');
-            if (!resultsDiv) return;
+            const symbol = document.getElementById('chart-symbol')?.value;
+            const timeframe = document.getElementById('chart-timeframe')?.value;
             
             resultsDiv.classList.remove('hidden');
             resultsDiv.innerHTML = `
                 <div class="flex items-center justify-center py-12">
                     <div class="spinner mr-3"></div>
-                    <span class="text-gray-600">Analyzing chart with AI Vision...</span>
+                    <span class="text-gray-600">Analyzing chart with AI...</span>
                 </div>
             `;
             
-            const symbol = document.getElementById('chart-symbol')?.value;
-            const timeframe = document.getElementById('chart-timeframe')?.value;
-            
             try {
                 const analysis = await API.analyzeChart(file, symbol, timeframe);
-                
-                const biasColor = analysis.trading_bias === 'bullish' ? 'text-green-600' : 
-                                 analysis.trading_bias === 'bearish' ? 'text-red-600' : 'text-gray-600';
+                const imageUrl = URL.createObjectURL(file);
                 
                 resultsDiv.innerHTML = `
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-start mb-6 gap-4">
+                    <div class="space-y-6">
                         <div>
-                            <h4 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                <i class="fas fa-microscope text-green-500"></i>
-                                Analysis Results
-                            </h4>
-                            <p class="text-sm text-gray-500">${analysis.symbol || symbol || 'Unknown'} ${analysis.timeframe || timeframe || ''}</p>
+                            <h4 class="font-bold text-gray-800 mb-3">Uploaded Chart</h4>
+                            <div class="relative rounded-lg overflow-hidden border border-gray-200">
+                                <img src="${imageUrl}" class="w-full h-auto max-h-[400px] object-contain bg-gray-900" alt="Chart">
+                                ${analysis.suggested_entry ? `
+                                    <div class="absolute top-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs font-mono">
+                                        <div class="text-green-400">Entry: ${analysis.suggested_entry}</div>
+                                        <div class="text-red-400">SL: ${analysis.suggested_stop}</div>
+                                        <div class="text-blue-400">TP: ${analysis.suggested_target}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
-                        <span class="px-3 py-1 rounded-full ${analysis.confidence > 0.7 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'} text-sm font-bold">
-                            ${Math.round((analysis.confidence || 0) * 100)}% Confidence
-                        </span>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <span class="text-sm text-gray-600">Trading Bias:</span>
-                        <span class="text-2xl font-bold ml-2 ${biasColor} uppercase">${analysis.trading_bias || 'Neutral'}</span>
-                    </div>
-                    
-                    <div class="space-y-4">
+                        
                         <div>
-                            <h5 class="font-semibold text-gray-700 mb-2">Patterns Detected</h5>
+                            <h4 class="font-bold text-gray-800 mb-3">AI Analysis Visualization</h4>
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="analysisChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                                <span class="text-xs text-green-600 font-semibold">TRADING BIAS</span>
+                                <p class="text-2xl font-bold text-green-700 uppercase">${analysis.trading_bias || 'Neutral'}</p>
+                            </div>
+                            <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <span class="text-xs text-blue-600 font-semibold">CONFIDENCE</span>
+                                <p class="text-2xl font-bold text-blue-700">${Math.round((analysis.confidence || 0) * 100)}%</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">Detected Patterns</h5>
                             <div class="flex flex-wrap gap-2">
                                 ${analysis.patterns_detected?.map(p => `
-                                    <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm">${p.name} (${p.reliability})</span>
-                                `).join('') || '<span class="text-gray-500">None detected</span>'}
+                                    <span class="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+                                        ${p.name} (${p.reliability})
+                                    </span>
+                                `).join('') || '<span class="text-gray-500">No patterns detected</span>'}
                             </div>
                         </div>
                         
@@ -1059,16 +805,33 @@
                             </div>
                         </div>
                         
+                        ${analysis.suggested_entry ? `
+                            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <h5 class="font-semibold text-yellow-800 mb-2">Suggested Trade Levels</h5>
+                                <div class="space-y-1 text-sm">
+                                    <div class="flex justify-between"><span>Entry:</span><span class="font-bold">${analysis.suggested_entry}</span></div>
+                                    <div class="flex justify-between"><span>Stop Loss:</span><span class="font-bold text-red-600">${analysis.suggested_stop}</span></div>
+                                    <div class="flex justify-between"><span>Take Profit:</span><span class="font-bold text-green-600">${analysis.suggested_target}</span></div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
                         <div>
                             <h5 class="font-semibold text-gray-700 mb-2">AI Insights</h5>
                             <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
-                                ${analysis.key_insights?.map(i => `<li>${i}</li>`).join('') || '<li>No specific insights</li>'}
+                                ${analysis.key_insights?.map(i => `<li>${escapeHtml(i)}</li>`).join('') || '<li>No specific insights</li>'}
                             </ul>
                         </div>
                     </div>
                 `;
+                
+                if (analysis.suggested_entry && analysis.suggested_stop && analysis.suggested_target) {
+                    setTimeout(() => initAnalysisChart(analysis), 100);
+                }
+                
             } catch (error) {
-                resultsDiv.innerHTML = `
+                showToast(error.message, 'error');
+                document.getElementById('chart-results').innerHTML = `
                     <div class="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
                         <i class="fas fa-exclamation-circle mr-2"></i>
                         Analysis failed: ${error.message}
@@ -1077,9 +840,257 @@
             }
         }
         
+        function initAnalysisChart(analysis) {
+            const ctx = document.getElementById('analysisChart')?.getContext('2d');
+            if (!ctx) return;
+            
+            if (chartInstances.analysis) {
+                chartInstances.analysis.destroy();
+            }
+            
+            const entry = parseFloat(analysis.suggested_entry) || 0;
+            const stop = parseFloat(analysis.suggested_stop) || 0;
+            const target = parseFloat(analysis.suggested_target) || 0;
+            
+            chartInstances.analysis = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Stop Loss', 'Entry', 'Take Profit'],
+                    datasets: [{
+                        label: 'Price Levels',
+                        data: [stop, entry, target],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(34, 197, 94, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgb(239, 68, 68)',
+                            'rgb(59, 130, 246)',
+                            'rgb(34, 197, 94)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Trade Setup Levels'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'Price' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderJournal() {
+            document.getElementById('content').innerHTML = `
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-book text-orange-500"></i>
+                            Trading Journal Analysis
+                        </h3>
+                        <p class="text-gray-600 mb-6">Upload your trading statement (CSV, Excel, PDF) or paste trade data for AI analysis.</p>
+                        
+                        <div class="mb-6">
+                            <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer bg-gray-50" 
+                                 onclick="document.getElementById('journalFileUpload').click()">
+                                <input type="file" id="journalFileUpload" class="hidden" 
+                                       accept=".csv,.xls,.xlsx,.pdf,.html,.png,.jpg,.jpeg" 
+                                       onchange="handleJournalFileUpload(this.files[0])">
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                    <i class="fas fa-file-upload text-xl"></i>
+                                </div>
+                                <p class="text-gray-800 font-medium">Drop trading statement here</p>
+                                <p class="text-sm text-gray-500 mt-1">Supports: CSV, Excel, PDF, MT4/MT5 HTML, Screenshots</p>
+                            </div>
+                        </div>
+                        
+                        <div class="relative mb-6">
+                            <div class="absolute inset-0 flex items-center">
+                                <div class="w-full border-t border-gray-300"></div>
+                            </div>
+                            <div class="relative flex justify-center text-sm">
+                                <span class="px-2 bg-white text-gray-500">Or paste JSON data</span>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <textarea id="journal-input" rows="6" 
+                                    class="w-full p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm"
+                                    placeholder='[{"symbol": "EURUSD", "direction": "BUY", "entry_price": 1.0850, "exit_price": 1.0900, "pnl": 50, "outcome": "win"}]'></textarea>
+                            </div>
+                            
+                            <div class="flex flex-col sm:flex-row gap-4">
+                                <button onclick="analyzeJournal()" 
+                                        class="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
+                                    <i class="fas fa-brain"></i>
+                                    Analyze Performance
+                                </button>
+                                <button onclick="showPage('trade-analysis')" 
+                                        class="px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold hover:border-orange-500 hover:text-orange-600 transition-colors">
+                                    View Advanced Stats
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="journal-results" class="hidden glass-card rounded-xl p-6 sm:p-8"></div>
+                </div>
+            `;
+        }
+        
+        async function handleJournalFileUpload(file) {
+            if (!file) return;
+            
+            const allowedExts = ['.csv', '.xls', '.xlsx', '.pdf', '.html', '.png', '.jpg', '.jpeg'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedExts.includes(ext)) {
+                showToast('Unsupported file format. Please use CSV, Excel, PDF, HTML, or image.', 'error');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('journal-results');
+            resultsDiv.classList.remove('hidden');
+            resultsDiv.innerHTML = `
+                <div class="flex items-center justify-center py-8">
+                    <div class="spinner mr-3"></div>
+                    <span class="text-gray-600">Parsing ${file.name}...</span>
+                </div>
+            `;
+            
+            try {
+                const analysis = await API.uploadJournalFile(file);
+                renderJournalResults(analysis);
+                showToast('File analyzed successfully', 'success');
+            } catch (e) {
+                showToast(e.message, 'error');
+                resultsDiv.innerHTML = `<div class="text-red-500 text-center py-4">Failed to analyze file: ${e.message}</div>`;
+            }
+        }
+        
+        async function analyzeJournal() {
+            const input = document.getElementById('journal-input');
+            const resultsDiv = document.getElementById('journal-results');
+            
+            if (!input || !input.value.trim()) {
+                showToast('Please enter trade data or upload a file', 'warning');
+                return;
+            }
+            
+            try {
+                const trades = JSON.parse(input.value);
+                resultsDiv.classList.remove('hidden');
+                resultsDiv.innerHTML = `
+                    <div class="flex items-center justify-center py-8">
+                        <div class="spinner mr-3"></div>
+                        <span class="text-gray-600">Analyzing trading performance...</span>
+                    </div>
+                `;
+                
+                const analysis = await API.analyzeJournal(trades);
+                renderJournalResults(analysis);
+            } catch (e) {
+                showToast('Invalid JSON format: ' + e.message, 'error');
+            }
+        }
+        
+        function renderJournalResults(analysis) {
+            const resultsDiv = document.getElementById('journal-results');
+            if (!resultsDiv) return;
+            
+            const stats = analysis.statistics || {};
+            
+            resultsDiv.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h4 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fas fa-chart-pie text-blue-600"></i>
+                        Analysis Results
+                    </h4>
+                    <span class="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold text-lg">
+                        Grade: ${analysis.overall_grade || 'N/A'}
+                    </span>
+                </div>
+                
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600">${stats.win_rate || 0}%</div>
+                        <div class="text-xs text-gray-600">Win Rate</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600">${stats.profit_factor || 0}</div>
+                        <div class="text-xs text-gray-600">Profit Factor</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600">$${stats.expectancy || 0}</div>
+                        <div class="text-xs text-gray-600">Expectancy</div>
+                    </div>
+                    <div class="text-center p-4 bg-orange-50 rounded-lg">
+                        <div class="text-2xl font-bold text-orange-600">${stats.total_trades || 0}</div>
+                        <div class="text-xs text-gray-600">Total Trades</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-yellow-500"></i>
+                        Recommendations
+                    </h5>
+                    ${analysis.improvements?.map(i => `
+                        <div class="p-3 bg-blue-50 rounded-lg text-sm text-blue-800 border-l-4 border-blue-500">
+                            ${escapeHtml(i)}
+                        </div>
+                    `).join('') || '<p class="text-gray-500">No specific recommendations</p>'}
+                </div>
+                
+                ${analysis.trades_sample ? `
+                    <div class="mt-6">
+                        <h5 class="font-semibold text-gray-800 mb-2">Sample Trades Analyzed</h5>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Symbol</th>
+                                        <th class="px-3 py-2 text-left">Direction</th>
+                                        <th class="px-3 py-2 text-right">P&L</th>
+                                        <th class="px-3 py-2 text-left">Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${analysis.trades_sample.map(t => `
+                                        <tr class="border-b">
+                                            <td class="px-3 py-2">${t.symbol}</td>
+                                            <td class="px-3 py-2">${t.direction}</td>
+                                            <td class="px-3 py-2 text-right ${t.pnl > 0 ? 'text-green-600' : 'text-red-600'}">$${t.pnl}</td>
+                                            <td class="px-3 py-2">
+                                                <span class="px-2 py-1 rounded text-xs ${t.outcome === 'win' ? 'bg-green-100 text-green-800' : t.outcome === 'loss' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}">
+                                                    ${t.outcome}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        }
+        
         function renderTradeAnalysis() {
-            const content = document.getElementById('content');
-            content.innerHTML = `
+            document.getElementById('content').innerHTML = `
                 <div class="max-w-6xl mx-auto space-y-6">
                     <div class="glass-card rounded-xl p-6 sm:p-8">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -1090,8 +1101,8 @@
                                 </h3>
                                 <p class="text-gray-600 text-sm">Detailed performance statistics and psychology insights</p>
                             </div>
-                            <div class="flex gap-2 w-full sm:w-auto">
-                                <select id="analysis-period" onchange="loadPerformanceStats()" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 sm:flex-none">
+                            <div class="flex gap-2">
+                                <select id="analysis-period" onchange="loadPerformanceStats()" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="30">Last 30 Days</option>
                                     <option value="90">Last 90 Days</option>
                                     <option value="365">Last Year</option>
@@ -1117,6 +1128,10 @@
                                 <div class="text-sm text-gray-600">Grade</div>
                             </div>
                         </div>
+                        
+                        <div id="stats-loading" class="hidden mt-4 flex justify-center">
+                            <div class="spinner"></div>
+                        </div>
                     </div>
                     
                     <div class="glass-card rounded-xl p-6 sm:p-8">
@@ -1124,10 +1139,10 @@
                             <i class="fas fa-brain text-purple-500"></i>
                             Trading Psychology
                         </h4>
-                        <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-200">
+                        <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-200" id="psychology-chart-container">
                             <div class="text-center">
                                 <i class="fas fa-chart-area text-4xl mb-2 block"></i>
-                                <span>Psychology analysis charts will appear here</span>
+                                <span>Upload journal data to see psychology analysis</span>
                             </div>
                         </div>
                     </div>
@@ -1139,138 +1154,240 @@
         
         async function loadPerformanceStats() {
             const days = document.getElementById('analysis-period')?.value || 30;
+            const loadingEl = document.getElementById('stats-loading');
+            
+            loadingEl?.classList.remove('hidden');
+            
             try {
                 const stats = await API.getPerformanceStats(days);
                 
                 document.getElementById('stat-trades').textContent = stats.summary?.trades_taken || 0;
                 document.getElementById('stat-winrate').textContent = (stats.summary?.win_rate || 0) + '%';
                 document.getElementById('stat-pnl').textContent = '$' + (stats.summary?.net_pnl || 0);
-                document.getElementById('stat-grade').textContent = stats.summary?.grade || 'B';
+                document.getElementById('stat-grade').textContent = stats.summary?.grade || '-';
                 
             } catch (e) {
-                console.error('Failed to load stats:', e);
                 showToast('Failed to load performance stats', 'error');
+            } finally {
+                loadingEl?.classList.add('hidden');
             }
         }
         
-        function renderCourses() {
+        async function renderCourses() {
             const content = document.getElementById('content');
             content.innerHTML = `
                 <div class="max-w-6xl mx-auto">
-                    <div class="glass-card rounded-xl p-8 text-center">
-                        <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-4xl text-teal-600">
-                            <i class="fas fa-graduation-cap"></i>
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <div class="text-center mb-8">
+                            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-4xl text-teal-600">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">Trading Courses</h3>
+                            <p class="text-gray-600 max-w-lg mx-auto">Master the markets with our professional curriculum</p>
                         </div>
-                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Trading Courses</h3>
-                        <p class="text-gray-600 max-w-lg mx-auto mb-6">Master the markets with our comprehensive curriculum designed for traders at all levels.</p>
                         
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-                            <div class="glass-card rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow group">
-                                <div class="h-40 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-4xl">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <div class="p-4">
-                                    <h4 class="font-bold text-gray-800 mb-2">Forex Fundamentals</h4>
-                                    <p class="text-sm text-gray-600 mb-3">Learn the basics of currency trading, including pips, lots, and leverage.</p>
-                                    <span class="text-blue-600 text-sm font-semibold group-hover:underline">Start Learning →</span>
-                                </div>
-                            </div>
-                            
-                            <div class="glass-card rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow group">
-                                <div class="h-40 bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white text-4xl">
-                                    <i class="fas fa-brain"></i>
-                                </div>
-                                <div class="p-4">
-                                    <h4 class="font-bold text-gray-800 mb-2">Trading Psychology</h4>
-                                    <p class="text-sm text-gray-600 mb-3">Master your emotions and maintain discipline during volatile markets.</p>
-                                    <span class="text-purple-600 text-sm font-semibold group-hover:underline">Start Learning →</span>
-                                </div>
-                            </div>
-                            
-                            <div class="glass-card rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow group">
-                                <div class="h-40 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-4xl">
-                                    <i class="fas fa-shield-alt"></i>
-                                </div>
-                                <div class="p-4">
-                                    <h4 class="font-bold text-gray-800 mb-2">Risk Management</h4>
-                                    <p class="text-sm text-gray-600 mb-3">Essential strategies to protect your capital and maximize longevity.</p>
-                                    <span class="text-green-600 text-sm font-semibold group-hover:underline">Start Learning →</span>
-                                </div>
+                        <div id="courses-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="col-span-full flex justify-center py-12">
+                                <div class="spinner"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
+            
+            try {
+                const courses = await API.getCourses();
+                const grid = document.getElementById('courses-grid');
+                
+                if (!courses || courses.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-500">
+                            <i class="fas fa-book-open text-4xl mb-4 text-gray-300"></i>
+                            <p>No courses available at the moment</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                grid.innerHTML = courses.map(course => `
+                    <div class="glass-card rounded-lg overflow-hidden hover:shadow-xl transition-all group cursor-pointer">
+                        <div class="h-40 bg-gradient-to-br from-teal-400 to-blue-600 flex items-center justify-center text-white text-4xl relative overflow-hidden">
+                            <i class="fas fa-graduation-cap"></i>
+                            ${course.progress ? `
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/30">
+                                    <div class="h-full bg-white" style="width: ${course.progress}%"></div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="p-5">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded">${course.level || 'All Levels'}</span>
+                                ${course.progress ? `<span class="text-xs text-gray-500">${course.progress}% Complete</span>` : ''}
+                            </div>
+                            <h4 class="font-bold text-gray-800 mb-2 text-lg">${course.title}</h4>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">${course.description || 'No description available'}</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-teal-600 text-sm font-semibold group-hover:underline">Start Learning →</span>
+                                <span class="text-xs text-gray-500">${course.lesson_count || 0} lessons</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (e) {
+                document.getElementById('courses-grid').innerHTML = `
+                    <div class="col-span-full text-center py-12 text-red-500">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                        <p>Failed to load courses</p>
+                        <p class="text-sm mt-2">${e.message}</p>
+                    </div>
+                `;
+            }
         }
         
-        function renderWebinars() {
+        async function renderWebinars() {
             const content = document.getElementById('content');
             content.innerHTML = `
                 <div class="max-w-6xl mx-auto space-y-6">
-                    <div class="glass-card rounded-xl p-8 text-center">
+                    <div class="glass-card rounded-xl p-6 sm:p-8 text-center">
                         <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-100 to-pink-200 flex items-center justify-center text-4xl text-pink-600">
                             <i class="fas fa-video"></i>
                         </div>
                         <h3 class="text-2xl font-bold text-gray-800 mb-2">Live Webinars</h3>
-                        <p class="text-gray-600 max-w-lg mx-auto mb-6">Join our expert-led trading sessions and access recorded educational content.</p>
+                        <p class="text-gray-600 max-w-lg mx-auto">Join our expert-led trading sessions</p>
                     </div>
                     
-                    <div class="space-y-4">
-                        <div class="glass-card rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between cursor-pointer hover:shadow-md transition-shadow border-l-4 border-red-500">
-                            <div class="flex items-center gap-4 mb-3 sm:mb-0">
-                                <div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center text-red-600 flex-shrink-0">
-                                    <i class="fas fa-play-circle text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-gray-800">Live Market Analysis</h4>
-                                    <p class="text-sm text-gray-600">Join our Head Trader for pre-market analysis and key levels</p>
-                                    <p class="text-xs text-red-600 mt-1">Live Now</p>
-                                </div>
-                            </div>
-                            <button class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors">
-                                Join Live
-                            </button>
-                        </div>
-                        
-                        <div class="glass-card rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between cursor-pointer hover:shadow-md transition-shadow border-l-4 border-blue-500">
-                            <div class="flex items-center gap-4 mb-3 sm:mb-0">
-                                <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                                    <i class="fas fa-calendar text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-gray-800">Q&A Session</h4>
-                                    <p class="text-sm text-gray-600">Get your trading questions answered by our experts</p>
-                                    <p class="text-xs text-blue-600 mt-1">Tomorrow at 2:00 PM EST</p>
-                                </div>
-                            </div>
-                            <button class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-200 transition-colors">
-                                Remind Me
-                            </button>
-                        </div>
-                        
-                        <div class="glass-card rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-400">
-                            <div class="flex items-center gap-4 mb-3 sm:mb-0">
-                                <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0">
-                                    <i class="fas fa-history text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-gray-800">Risk Management Masterclass</h4>
-                                    <p class="text-sm text-gray-600">Recorded session on position sizing and account protection</p>
-                                    <p class="text-xs text-gray-500 mt-1">Recorded 3 days ago</p>
-                                </div>
-                            </div>
-                            <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors">
-                                Watch Replay
-                            </button>
+                    <div id="webinars-list" class="space-y-4">
+                        <div class="flex justify-center py-12">
+                            <div class="spinner"></div>
                         </div>
                     </div>
                 </div>
             `;
+            
+            try {
+                const webinars = await API.getWebinars(true);
+                const container = document.getElementById('webinars-list');
+                
+                if (!webinars || webinars.length === 0) {
+                    container.innerHTML = `
+                        <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                            <i class="fas fa-calendar-times text-4xl mb-4 text-gray-300"></i>
+                            <p>No upcoming webinars scheduled</p>
+                            <button onclick="showPage('mentor')" class="mt-4 text-pink-600 hover:text-pink-800 font-medium">
+                                Ask AI Mentor instead
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = webinars.map(w => {
+                    const isLive = w.status === 'live';
+                    const isUpcoming = new Date(w.scheduled_at) > new Date();
+                    
+                    return `
+                        <div class="glass-card rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 ${isLive ? 'border-red-500' : isUpcoming ? 'border-blue-500' : 'border-gray-400'}">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg ${isLive ? 'bg-red-100 text-red-600' : isUpcoming ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'} flex items-center justify-center flex-shrink-0">
+                                    <i class="fas ${isLive ? 'fa-broadcast-tower' : isUpcoming ? 'fa-calendar' : 'fa-history'} text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-gray-800">${w.title}</h4>
+                                    <p class="text-sm text-gray-600">${w.description || 'No description'}</p>
+                                    <p class="text-xs ${isLive ? 'text-red-600 font-semibold animate-pulse' : 'text-gray-500'} mt-1">
+                                        ${isLive ? '🔴 LIVE NOW' : new Date(w.scheduled_at).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <button class="px-4 py-2 ${isLive ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} rounded-lg text-sm font-semibold transition-colors w-full sm:w-auto">
+                                ${isLive ? 'Join Now' : isUpcoming ? 'Set Reminder' : 'Watch Replay'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (e) {
+                document.getElementById('webinars-list').innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center text-red-500">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                        <p>Failed to load webinars</p>
+                        <p class="text-sm mt-2">${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function renderBlog() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="max-w-6xl mx-auto">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <div class="text-center mb-8">
+                            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-4xl text-indigo-600">
+                                <i class="fas fa-newspaper"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">Trading Blog</h3>
+                            <p class="text-gray-600 max-w-lg mx-auto">Latest market insights and educational content</p>
+                        </div>
+                        
+                        <div id="blog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="col-span-full flex justify-center py-12">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const posts = await API.getBlogPosts({ limit: 9 });
+                const grid = document.getElementById('blog-grid');
+                
+                if (!posts || posts.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-500">
+                            <i class="fas fa-newspaper text-4xl mb-4 text-gray-300"></i>
+                            <p>No blog posts available</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                grid.innerHTML = posts.map(post => `
+                    <article class="glass-card rounded-lg overflow-hidden hover:shadow-xl transition-all cursor-pointer group flex flex-col h-full" onclick="showToast('Full article view coming soon', 'info')">
+                        <div class="h-48 bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center text-white text-5xl relative overflow-hidden">
+                            <i class="fas fa-newspaper"></i>
+                            ${post.featured ? '<div class="absolute top-2 right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded">FEATURED</div>' : ''}
+                        </div>
+                        <div class="p-5 flex-1 flex flex-col">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${post.category || 'General'}</span>
+                                <span class="text-xs text-gray-500">${new Date(post.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <h4 class="font-bold text-gray-800 mb-2 text-lg line-clamp-2 group-hover:text-indigo-600 transition-colors">${post.title}</h4>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-3 flex-1">${post.excerpt || post.content?.substring(0, 150) + '...' || 'No content preview'}</p>
+                            <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
+                                <span class="text-indigo-600 text-sm font-semibold group-hover:underline">Read More →</span>
+                                <span class="text-xs text-gray-500">${post.read_time || '5 min read'}</span>
+                            </div>
+                        </div>
+                    </article>
+                `).join('');
+                
+            } catch (e) {
+                document.getElementById('blog-grid').innerHTML = `
+                    <div class="col-span-full text-center py-12 text-red-500">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                        <p>Failed to load blog posts</p>
+                        <p class="text-sm mt-2">${e.message}</p>
+                    </div>
+                `;
+            }
         }
         
         function renderMentor() {
-            const content = document.getElementById('content');
-            content.innerHTML = `
+            document.getElementById('content').innerHTML = `
                 <div class="max-w-6xl mx-auto h-[calc(100vh-200px)]">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                         <div class="lg:col-span-2 glass-card rounded-xl flex flex-col h-full">
@@ -1298,8 +1415,15 @@
                                         <i class="fas fa-robot"></i>
                                     </div>
                                     <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] sm:max-w-[80%]">
-                                        <p class="text-gray-800">Welcome! I'm your AI Trading Mentor. Ask me anything about trading strategies, risk management, or market analysis.</p>
+                                        <p class="text-gray-800">Hello! I'm your AI Trading Mentor. Ask me anything about trading strategies, risk management, or market analysis. <strong>Note: I provide educational guidance only.</strong></p>
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <div id="mentor-loading" class="hidden px-4 py-2 bg-gray-50 border-t border-gray-200">
+                                <div class="flex items-center gap-2 text-sm text-gray-600">
+                                    <div class="spinner small"></div>
+                                    <span>AI is thinking...</span>
                                 </div>
                             </div>
                             
@@ -1308,10 +1432,11 @@
                                     <input type="text" id="mentorInput" placeholder="Ask your trading question..." 
                                         class="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         onkeypress="if(event.key==='Enter') sendMentorMessage()">
-                                    <button onclick="sendMentorMessage()" class="gradient-btn px-6 py-3 rounded-lg text-white font-semibold cursor-pointer hover:shadow-lg transition-shadow">
+                                    <button onclick="sendMentorMessage()" id="mentor-send-btn" class="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 rounded-lg text-white font-semibold cursor-pointer hover:shadow-lg transition-shadow">
                                         <i class="fas fa-paper-plane"></i>
                                     </button>
                                 </div>
+                                <p class="text-xs text-gray-500 mt-2">This is an AI assistant for educational purposes only. Not financial advice.</p>
                             </div>
                         </div>
                         
@@ -1322,16 +1447,16 @@
                                     Quick Topics
                                 </h4>
                                 <div class="space-y-2">
-                                    <button onclick="askMentor('How do I manage risk effectively?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
-                                        Risk Management
+                                    <button onclick="askMentor('How do I calculate position size?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                        Position Sizing
                                     </button>
-                                    <button onclick="askMentor('What is a good risk/reward ratio?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
-                                        R:R Ratios
+                                    <button onclick="askMentor('What is a good risk to reward ratio?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                        Risk/Reward Ratios
                                     </button>
                                     <button onclick="askMentor('How do I control emotions while trading?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
                                         Trading Psychology
                                     </button>
-                                    <button onclick="askMentor('Explain support and resistance levels')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                    <button onclick="askMentor('Explain support and resistance')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
                                         Technical Analysis
                                     </button>
                                 </div>
@@ -1340,9 +1465,9 @@
                             <div class="glass-card rounded-xl p-4 bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200">
                                 <h4 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
                                     <i class="fas fa-lightbulb text-yellow-600"></i>
-                                    Daily Tip
+                                    Daily Wisdom
                                 </h4>
-                                <p class="text-sm text-gray-600 italic">"Never risk more than 2% of your account on a single trade. Consistency beats intensity in the long run."</p>
+                                <p class="text-sm text-gray-600 italic">"Cut losses short, let profits run." — Trading Proverb</p>
                             </div>
                         </div>
                     </div>
@@ -1377,13 +1502,14 @@
         async function sendMentorMessage() {
             const input = document.getElementById('mentorInput');
             const container = document.getElementById('mentor-messages');
+            const loadingEl = document.getElementById('mentor-loading');
+            const sendBtn = document.getElementById('mentor-send-btn');
             
             if (!input || !container) return;
             
             const message = input.value.trim();
             if (!message) return;
             
-            // Add user message
             container.innerHTML += `
                 <div class="flex gap-3 flex-row-reverse">
                     <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-sm flex-shrink-0">
@@ -1398,28 +1524,11 @@
             input.value = '';
             container.scrollTop = container.scrollHeight;
             
-            // Show typing indicator
-            const typingId = 'typing-' + Date.now();
-            container.innerHTML += `
-                <div id="${typingId}" class="flex gap-3">
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0">
-                        <i class="fas fa-robot"></i>
-                    </div>
-                    <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm">
-                        <div class="flex space-x-1">
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            container.scrollTop = container.scrollHeight;
+            loadingEl?.classList.remove('hidden');
+            if (sendBtn) sendBtn.disabled = true;
             
             try {
                 const response = await API.askMentor(message);
-                const typingEl = document.getElementById(typingId);
-                if (typingEl) typingEl.remove();
                 
                 container.innerHTML += `
                     <div class="flex gap-3">
@@ -1427,98 +1536,50 @@
                             <i class="fas fa-robot"></i>
                         </div>
                         <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] sm:max-w-[80%]">
-                            <p class="text-gray-800">${escapeHtml(response.response)}</p>
-                            ${response.suggested_resources ? `
-                                <div class="mt-2 pt-2 border-t border-gray-100 text-xs text-blue-600">
-                                    <strong>Suggested:</strong> ${response.suggested_resources.join(', ')}
+                            <p class="text-gray-800 whitespace-pre-wrap">${escapeHtml(response.response)}</p>
+                            ${response.suggested_resources?.length ? `
+                                <div class="mt-3 pt-2 border-t border-gray-100">
+                                    <p class="text-xs text-gray-500 mb-1">Suggested resources:</p>
+                                    <div class="flex flex-wrap gap-1">
+                                        ${response.suggested_resources.map(r => `
+                                            <span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">${r}</span>
+                                        `).join('')}
+                                    </div>
                                 </div>
                             ` : ''}
                         </div>
                     </div>
                 `;
                 container.scrollTop = container.scrollHeight;
-            } catch (e) {
-                const typingEl = document.getElementById(typingId);
-                if (typingEl) typingEl.remove();
                 
+            } catch (e) {
                 container.innerHTML += `
                     <div class="flex gap-3">
                         <div class="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-sm flex-shrink-0">
                             <i class="fas fa-exclamation"></i>
                         </div>
                         <div class="bg-red-50 p-3 rounded-2xl rounded-tl-none border border-red-100 max-w-[80%]">
-                            <p class="text-red-700 text-sm">Sorry, I encountered an error. Please try again.</p>
+                            <p class="text-red-700 text-sm">Sorry, I couldn't process your request. ${e.message}</p>
                         </div>
                     </div>
                 `;
+                container.scrollTop = container.scrollHeight;
+            } finally {
+                loadingEl?.classList.add('hidden');
+                if (sendBtn) sendBtn.disabled = false;
             }
         }
         
-        function renderBlog() {
-            const content = document.getElementById('content');
-            content.innerHTML = `
-                <div class="max-w-6xl mx-auto">
-                    <div class="glass-card rounded-xl p-6 sm:p-8">
-                        <div class="text-center mb-8">
-                            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-4xl text-indigo-600">
-                                <i class="fas fa-newspaper"></i>
-                            </div>
-                            <h3 class="text-2xl font-bold text-gray-800 mb-2">Trading Blog</h3>
-                            <p class="text-gray-600 max-w-lg mx-auto">Latest insights, strategies, and market analysis from our expert traders.</p>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-                            <div class="glass-card rounded-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all group">
-                                <div class="h-48 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-5xl">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <div class="p-5">
-                                    <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded mb-2 inline-block">Technical Analysis</span>
-                                    <h4 class="font-bold text-gray-800 mb-2 text-lg">Understanding Trend Lines</h4>
-                                    <p class="text-sm text-gray-600 mb-4">Master the art of drawing and interpreting trend lines in your technical analysis workflow.</p>
-                                    <span class="text-blue-600 text-sm font-semibold group-hover:underline">Read More →</span>
-                                </div>
-                            </div>
-                            
-                            <div class="glass-card rounded-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all group">
-                                <div class="h-48 bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white text-5xl">
-                                    <i class="fas fa-shield-alt"></i>
-                                </div>
-                                <div class="p-5">
-                                    <span class="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded mb-2 inline-block">Risk Management</span>
-                                    <h4 class="font-bold text-gray-800 mb-2 text-lg">Risk Management Basics</h4>
-                                    <p class="text-sm text-gray-600 mb-4">Essential risk management strategies every trader must know to protect capital.</p>
-                                    <span class="text-purple-600 text-sm font-semibold group-hover:underline">Read More →</span>
-                                </div>
-                            </div>
-                            
-                            <div class="glass-card rounded-lg overflow-hidden cursor-pointer hover:shadow-xl transition-all group">
-                                <div class="h-48 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-5xl">
-                                    <i class="fas fa-brain"></i>
-                                </div>
-                                <div class="p-5">
-                                    <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded mb-2 inline-block">Psychology</span>
-                                    <h4 class="font-bold text-gray-800 mb-2 text-lg">Trading Psychology 101</h4>
-                                    <p class="text-sm text-gray-600 mb-4">How to master your emotions and maintain discipline during volatile markets.</p>
-                                    <span class="text-green-600 text-sm font-semibold group-hover:underline">Read More →</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        function renderAdmin() {
+        async function renderAdmin() {
             const content = document.getElementById('content');
             const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
             
-            if (!user.is_admin) {
+            if (user.role !== 'admin' && user.role !== 'moderator' && !user.is_admin) {
                 content.innerHTML = `
-                    <div class="max-w-md mx-auto glass-card rounded-xl p-8 text-center border-red-200 bg-red-50">
+                    <div class="max-w-md mx-auto glass-card rounded-xl p-8 text-center border-red-200 bg-red-50 mt-12">
                         <i class="fas fa-lock text-4xl text-red-500 mb-4"></i>
                         <h3 class="text-xl font-bold text-red-800 mb-2">Access Denied</h3>
-                        <p class="text-red-600 mb-4">Admin privileges required to view this section.</p>
+                        <p class="text-red-600 mb-4">Admin privileges required.</p>
                         <button onclick="showPage('dashboard')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">
                             Back to Dashboard
                         </button>
@@ -1541,12 +1602,12 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" id="admin-stats">
                         <div class="glass-card rounded-xl p-6 border-l-4 border-blue-500">
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="text-gray-600 text-sm">Total Users</p>
-                                    <p class="text-3xl font-bold text-gray-800 mt-1">1,247</p>
+                                    <div class="text-3xl font-bold text-gray-800 mt-1" id="admin-user-count">--</div>
                                 </div>
                                 <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
                                     <i class="fas fa-users"></i>
@@ -1558,7 +1619,7 @@
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="text-gray-600 text-sm">Active Signals</p>
-                                    <p class="text-3xl font-bold text-gray-800 mt-1">42</p>
+                                    <div class="text-3xl font-bold text-gray-800 mt-1" id="admin-signal-count">--</div>
                                 </div>
                                 <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
                                     <i class="fas fa-signal"></i>
@@ -1570,7 +1631,7 @@
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="text-gray-600 text-sm">Courses</p>
-                                    <p class="text-3xl font-bold text-gray-800 mt-1">12</p>
+                                    <div class="text-3xl font-bold text-gray-800 mt-1" id="admin-course-count">--</div>
                                 </div>
                                 <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
                                     <i class="fas fa-graduation-cap"></i>
@@ -1582,7 +1643,7 @@
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="text-gray-600 text-sm">System Status</p>
-                                    <p class="text-3xl font-bold text-green-600 mt-1">Online</p>
+                                    <div class="text-3xl font-bold text-green-600 mt-1">Online</div>
                                 </div>
                                 <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
                                     <i class="fas fa-server"></i>
@@ -1595,47 +1656,10 @@
                         <div class="glass-card rounded-xl p-6">
                             <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
                                 <i class="fas fa-users-cog text-blue-500"></i>
-                                Recent User Activity
+                                Recent Users
                             </h4>
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                                            <i class="fas fa-user-plus text-sm"></i>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-semibold text-gray-800">New user registered</p>
-                                            <p class="text-xs text-gray-500">john.doe@example.com</p>
-                                        </div>
-                                    </div>
-                                    <span class="text-xs text-gray-400">2 min ago</span>
-                                </div>
-                                
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                                            <i class="fas fa-signal text-sm"></i>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-semibold text-gray-800">New signal created</p>
-                                            <p class="text-xs text-gray-500">EURUSD BUY @ 1.0850</p>
-                                        </div>
-                                    </div>
-                                    <span class="text-xs text-gray-400">15 min ago</span>
-                                </div>
-                                
-                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                                            <i class="fas fa-comment text-sm"></i>
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-semibold text-gray-800">AI Mentor query</p>
-                                            <p class="text-xs text-gray-500">Risk management question</p>
-                                        </div>
-                                    </div>
-                                    <span class="text-xs text-gray-400">1 hour ago</span>
-                                </div>
+                            <div id="admin-users-list" class="space-y-3">
+                                <div class="spinner mx-auto"></div>
                             </div>
                         </div>
                         
@@ -1645,19 +1669,19 @@
                                 Quick Actions
                             </h4>
                             <div class="grid grid-cols-2 gap-3">
-                                <button class="p-4 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-colors text-left">
+                                <button onclick="showToast('Create Signal modal coming soon', 'info')" class="p-4 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-colors text-left">
                                     <i class="fas fa-plus mb-2 block text-xl"></i>
                                     Create Signal
                                 </button>
-                                <button class="p-4 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-sm font-semibold transition-colors text-left">
-                                    <i class="fas fa-user-plus mb-2 block text-xl"></i>
-                                    Add User
-                                </button>
-                                <button class="p-4 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm font-semibold transition-colors text-left">
+                                <button onclick="showToast('Add Course modal coming soon', 'info')" class="p-4 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm font-semibold transition-colors text-left">
                                     <i class="fas fa-book mb-2 block text-xl"></i>
                                     Add Course
                                 </button>
-                                <button class="p-4 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-sm font-semibold transition-colors text-left">
+                                <button onclick="showToast('Add Webinar modal coming soon', 'info')" class="p-4 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 text-sm font-semibold transition-colors text-left">
+                                    <i class="fas fa-video mb-2 block text-xl"></i>
+                                    Add Webinar
+                                </button>
+                                <button onclick="showToast('Blog post editor coming soon', 'info')" class="p-4 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold transition-colors text-left">
                                     <i class="fas fa-newspaper mb-2 block text-xl"></i>
                                     New Article
                                 </button>
@@ -1666,37 +1690,35 @@
                     </div>
                 </div>
             `;
-        }
-        
-        // ==========================================
-        // UTILITY FUNCTIONS
-        // ==========================================
-        
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `
-                <div class="flex items-center justify-between gap-4">
-                    <span>${message}</span>
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
             
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                if (toast.parentElement) toast.remove();
-            }, 5000);
+            try {
+                const stats = await API.getAdminStats();
+                document.getElementById('admin-user-count').textContent = stats.total_users || '--';
+                document.getElementById('admin-signal-count').textContent = stats.active_signals || '--';
+                document.getElementById('admin-course-count').textContent = stats.total_courses || '--';
+                
+                if (stats.recent_users) {
+                    document.getElementById('admin-users-list').innerHTML = stats.recent_users.map(u => `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm">
+                                    ${u.email[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-800">${u.email}</p>
+                                    <p class="text-xs text-gray-500">${u.role || 'user'}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs text-gray-400">${new Date(u.created_at).toLocaleDateString()}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('admin-users-list').innerHTML = '<p class="text-gray-500 text-center py-4">No recent user data</p>';
+                }
+            } catch (e) {
+                console.error('Failed to load admin stats:', e);
+                document.getElementById('admin-users-list').innerHTML = '<p class="text-red-500 text-center py-4">Failed to load users</p>';
+            }
         }
         
         // ==========================================
@@ -1704,28 +1726,36 @@
         // ==========================================
         
         document.addEventListener('DOMContentLoaded', () => {
-            // Check authentication
             const token = localStorage.getItem('pipways_token');
             if (!token) {
                 window.location.href = '/';
                 return;
             }
             
-            // Load user data
             const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            currentUser = user;
+            
             if (user.email) {
                 document.getElementById('user-email').textContent = user.email;
                 document.getElementById('user-name').textContent = user.full_name || user.email.split('@')[0];
                 document.getElementById('user-avatar').textContent = (user.full_name || user.email)[0].toUpperCase();
                 
-                // Show admin nav if applicable
-                if (user.is_admin) {
-                    document.getElementById('admin-nav-section').classList.remove('hidden');
-                }
+                checkAdminAccess();
             }
             
-            // Initialize page
             showPage('dashboard');
+            
+            fetch(`${API_BASE}/health`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data && data.status !== 'healthy') {
+                        const statusEl = document.getElementById('system-status');
+                        if (statusEl) {
+                            statusEl.innerHTML = '<div class="w-2 h-2 rounded-full bg-yellow-500"></div><span class="text-xs sm:text-sm font-medium text-yellow-700">Degraded</span>';
+                        }
+                    }
+                })
+                .catch(() => {});
         });
     </script>
 </body>

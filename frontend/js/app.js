@@ -1,35 +1,86 @@
-/**
- * Main Application Entry
- */
-const App = {
-    async init() {
-        console.log('Initializing Pipways App...');
-        
-        // Initialize store first
-        Store.init();
-        
-        // Initialize UI utilities
-        if (typeof UI !== 'undefined') {
-            UI.init();
-        }
-        
-        // Initialize auth
-        if (typeof Auth !== 'undefined') {
-            await Auth.init();
-        }
-        
-        // Initialize router last
-        if (typeof Router !== 'undefined') {
-            Router.init();
-        }
-        
-        console.log('App initialized successfully');
-    }
-};
+// Auth functions - Logic preserved exactly, UI selectors updated for new design
 
-// Start when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => App.init());
-} else {
-    App.init();
+const API_BASE = window.location.origin;
+
+function showError(message) {
+    const errorDiv = document.getElementById('auth-error');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+    }
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    try {
+        const formData = new FormData();
+        formData.append('username', email);
+        formData.append('password', password);
+        
+        const res = await fetch(`${API_BASE}/auth/token`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Login failed');
+        }
+        
+        const data = await res.json();
+        
+        // Store auth data
+        localStorage.setItem('pipways_token', data.access_token);
+        localStorage.setItem('pipways_user', JSON.stringify(data.user));
+        
+        // Redirect to dashboard
+        window.location.href = '/dashboard.html';
+        
+    } catch (e) {
+        showError(e.message);
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    
+    const data = {
+        email: document.getElementById('reg-email').value,
+        password: document.getElementById('reg-password').value,
+        full_name: document.getElementById('reg-name').value
+    };
+    
+    try {
+        const res = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Registration failed');
+        }
+        
+        const result = await res.json();
+        
+        localStorage.setItem('pipways_token', result.access_token);
+        localStorage.setItem('pipways_user', JSON.stringify(result.user));
+        
+        window.location.href = '/dashboard.html';
+        
+    } catch (e) {
+        showError(e.message);
+    }
+}
+
+function logout() {
+    localStorage.removeItem('pipways_token');
+    localStorage.removeItem('pipways_user');
+    window.location.href = '/';
 }

@@ -1,6 +1,6 @@
 """
 Authentication module - handles user registration and login.
-Fixed to work with older database schemas.
+Fixed to work with older database schemas gracefully.
 """
 from fastapi import APIRouter, HTTPException, status, Depends, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -9,7 +9,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 
-from .database import database, users
+from .database import database, users, get_available_columns
 from .security import (
     verify_password, 
     get_password_hash, 
@@ -21,7 +21,7 @@ from .security import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# OAuth2 scheme - tokenUrl must match the login endpoint
+# OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 class UserRegister(BaseModel):
@@ -41,15 +41,24 @@ class Token(BaseModel):
     token_type: str
     user: UserResponse
 
-def get_available_columns():
-    """Get list of available columns in users table."""
-    return [col.name for col in users.columns]
+# Cache available columns to avoid repeated inspection
+_available_columns_cache = None
+
+def get_columns():
+    """Get available columns with caching."""
+    global _available_columns_cache
+    if _available_columns_cache is None:
+        _available_columns_cache = get_available_columns()
+    return _available_columns_cache
 
 async def get_user_by_email(email: str):
-    """Fetch user by email."""
+    """Fetch user by email safely."""
     try:
+        # Only select columns that exist
+        cols = get_columns()
         query = users.select().where(users.c.email == email)
-        return await database.fetch_one(query)
+        result = await database.fetch_one(query)
+        return result
     except Exception as e:
         print(f"DB Error fetching user: {e}", flush=True)
         return None
@@ -57,8 +66,7 @@ async def get_user_by_email(email: str):
 async def create_user(user_data: dict):
     """Create user with only available columns."""
     try:
-        available_cols = get_available_columns()
-        print(f"Available columns: {available_cols}", flush=True)
+        available_cols = get_columns()
         
         # Build insert data with only existing columns
         insert_data = {
@@ -67,17 +75,19 @@ async def create_user(user_data: dict):
             "created_at": datetime.utcnow()
         }
         
+        # Only add optional columns if they exist in DB
         if "full_name" in available_cols:
             insert_data["full_name"] = user_data.get("full_name", "")
-        
-        # Only add these if they exist in schema
         if "is_active" in available_cols:
             insert_data["is_active"] = True
         if "is_admin" in available_cols:
             insert_data["is_admin"] = False
         if "role" in available_cols:
             insert_data["role"] = "user"
+        if "subscription_tier" in available_cols:
+            insert_data["subscription_tier"] = "free"
         
+        # Build query dynamically
         query = users.insert().values(**insert_data)
         user_id = await database.execute(query)
         
@@ -100,10 +110,7 @@ async def register(user_data: UserRegister):
     # Check if user exists
     existing = await get_user_by_email(user_data.email)
     if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
+        raise HTTPException(status_code=400, detail="Email already registered")
     
     # Create user
     user = await create_user({
@@ -124,12 +131,11 @@ async def register(user_data: UserRegister):
         "user": UserResponse(**user)
     }
 
-@router.post("/token", response_model=Token)  # Changed from /login to /token
+@router.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return JWT token."""
     print(f"Login attempt for: {form_data.username}", flush=True)
     
-    # Get user by email
     user = await get_user_by_email(form_data.username)
     
     if not user:
@@ -141,7 +147,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     
     # Verify password
     try:
-        is_valid = verify_password(form_data.password, user.password_hash)
+        stored_hash = user.password_hash if hasattr(user, 'password_hash') else user['password_hash']
+        is_valid = verify_password(form_data.password, stored_hash)
     except Exception as e:
         print(f"Password verification error: {e}", flush=True)
         is_valid = False
@@ -153,30 +160,40 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check if user is active (if column exists)
-    is_active = getattr(user, 'is_active', True)
-    if not is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Account is deactivated"
-        )
+    # Check active status safely
+    is_active = True
+    if hasattr(user, 'is_active'):
+        is_active = user.is_active
+    elif isinstance(user, dict) and 'is_active' in user:
+        is_active = user['is_active']
     
-    # Create access token
+    if not is_active:
+        raise HTTPException(status_code=400, detail="Account is deactivated")
+    
+    # Get user ID and email safely
+    user_id = user.id if hasattr(user, 'id') else user['id']
+    user_email = user.email if hasattr(user, 'email') else user['email']
+    is_admin = False
+    if hasattr(user, 'is_admin'):
+        is_admin = user.is_admin
+    elif isinstance(user, dict) and 'is_admin' in user:
+        is_admin = user['is_admin']
+    
     access_token = create_access_token(
         data={
-            "sub": user.email,
-            "user_id": user.id,
-            "is_admin": getattr(user, 'is_admin', False)
+            "sub": user_email,
+            "user_id": user_id,
+            "is_admin": is_admin
         },
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
     user_response = {
-        "id": user.id,
-        "email": user.email,
-        "full_name": getattr(user, 'full_name', ''),
+        "id": user_id,
+        "email": user_email,
+        "full_name": getattr(user, 'full_name', user.get('full_name', '')) if isinstance(user, dict) else getattr(user, 'full_name', ''),
         "is_active": is_active,
-        "is_admin": getattr(user, 'is_admin', False)
+        "is_admin": is_admin
     }
     
     return {
@@ -207,9 +224,9 @@ async def get_current_user_info(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     
     return UserResponse(
-        id=user.id,
-        email=user.email,
-        full_name=getattr(user, 'full_name', ''),
-        is_active=getattr(user, 'is_active', True),
-        is_admin=getattr(user, 'is_admin', False)
+        id=user.id if hasattr(user, 'id') else user['id'],
+        email=user.email if hasattr(user, 'email') else user['email'],
+        full_name=getattr(user, 'full_name', user.get('full_name', '')) if isinstance(user, dict) else getattr(user, 'full_name', ''),
+        is_active=getattr(user, 'is_active', True) if not isinstance(user, dict) else user.get('is_active', True),
+        is_admin=getattr(user, 'is_admin', False) if not isinstance(user, dict) else user.get('is_admin', False)
     )

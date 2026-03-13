@@ -1,24 +1,28 @@
 """
 Main FastAPI application entry point.
-All imports use absolute paths (backend.module) to work with uvicorn.
+Uses RELATIVE imports to work as a Python package.
+Run with: uvicorn backend.main:app (from root directory)
 """
 import os
-from fastapi import FastAPI, Depends
+from datetime import datetime
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-# ABSOLUTE imports (not relative) - this is key for Render deployment
-from backend.database import database, engine, metadata
-from backend.security import get_current_user
+# RELATIVE imports (from .module)
+from .database import database, metadata
+from .security import get_current_user
 
-# Import all route modules
-from backend import auth, signals, courses, blog, webinars, media, admin
+# Import all route modules using RELATIVE imports
+from . import auth, signals, courses, blog, webinars, media, admin
+from . import notifications, payments, risk_calculator, ai_screening, blog_enhanced, courses_enhanced
 
 # Create FastAPI app
 app = FastAPI(
     title="Pipways Trading Platform API",
     description="Professional trading signals and analysis platform",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # CORS Configuration
@@ -43,6 +47,30 @@ async def shutdown():
     await database.disconnect()
     print("✓ Database disconnected", flush=True)
 
+# ROOT ENDPOINT - Fixes "Not Found" error
+@app.get("/")
+async def root():
+    """Root endpoint - API info and health status."""
+    return {
+        "message": "Welcome to Pipways Trading Platform API",
+        "version": "1.0.0",
+        "status": "operational",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "auth": "/auth",
+            "signals": "/signals",
+            "courses": "/courses",
+            "blog": "/blog",
+            "webinars": "/webinars",
+            "admin": "/admin",
+            "notifications": "/notifications",
+            "payments": "/payments",
+            "risk": "/risk",
+            "ai": "/ai"
+        }
+    }
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -50,7 +78,8 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "pipways-api",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "timestamp": str(datetime.utcnow())
     }
 
 # Include all routers
@@ -61,3 +90,9 @@ app.include_router(blog.router, prefix="/blog", tags=["blog"])
 app.include_router(webinars.router, prefix="/webinars", tags=["webinars"])
 app.include_router(media.router, prefix="/media", tags=["media"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+app.include_router(payments.router, prefix="/payments", tags=["payments"])
+app.include_router(risk_calculator.router, prefix="/risk", tags=["risk"])
+app.include_router(ai_screening.router, prefix="/ai", tags=["ai"])
+app.include_router(blog_enhanced.router, prefix="/blog-enhanced", tags=["blog-enhanced"])
+app.include_router(courses_enhanced.router, prefix="/courses-enhanced", tags=["courses-enhanced"])

@@ -68,6 +68,17 @@ async def analyze_trading_journal(
         print(f"[PERFORMANCE ERROR] {e}", flush=True)
         raise HTTPException(500, f"Analysis failed: {str(e)}")
 
+@router.post("/analyze-journal-upload")
+async def analyze_journal_upload(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    """
+    File upload endpoint for Trading Journal.
+    Frontend calls this when user drops a file.
+    """
+    return await analyze_trading_journal(file=file, trades=None, current_user=current_user)
+
 def parse_csv(content: bytes) -> List[dict]:
     """Parse CSV trading statement"""
     try:

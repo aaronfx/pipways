@@ -11,11 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import select, text, inspect
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select, text
 
 # RELATIVE imports from sibling modules (not via __init__.py)
-from .database import database, engine, metadata, users
+from .database import database, metadata, users
 from .security import get_password_hash, get_current_user
 
 # Import routers DIRECTLY from modules (avoiding __init__.py circular imports)
@@ -67,69 +66,42 @@ if FRONTEND_DIR.exists():
 else:
     print(f"⚠ Frontend directory not found at: {FRONTEND_DIR}", flush=True)
 
-async def get_table_columns(table_name: str):
-    """Get list of column names for a table."""
-    try:
-        inspector = inspect(engine)
-        return [col['name'] for col in inspector.get_columns(table_name)]
-    except Exception as e:
-        print(f"⚠ Could not inspect table {table_name}: {e}", flush=True)
-        return []
-
 async def create_default_admin():
     """Create default admin user if no admin exists."""
     try:
-        # Get available columns
-        columns = await get_table_columns('users')
-        print(f"✓ Available user columns: {columns}", flush=True)
-        
-        if not columns:
-            print("⚠ Could not detect columns, skipping admin creation", flush=True)
-            return
-        
-        # Check if admin exists using only available columns
-        check_fields = ["email"]
-        available_check_fields = [f for f in check_fields if f in columns]
-        
-        if not available_check_fields:
-            print("⚠ No fields available to check for existing admin", flush=True)
-            return
-        
-        # Build query dynamically based on available columns
+        # Check if admin exists using safe query
         query = select(users.c.email).where(users.c.email == "admin@pipways.com")
         existing = await database.fetch_one(query)
         
         if not existing:
-            # Build admin data with only available columns
+            # Build admin data dynamically based on available columns
             admin_data = {
                 "email": "admin@pipways.com",
                 "password_hash": get_password_hash("admin123"),
                 "created_at": datetime.utcnow()
             }
             
-            # Add optional fields if they exist
-            if "full_name" in columns:
+            # Only add columns if they exist in the table
+            if hasattr(users.c, 'full_name'):
                 admin_data["full_name"] = "System Administrator"
-            if "is_active" in columns:
+            if hasattr(users.c, 'is_active'):
                 admin_data["is_active"] = True
-            if "is_admin" in columns:
+            if hasattr(users.c, 'is_admin'):
                 admin_data["is_admin"] = True
-            if "role" in columns:
+            if hasattr(users.c, 'role'):
                 admin_data["role"] = "admin"
             
-            # Build insert statement dynamically
-            cols = list(admin_data.keys())
+            # Insert with only available columns
             query = users.insert().values(**admin_data)
             await database.execute(query)
             
             print("✓ Default admin created: admin@pipways.com / admin123", flush=True)
-            print(f"  Columns used: {cols}", flush=True)
         else:
             print("✓ Admin user already exists", flush=True)
             
     except Exception as e:
         print(f"⚠ Admin initialization error: {e}", flush=True)
-        # Don't raise - allow app to start even if admin creation fails
+        # Log but don't crash - app can still work without admin
 
 @app.on_event("startup")
 async def startup():

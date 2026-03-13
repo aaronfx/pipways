@@ -12,7 +12,7 @@ class ApiClient {
 
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
-        const token = Store.getToken();
+        const token = Store ? Store.getToken() : localStorage.getItem('token');
 
         const headers = {
             ...this.defaultHeaders,
@@ -20,22 +20,22 @@ class ApiClient {
             ...options.headers
         };
 
-        // Remove Content-Type for FormData
         if (options.body instanceof FormData) {
             delete headers['Content-Type'];
         }
 
         try {
-            Store.setState('loading', true);
+            if (Store) Store.setState('loading', true);
             const response = await fetch(url, {
                 ...options,
                 headers
             });
 
             if (response.status === 401) {
-                Store.logout();
-                window.location.hash = '#/';
-                throw new Error('Session expired. Please login again.');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/index.html';
+                throw new Error('Session expired');
             }
 
             if (!response.ok) {
@@ -45,14 +45,13 @@ class ApiClient {
 
             return await response.json();
         } catch (error) {
-            UI.showToast(error.message, 'error');
+            if (typeof UI !== 'undefined') UI.showToast(error.message, 'error');
             throw error;
         } finally {
-            Store.setState('loading', false);
+            if (Store) Store.setState('loading', false);
         }
     }
 
-    // Auth endpoints
     async register(data) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -78,7 +77,6 @@ class ApiClient {
         return this.request('/auth/me');
     }
 
-    // Signals endpoints
     async getSignals(params = {}) {
         const query = new URLSearchParams(params).toString();
         return this.request(`/signals/active?${query}`);
@@ -104,7 +102,6 @@ class ApiClient {
         });
     }
 
-    // Courses endpoints
     async getCourses(params = {}) {
         const query = new URLSearchParams(params).toString();
         return this.request(`/courses/list?${query}`);
@@ -117,11 +114,6 @@ class ApiClient {
         });
     }
 
-    async getMyProgress() {
-        return this.request('/courses-enhanced/progress');
-    }
-
-    // Blog endpoints
     async getBlogPosts(params = {}) {
         const query = new URLSearchParams(params).toString();
         return this.request(`/blog/posts?${query}`);
@@ -131,12 +123,10 @@ class ApiClient {
         return this.request(`/blog/posts/${slug}`);
     }
 
-    // Webinars endpoints
     async getWebinars(upcoming = true) {
         return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
     }
 
-    // Media endpoints
     async uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
@@ -148,7 +138,6 @@ class ApiClient {
         });
     }
 
-    // Admin endpoints
     async getAdminStats() {
         return this.request('/admin/users');
     }
@@ -158,7 +147,6 @@ class ApiClient {
         return this.request(`/admin/users?${query}`);
     }
 
-    // Risk calculator endpoints
     async calculateRisk(data) {
         return this.request('/risk/calculate', {
             method: 'POST',
@@ -170,7 +158,6 @@ class ApiClient {
         return this.request('/risk/history');
     }
 
-    // Blog enhanced endpoints
     async captureEmail(data) {
         return this.request('/blog-enhanced/capture-email', {
             method: 'POST',
@@ -178,12 +165,106 @@ class ApiClient {
         });
     }
 
-    // Quiz endpoints
     async submitQuiz(courseId, quizId, answers) {
         return this.request(`/courses-enhanced/courses/${courseId}/complete`, {
             method: 'POST',
             body: JSON.stringify({ lesson_id: quizId, answers })
         });
+    }
+
+    // AI Market Analysis
+    async analyzeMarket(data) {
+        return this.request('/ai/analyze', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
+    async batchScreen(symbols) {
+        return this.request('/ai/batch-screen', {
+            method: 'POST',
+            body: JSON.stringify(symbols)
+        });
+    }
+
+    async getSentiment(symbol) {
+        return this.request(`/ai/sentiment/${symbol}`);
+    }
+
+    async validateSignal(data) {
+        return this.request('/ai/validate-signal', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
+    // AI Mentor
+    async askMentor(question, skillLevel = 'intermediate', topic = null) {
+        return this.request('/ai/mentor/ask', {
+            method: 'POST',
+            body: JSON.stringify({
+                question,
+                skill_level: skillLevel,
+                topic,
+                context: window.location.hash
+            })
+        });
+    }
+
+    async getLearningPath(goal, currentLevel, timeAvailable, markets = ['forex']) {
+        return this.request('/ai/mentor/learning-path', {
+            method: 'POST',
+            body: JSON.stringify({
+                goal,
+                current_level: currentLevel,
+                time_available: timeAvailable,
+                preferred_markets: markets
+            })
+        });
+    }
+
+    async reviewTrade(tradeData) {
+        return this.request('/ai/mentor/review-trade', {
+            method: 'POST',
+            body: JSON.stringify(tradeData)
+        });
+    }
+
+    async getDailyWisdom() {
+        return this.request('/ai/mentor/daily-wisdom');
+    }
+
+    // Chart Analysis
+    async analyzeChartImage(file, symbol = null, timeframe = null) {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (symbol) formData.append('symbol', symbol);
+        if (timeframe) formData.append('timeframe', timeframe);
+        
+        return this.request('/ai/chart/analyze', {
+            method: 'POST',
+            headers: {},
+            body: formData
+        });
+    }
+
+    async getPatternLibrary(patternType = null) {
+        const url = patternType 
+            ? `/ai/chart/pattern-library?pattern_type=${patternType}`
+            : '/ai/chart/pattern-library';
+        return this.request(url, { method: 'POST' });
+    }
+
+    // Performance Analysis
+    async analyzeJournal(trades) {
+        return this.request('/ai/performance/analyze-journal', {
+            method: 'POST',
+            body: JSON.stringify(trades)
+        });
+    }
+
+    async getPerformanceStats(days = 30) {
+        return this.request(`/ai/performance/dashboard-stats?days=${days}`);
     }
 }
 

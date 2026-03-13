@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipways Trading Platform</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav id="navbar" class="navbar">
+        <div class="nav-brand">
+            <h1>Pipways</h1>
+        </div>
+        <div class="nav-links" id="navLinks">
+            <a href="#/" class="nav-link">Home</a>
+            <a href="#/signals" class="nav-link">Signals</a>
+            <a href="#/courses" class="nav-link">Courses</a>
+            <a href="#/blog" class="nav-link">Blog</a>
+            <a href="#/webinars" class="nav-link">Webinars</a>
+            <a href="#/dashboard" class="nav-link" id="dashboardLink">Dashboard</a>
+            <a href="#/admin" class="nav-link" id="adminLink" style="display:none">Admin</a>
+        </div>
+        <div class="nav-auth" id="authSection">
+            <div id="userMenu" style="display:flex; align-items: center; gap: 1rem;">
+                <span id="userName"></span>
+                <button id="logoutBtn" class="btn btn-text">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="app" class="container"></main>
+
+    <div id="toastContainer" class="toast-container"></div>
+    <div id="loadingSpinner" class="spinner-overlay" style="display:none">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Core Modules -->
+    <script src="/static/js/store.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/router.js"></script>
+
+    <!-- Feature Modules -->
+    <script src="/static/js/modules/signals.js"></script>
+    <script src="/static/js/modules/courses.js"></script>
+    <script src="/static/js/modules/blog.js"></script>
+    <script src="/static/js/modules/webinars.js"></script>
+    <script src="/static/js/modules/dashboard.js"></script>
+    <script src="/static/js/modules/admin.js"></script>
+    <script src="/static/js/modules/risk_calculator.js"></script>
+    <script src="/static/js/modules/blog_enhanced.js"></script>
+    <script src="/static/js/modules/quiz.js"></script>
+    <script src="/static/js/modules/notifications.js"></script>
+
+    <script>
+        // Auth check - redirect to login if not authenticated
+        (function() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/index.html';
+                return;
+            }
+            
+            // Load user data
+            const userData = localStorage.getItem('user');
+            const user = userData ? JSON.parse(userData) : {};
+            
+            // Check admin access for admin routes
+            const isAdmin = user.is_admin || user.role === 'admin' || user.role === 'moderator';
+            const hash = window.location.hash;
+            
+            if ((hash.includes('/admin') || hash.includes('admin')) && !isAdmin) {
+                window.location.hash = '#/dashboard';
+                alert('Admin access required');
+            }
+            
+            // Show admin link if admin
+            if (isAdmin) {
+                const adminLink = document.getElementById('adminLink');
+                if (adminLink) adminLink.style.display = 'inline';
+            }
+            
+            // Display username
+            const userNameEl = document.getElementById('userName');
+            if (userNameEl) userNameEl.textContent = user.email || user.username || 'User';
+            
+            // Logout handler
+            document.getElementById('logoutBtn')?.addEventListener('click', () => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/index.html';
+            });
+        })();
+    </script>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

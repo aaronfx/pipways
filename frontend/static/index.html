@@ -46,7 +46,7 @@
                 </button>
             </div>
 
-            <!-- LOGIN FORM - METHOD POST -->
+            <!-- LOGIN FORM -->
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -72,7 +72,7 @@
                 </button>
             </form>
 
-            <!-- SIGNUP FORM - METHOD POST -->
+            <!-- SIGNUP FORM -->
             <form id="signup-form" onsubmit="handleSignup(event)" class="hidden space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
@@ -183,18 +183,15 @@
                 const email = document.getElementById('login-email').value;
                 const password = document.getElementById('login-password').value;
                 
-                console.log('Attempting login with POST to:', `${API_BASE}/auth/login`);
+                // FIXED: Use /auth/token endpoint with FormData (OAuth2 standard)
+                const formData = new FormData();
+                formData.append('username', email);  // OAuth2 uses 'username' field
+                formData.append('password', password);
                 
-                const response = await fetch(`${API_BASE}/auth/login`, {
+                const response = await fetch(`${API_BASE}/auth/token`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
+                    body: formData  // Send as form data, not JSON
                 });
-                
-                console.log('Response status:', response.status);
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
@@ -202,9 +199,9 @@
                 }
                 
                 const data = await response.json();
-                console.log('Login success:', data);
                 
                 localStorage.setItem('pipways_token', data.access_token);
+                localStorage.setItem('pipways_user', JSON.stringify(data.user));
                 showSuccess('Login successful! Redirecting...');
                 
                 setTimeout(() => {
@@ -237,7 +234,8 @@
             spinner.classList.remove('hidden');
             
             try {
-                const name = document.getElementById('signup-name').value;
+                // FIXED: Use full_name instead of name to match backend
+                const full_name = document.getElementById('signup-name').value;
                 const email = document.getElementById('signup-email').value;
                 const password = document.getElementById('signup-password').value;
                 
@@ -247,7 +245,7 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ name, email, password })
+                    body: JSON.stringify({ full_name, email, password })  // FIXED: full_name not name
                 });
                 
                 if (!response.ok) {
@@ -255,8 +253,14 @@
                     throw new Error(errorData.detail || `Registration failed: ${response.status}`);
                 }
                 
-                showSuccess('Account created! Please login.');
-                setTimeout(() => switchTab('login'), 1500);
+                const data = await response.json();
+                localStorage.setItem('pipways_token', data.access_token);
+                localStorage.setItem('pipways_user', JSON.stringify(data.user));
+                
+                showSuccess('Account created! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/dashboard.html';
+                }, 1500);
                 
             } catch (error) {
                 showError(error.message || 'Network error. Please try again.');

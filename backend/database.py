@@ -2,7 +2,7 @@
 Database configuration - PRODUCTION READY
 """
 import os
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, inspect
 from databases import Database
 from datetime import datetime
 
@@ -11,7 +11,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/pipwa
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-database = Database(DATABASE_URL, min_size=5, max_size=20)
+database = Database(DATABASE_URL, min_size=5, max_size=20, command_timeout=60)
 metadata = MetaData()
 
 # ==========================================
@@ -32,7 +32,6 @@ users = Table(
     Column("subscription_tier", String(50), default="free")
 )
 
-# THIS WAS MISSING - NOW ADDED
 courses_table = Table(
     "courses",
     metadata,
@@ -106,3 +105,32 @@ user_progress = Table(
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+
+# ==========================================
+# THIS FUNCTION WAS MISSING - NOW ADDED
+# ==========================================
+
+_cached_columns = None
+
+def get_available_columns(table_name='users'):
+    """
+    Get list of actually available columns in the database table.
+    Used for flexible schema handling.
+    """
+    global _cached_columns
+    
+    if _cached_columns is not None:
+        return _cached_columns
+    
+    try:
+        sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_url, pool_pre_ping=True)
+        inspector = inspect(engine)
+        columns = inspector.get_columns(table_name)
+        _cached_columns = [col['name'] for col in columns]
+        print(f"[DB] Discovered columns: {_cached_columns}", flush=True)
+        return _cached_columns
+    except Exception as e:
+        print(f"[DB ERROR] Could not inspect columns: {e}", flush=True)
+        # Fallback to defined columns
+        return [col.name for col in users.columns]

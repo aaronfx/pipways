@@ -9,36 +9,39 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <a href="#/dashboard">Pipways</a>
+            <h1>Pipways</h1>
         </div>
         <div class="nav-links">
-            <a href="#/dashboard">Home</a>
-            <a href="#/signals">Signals</a>
-            <a href="#/courses">Courses</a>
-            <a href="#/blog">Blog</a>
-            <a href="#/webinars">Webinars</a>
-            <div class="dropdown">
-                <a href="#/ai-tools" class="dropbtn">AI Tools ▼</a>
+            <a href="#/dashboard" class="nav-link active">Home</a>
+            <a href="#/signals" class="nav-link">Signals</a>
+            <a href="#/courses" class="nav-link">Courses</a>
+            <a href="#/blog" class="nav-link">Blog</a>
+            <a href="#/webinars" class="nav-link">Webinars</a>
+            <div class="nav-dropdown">
+                <a href="#/ai-tools" class="nav-link">AI Tools ▼</a>
                 <div class="dropdown-content">
                     <a href="#/ai-mentor">AI Mentor</a>
                     <a href="#/chart-analysis">Chart Analysis</a>
                     <a href="#/performance">Performance</a>
                 </div>
             </div>
-            <a href="#/dashboard" id="dashboardLink">Dashboard</a>
-            <a href="#/admin" id="adminLink" style="display:none">Admin</a>
+            <a href="#/admin" class="nav-link" id="adminLink" style="display:none">Admin</a>
         </div>
         <div class="nav-user">
-            <span id="userEmail"></span>
-            <button onclick="logout()" class="btn btn-secondary">Logout</button>
+            <span id="userEmail" style="margin-right: 1rem; color: var(--gray-300);"></span>
+            <button onclick="logout()" class="btn btn-secondary btn-sm">Logout</button>
         </div>
     </nav>
 
-    <main id="app"></main>
+    <main id="app" style="padding: 2rem; max-width: 1280px; margin: 0 auto; min-height: calc(100vh - 80px);"></main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <!-- Core -->
     <script src="/static/js/store.js"></script>
     <script src="/static/js/api.js"></script>
+    <script src="/static/js/ui.js"></script>
     <script src="/static/js/router.js"></script>
     
     <!-- Modules -->
@@ -51,7 +54,6 @@
     <script src="/static/js/modules/chart_analysis.js"></script>
     <script src="/static/js/modules/performance.js"></script>
     <script src="/static/js/modules/admin.js"></script>
-    <script src="/static/js/modules/risk_calculator.js"></script>
     
     <script>
         // Check auth
@@ -59,7 +61,7 @@
             window.location.href = '/';
         }
         
-        // Display user
+        // Show user
         const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
         document.getElementById('userEmail').textContent = user.email || '';
         if (user.is_admin) {
@@ -72,8 +74,9 @@
             window.location.href = '/';
         }
         
-        // Initialize router when DOM ready
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            UI.init();
             Router.init();
         });
     </script>

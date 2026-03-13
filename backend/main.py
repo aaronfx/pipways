@@ -10,10 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
+from sqlalchemy import select
 
 # RELATIVE imports (from .module)
-from .database import database, metadata
-from .security import get_current_user
+from .database import database, metadata, users
+from .security import get_password_hash, get_current_user
 
 # Import all route modules using RELATIVE imports
 from . import auth, signals, courses, blog, webinars, media, admin
@@ -38,11 +39,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Determine the correct path to frontend directory
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+
+# Mount static files
+if FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+    print(f"✓ Mounted static files from: {FRONTEND_DIR}", flush=True)
+else:
+    print(f"⚠ Frontend directory not found at: {FRONTEND_DIR}", flush=True)
+
+async def create_default_admin():
+    """Create default admin user if no admin exists."""
+    try:
+        # Check if admin exists
+        query = users.select().where(users.c.email == "admin@pipways.com")
+        existing = await database.fetch_one(query)
+        
+        if not existing:
+            # Create default admin
+            admin_data = {
+                "email": "admin@pipways.com",
+                "password_hash": get_password_hash("admin123"),
+                "full_name": "System Administrator",
+                "is_active": True,
+                "is_admin": True,
+                "created_at": datetime.utcnow()
+            }
+            
+            # Add role column if it exists in schema
+            if hasattr(users.c, 'role'):
+                admin_data["role"] = "admin"
+            
+            query = users.insert().values(**admin_data)
+            await database.execute(query)
+            print("✓ Default admin created: admin@pipways.com / admin123", flush=True)
+        else:
+            print("✓ Admin user already exists", flush=True)
+            
+    except Exception as e:
+        print(f"⚠ Admin initialization error: {e}", flush=True)
+
 @app.on_event("startup")
 async def startup():
-    """Connect to database on startup."""
+    """Connect to database and initialize admin user."""
     await database.connect()
     print("✓ Database connected", flush=True)
+    
+    # Initialize admin user
+    await create_default_admin()
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -50,18 +95,7 @@ async def shutdown():
     await database.disconnect()
     print("✓ Database disconnected", flush=True)
 
-# Determine the correct path to frontend directory
-# When running from project root with uvicorn backend.main:app
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
-
-# Mount static files - THIS MUST COME BEFORE the root route
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
-    print(f"✓ Mounted static files from: {FRONTEND_DIR}", flush=True)
-else:
-    print(f"⚠ Frontend directory not found at: {FRONTEND_DIR}", flush=True)
-
-# Health check endpoint (keep this before root)
+# Health check endpoint
 @app.get("/health")
 async def health_check():
     """Health check for Render monitoring."""
@@ -72,7 +106,7 @@ async def health_check():
         "timestamp": str(datetime.utcnow())
     }
 
-# API info endpoint (moved from root to /api)
+# API info endpoint
 @app.get("/api")
 async def api_info():
     """API info and available endpoints."""
@@ -96,23 +130,36 @@ async def api_info():
         }
     }
 
-# ROOT ENDPOINT - Serves frontend (must be AFTER specific API routes)
+# Serve frontend files
 @app.get("/")
-async def serve_frontend():
-    """Serve the frontend index.html at root path."""
+async def serve_index():
+    """Serve the login landing page."""
     index_file = FRONTEND_DIR / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))
     else:
-        return {
-            "error": "Frontend not found",
-            "message": "The frontend files are not deployed",
-            "expected_path": str(index_file),
-            "api_docs": "/docs",
-            "api_endpoints": "/api"
-        }
+        return {"error": "Frontend not found", "path": str(index_file)}
 
-# Include all API routers (these have their own prefixes)
+@app.get("/dashboard.html")
+async def serve_dashboard():
+    """Serve the main dashboard app."""
+    dashboard_file = FRONTEND_DIR / "dashboard.html"
+    if dashboard_file.exists():
+        return FileResponse(str(dashboard_file))
+    else:
+        return {"error": "Dashboard not found", "path": str(dashboard_file)}
+
+@app.get("/admin.html")
+async def serve_admin():
+    """Serve admin page."""
+    admin_file = FRONTEND_DIR / "admin.html"
+    if admin_file.exists():
+        return FileResponse(str(admin_file))
+    else:
+        # Fallback to dashboard if separate admin.html doesn't exist
+        return FileResponse(str(FRONTEND_DIR / "dashboard.html"))
+
+# Include all API routers
 app.include_router(auth.router)
 app.include_router(signals.router, prefix="/signals", tags=["signals"])
 app.include_router(courses.router, prefix="/courses", tags=["courses"])

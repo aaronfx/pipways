@@ -1,146 +1,150 @@
-"""
-Pipways Trading Platform - Main Application
-PRODUCTION READY - With Enhanced Features
-"""
+"""Pipways Trading Platform - Main Application"""
 import os
-from fastapi import FastAPI, Depends, HTTPException
+import sys
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
+
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from .database import database, init_database
 
 # Import all routers
-from . import auth
-from . import signals
-from . import courses
-from . import webinars
-from . import blog
-from . import ai_screening
-from . import performance
-from . import admin
-from . import blog_enhanced      # ENHANCED: Blog with comments/tags/SEO
-from . import courses_enhanced  # ENHANCED: Progress tracking & certificates
+try:
+    from . import auth
+    from . import signals
+    from . import courses
+    from . import webinars
+    from . import blog
+    from . import ai_screening
+    from . import performance
+    from . import admin
+    from . import blog_enhanced
+    from . import courses_enhanced
+    print("[IMPORT] All modules loaded successfully", flush=True)
+except ImportError as e:
+    print(f"[IMPORT ERROR] {e}", flush=True)
+    raise
 
-# Environment configuration
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle startup and shutdown events"""
-    # Startup
-    print(f"[STARTUP] Environment: {ENVIRONMENT}", flush=True)
     try:
         await init_database()
         print("[STARTUP] Database connected", flush=True)
     except Exception as e:
-        print(f"[STARTUP ERROR] Database connection failed: {e}", flush=True)
-        # Continue anyway - graceful degradation
-    
+        print(f"[STARTUP ERROR] {e}", flush=True)
     yield
-    
-    # Shutdown
     try:
         await database.disconnect()
-        print("[SHUTDOWN] Database disconnected", flush=True)
     except:
         pass
 
-# Create FastAPI app
 app = FastAPI(
     title="Pipways Trading Platform",
-    description="Professional trading signals and AI analysis platform",
     version="2.1.0",
     lifespan=lifespan
 )
 
-# CORS Configuration
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL] if FRONTEND_URL != "*" else ["*"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ==========================================
-# API ROUTES - CORE
-# ==========================================
-
+# Health check
 @app.get("/health")
 async def health_check():
-    """System health check endpoint"""
-    try:
-        await database.fetch_one("SELECT 1")
-        db_status = "connected"
-    except:
-        db_status = "disconnected"
-    
-    return {
-        "status": "healthy" if db_status == "connected" else "degraded",
-        "database": db_status,
-        "version": "2.1.0",
-        "environment": ENVIRONMENT,
-        "features": ["core", "enhanced_blog", "enhanced_courses"]
-    }
+    return {"status": "healthy", "version": "2.1.0"}
 
-# Core routers
+# API Routes
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/signals", tags=["Trading Signals"])
 app.include_router(courses.router, prefix="/courses", tags=["Courses"])
 app.include_router(webinars.router, prefix="/webinars", tags=["Webinars"])
 app.include_router(blog.router, prefix="/blog", tags=["Blog"])
 app.include_router(ai_screening.router, prefix="/ai", tags=["AI Services"])
-app.include_router(performance.router, prefix="/ai/performance", tags=["Performance Analytics"])
+app.include_router(performance.router, prefix="/ai/performance", tags=["Performance"])
 app.include_router(admin.router, prefix="/admin", tags=["Administration"])
-
-# ==========================================
-# API ROUTES - ENHANCED FEATURES
-# ==========================================
-
-# Enhanced Blog (SEO, comments, tags)
 app.include_router(blog_enhanced.router, prefix="/blog", tags=["Blog Enhanced"])
-
-# Enhanced Courses (progress tracking, certificates)
 app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses Enhanced"])
 
 # ==========================================
-# STATIC FILES & SPA ROUTING
+# STATIC FILES - FIXED PATH
 # ==========================================
 
-# Mount static files directory
-try:
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-except RuntimeError:
-    print("[WARNING] Static directory not found, skipping mount", flush=True)
+# Get absolute path to static directory (inside frontend folder)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR = os.path.join(BASE_DIR, "frontend", "static")
 
-# Serve frontend SPA - catch all routes and serve index.html
+print(f"[STATIC] Looking for static files at: {STATIC_DIR}", flush=True)
+print(f"[STATIC] Directory exists: {os.path.exists(STATIC_DIR)}", flush=True)
+
+# Mount static files if directory exists
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    print(f"[STATIC] Mounted successfully from frontend/static", flush=True)
+else:
+    # Fallback: try root static folder
+    STATIC_DIR = os.path.join(BASE_DIR, "static")
+    if os.path.exists(STATIC_DIR):
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+        print(f"[STATIC] Mounted successfully from root static", flush=True)
+    else:
+        print(f"[WARNING] Static directory not found", flush=True)
+
+# ==========================================
+# SPA ROUTING
+# ==========================================
+
+@app.get("/")
+async def serve_index():
+    """Serve index.html for root path"""
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse({
+        "message": "Pipways API Server",
+        "status": "running",
+        "docs": "/docs",
+        "hint": "Frontend not found"
+    })
+
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     """
-    Serve Single Page Application (SPA).
+    Serve Single Page Application.
     Returns index.html for all non-API routes.
     """
-    # Don't interfere with API routes
-    if full_path.startswith(("api/", "auth/", "signals/", "courses/", 
-                            "webinars/", "blog/", "ai/", "admin/", "health")):
+    # Skip API routes
+    api_prefixes = (
+        "auth/", "signals/", "courses/", "webinars/", 
+        "blog/", "ai/", "admin/", "health", "docs", "openapi.json",
+        "static/"
+    )
+    if full_path.startswith(api_prefixes):
         raise HTTPException(404, "Not found")
     
-    # Check for static file first
-    static_file = f"static/{full_path}"
-    if os.path.exists(static_file) and os.path.isfile(static_file):
-        return FileResponse(static_file)
+    # Try to serve specific file first
+    file_path = os.path.join(STATIC_DIR, full_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
     
-    # Serve index.html for all other routes (SPA routing)
-    index_path = "static/index.html"
+    # Serve index.html for SPA routing
+    index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     
-    # Fallback if no frontend files
-    return {
+    # Fallback
+    return JSONResponse({
         "message": "Pipways API Server",
         "status": "running",
-        "docs": "/docs"
-    }
+        "path": full_path
+    })

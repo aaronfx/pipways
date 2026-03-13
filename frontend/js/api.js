@@ -1,6 +1,6 @@
 const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000/api' 
-    : 'https://your-api.onrender.com/api';
+    ? 'http://localhost:8000' 
+    : 'https://pipwaysapp.onrender.com';
 
 class ApiClient {
     constructor() {
@@ -20,6 +20,11 @@ class ApiClient {
             ...options.headers
         };
 
+        // Remove Content-Type for FormData
+        if (options.body instanceof FormData) {
+            delete headers['Content-Type'];
+        }
+
         try {
             Store.setState('loading', true);
             const response = await fetch(url, {
@@ -29,13 +34,13 @@ class ApiClient {
 
             if (response.status === 401) {
                 Store.logout();
-                window.location.hash = '#/login';
-                throw new Error('Session expired');
+                window.location.hash = '#/';
+                throw new Error('Session expired. Please login again.');
             }
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Request failed');
+                const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+                throw new Error(error.detail || `Error: ${response.status}`);
             }
 
             return await response.json();
@@ -47,6 +52,7 @@ class ApiClient {
         }
     }
 
+    // Auth endpoints
     async register(data) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -59,7 +65,7 @@ class ApiClient {
         formData.append('username', username);
         formData.append('password', password);
 
-        const response = await fetch(`${this.baseURL}/auth/login`, {
+        const response = await fetch(`${this.baseURL}/auth/token`, {
             method: 'POST',
             body: formData
         });
@@ -72,13 +78,14 @@ class ApiClient {
         return this.request('/auth/me');
     }
 
+    // Signals endpoints
     async getSignals(params = {}) {
         const query = new URLSearchParams(params).toString();
-        return this.request(`/signals?${query}`);
+        return this.request(`/signals/active?${query}`);
     }
 
     async createSignal(data) {
-        return this.request('/signals', {
+        return this.request('/signals/create', {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -97,9 +104,10 @@ class ApiClient {
         });
     }
 
+    // Courses endpoints
     async getCourses(params = {}) {
         const query = new URLSearchParams(params).toString();
-        return this.request(`/courses?${query}`);
+        return this.request(`/courses/list?${query}`);
     }
 
     async createCourse(data) {
@@ -109,19 +117,26 @@ class ApiClient {
         });
     }
 
+    async getMyProgress() {
+        return this.request('/courses-enhanced/progress');
+    }
+
+    // Blog endpoints
     async getBlogPosts(params = {}) {
         const query = new URLSearchParams(params).toString();
-        return this.request(`/blog?${query}`);
+        return this.request(`/blog/posts?${query}`);
     }
 
     async getBlogPost(slug) {
-        return this.request(`/blog/slug/${slug}`);
+        return this.request(`/blog/posts/${slug}`);
     }
 
+    // Webinars endpoints
     async getWebinars(upcoming = true) {
-        return this.request(`/webinars?upcoming=${upcoming}`);
+        return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
     }
 
+    // Media endpoints
     async uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
@@ -133,8 +148,9 @@ class ApiClient {
         });
     }
 
+    // Admin endpoints
     async getAdminStats() {
-        return this.request('/admin/dashboard');
+        return this.request('/admin/users');
     }
 
     async getUsers(params = {}) {
@@ -142,6 +158,7 @@ class ApiClient {
         return this.request(`/admin/users?${query}`);
     }
 
+    // Risk calculator endpoints
     async calculateRisk(data) {
         return this.request('/risk/calculate', {
             method: 'POST',
@@ -153,22 +170,20 @@ class ApiClient {
         return this.request('/risk/history');
     }
 
+    // Blog enhanced endpoints
     async captureEmail(data) {
-        return this.request('/blog/capture-email', {
+        return this.request('/blog-enhanced/capture-email', {
             method: 'POST',
             body: JSON.stringify(data)
         });
     }
 
+    // Quiz endpoints
     async submitQuiz(courseId, quizId, answers) {
-        return this.request(`/courses/${courseId}/quizzes/${quizId}/submit`, {
+        return this.request(`/courses-enhanced/courses/${courseId}/complete`, {
             method: 'POST',
-            body: JSON.stringify({ answers })
+            body: JSON.stringify({ lesson_id: quizId, answers })
         });
-    }
-
-    async getMyProgress() {
-        return this.request('/courses/my-progress');
     }
 }
 

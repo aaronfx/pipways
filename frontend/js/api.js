@@ -12,7 +12,7 @@ class ApiClient {
 
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
-        const token = Store ? Store.getToken() : localStorage.getItem('token');
+        const token = localStorage.getItem('token');
 
         const headers = {
             ...this.defaultHeaders,
@@ -20,38 +20,84 @@ class ApiClient {
             ...options.headers
         };
 
+        // Remove Content-Type for FormData
         if (options.body instanceof FormData) {
             delete headers['Content-Type'];
         }
 
         try {
-            if (Store) Store.setState('loading', true);
+            // Show loading if Store exists
+            if (typeof Store !== 'undefined' && Store.setState) {
+                Store.setState('loading', true);
+            }
+            
             const response = await fetch(url, {
                 ...options,
                 headers
             });
 
-            if (response.status === 401) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.href = '/index.html';
-                throw new Error('Session expired');
-            }
-
+            // Handle non-OK responses safely
             if (!response.ok) {
-                const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-                throw new Error(error.detail || `Error: ${response.status}`);
+                let errorMessage = `Error ${response.status}`;
+                const contentType = response.headers.get('content-type');
+                
+                try {
+                    // Try to parse as JSON first
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
+                    } else {
+                        // Try to get text
+                        const text = await response.text();
+                        // Only use text if it's short and not HTML
+                        if (text && text.length < 200 && !text.includes('<')) {
+                            errorMessage = text;
+                        } else if (text.includes('<')) {
+                            errorMessage = `Server error (${response.status}). Please try again.`;
+                        }
+                    }
+                } catch (parseError) {
+                    // If parsing fails, use status
+                    errorMessage = `Request failed (${response.status})`;
+                }
+                
+                throw new Error(errorMessage);
             }
 
-            return await response.json();
+            // Parse successful response
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return await response.json();
+            } else {
+                return await response.text();
+            }
+            
         } catch (error) {
-            if (typeof UI !== 'undefined') UI.showToast(error.message, 'error');
-            throw error;
+            // Handle network errors
+            if (error.message === 'Failed to fetch') {
+                throw new Error('Network error. Please check your connection.');
+            }
+            
+            // Clean up common error messages
+            let cleanMessage = error.message;
+            if (cleanMessage.includes('Unexpected token') || cleanMessage.includes('not valid JSON')) {
+                cleanMessage = 'Server error. Please try again later.';
+            }
+            
+            // Show toast if UI exists
+            if (typeof UI !== 'undefined' && UI.showToast) {
+                UI.showToast(cleanMessage, 'error');
+            }
+            
+            throw new Error(cleanMessage);
         } finally {
-            if (Store) Store.setState('loading', false);
+            if (typeof Store !== 'undefined' && Store.setState) {
+                Store.setState('loading', false);
+            }
         }
     }
 
+    // Auth endpoints
     async register(data) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -69,7 +115,20 @@ class ApiClient {
             body: formData
         });
 
-        if (!response.ok) throw new Error('Invalid credentials');
+        if (!response.ok) {
+            let errorMessage = 'Login failed';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorMessage;
+            } catch (e) {
+                const text = await response.text();
+                if (text && text.length < 200 && !text.includes('<')) {
+                    errorMessage = text;
+                }
+            }
+            throw new Error(errorMessage);
+        }
+
         return response.json();
     }
 
@@ -77,6 +136,7 @@ class ApiClient {
         return this.request('/auth/me');
     }
 
+    // Signals endpoints
     async getSignals(params = {}) {
         const query = new URLSearchParams(params).toString();
         return this.request(`/signals/active?${query}`);
@@ -102,6 +162,7 @@ class ApiClient {
         });
     }
 
+    // Courses endpoints
     async getCourses(params = {}) {
         const query = new URLSearchParams(params).toString();
         return this.request(`/courses/list?${query}`);
@@ -114,6 +175,11 @@ class ApiClient {
         });
     }
 
+    async getMyProgress() {
+        return this.request('/courses-enhanced/progress');
+    }
+
+    // Blog endpoints
     async getBlogPosts(params = {}) {
         const query = new URLSearchParams(params).toString();
         return this.request(`/blog/posts?${query}`);
@@ -123,10 +189,12 @@ class ApiClient {
         return this.request(`/blog/posts/${slug}`);
     }
 
+    // Webinars endpoints
     async getWebinars(upcoming = true) {
         return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
     }
 
+    // Media endpoints
     async uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
@@ -138,6 +206,7 @@ class ApiClient {
         });
     }
 
+    // Admin endpoints
     async getAdminStats() {
         return this.request('/admin/users');
     }
@@ -147,6 +216,7 @@ class ApiClient {
         return this.request(`/admin/users?${query}`);
     }
 
+    // Risk calculator endpoints
     async calculateRisk(data) {
         return this.request('/risk/calculate', {
             method: 'POST',
@@ -158,6 +228,7 @@ class ApiClient {
         return this.request('/risk/history');
     }
 
+    // Blog enhanced endpoints
     async captureEmail(data) {
         return this.request('/blog-enhanced/capture-email', {
             method: 'POST',
@@ -165,6 +236,7 @@ class ApiClient {
         });
     }
 
+    // Quiz endpoints
     async submitQuiz(courseId, quizId, answers) {
         return this.request(`/courses-enhanced/courses/${courseId}/complete`, {
             method: 'POST',

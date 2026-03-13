@@ -1,75 +1,58 @@
+/**
+ * UI Utilities
+ */
 const UI = {
     init() {
-        this.spinner = document.getElementById('loadingSpinner');
-        this.toastContainer = document.getElementById('toastContainer');
-        this.modal = null;
+        // Create spinner overlay
+        this.spinner = document.createElement('div');
+        this.spinner.className = 'spinner-overlay';
+        this.spinner.innerHTML = '<div class="spinner"></div>';
+        this.spinner.style.display = 'none';
+        document.body.appendChild(this.spinner);
 
-        Store.subscribe((state) => {
-            if (state.loading) {
-                this.showSpinner();
-            } else {
-                this.hideSpinner();
+        // Subscribe to loading state
+        Store.subscribe((key, value) => {
+            if (key === 'loading') {
+                this.spinner.style.display = value ? 'flex' : 'none';
             }
         });
     },
 
-    showSpinner() {
-        if (this.spinner) this.spinner.style.display = 'flex';
-    },
-
-    hideSpinner() {
-        if (this.spinner) this.spinner.style.display = 'none';
-    },
-
-    showToast(message, type = 'info', duration = 3000) {
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-
-        this.toastContainer.appendChild(toast);
-
-        setTimeout(() => toast.classList.add('show'), 10);
-
+        toast.innerHTML = `
+            <span>${message}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 1.25rem;">&times;</button>
+        `;
+        
+        container.appendChild(toast);
+        
         setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
+            if (toast.parentElement) toast.remove();
+        }, 5000);
     },
 
     showModal(content) {
-        this.closeModal();
-
         const modal = document.createElement('div');
         modal.className = 'modal';
-        modal.id = 'activeModal';
         modal.innerHTML = `
             <div class="modal-content">
-                <button class="modal-close" onclick="UI.closeModal()">&times;</button>
-                ${content}
+                <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                <div style="padding: 2rem;">${content}</div>
             </div>
         `;
-
+        
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) this.closeModal();
+            if (e.target === modal) modal.remove();
         });
-
+        
         document.body.appendChild(modal);
-        document.body.style.overflow = 'hidden';
-        this.modal = modal;
     },
 
     closeModal() {
-        if (this.modal) {
-            this.modal.remove();
-            this.modal = null;
-            document.body.style.overflow = '';
-        }
-    },
-
-    formatDate(dateString) {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        document.querySelectorAll('.modal').forEach(m => m.remove());
     },
 
     formatCurrency(amount) {
@@ -79,35 +62,11 @@ const UI = {
         }).format(amount);
     },
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-
-    setActiveNav(route) {
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === `#${route}`) {
-                link.classList.add('active');
-            }
+    formatDate(date) {
+        return new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
         });
-    },
-
-    buildTable(headers, rows, actions = null) {
-        let html = '<div class="table-responsive"><table class="table"><thead><tr>';
-        headers.forEach(h => html += `<th>${h}</th>`);
-        if (actions) html += '<th>Actions</th>';
-        html += '</tr></thead><tbody>';
-
-        rows.forEach(row => {
-            html += '<tr>';
-            row.forEach(cell => html += `<td>${cell}</td>`);
-            if (actions) html += `<td>${actions(row)}</td>`;
-            html += '</tr>';
-        });
-
-        html += '</tbody></table></div>';
-        return html;
     }
 };

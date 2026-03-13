@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipways - Login</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             margin: 0; 
             min-height: 100vh; 
@@ -50,6 +50,7 @@
             color: #64748b;
             border-bottom: 2px solid transparent;
             margin-bottom: -2px;
+            font-size: 1rem;
         }
         .tab-btn.active {
             color: #3b82f6;
@@ -59,6 +60,13 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-weight: 500;
         }
         .form-group input {
             width: 100%;
@@ -66,15 +74,27 @@
             border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
             font-size: 1rem;
-            box-sizing: border-box;
         }
         .form-group input:focus {
             outline: none;
             border-color: #3b82f6;
         }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover { background: #2563eb; }
         .btn-block {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.875rem;
             font-size: 1rem;
             margin-top: 0.5rem;
         }
@@ -83,9 +103,20 @@
             border-radius: 0.5rem;
             margin-bottom: 1rem;
             display: none;
+            text-align: left;
         }
-        .alert-error { background: #fee2e2; color: #dc2626; }
-        .alert-success { background: #dcfce7; color: #16a34a; }
+        .alert-error { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+        .alert-success { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+        .switch-link {
+            margin-top: 1rem;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+        .switch-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -104,26 +135,35 @@
 
         <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
             <div class="form-group">
-                <input type="email" name="username" placeholder="Email" required autofocus>
+                <label>Email</label>
+                <input type="email" name="username" placeholder="your@email.com" required autofocus>
             </div>
             <div class="form-group">
-                <input type="password" name="password" placeholder="Password" required>
+                <label>Password</label>
+                <input type="password" name="password" placeholder="••••••••" required>
             </div>
             <button type="submit" class="btn btn-primary btn-block">Login</button>
         </form>
 
         <form id="registerForm" class="auth-form" style="display:none" onsubmit="handleRegister(event)">
             <div class="form-group">
-                <input type="email" name="email" placeholder="Email" required>
+                <label>Email</label>
+                <input type="email" name="email" placeholder="your@email.com" required>
             </div>
             <div class="form-group">
-                <input type="password" name="password" placeholder="Password" required minlength="8">
+                <label>Password</label>
+                <input type="password" name="password" placeholder="Min 8 characters" required minlength="8">
             </div>
             <div class="form-group">
-                <input type="text" name="full_name" placeholder="Full Name" required>
+                <label>Full Name</label>
+                <input type="text" name="full_name" placeholder="John Doe" required>
             </div>
             <button type="submit" class="btn btn-primary btn-block">Create Account</button>
         </form>
+        
+        <div class="switch-link">
+            <span id="switchText">Don't have an account? <a href="#" onclick="showRegister(); return false;">Sign up</a></span>
+        </div>
     </div>
 
     <script>
@@ -138,6 +178,7 @@
             document.getElementById('registerForm').style.display = 'none';
             document.querySelectorAll('.tab-btn')[0].classList.add('active');
             document.querySelectorAll('.tab-btn')[1].classList.remove('active');
+            document.getElementById('switchText').innerHTML = 'Don\'t have an account? <a href="#" onclick="showRegister(); return false;">Sign up</a>';
         }
 
         function showRegister() {
@@ -145,6 +186,7 @@
             document.getElementById('registerForm').style.display = 'flex';
             document.querySelectorAll('.tab-btn')[0].classList.remove('active');
             document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('switchText').innerHTML = 'Already have an account? <a href="#" onclick="showLogin(); return false;">Login</a>';
         }
 
         function showAlert(message, type = 'error') {
@@ -205,7 +247,6 @@
                     throw new Error(err.detail || 'Registration failed');
                 }
 
-                // Auto login after register
                 const loginForm = new FormData();
                 loginForm.append('username', data.email);
                 loginForm.append('password', data.password);

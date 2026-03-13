@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Pipways</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #f3f4f6; 
+            overflow-x: hidden;
+        }
+        
+        .sidebar {
+            background: #1e293b;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-link {
+            transition: all 0.3s ease;
+            border-radius: 0.5rem;
+            margin: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .sidebar-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .sidebar-link.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+        }
+        
+        .sidebar-overlay.active { display: block; }
+        
+        @media (max-width: 1024px) {
+            .sidebar {
+                position: fixed;
+                left: 0; top: 0; bottom: 0;
+                z-index: 50;
+                transform: translateX(-100%);
+            }
+            .sidebar.mobile-open { transform: translateX(0); }
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .spinner.small {
+            width: 20px;
+            height: 20px;
+            border-width: 2px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .toast {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- Mobile Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay lg:hidden" onclick="toggleMobileSidebar()"></div>
+    
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar w-64 flex flex-col text-white flex-shrink-0 overflow-y-auto">
+        <div class="p-6 border-b border-white/10 flex justify-between items-center flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">Pipways</h1>
+                    <p class="text-xs text-gray-400">Pro Trading</p>
+                </div>
+            </div>
+            <button onclick="toggleMobileSidebar()" class="lg:hidden text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <nav class="flex-1 py-4">
+            <div class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Main</div>
+            
+            <a onclick="showPage('dashboard')" id="nav-dashboard" class="sidebar-link active">
+                <i class="fas fa-home w-5 text-center"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a onclick="showPage('signals')" id="nav-signals" class="sidebar-link">
+                <i class="fas fa-signal w-5 text-center"></i>
+                <span>Trading Signals</span>
+            </a>
+            
+            <a onclick="showPage('journal')" id="nav-journal" class="sidebar-link">
+                <i class="fas fa-book w-5 text-center"></i>
+                <span>Trading Journal</span>
+            </a>
+            
+            <a onclick="showPage('analysis')" id="nav-analysis" class="sidebar-link">
+                <i class="fas fa-chart-pie w-5 text-center"></i>
+                <span>Chart Analysis</span>
+            </a>
+            
+            <a onclick="showPage('trade-analysis')" id="nav-trade-analysis" class="sidebar-link">
+                <i class="fas fa-chart-line w-5 text-center"></i>
+                <span>Performance</span>
+            </a>
+            
+            <a onclick="showPage('mentor')" id="nav-mentor" class="sidebar-link">
+                <i class="fas fa-robot w-5 text-center"></i>
+                <span>AI Mentor</span>
+            </a>
+            
+            <a onclick="showPage('courses')" id="nav-courses" class="sidebar-link">
+                <i class="fas fa-graduation-cap w-5 text-center"></i>
+                <span>Courses</span>
+            </a>
+            
+            <a onclick="showPage('webinars')" id="nav-webinars" class="sidebar-link">
+                <i class="fas fa-video w-5 text-center"></i>
+                <span>Webinars</span>
+            </a>
+            
+            <a onclick="showPage('blog')" id="nav-blog" class="sidebar-link">
+                <i class="fas fa-newspaper w-5 text-center"></i>
+                <span>Blog</span>
+            </a>
+            
+            <!-- Admin Section - Hidden by default, shown via JS -->
+            <div id="admin-nav-section" class="hidden">
+                <div class="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administration</div>
+                <a onclick="showPage('admin')" id="nav-admin" class="sidebar-link">
+                    <i class="fas fa-shield-alt w-5 text-center"></i>
+                    <span>Admin Dashboard</span>
+                </a>
+            </div>
+        </nav>
+        
+        <div class="p-4 border-t border-white/10 mt-auto">
+            <div class="flex items-center gap-3 mb-3">
+                <div id="user-avatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-semibold">
+                    U
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p id="user-name" class="text-sm font-medium truncate">User</p>
+                    <p id="user-email" class="text-xs text-gray-400 truncate">user@pipways.com</p>
+                </div>
+            </div>
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors text-sm font-medium cursor-pointer">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- Header -->
+        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 sm:px-8 py-4 flex justify-between items-center flex-shrink-0">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleMobileSidebar()" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <div>
+                    <h2 id="page-title" class="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h2>
+                    <p class="text-sm text-gray-500 hidden sm:block">Professional Trading Platform</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="system-status" class="glass-card px-3 sm:px-4 py-2 rounded-full flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span class="text-xs sm:text-sm font-medium text-gray-700 hidden sm:inline">System Online</span>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Dynamic Content -->
+        <main id="content" class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-gray-50">
+            <!-- Content injected by JavaScript -->
+        </main>
+    </div>
+    
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const API_BASE = window.location.origin;
+        let currentPage = 'dashboard';
+        let currentUser = null;
+        let chartInstances = {};
+        
+        // ==========================================
+        // NAVIGATION & UI
+        // ==========================================
+        
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        }
+        
+        function logout() {
+            localStorage.removeItem('pipways_token');
+            localStorage.removeItem('pipways_user');
+            window.location.href = '/';
+        }
+        
+        function showPage(page) {
+            currentPage = page;
+            
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar && sidebar.classList.contains('mobile-open')) {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+            }
+            
+            document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + page)?.classList.add('active');
+            
+            const titles = {
+                'dashboard': 'Dashboard',
+                'signals': 'Trading Signals',
+                'journal': 'Trading Journal',
+                'analysis': 'Chart Analysis',
+                'trade-analysis': 'Performance Analytics',
+                'courses': 'Trading Courses',
+                'webinars': 'Live Webinars',
+                'mentor': 'AI Mentor',
+                'blog': 'Trading Blog',
+                'admin': 'Admin Dashboard'
+            };
+            document.getElementById('page-title').textContent = titles[page] || page;
+            
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="flex items-center justify-center h-64">
+                    <div class="spinner"></div>
+                </div>
+            `;
+            
+            const renderers = {
+                'dashboard': renderDashboard,
+                'signals': renderSignals,
+                'journal': renderJournal,
+                'analysis': renderChartAnalysis,
+                'trade-analysis': renderTradeAnalysis,
+                'courses': renderCourses,
+                'webinars': renderWebinars,
+                'mentor': renderMentor,
+                'blog': renderBlog,
+                'admin': renderAdmin
+            };
+            
+            if (renderers[page]) {
+                renderers[page]();
+            } else {
+                renderDashboard();
+            }
+        }
+        
+        // ==========================================
+        // API CLIENT - With better error handling
+        // ==========================================
+        
+        const API = {
+            async request(endpoint, options = {}) {
+                const token = localStorage.getItem('pipways_token');
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                    ...options.headers
+                };
+                
+                if (options.body instanceof FormData) {
+                    delete headers['Content-Type'];
+                }
+                
+                try {
+                    const res = await fetch(`${API_BASE}${endpoint}`, {
+                        ...options,
+                        headers
+                    });
+                    
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || `Error ${res.status}`);
+                    }
+                    
+                    return res.json();
+                } catch (error) {
+                    console.error(`API Error (${endpoint}):`, error);
+                    throw error;
+                }
+            },
+            
+            getSignals(params = {}) {
+                const qs = new URLSearchParams(params).toString();
+                return this.request(`/signals/active?${qs}`);
+            },
+            
+            getCourses() {
+                return this.request('/courses/list').catch(() => []);
+            },
+            
+            getWebinars(upcoming = true) {
+                return this.request(`/webinars/upcoming?upcoming=${upcoming}`).catch(() => []);
+            },
+            
+            getBlogPosts(params = {}) {
+                const qs = new URLSearchParams(params).toString();
+                return this.request(`/blog/posts?${qs}`).catch(() => []);
+            },
+            
+            askMentor(question, skillLevel = 'intermediate') {
+                return this.request('/ai/mentor/ask', {
+                    method: 'POST',
+                    body: JSON.stringify({ question, skill_level: skillLevel })
+                });
+            },
+            
+            analyzeChart(file, symbol, timeframe) {
+                const formData = new FormData();
+                formData.append('file', file);
+                if (symbol) formData.append('symbol', symbol);
+                if (timeframe) formData.append('timeframe', timeframe);
+                
+                return fetch(`${API_BASE}/ai/chart/analyze`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pipways_token')}` },
+                    body: formData
+                }).then(r => {
+                    if (!r.ok) throw new Error('Analysis failed');
+                    return r.json();
+                });
+            },
+            
+            analyzeJournal(trades) {
+                return this.request('/ai/performance/analyze-journal', {
+                    method: 'POST',
+                    body: JSON.stringify(trades)
+                });
+            },
+            
+            uploadJournalFile(file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                return fetch(`${API_BASE}/ai/performance/analyze-journal`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pipways_token')}` },
+                    body: formData
+                }).then(r => {
+                    if (!r.ok) throw new Error('Upload failed');
+                    return r.json();
+                });
+            },
+            
+            getPerformanceStats(days = 30) {
+                return this.request(`/ai/performance/dashboard-stats?days=${days}`);
+            },
+            
+            getAdminStats() {
+                return this.request('/admin/users');
+            }
+        };
+        
+        // ==========================================
+        // UTILITY FUNCTIONS
+        // ==========================================
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'border-green-500 text-green-800 bg-white',
+                error: 'border-red-500 text-red-800 bg-white',
+                warning: 'border-yellow-500 text-yellow-800 bg-white',
+                info: 'border-blue-500 text-blue-800 bg-white'
+            };
+            
+            toast.className = `toast border-l-4 ${colors[type]} p-4 rounded shadow-lg min-w-[300px] flex justify-between items-center`;
+            toast.innerHTML = `
+                <span class="font-medium">${message}</span>
+                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 ml-4">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+        
+        function checkAdminAccess() {
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            
+            // DEBUG: Log user data to console to check what's available
+            console.log('User data:', user);
+            
+            // Check multiple possible admin indicators
+            const isAdmin = user.role === 'admin' || 
+                           user.role === 'moderator' || 
+                           user.is_admin === true ||
+                           user.email?.includes('admin') ||
+                           user.is_staff === true ||
+                           user.user_type === 'admin';
+            
+            console.log('Is Admin:', isAdmin);
+            
+            if (isAdmin) {
+                document.getElementById('admin-nav-section')?.classList.remove('hidden');
+            }
+        }
+        
+        // ==========================================
+        // PAGE RENDERERS
+        // ==========================================
+        
+        function renderDashboard() {
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            
+            document.getElementById('content').innerHTML = `
+                <div class="space-y-8 max-w-7xl mx-auto">
+                    <div class="glass-card rounded-2xl p-6 sm:p-8 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white shadow-lg">
+                        <h3 class="text-2xl sm:text-3xl font-bold mb-2">Welcome back, ${user.full_name || user.email || 'Trader'}!</h3>
+                        <p class="text-blue-100">Your professional trading command center</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                        ${renderFeatureCard('signals', 'Trading Signals', 'Real-time buy/sell signals', 'fa-signal', 'blue')}
+                        ${renderFeatureCard('mentor', 'AI Mentor', '24/7 trading guidance', 'fa-robot', 'purple')}
+                        ${renderFeatureCard('analysis', 'Chart Analysis', 'AI-powered pattern recognition', 'fa-chart-pie', 'green')}
+                        ${renderFeatureCard('journal', 'Trading Journal', 'Track and analyze trades', 'fa-book', 'orange')}
+                        ${renderFeatureCard('trade-analysis', 'Performance', 'Detailed analytics', 'fa-chart-line', 'red')}
+                        ${renderFeatureCard('courses', 'Courses', 'Professional training', 'fa-graduation-cap', 'teal')}
+                        ${renderFeatureCard('webinars', 'Webinars', 'Live sessions', 'fa-video', 'pink')}
+                        ${renderFeatureCard('blog', 'Blog', 'Market insights', 'fa-newspaper', 'indigo')}
+                    </div>
+                    
+                    <div class="glass-card rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">Recent Signals</h3>
+                            <button onclick="showPage('signals')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                View All <i class="fas fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                        <div id="recent-signals-list" class="space-y-3">
+                            <div class="spinner mx-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            loadRecentSignals();
+        }
+        
+        function renderFeatureCard(page, title, desc, icon, color) {
+            const colors = {
+                blue: 'border-blue-500 hover:bg-blue-50',
+                purple: 'border-purple-500 hover:bg-purple-50',
+                green: 'border-green-500 hover:bg-green-50',
+                orange: 'border-orange-500 hover:bg-orange-50',
+                red: 'border-red-500 hover:bg-red-50',
+                teal: 'border-teal-500 hover:bg-teal-50',
+                pink: 'border-pink-500 hover:bg-pink-50',
+                indigo: 'border-indigo-500 hover:bg-indigo-50'
+            };
+            
+            return `
+                <div onclick="showPage('${page}')" class="glass-card rounded-xl p-6 cursor-pointer border-l-4 ${colors[color]} transition-all hover:-translate-y-1 hover:shadow-lg group">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-12 h-12 rounded-lg bg-${color}-100 flex items-center justify-center text-${color}-600 group-hover:scale-110 transition-transform">
+                            <i class="fas ${icon} text-xl"></i>
+                        </div>
+                    </div>
+                    <h4 class="font-bold text-gray-800 mb-1">${title}</h4>
+                    <p class="text-sm text-gray-600">${desc}</p>
+                </div>
+            `;
+        }
+        
+        async function loadRecentSignals() {
+            try {
+                const signals = await API.getSignals({ limit: 5 });
+                const container = document.getElementById('recent-signals-list');
+                
+                if (!signals || signals.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">No active signals available</p>';
+                    return;
+                }
+                
+                container.innerHTML = signals.slice(0, 3).map(s => `
+                    <div onclick="showPage('signals')" class="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border-l-4 ${s.direction === 'BUY' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'} hover:shadow-md transition-shadow cursor-pointer">
+                        <div class="mb-2 sm:mb-0">
+                            <div class="flex items-center gap-2">
+                                <strong class="text-lg text-gray-800">${s.symbol}</strong>
+                                <span class="px-2 py-1 rounded text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}">${s.direction}</span>
+                            </div>
+                            <div class="text-sm text-gray-600 mt-1">
+                                Entry: ${s.entry_price} | SL: ${s.stop_loss} | TP: ${s.take_profit}
+                            </div>
+                        </div>
+                        <div class="text-right text-sm text-gray-500">
+                            ${new Date(s.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('recent-signals-list').innerHTML = `
+                    <p class="text-red-500 text-center py-4">Failed to load signals: ${e.message}</p>
+                `;
+            }
+        }
+        
+        async function renderSignals() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="max-w-6xl mx-auto">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl sm:text-2xl font-bold text-gray-800">Active Trading Signals</h3>
+                            <button onclick="renderSignals()" class="text-blue-600 hover:text-blue-800 text-sm">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
+                        <div id="signals-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="col-span-full flex justify-center py-12">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const signals = await API.getSignals();
+                const grid = document.getElementById('signals-grid');
+                
+                if (!signals || signals.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-500">
+                            <i class="fas fa-signal text-4xl mb-4 text-gray-300"></i>
+                            <p>No active signals available</p>
+                            <p class="text-sm mt-2">Check back later for new opportunities</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                grid.innerHTML = signals.map(s => `
+                    <div class="glass-card rounded-xl p-6 border-t-4 ${s.direction === 'BUY' ? 'border-green-500' : 'border-red-500'}">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="text-xl font-bold text-gray-800">${s.symbol}</h4>
+                            <span class="px-3 py-1 rounded-full text-sm font-bold ${s.direction === 'BUY' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${s.direction}
+                            </span>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-600">Entry:</span><span class="font-semibold">${s.entry_price}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Stop Loss:</span><span class="font-semibold text-red-600">${s.stop_loss}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Take Profit:</span><span class="font-semibold text-green-600">${s.take_profit}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Timeframe:</span><span class="font-semibold">${s.timeframe || 'N/A'}</span></div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                            <span class="text-xs text-gray-500">${new Date(s.created_at).toLocaleString()}</span>
+                            ${s.ai_confidence ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">AI: ${Math.round(s.ai_confidence * 100)}%</span>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('signals-grid').innerHTML = `
+                    <div class="col-span-full text-center py-12 text-red-500">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                        <p>Failed to load signals</p>
+                        <p class="text-sm mt-2">${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderChartAnalysis() {
+            document.getElementById('content').innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-bar text-green-500"></i>
+                            AI Chart Analysis
+                        </h3>
+                        <p class="text-gray-600 mb-6">Upload your chart for AI pattern recognition with visual annotations.</p>
+                        
+                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 sm:p-8 text-center hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer bg-gray-50" 
+                             onclick="document.getElementById('chartUpload').click()" id="upload-area">
+                            <input type="file" id="chartUpload" accept="image/*" class="hidden" onchange="handleChartUpload(this.files[0])">
+                            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-2xl">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <p class="text-gray-800 font-medium mb-1">Drop chart image here</p>
+                            <p class="text-sm text-gray-500">PNG, JPG up to 10MB</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+                                <input type="text" id="chart-symbol" placeholder="EURUSD" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Timeframe</label>
+                                <select id="chart-timeframe" class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500">
+                                    <option value="">Auto-detect</option>
+                                    <option value="5M">5M</option>
+                                    <option value="15M">15M</option>
+                                    <option value="1H">1H</option>
+                                    <option value="4H">4H</option>
+                                    <option value="1D">1D</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="chart-results" class="glass-card rounded-xl p-6 sm:p-8 hidden">
+                        <p class="text-gray-500 text-center">Upload a chart to see AI analysis with visual preview</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function handleChartUpload(file) {
+            if (!file) return;
+            
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('File too large (max 10MB)', 'error');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('chart-results');
+            const symbol = document.getElementById('chart-symbol')?.value;
+            const timeframe = document.getElementById('chart-timeframe')?.value;
+            
+            resultsDiv.classList.remove('hidden');
+            resultsDiv.innerHTML = `
+                <div class="flex items-center justify-center py-12">
+                    <div class="spinner mr-3"></div>
+                    <span class="text-gray-600">Analyzing chart with AI...</span>
+                </div>
+            `;
+            
+            try {
+                const analysis = await API.analyzeChart(file, symbol, timeframe);
+                const imageUrl = URL.createObjectURL(file);
+                
+                resultsDiv.innerHTML = `
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-bold text-gray-800 mb-3">Uploaded Chart</h4>
+                            <div class="relative rounded-lg overflow-hidden border border-gray-200">
+                                <img src="${imageUrl}" class="w-full h-auto max-h-[400px] object-contain bg-gray-900" alt="Chart">
+                                ${analysis.suggested_entry ? `
+                                    <div class="absolute top-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs font-mono">
+                                        <div class="text-green-400">Entry: ${analysis.suggested_entry}</div>
+                                        <div class="text-red-400">SL: ${analysis.suggested_stop}</div>
+                                        <div class="text-blue-400">TP: ${analysis.suggested_target}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-800 mb-3">AI Analysis Visualization</h4>
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="analysisChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                                <span class="text-xs text-green-600 font-semibold">TRADING BIAS</span>
+                                <p class="text-2xl font-bold text-green-700 uppercase">${analysis.trading_bias || 'Neutral'}</p>
+                            </div>
+                            <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <span class="text-xs text-blue-600 font-semibold">CONFIDENCE</span>
+                                <p class="text-2xl font-bold text-blue-700">${Math.round((analysis.confidence || 0) * 100)}%</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">Detected Patterns</h5>
+                            <div class="flex flex-wrap gap-2">
+                                ${analysis.patterns_detected?.map(p => `
+                                    <span class="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+                                        ${p.name} (${p.reliability})
+                                    </span>
+                                `).join('') || '<span class="text-gray-500">No patterns detected</span>'}
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-3 bg-red-50 rounded-lg border border-red-100">
+                                <span class="text-xs text-red-600 font-semibold">RESISTANCE</span>
+                                <p class="text-lg font-bold text-red-700">${analysis.resistance_levels?.[0] || 'N/A'}</p>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded-lg border border-green-100">
+                                <span class="text-xs text-green-600 font-semibold">SUPPORT</span>
+                                <p class="text-lg font-bold text-green-700">${analysis.support_levels?.[0] || 'N/A'}</p>
+                            </div>
+                        </div>
+                        
+                        ${analysis.suggested_entry ? `
+                            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <h5 class="font-semibold text-yellow-800 mb-2">Suggested Trade Levels</h5>
+                                <div class="space-y-1 text-sm">
+                                    <div class="flex justify-between"><span>Entry:</span><span class="font-bold">${analysis.suggested_entry}</span></div>
+                                    <div class="flex justify-between"><span>Stop Loss:</span><span class="font-bold text-red-600">${analysis.suggested_stop}</span></div>
+                                    <div class="flex justify-between"><span>Take Profit:</span><span class="font-bold text-green-600">${analysis.suggested_target}</span></div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">AI Insights</h5>
+                            <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
+                                ${analysis.key_insights?.map(i => `<li>${escapeHtml(i)}</li>`).join('') || '<li>No specific insights</li>'}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                
+                if (analysis.suggested_entry && analysis.suggested_stop && analysis.suggested_target) {
+                    setTimeout(() => initAnalysisChart(analysis), 100);
+                }
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+                document.getElementById('chart-results').innerHTML = `
+                    <div class="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        Analysis failed: ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        function initAnalysisChart(analysis) {
+            const ctx = document.getElementById('analysisChart')?.getContext('2d');
+            if (!ctx) return;
+            
+            if (chartInstances.analysis) {
+                chartInstances.analysis.destroy();
+            }
+            
+            const entry = parseFloat(analysis.suggested_entry) || 0;
+            const stop = parseFloat(analysis.suggested_stop) || 0;
+            const target = parseFloat(analysis.suggested_target) || 0;
+            
+            chartInstances.analysis = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Stop Loss', 'Entry', 'Take Profit'],
+                    datasets: [{
+                        label: 'Price Levels',
+                        data: [stop, entry, target],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(34, 197, 94, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgb(239, 68, 68)',
+                            'rgb(59, 130, 246)',
+                            'rgb(34, 197, 94)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Trade Setup Levels'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'Price' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderJournal() {
+            document.getElementById('content').innerHTML = `
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <h3 class="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-book text-orange-500"></i>
+                            Trading Journal Analysis
+                        </h3>
+                        <p class="text-gray-600 mb-6">Upload your trading statement (CSV, Excel, PDF) or paste trade data for AI analysis.</p>
+                        
+                        <div class="mb-6">
+                            <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer bg-gray-50" 
+                                 onclick="document.getElementById('journalFileUpload').click()">
+                                <input type="file" id="journalFileUpload" class="hidden" 
+                                       accept=".csv,.xls,.xlsx,.pdf,.html,.png,.jpg,.jpeg" 
+                                       onchange="handleJournalFileUpload(this.files[0])">
+                                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                    <i class="fas fa-file-upload text-xl"></i>
+                                </div>
+                                <p class="text-gray-800 font-medium">Drop trading statement here</p>
+                                <p class="text-sm text-gray-500 mt-1">Supports: CSV, Excel, PDF, MT4/MT5 HTML, Screenshots</p>
+                            </div>
+                        </div>
+                        
+                        <div class="relative mb-6">
+                            <div class="absolute inset-0 flex items-center">
+                                <div class="w-full border-t border-gray-300"></div>
+                            </div>
+                            <div class="relative flex justify-center text-sm">
+                                <span class="px-2 bg-white text-gray-500">Or paste JSON data</span>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <textarea id="journal-input" rows="6" 
+                                    class="w-full p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono text-sm"
+                                    placeholder='[{"symbol": "EURUSD", "direction": "BUY", "entry_price": 1.0850, "exit_price": 1.0900, "pnl": 50, "outcome": "win"}]'></textarea>
+                            </div>
+                            
+                            <div class="flex flex-col sm:flex-row gap-4">
+                                <button onclick="analyzeJournal()" 
+                                        class="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
+                                    <i class="fas fa-brain"></i>
+                                    Analyze Performance
+                                </button>
+                                <button onclick="showPage('trade-analysis')" 
+                                        class="px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-700 font-semibold hover:border-orange-500 hover:text-orange-600 transition-colors">
+                                    View Advanced Stats
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="journal-results" class="hidden glass-card rounded-xl p-6 sm:p-8"></div>
+                </div>
+            `;
+        }
+        
+        async function handleJournalFileUpload(file) {
+            if (!file) return;
+            
+            const allowedExts = ['.csv', '.xls', '.xlsx', '.pdf', '.html', '.png', '.jpg', '.jpeg'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedExts.includes(ext)) {
+                showToast('Unsupported file format. Please use CSV, Excel, PDF, HTML, or image.', 'error');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('journal-results');
+            resultsDiv.classList.remove('hidden');
+            resultsDiv.innerHTML = `
+                <div class="flex items-center justify-center py-8">
+                    <div class="spinner mr-3"></div>
+                    <span class="text-gray-600">Parsing ${file.name}...</span>
+                </div>
+            `;
+            
+            try {
+                const analysis = await API.uploadJournalFile(file);
+                renderJournalResults(analysis);
+                showToast('File analyzed successfully', 'success');
+            } catch (e) {
+                showToast(e.message, 'error');
+                resultsDiv.innerHTML = `<div class="text-red-500 text-center py-4">Failed to analyze file: ${e.message}</div>`;
+            }
+        }
+        
+        async function analyzeJournal() {
+            const input = document.getElementById('journal-input');
+            const resultsDiv = document.getElementById('journal-results');
+            
+            if (!input || !input.value.trim()) {
+                showToast('Please enter trade data or upload a file', 'warning');
+                return;
+            }
+            
+            try {
+                const trades = JSON.parse(input.value);
+                resultsDiv.classList.remove('hidden');
+                resultsDiv.innerHTML = `
+                    <div class="flex items-center justify-center py-8">
+                        <div class="spinner mr-3"></div>
+                        <span class="text-gray-600">Analyzing trading performance...</span>
+                    </div>
+                `;
+                
+                const analysis = await API.analyzeJournal(trades);
+                renderJournalResults(analysis);
+            } catch (e) {
+                showToast('Invalid JSON format: ' + e.message, 'error');
+            }
+        }
+        
+        function renderJournalResults(analysis) {
+            const resultsDiv = document.getElementById('journal-results');
+            if (!resultsDiv) return;
+            
+            const stats = analysis.statistics || {};
+            
+            resultsDiv.innerHTML = `
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h4 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fas fa-chart-pie text-blue-600"></i>
+                        Analysis Results
+                    </h4>
+                    <span class="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold text-lg">
+                        Grade: ${analysis.overall_grade || 'N/A'}
+                    </span>
+                </div>
+                
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600">${stats.win_rate || 0}%</div>
+                        <div class="text-xs text-gray-600">Win Rate</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600">${stats.profit_factor || 0}</div>
+                        <div class="text-xs text-gray-600">Profit Factor</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600">$${stats.expectancy || 0}</div>
+                        <div class="text-xs text-gray-600">Expectancy</div>
+                    </div>
+                    <div class="text-center p-4 bg-orange-50 rounded-lg">
+                        <div class="text-2xl font-bold text-orange-600">${stats.total_trades || 0}</div>
+                        <div class="text-xs text-gray-600">Total Trades</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <h5 class="font-semibold text-gray-800 flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-yellow-500"></i>
+                        Recommendations
+                    </h5>
+                    ${analysis.improvements?.map(i => `
+                        <div class="p-3 bg-blue-50 rounded-lg text-sm text-blue-800 border-l-4 border-blue-500">
+                            ${escapeHtml(i)}
+                        </div>
+                    `).join('') || '<p class="text-gray-500">No specific recommendations</p>'}
+                </div>
+                
+                ${analysis.trades_sample ? `
+                    <div class="mt-6">
+                        <h5 class="font-semibold text-gray-800 mb-2">Sample Trades Analyzed</h5>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Symbol</th>
+                                        <th class="px-3 py-2 text-left">Direction</th>
+                                        <th class="px-3 py-2 text-right">P&L</th>
+                                        <th class="px-3 py-2 text-left">Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${analysis.trades_sample.map(t => `
+                                        <tr class="border-b">
+                                            <td class="px-3 py-2">${t.symbol}</td>
+                                            <td class="px-3 py-2">${t.direction}</td>
+                                            <td class="px-3 py-2 text-right ${t.pnl > 0 ? 'text-green-600' : 'text-red-600'}">$${t.pnl}</td>
+                                            <td class="px-3 py-2">
+                                                <span class="px-2 py-1 rounded text-xs ${t.outcome === 'win' ? 'bg-green-100 text-green-800' : t.outcome === 'loss' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}">
+                                                    ${t.outcome}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        }
+        
+        function renderTradeAnalysis() {
+            document.getElementById('content').innerHTML = `
+                <div class="max-w-6xl mx-auto space-y-6">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <div>
+                                <h3 class="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+                                    <i class="fas fa-chart-line text-red-500"></i>
+                                    Performance Analytics
+                                </h3>
+                                <p class="text-gray-600 text-sm">Detailed performance statistics and psychology insights</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <select id="analysis-period" onchange="loadPerformanceStats()" class="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="30">Last 30 Days</option>
+                                    <option value="90">Last 90 Days</option>
+                                    <option value="365">Last Year</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="stats-container" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+                                <div class="text-3xl font-bold text-blue-600" id="stat-trades">--</div>
+                                <div class="text-sm text-gray-600">Total Trades</div>
+                            </div>
+                            <div class="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl">
+                                <div class="text-3xl font-bold text-green-600" id="stat-winrate">--</div>
+                                <div class="text-sm text-gray-600">Win Rate</div>
+                            </div>
+                            <div class="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
+                                <div class="text-3xl font-bold text-purple-600" id="stat-pnl">--</div>
+                                <div class="text-sm text-gray-600">Net P&L</div>
+                            </div>
+                            <div class="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl">
+                                <div class="text-3xl font-bold text-orange-600" id="stat-grade">--</div>
+                                <div class="text-sm text-gray-600">Grade</div>
+                            </div>
+                        </div>
+                        
+                        <div id="stats-loading" class="hidden mt-4 flex justify-center">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-brain text-purple-500"></i>
+                            Trading Psychology
+                        </h4>
+                        <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-200" id="psychology-chart-container">
+                            <div class="text-center">
+                                <i class="fas fa-chart-area text-4xl mb-2 block"></i>
+                                <span>Upload journal data to see psychology analysis</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            loadPerformanceStats();
+        }
+        
+        async function loadPerformanceStats() {
+            const days = document.getElementById('analysis-period')?.value || 30;
+            const loadingEl = document.getElementById('stats-loading');
+            
+            loadingEl?.classList.remove('hidden');
+            
+            try {
+                const stats = await API.getPerformanceStats(days);
+                
+                document.getElementById('stat-trades').textContent = stats.summary?.trades_taken || 0;
+                document.getElementById('stat-winrate').textContent = (stats.summary?.win_rate || 0) + '%';
+                document.getElementById('stat-pnl').textContent = '$' + (stats.summary?.net_pnl || 0);
+                document.getElementById('stat-grade').textContent = stats.summary?.grade || '-';
+                
+            } catch (e) {
+                showToast('Failed to load performance stats', 'error');
+            } finally {
+                loadingEl?.classList.add('hidden');
+            }
+        }
+        
+        async function renderCourses() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="max-w-6xl mx-auto">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <div class="text-center mb-8">
+                            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-4xl text-teal-600">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">Trading Courses</h3>
+                            <p class="text-gray-600 max-w-lg mx-auto">Master the markets with our professional curriculum</p>
+                        </div>
+                        
+                        <div id="courses-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="col-span-full flex justify-center py-12">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const courses = await API.getCourses();
+                const grid = document.getElementById('courses-grid');
+                
+                if (!courses || courses.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-500">
+                            <i class="fas fa-book-open text-4xl mb-4 text-gray-300"></i>
+                            <p>No courses available at the moment</p>
+                            <button onclick="showToast('Courses feature coming soon', 'info')" class="mt-4 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">
+                                Browse Sample Courses
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                grid.innerHTML = courses.map(course => `
+                    <div class="glass-card rounded-lg overflow-hidden hover:shadow-xl transition-all group cursor-pointer">
+                        <div class="h-40 bg-gradient-to-br from-teal-400 to-blue-600 flex items-center justify-center text-white text-4xl relative overflow-hidden">
+                            <i class="fas fa-graduation-cap"></i>
+                            ${course.progress ? `
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-white/30">
+                                    <div class="h-full bg-white" style="width: ${course.progress}%"></div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="p-5">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded">${course.level || 'All Levels'}</span>
+                                ${course.progress ? `<span class="text-xs text-gray-500">${course.progress}% Complete</span>` : ''}
+                            </div>
+                            <h4 class="font-bold text-gray-800 mb-2 text-lg">${course.title}</h4>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">${course.description || 'No description available'}</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-teal-600 text-sm font-semibold group-hover:underline">Start Learning →</span>
+                                <span class="text-xs text-gray-500">${course.lesson_count || 0} lessons</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (e) {
+                document.getElementById('courses-grid').innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4 text-gray-300"></i>
+                        <p class="text-gray-500 mb-4">Failed to load courses</p>
+                        <button onclick="renderCourses()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        async function renderWebinars() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="max-w-6xl mx-auto space-y-6">
+                    <div class="glass-card rounded-xl p-6 sm:p-8 text-center">
+                        <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-100 to-pink-200 flex items-center justify-center text-4xl text-pink-600">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2">Live Webinars</h3>
+                        <p class="text-gray-600 max-w-lg mx-auto">Join our expert-led trading sessions</p>
+                    </div>
+                    
+                    <div id="webinars-list" class="space-y-4">
+                        <div class="flex justify-center py-12">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const webinars = await API.getWebinars(true);
+                const container = document.getElementById('webinars-list');
+                
+                if (!webinars || webinars.length === 0) {
+                    container.innerHTML = `
+                        <div class="glass-card rounded-lg p-8 text-center text-gray-500">
+                            <i class="fas fa-calendar-times text-4xl mb-4 text-gray-300"></i>
+                            <p>No upcoming webinars scheduled</p>
+                            <button onclick="showPage('mentor')" class="mt-4 text-pink-600 hover:text-pink-800 font-medium">
+                                Ask AI Mentor instead
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = webinars.map(w => {
+                    const isLive = w.status === 'live';
+                    const isUpcoming = new Date(w.scheduled_at) > new Date();
+                    
+                    return `
+                        <div class="glass-card rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 ${isLive ? 'border-red-500' : isUpcoming ? 'border-blue-500' : 'border-gray-400'}">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-lg ${isLive ? 'bg-red-100 text-red-600' : isUpcoming ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'} flex items-center justify-center flex-shrink-0">
+                                    <i class="fas ${isLive ? 'fa-broadcast-tower' : isUpcoming ? 'fa-calendar' : 'fa-history'} text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-gray-800">${w.title}</h4>
+                                    <p class="text-sm text-gray-600">${w.description || 'No description'}</p>
+                                    <p class="text-xs ${isLive ? 'text-red-600 font-semibold animate-pulse' : 'text-gray-500'} mt-1">
+                                        ${isLive ? '🔴 LIVE NOW' : new Date(w.scheduled_at).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <button class="px-4 py-2 ${isLive ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} rounded-lg text-sm font-semibold transition-colors w-full sm:w-auto">
+                                ${isLive ? 'Join Now' : isUpcoming ? 'Set Reminder' : 'Watch Replay'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (e) {
+                document.getElementById('webinars-list').innerHTML = `
+                    <div class="glass-card rounded-lg p-8 text-center">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4 text-gray-300"></i>
+                        <p class="text-gray-500 mb-4">Failed to load webinars</p>
+                        <button onclick="renderWebinars()" class="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        async function renderBlog() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="max-w-6xl mx-auto">
+                    <div class="glass-card rounded-xl p-6 sm:p-8">
+                        <div class="text-center mb-8">
+                            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-4xl text-indigo-600">
+                                <i class="fas fa-newspaper"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">Trading Blog</h3>
+                            <p class="text-gray-600 max-w-lg mx-auto">Latest market insights and educational content</p>
+                        </div>
+                        
+                        <div id="blog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div class="col-span-full flex justify-center py-12">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const posts = await API.getBlogPosts({ limit: 9 });
+                const grid = document.getElementById('blog-grid');
+                
+                if (!posts || posts.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-500">
+                            <i class="fas fa-newspaper text-4xl mb-4 text-gray-300"></i>
+                            <p>No blog posts available</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                grid.innerHTML = posts.map(post => `
+                    <article class="glass-card rounded-lg overflow-hidden hover:shadow-xl transition-all cursor-pointer group flex flex-col h-full" onclick="showToast('Full article view coming soon', 'info')">
+                        <div class="h-48 bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center text-white text-5xl relative overflow-hidden">
+                            <i class="fas fa-newspaper"></i>
+                            ${post.featured ? '<div class="absolute top-2 right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded">FEATURED</div>' : ''}
+                        </div>
+                        <div class="p-5 flex-1 flex flex-col">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${post.category || 'General'}</span>
+                                <span class="text-xs text-gray-500">${new Date(post.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <h4 class="font-bold text-gray-800 mb-2 text-lg line-clamp-2 group-hover:text-indigo-600 transition-colors">${post.title}</h4>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-3 flex-1">${post.excerpt || post.content?.substring(0, 150) + '...' || 'No content preview'}</p>
+                            <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
+                                <span class="text-indigo-600 text-sm font-semibold group-hover:underline">Read More →</span>
+                                <span class="text-xs text-gray-500">${post.read_time || '5 min read'}</span>
+                            </div>
+                        </div>
+                    </article>
+                `).join('');
+                
+            } catch (e) {
+                document.getElementById('blog-grid').innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4 text-gray-300"></i>
+                        <p class="text-gray-500 mb-4">Failed to load blog posts</p>
+                        <button onclick="renderBlog()" class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
+                            <i class="fas fa-sync-alt mr-2"></i>Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderMentor() {
+            document.getElementById('content').innerHTML = `
+                <div class="max-w-6xl mx-auto h-[calc(100vh-200px)]">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                        <div class="lg:col-span-2 glass-card rounded-xl flex flex-col h-full">
+                            <div class="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-gray-800">AI Trading Mentor</h3>
+                                        <p class="text-xs text-green-600 flex items-center gap-1">
+                                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                            Online
+                                        </p>
+                                    </div>
+                                </div>
+                                <button onclick="clearMentorChat()" class="text-gray-400 hover:text-gray-600 p-2" title="Clear Chat">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            
+                            <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 min-h-0">
+                                <div class="flex gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] sm:max-w-[80%]">
+                                        <p class="text-gray-800">Hello! I'm your AI Trading Mentor. Ask me anything about trading strategies, risk management, or market analysis. <strong>Note: I provide educational guidance only.</strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="mentor-loading" class="hidden px-4 py-2 bg-gray-50 border-t border-gray-200">
+                                <div class="flex items-center gap-2 text-sm text-gray-600">
+                                    <div class="spinner small"></div>
+                                    <span>AI is thinking...</span>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4 border-t border-gray-200 bg-white rounded-b-xl flex-shrink-0">
+                                <div class="flex gap-2">
+                                    <input type="text" id="mentorInput" placeholder="Ask your trading question..." 
+                                        class="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        onkeypress="if(event.key==='Enter') sendMentorMessage()">
+                                    <button onclick="sendMentorMessage()" id="mentor-send-btn" class="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 rounded-lg text-white font-semibold cursor-pointer hover:shadow-lg transition-shadow">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">This is an AI assistant for educational purposes only. Not financial advice.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4 hidden lg:block">
+                            <div class="glass-card rounded-xl p-4">
+                                <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-bolt text-yellow-500"></i>
+                                    Quick Topics
+                                </h4>
+                                <div class="space-y-2">
+                                    <button onclick="askMentor('How do I calculate position size?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                        Position Sizing
+                                    </button>
+                                    <button onclick="askMentor('What is a good risk to reward ratio?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                        Risk/Reward Ratios
+                                    </button>
+                                    <button onclick="askMentor('How do I control emotions while trading?')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                        Trading Psychology
+                                    </button>
+                                    <button onclick="askMentor('Explain support and resistance')" class="w-full text-left px-4 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors cursor-pointer">
+                                        Technical Analysis
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="glass-card rounded-xl p-4 bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200">
+                                <h4 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-lightbulb text-yellow-600"></i>
+                                    Daily Wisdom
+                                </h4>
+                                <p class="text-sm text-gray-600 italic">"Cut losses short, let profits run." — Trading Proverb</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function clearMentorChat() {
+            const container = document.getElementById('mentor-messages');
+            if (!container) return;
+            
+            container.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[80%]">
+                        <p class="text-gray-800">Chat cleared. How can I help you today?</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function askMentor(question) {
+            const input = document.getElementById('mentorInput');
+            if (!input) return;
+            
+            input.value = question;
+            sendMentorMessage();
+        }
+        
+        async function sendMentorMessage() {
+            const input = document.getElementById('mentorInput');
+            const container = document.getElementById('mentor-messages');
+            const loadingEl = document.getElementById('mentor-loading');
+            const sendBtn = document.getElementById('mentor-send-btn');
+            
+            if (!input || !container) return;
+            
+            const message = input.value.trim();
+            if (!message) return;
+            
+            container.innerHTML += `
+                <div class="flex gap-3 flex-row-reverse">
+                    <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-sm flex-shrink-0">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="bg-blue-600 p-3 rounded-2xl rounded-tr-none shadow-sm max-w-[85%] sm:max-w-[80%]">
+                        <p class="text-white">${escapeHtml(message)}</p>
+                    </div>
+                </div>
+            `;
+            
+            input.value = '';
+            container.scrollTop = container.scrollHeight;
+            
+            loadingEl?.classList.remove('hidden');
+            if (sendBtn) sendBtn.disabled = true;
+            
+            try {
+                const response = await API.askMentor(message);
+                
+                container.innerHTML += `
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] sm:max-w-[80%]">
+                            <p class="text-gray-800 whitespace-pre-wrap">${escapeHtml(response.response)}</p>
+                            ${response.suggested_resources?.length ? `
+                                <div class="mt-3 pt-2 border-t border-gray-100">
+                                    <p class="text-xs text-gray-500 mb-1">Suggested resources:</p>
+                                    <div class="flex flex-wrap gap-1">
+                                        ${response.suggested_resources.map(r => `
+                                            <span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">${r}</span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                container.scrollTop = container.scrollHeight;
+                
+            } catch (e) {
+                // Check if error is about OpenAI API key
+                const errorMsg = e.message || '';
+                const isConfigError = errorMsg.includes('OPENAI_API_KEY') || errorMsg.includes('not configured');
+                
+                container.innerHTML += `
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-sm flex-shrink-0">
+                            <i class="fas fa-exclamation"></i>
+                        </div>
+                        <div class="bg-red-50 p-3 rounded-2xl rounded-tl-none border border-red-100 max-w-[80%]">
+                            <p class="text-red-700 text-sm">
+                                ${isConfigError ? 
+                                    '<strong>AI Mentor not configured.</strong><br>Please set OPENAI_API_KEY environment variable in your deployment settings.<br><br>In the meantime, check the Quick Topics on the right side for educational content.' : 
+                                    `Sorry, I couldn't process your request. ${e.message}`
+                                }
+                            </p>
+                        </div>
+                    </div>
+                `;
+                container.scrollTop = container.scrollHeight;
+            } finally {
+                loadingEl?.classList.add('hidden');
+                if (sendBtn) sendBtn.disabled = false;
+            }
+        }
+        
+        async function renderAdmin() {
+            const content = document.getElementById('content');
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            
+            // Double-check admin access
+            const isAdmin = user.role === 'admin' || user.role === 'moderator' || user.is_admin === true || user.email?.includes('admin');
+            
+            if (!isAdmin) {
+                content.innerHTML = `
+                    <div class="max-w-md mx-auto glass-card rounded-xl p-8 text-center border-red-200 bg-red-50 mt-12">
+                        <i class="fas fa-lock text-4xl text-red-500 mb-4"></i>
+                        <h3 class="text-xl font-bold text-red-800 mb-2">Access Denied</h3>
+                        <p class="text-red-600 mb-4">Admin privileges required.</p>
+                        <button onclick="showPage('dashboard')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">
+                            Back to Dashboard
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            content.innerHTML = `
+                <div class="max-w-6xl mx-auto space-y-6">
+                    <div class="glass-card rounded-xl p-6 sm:p-8 bg-gradient-to-r from-gray-800 via-gray-900 to-black text-white">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">
+                                <i class="fas fa-shield-alt text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-bold mb-1">Admin Dashboard</h3>
+                                <p class="text-gray-300 text-sm">Platform management and user administration</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" id="admin-stats">
+                        <div class="glass-card rounded-xl p-6 border-l-4 border-blue-500">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-gray-600 text-sm">Total Users</p>
+                                    <div class="text-3xl font-bold text-gray-800 mt-1" id="admin-user-count">--</div>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-xl p-6 border-l-4 border-green-500">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-gray-600 text-sm">Active Signals</p>
+                                    <div class="text-3xl font-bold text-gray-800 mt-1" id="admin-signal-count">--</div>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
+                                    <i class="fas fa-signal"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-xl p-6 border-l-4 border-purple-500">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-gray-600 text-sm">Courses</p>
+                                    <div class="text-3xl font-bold text-gray-800 mt-1" id="admin-course-count">--</div>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-xl p-6 border-l-4 border-orange-500">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-gray-600 text-sm">System Status</p>
+                                    <div class="text-3xl font-bold text-green-600 mt-1">Online</div>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="glass-card rounded-xl p-6">
+                            <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i class="fas fa-users-cog text-blue-500"></i>
+                                Recent Users
+                            </h4>
+                            <div id="admin-users-list" class="space-y-3">
+                                <div class="spinner mx-auto"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card rounded-xl p-6">
+                            <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <i class="fas fa-cog text-gray-500"></i>
+                                Quick Actions
+                            </h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button onclick="showToast('Create Signal modal coming soon', 'info')" class="p-4 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-colors text-left">
+                                    <i class="fas fa-plus mb-2 block text-xl"></i>
+                                    Create Signal
+                                </button>
+                                <button onclick="showToast('Add Course modal coming soon', 'info')" class="p-4 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm font-semibold transition-colors text-left">
+                                    <i class="fas fa-book mb-2 block text-xl"></i>
+                                    Add Course
+                                </button>
+                                <button onclick="showToast('Add Webinar modal coming soon', 'info')" class="p-4 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 text-sm font-semibold transition-colors text-left">
+                                    <i class="fas fa-video mb-2 block text-xl"></i>
+                                    Add Webinar
+                                </button>
+                                <button onclick="showToast('Blog post editor coming soon', 'info')" class="p-4 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold transition-colors text-left">
+                                    <i class="fas fa-newspaper mb-2 block text-xl"></i>
+                                    New Article
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            try {
+                const stats = await API.getAdminStats();
+                document.getElementById('admin-user-count').textContent = stats.total_users || '--';
+                document.getElementById('admin-signal-count').textContent = stats.active_signals || '--';
+                document.getElementById('admin-course-count').textContent = stats.total_courses || '--';
+                
+                if (stats.recent_users) {
+                    document.getElementById('admin-users-list').innerHTML = stats.recent_users.map(u => `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm">
+                                    ${u.email[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-800">${u.email}</p>
+                                    <p class="text-xs text-gray-500">${u.role || 'user'}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs text-gray-400">${new Date(u.created_at).toLocaleDateString()}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('admin-users-list').innerHTML = '<p class="text-gray-500 text-center py-4">No recent user data</p>';
+                }
+            } catch (e) {
+                console.error('Failed to load admin stats:', e);
+                document.getElementById('admin-users-list').innerHTML = '<p class="text-red-500 text-center py-4">Failed to load users</p>';
+            }
+        }
+        
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('pipways_token');
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+            
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            currentUser = user;
+            
+            if (user.email) {
+                document.getElementById('user-email').textContent = user.email;
+                document.getElementById('user-name').textContent = user.full_name || user.email.split('@')[0];
+                document.getElementById('user-avatar').textContent = (user.full_name || user.email)[0].toUpperCase();
+                
+                // Check admin access
+                checkAdminAccess();
+            }
+            
+            showPage('dashboard');
+            
+            fetch(`${API_BASE}/health`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data && data.status !== 'healthy') {
+                        const statusEl = document.getElementById('system-status');
+                        if (statusEl) {
+                            statusEl.innerHTML = '<div class="w-2 h-2 rounded-full bg-yellow-500"></div><span class="text-xs sm:text-sm font-medium text-yellow-700">Degraded</span>';
+                        }
+                    }
+                })
+                .catch(() => {});
+        });
+    </script>
+</body>
+</html>

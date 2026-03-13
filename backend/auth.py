@@ -1,6 +1,7 @@
 """
 Authentication routes and handlers.
 """
+from datetime import datetime  # ← ADD THIS LINE
 from fastapi import APIRouter, HTTPException, status, Depends
 from datetime import timedelta
 from pydantic import BaseModel, EmailStr
@@ -30,7 +31,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     role: Optional[str] = "user"
-    created_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None  # ← This now works
 
     class Config:
         from_attributes = True
@@ -39,8 +40,6 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user: Optional[dict] = None
-
-from datetime import datetime
 
 @router.post("/register", response_model=Token)
 async def register(user_data: UserRegister):

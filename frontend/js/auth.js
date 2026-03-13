@@ -1,4 +1,4 @@
-// Auth functions - Logic preserved exactly, UI selectors updated for new design
+// Authentication Logic - Preserved Exactly
 
 const API_BASE = window.location.origin;
 
@@ -14,8 +14,13 @@ function showError(message) {
 async function handleLogin(e) {
     e.preventDefault();
     
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+    const email = document.getElementById('login-email')?.value;
+    const password = document.getElementById('login-password')?.value;
+    
+    if (!email || !password) {
+        showError('Please fill in all fields');
+        return;
+    }
     
     try {
         const formData = new FormData();
@@ -49,10 +54,19 @@ async function handleLogin(e) {
 async function handleRegister(e) {
     e.preventDefault();
     
+    const email = document.getElementById('reg-email')?.value;
+    const password = document.getElementById('reg-password')?.value;
+    const full_name = document.getElementById('reg-name')?.value;
+    
+    if (!email || !password) {
+        showError('Please fill in required fields');
+        return;
+    }
+    
     const data = {
-        email: document.getElementById('reg-email').value,
-        password: document.getElementById('reg-password').value,
-        full_name: document.getElementById('reg-name').value
+        email: email,
+        password: password,
+        full_name: full_name || ''
     };
     
     try {

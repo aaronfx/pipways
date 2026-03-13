@@ -1,5 +1,5 @@
 /**
- * API Client
+ * API Client - Complete
  */
 const API_BASE = window.location.origin;
 
@@ -174,7 +174,7 @@ const API = {
         const url = patternType 
             ? `/ai/chart/pattern-library?pattern_type=${patternType}`
             : '/ai/chart/pattern-library';
-        return this.request(url, { method: 'POST' });
+        return this.request(url);
     },
 
     // Performance

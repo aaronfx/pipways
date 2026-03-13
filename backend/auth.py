@@ -1,196 +1,197 @@
 """
-Authentication routes and handlers.
+Authentication module - handles user registration and login.
+Fixed to work with older database schemas that may lack is_active/is_admin columns.
 """
-from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, status, Form
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-import traceback
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
 
-# RELATIVE imports
-from .database import database, users, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from .database import database, users
 from .security import (
-    get_password_hash, 
     verify_password, 
-    create_access_token
+    get_password_hash, 
+    create_access_token, 
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    SECRET_KEY,
+    ALGORITHM
 )
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Pydantic models
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
-    full_name: Optional[str] = None
+    full_name: str
 
-class UserLogin(BaseModel):
-    username: str
-    password: str
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    is_active: bool = True
+    is_admin: bool = False
 
-class TokenResponse(BaseModel):
+class Token(BaseModel):
     access_token: str
     token_type: str
-    user: dict
+    user: UserResponse
 
-@router.post("/register")
-async def register(user_data: UserRegister):
-    """Register a new user."""
-    try:
-        # Check if database is connected
-        if not database.is_connected:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Database not available"
-            )
-        
-        # Check if user exists
-        query = users.select().where(users.c.email == user_data.email)
-        existing = await database.fetch_one(query)
-        
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
-        
-        # Hash password
-        hashed_password = get_password_hash(user_data.password)
-        
-        # Prepare user data
-        user_values = {
-            "email": user_data.email,
-            "password_hash": hashed_password,
-            "full_name": user_data.full_name or "",
-            "is_active": True,
-            "is_admin": False,
-            "created_at": datetime.utcnow()
-        }
-        
-        # Insert user
-        query = users.insert().values(**user_values)
-        user_id = await database.execute(query)
-        
-        # Create access token
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user_data.email}, 
-            expires_delta=access_token_expires
-        )
-        
-        # Return success response
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": {
-                "id": user_id,
-                "email": user_data.email,
-                "full_name": user_data.full_name or "",
-                "is_active": True,
-                "is_admin": False,
-                "role": "user"
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Registration error: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration failed: {str(e)}"
-        )
+def get_available_columns():
+    """Get list of available columns in users table."""
+    return [col.name for col in users.columns]
 
-@router.post("/token")
-async def login(username: str = Form(...), password: str = Form(...)):
-    """
-    OAuth2 compatible token login using form data.
-    """
-    try:
-        # Check if database is connected
-        if not database.is_connected:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Database not available"
-            )
-        
-        # Find user by email (username field contains email)
-        query = users.select().where(users.c.email == username)
-        user = await database.fetch_one(query)
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Verify password
-        if not verify_password(password, user["password_hash"]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        if not user["is_active"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is disabled"
-            )
-        
-        # Create access token
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user["email"]}, 
-            expires_delta=access_token_expires
-        )
-        
-        # Determine role
-        role = "admin" if user.get("is_admin") else user.get("role", "user")
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": {
-                "id": user["id"],
-                "email": user["email"],
-                "full_name": user.get("full_name", ""),
-                "is_active": user["is_active"],
-                "is_admin": user.get("is_admin", False),
-                "role": role
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Login error: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Login failed: {str(e)}"
-        )
+async def get_user_by_email(email: str):
+    """Fetch user by email, returning None if not found."""
+    query = users.select().where(users.c.email == email)
+    return await database.fetch_one(query)
 
-@router.get("/me")
-async def get_current_user_info():
-    """Get current user info - requires token in header."""
-    from fastapi import Depends
-    from .security import get_current_user as security_get_current_user
+async def create_user(user_data: dict):
+    """Create user with only available columns."""
+    available_cols = get_available_columns()
     
-    try:
-        user = await security_get_current_user()
-        return {
-            "id": user["id"],
-            "email": user["email"],
-            "full_name": user.get("full_name", ""),
-            "is_active": user["is_active"],
-            "is_admin": user.get("is_admin", False),
-            "role": "admin" if user.get("is_admin") else user.get("role", "user")
-        }
-    except Exception as e:
+    # Build insert data with only existing columns
+    insert_data = {
+        "email": user_data["email"],
+        "password_hash": get_password_hash(user_data["password"]),
+        "created_at": datetime.utcnow()
+    }
+    
+    if "full_name" in available_cols:
+        insert_data["full_name"] = user_data.get("full_name", "")
+    
+    # Only add these if they exist in schema
+    if "is_active" in available_cols:
+        insert_data["is_active"] = True
+    if "is_admin" in available_cols:
+        insert_data["is_admin"] = False
+    if "role" in available_cols:
+        insert_data["role"] = "user"
+    
+    query = users.insert().values(**insert_data)
+    user_id = await database.execute(query)
+    
+    # Return user dict with safe defaults
+    return {
+        "id": user_id,
+        "email": user_data["email"],
+        "full_name": insert_data.get("full_name", ""),
+        "is_active": insert_data.get("is_active", True),
+        "is_admin": insert_data.get("is_admin", False)
+    }
+
+@router.post("/register", response_model=Token)
+async def register(user_data: UserRegister):
+    """Register a new user account."""
+    # Check if user exists
+    existing = await get_user_by_email(user_data.email)
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    
+    # Create user with available columns only
+    user = await create_user({
+        "email": user_data.email,
+        "password": user_data.password,
+        "full_name": user_data.full_name
+    })
+    
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": user_data.email, "user_id": user["id"]},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": UserResponse(**user)
+    }
+
+@router.post("/login", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """Authenticate user and return JWT token."""
+    # Get user by email
+    user = await get_user_by_email(form_data.username)
+    
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication"
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Check password
+    if not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if user is active (if column exists)
+    is_active = getattr(user, 'is_active', True)
+    if not is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account is deactivated"
+        )
+    
+    # Create access token
+    access_token = create_access_token(
+        data={
+            "sub": user.email,
+            "user_id": user.id,
+            "is_admin": getattr(user, 'is_admin', False)
+        },
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    user_response = {
+        "id": user.id,
+        "email": user.email,
+        "full_name": getattr(user, 'full_name', ''),
+        "is_active": is_active,
+        "is_admin": getattr(user, 'is_admin', False)
+    }
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": UserResponse(**user_response)
+    }
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(token: str = Depends(oauth2_scheme)):
+    """Get current authenticated user info."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = await get_user_by_email(email)
+    if user is None:
+        raise credentials_exception
+    
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        full_name=getattr(user, 'full_name', ''),
+        is_active=getattr(user, 'is_active', True),
+        is_admin=getattr(user, 'is_admin', False)
+    )

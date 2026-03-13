@@ -1,8 +1,8 @@
 """
 Authentication module - handles user registration and login.
-Fixed to work with older database schemas that may lack is_active/is_admin columns.
+Fixed to work with older database schemas.
 """
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -21,8 +21,8 @@ from .security import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# OAuth2 scheme for token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# OAuth2 scheme - tokenUrl must match the login endpoint
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 class UserRegister(BaseModel):
     email: EmailStr
@@ -46,47 +46,57 @@ def get_available_columns():
     return [col.name for col in users.columns]
 
 async def get_user_by_email(email: str):
-    """Fetch user by email, returning None if not found."""
-    query = users.select().where(users.c.email == email)
-    return await database.fetch_one(query)
+    """Fetch user by email."""
+    try:
+        query = users.select().where(users.c.email == email)
+        return await database.fetch_one(query)
+    except Exception as e:
+        print(f"DB Error fetching user: {e}", flush=True)
+        return None
 
 async def create_user(user_data: dict):
     """Create user with only available columns."""
-    available_cols = get_available_columns()
-    
-    # Build insert data with only existing columns
-    insert_data = {
-        "email": user_data["email"],
-        "password_hash": get_password_hash(user_data["password"]),
-        "created_at": datetime.utcnow()
-    }
-    
-    if "full_name" in available_cols:
-        insert_data["full_name"] = user_data.get("full_name", "")
-    
-    # Only add these if they exist in schema
-    if "is_active" in available_cols:
-        insert_data["is_active"] = True
-    if "is_admin" in available_cols:
-        insert_data["is_admin"] = False
-    if "role" in available_cols:
-        insert_data["role"] = "user"
-    
-    query = users.insert().values(**insert_data)
-    user_id = await database.execute(query)
-    
-    # Return user dict with safe defaults
-    return {
-        "id": user_id,
-        "email": user_data["email"],
-        "full_name": insert_data.get("full_name", ""),
-        "is_active": insert_data.get("is_active", True),
-        "is_admin": insert_data.get("is_admin", False)
-    }
+    try:
+        available_cols = get_available_columns()
+        print(f"Available columns: {available_cols}", flush=True)
+        
+        # Build insert data with only existing columns
+        insert_data = {
+            "email": user_data["email"],
+            "password_hash": get_password_hash(user_data["password"]),
+            "created_at": datetime.utcnow()
+        }
+        
+        if "full_name" in available_cols:
+            insert_data["full_name"] = user_data.get("full_name", "")
+        
+        # Only add these if they exist in schema
+        if "is_active" in available_cols:
+            insert_data["is_active"] = True
+        if "is_admin" in available_cols:
+            insert_data["is_admin"] = False
+        if "role" in available_cols:
+            insert_data["role"] = "user"
+        
+        query = users.insert().values(**insert_data)
+        user_id = await database.execute(query)
+        
+        return {
+            "id": user_id,
+            "email": user_data["email"],
+            "full_name": insert_data.get("full_name", ""),
+            "is_active": insert_data.get("is_active", True),
+            "is_admin": insert_data.get("is_admin", False)
+        }
+    except Exception as e:
+        print(f"Error creating user: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/register", response_model=Token)
 async def register(user_data: UserRegister):
     """Register a new user account."""
+    print(f"Registration attempt for: {user_data.email}", flush=True)
+    
     # Check if user exists
     existing = await get_user_by_email(user_data.email)
     if existing:
@@ -95,7 +105,7 @@ async def register(user_data: UserRegister):
             detail="Email already registered"
         )
     
-    # Create user with available columns only
+    # Create user
     user = await create_user({
         "email": user_data.email,
         "password": user_data.password,
@@ -114,9 +124,11 @@ async def register(user_data: UserRegister):
         "user": UserResponse(**user)
     }
 
-@router.post("/login", response_model=Token)
+@router.post("/token", response_model=Token)  # Changed from /login to /token
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return JWT token."""
+    print(f"Login attempt for: {form_data.username}", flush=True)
+    
     # Get user by email
     user = await get_user_by_email(form_data.username)
     
@@ -127,8 +139,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check password
-    if not verify_password(form_data.password, user.password_hash):
+    # Verify password
+    try:
+        is_valid = verify_password(form_data.password, user.password_hash)
+    except Exception as e:
+        print(f"Password verification error: {e}", flush=True)
+        is_valid = False
+    
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

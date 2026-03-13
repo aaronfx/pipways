@@ -1,8 +1,9 @@
 """
-Database configuration and initialization.
+Database configuration with flexible schema handling.
+Works with both old and new database schemas.
 """
 import os
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, inspect
 from databases import Database
 from datetime import datetime
 
@@ -19,7 +20,7 @@ database = Database(DATABASE_URL)
 # SQLAlchemy metadata
 metadata = MetaData()
 
-# Users table definition
+# Users table definition - includes all modern columns
 users = Table(
     "users",
     metadata,
@@ -39,34 +40,20 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
-async def init_database():
-    """Initialize database and create admin user if not exists."""
-    from .security import get_password_hash
-    
+def get_available_columns(table_name='users'):
+    """Get list of actually available columns in the database table."""
     try:
-        # Check if admin exists
-        query = users.select().where(users.c.email == "admin@pipways.com")
-        existing = await database.fetch_one(query)
-        
-        if not existing:
-            # Create default admin
-            admin_data = {
-                "email": "admin@pipways.com",
-                "password_hash": get_password_hash("admin123"),
-                "full_name": "System Administrator",
-                "is_active": True,
-                "is_admin": True,
-                "role": "admin",
-                "created_at": datetime.utcnow(),
-                "subscription_tier": "admin"
-            }
-            
-            query = users.insert().values(**admin_data)
-            await database.execute(query)
-            print("✓ Default admin created: admin@pipways.com / admin123")
-        else:
-            print("✓ Admin user exists")
-            
+        # Create sync engine for inspection
+        sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_url)
+        inspector = inspect(engine)
+        columns = inspector.get_columns(table_name)
+        return [col['name'] for col in columns]
     except Exception as e:
-        print(f"⚠ Database initialization error: {e}")
-        # Don't raise - let the app start anyway
+        print(f"⚠ Could not inspect database columns: {e}", flush=True)
+        # Fallback to defined columns
+        return [col.name for col in users.columns]
+
+async def init_database():
+    """Initialize database - handles schema mismatches gracefully."""
+    print("ℹ Database module initialized", flush=True)

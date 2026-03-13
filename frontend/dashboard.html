@@ -14,30 +14,37 @@
             background: #f3f4f6;
         }
         
-        .glass-sidebar {
-            background: rgba(30, 41, 59, 0.95);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        .sidebar {
+            background: #1e293b;
+            transition: transform 0.3s ease;
         }
         
-        .nav-item {
+        .sidebar-link {
             transition: all 0.3s ease;
             border-radius: 0.5rem;
             margin: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            cursor: pointer;
         }
         
-        .nav-item:hover {
+        .sidebar-link:hover {
             background: rgba(255, 255, 255, 0.1);
-            transform: translateX(5px);
+            color: white;
         }
         
-        .nav-item.active {
+        .sidebar-link.active {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
         
         .glass-card {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.5);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -47,18 +54,6 @@
         .glass-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        }
-        
-        .metric-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-        }
-        
-        .gradient-text {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
         }
         
         .gradient-btn {
@@ -76,20 +71,45 @@
             min-height: calc(100vh - 80px);
         }
         
-        .sidebar-scroll::-webkit-scrollbar {
-            width: 6px;
+        /* Mobile sidebar overlay */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
         }
         
-        .sidebar-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+        .sidebar-overlay.active {
+            display: block;
+        }
+        
+        @media (max-width: 1024px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 50;
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
         }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
+    <!-- Mobile Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay lg:hidden" onclick="toggleMobileSidebar()"></div>
+    
     <!-- Sidebar -->
-    <aside class="glass-sidebar w-64 flex flex-col text-white">
-        <div class="p-6 border-b border-white/10">
+    <aside id="sidebar" class="sidebar w-64 flex flex-col text-white flex-shrink-0">
+        <div class="p-6 border-b border-white/10 flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
                     <i class="fas fa-chart-line text-white"></i>
@@ -99,84 +119,93 @@
                     <p class="text-xs text-gray-400">Pro Trading</p>
                 </div>
             </div>
+            <button onclick="toggleMobileSidebar()" class="lg:hidden text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
         
-        <nav class="flex-1 overflow-y-auto sidebar-scroll py-4">
-            <div class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase">Main</div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <div class="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Main</div>
             
-            <a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item active flex items-center gap-3 px-4 py-3 text-sm font-medium">
-                <i class="fas fa-home w-5"></i>
-                Dashboard
+            <a onclick="showPage('dashboard')" id="nav-dashboard" class="sidebar-link active">
+                <i class="fas fa-home w-5 text-center"></i>
+                <span>Dashboard</span>
             </a>
             
-            <a href="#" onclick="showPage('journal')" id="nav-journal" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
-                <i class="fas fa-book w-5"></i>
-                Trading Journal
+            <a onclick="showPage('journal')" id="nav-journal" class="sidebar-link">
+                <i class="fas fa-book w-5 text-center"></i>
+                <span>Trading Journal</span>
             </a>
             
-            <a href="#" onclick="showPage('analysis')" id="nav-analysis" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
-                <i class="fas fa-chart-pie w-5"></i>
-                Chart Analysis
+            <a onclick="showPage('analysis')" id="nav-analysis" class="sidebar-link">
+                <i class="fas fa-chart-pie w-5 text-center"></i>
+                <span>Chart Analysis</span>
             </a>
             
-            <a href="#" onclick="showPage('trade-analysis')" id="nav-trade-analysis" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
-                <i class="fas fa-robot w-5"></i>
-                Trade Analysis
+            <a onclick="showPage('trade-analysis')" id="nav-trade-analysis" class="sidebar-link">
+                <i class="fas fa-robot w-5 text-center"></i>
+                <span>Trade Analysis</span>
             </a>
             
-            <a href="#" onclick="showPage('mentor')" id="nav-mentor" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
-                <i class="fas fa-graduation-cap w-5"></i>
-                AI Mentor
+            <a onclick="showPage('mentor')" id="nav-mentor" class="sidebar-link">
+                <i class="fas fa-graduation-cap w-5 text-center"></i>
+                <span>AI Mentor</span>
             </a>
             
-            <a href="#" onclick="showPage('blog')" id="nav-blog" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300">
-                <i class="fas fa-newspaper w-5"></i>
-                Blog
+            <a onclick="showPage('blog')" id="nav-blog" class="sidebar-link">
+                <i class="fas fa-newspaper w-5 text-center"></i>
+                <span>Blog</span>
             </a>
             
-            <div class="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase">Admin</div>
+            <div class="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</div>
             
-            <a href="#" onclick="showPage('admin')" id="nav-admin" class="nav-item flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-300 hidden">
-                <i class="fas fa-cog w-5"></i>
-                Admin Panel
+            <a onclick="showPage('admin')" id="nav-admin" class="sidebar-link hidden">
+                <i class="fas fa-cog w-5 text-center"></i>
+                <span>Admin Panel</span>
             </a>
         </nav>
         
         <div class="p-4 border-t border-white/10">
             <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-semibold" id="user-avatar">
+                <div id="user-avatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-semibold">
                     U
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate" id="user-name">User</p>
-                    <p class="text-xs text-gray-400 truncate" id="user-email">user@pipways.com</p>
+                    <p id="user-name" class="text-sm font-medium truncate">User</p>
+                    <p id="user-email" class="text-xs text-gray-400 truncate">user@pipways.com</p>
                 </div>
             </div>
-            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors text-sm font-medium">
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors text-sm font-medium cursor-pointer">
                 <i class="fas fa-sign-out-alt"></i>
-                Logout
+                <span>Logout</span>
             </button>
         </div>
     </aside>
     
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
         <!-- Header -->
-        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-            <div>
-                <h2 id="page-title" class="text-2xl font-bold text-gray-800">Dashboard</h2>
-                <p class="text-sm text-gray-500">Welcome back to your trading dashboard</p>
+        <header class="bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 sm:px-8 py-4 flex justify-between items-center flex-shrink-0">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleMobileSidebar()" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <div>
+                    <h2 id="page-title" class="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h2>
+                    <p class="text-sm text-gray-500 hidden sm:block">Welcome back to your trading dashboard</p>
+                </div>
             </div>
             <div class="flex items-center gap-4">
-                <div class="glass-card px-4 py-2 rounded-full flex items-center gap-2">
+                <div class="glass-card px-3 sm:px-4 py-2 rounded-full flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <span class="text-sm font-medium text-gray-700">System Online</span>
+                    <span class="text-xs sm:text-sm font-medium text-gray-700 hidden sm:inline">System Online</span>
+                    <span class="text-xs font-medium text-gray-700 sm:hidden">Online</span>
                 </div>
             </div>
         </header>
         
         <!-- Dynamic Content -->
-        <main id="content" class="content-area flex-1 overflow-y-auto p-8">
+        <main id="content" class="content-area flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
             <!-- Content injected by JavaScript -->
         </main>
     </div>
@@ -185,6 +214,14 @@
     <script src="js/api.js"></script>
     <script src="js/app.js"></script>
     <script>
+        // Mobile sidebar toggle
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        }
+        
         // Initialize user info
         document.addEventListener('DOMContentLoaded', () => {
             const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');

@@ -9,24 +9,6 @@ print(f"[INIT] Backend location: {__file__}", flush=True)
 
 __version__ = "2.0.0"
 
-# Import all submodules for easy access
-from . import (
-    auth,
-    security,
-    database,
-    signals,
-    courses,
-    blog,
-    webinars,
-    media,
-    admin,
-    notifications,
-    payments,
-    risk_calculator,
-    ai_screening,
-    ai_mentor,
-    chart_analysis,
-    performance_analyzer,
-    blog_enhanced,
-    courses_enhanced,
-)
+# DO NOT import submodules here - causes circular imports when main.py imports them
+# All modules are imported directly by main.py to avoid initialization loops
+# This is especially important for: ai_mentor, chart_analysis, performance_analyzer

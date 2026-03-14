@@ -13,7 +13,7 @@ class DashboardController {
         this.checkAuth();
         this.setupNavigation();
         this.setupMobileMenu();
-        this.renderAdminMenu();
+        this.renderAdminMenu(); // This will now insert the menu if admin
         this.initFeatureCarousel();
         this.navigate('dashboard');
     }
@@ -76,22 +76,71 @@ class DashboardController {
         }
     }
 
+    /**
+     * FIXED: Dynamically inserts Admin Dashboard button above logout if user is admin
+     */
     renderAdminMenu() {
-        const adminMenu = document.getElementById('admin-menu');
-        if (!adminMenu) return;
-        
-        // FIXED: Properly check admin status from user object
+        // Check admin status
         const isAdmin = this.user && (
             this.user.is_admin === true || 
             this.user.role === 'admin' ||
             this.user.is_superuser === true
         );
         
+        // Look for existing admin menu element
+        let adminMenu = document.getElementById('admin-menu');
+        
         if (isAdmin) {
-            adminMenu.classList.remove('hidden');
-            console.log('[Dashboard] Admin menu enabled');
+            if (!adminMenu) {
+                // Create admin menu item dynamically
+                adminMenu = document.createElement('a');
+                adminMenu.id = 'admin-menu';
+                adminMenu.href = '#';
+                adminMenu.className = 'nav-link flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors mb-2';
+                adminMenu.dataset.section = 'admin';
+                adminMenu.innerHTML = `
+                    <i class="fas fa-shield-alt w-5 text-center text-purple-400"></i>
+                    <span class="font-medium">Admin Dashboard</span>
+                `;
+                
+                // Add click handler
+                adminMenu.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.navigate('admin');
+                });
+                
+                // Find logout element to insert before it
+                const logoutEl = document.getElementById('logout-btn') || 
+                               document.querySelector('[data-section="logout"]') ||
+                               document.querySelector('[onclick*="logout"]');
+                
+                if (logoutEl && logoutEl.parentNode) {
+                    logoutEl.parentNode.insertBefore(adminMenu, logoutEl);
+                    console.log('[Dashboard] Admin menu inserted before logout');
+                } else {
+                    // Fallback: append to sidebar nav container
+                    const sidebar = document.getElementById('sidebar');
+                    const nav = sidebar?.querySelector('nav');
+                    if (nav) {
+                        nav.appendChild(adminMenu);
+                        console.log('[Dashboard] Admin menu appended to sidebar');
+                    } else if (sidebar) {
+                        sidebar.appendChild(adminMenu);
+                    }
+                }
+            } else {
+                // Show existing admin menu
+                adminMenu.classList.remove('hidden');
+                adminMenu.style.display = 'flex';
+            }
+            
+            console.log('[Dashboard] Admin access enabled for', this.user.email);
         } else {
-            adminMenu.classList.add('hidden');
+            // Not admin - hide if exists
+            if (adminMenu) {
+                adminMenu.classList.add('hidden');
+                adminMenu.style.display = 'none';
+            }
         }
     }
 
@@ -358,7 +407,6 @@ class DashboardController {
         }
         
         try {
-            // Read file and parse trades
             const text = await file.text();
             const trades = JSON.parse(text);
             const result = await api.analyzeJournal(trades);

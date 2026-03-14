@@ -3,975 +3,1926 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways Trading Dashboard</title>
-
-    <!-- External Libraries -->
+    <title>Pipways Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.canvasjs.com/canvasjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#0f172a',
-                        secondary: '#1e293b',
-                        accent: '#3b82f6',
-                        success: '#10b981',
-                        danger: '#ef4444',
-                        warning: '#f59e0b'
-                    }
-                }
-            }
-        }
-    </script>
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .nav-item.active {
-            background: linear-gradient(90deg, #3b82f6 0%, transparent 100%);
-            border-left: 3px solid #3b82f6;
-        }
-        .fade-in {
-            animation: fadeIn 0.3s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .chart-container {
-            height: 400px;
-            width: 100%;
-        }
-        .metric-card {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-        }
-        .upload-zone {
-            border: 2px dashed #3b82f6;
-            background: rgba(59, 130, 246, 0.05);
-            transition: all 0.3s;
-        }
-        .upload-zone:hover {
-            background: rgba(59, 130, 246, 0.1);
-            border-color: #60a5fa;
-        }
-        .skill-btn.selected {
-            background: #3b82f6;
-            border-color: #3b82f6;
-        }
-        .trade-entry {
-            border-left: 3px solid #3b82f6;
-        }
-        .trade-entry.profit {
-            border-left-color: #10b981;
-        }
-        .trade-entry.loss {
-            border-left-color: #ef4444;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8,0,1,1); } 50% { transform: translateY(0); animation-timing-function: cubic-bezier(0,0,0.2,1); } }
+        .animate-bounce { animation: bounce 1s infinite; }
+        .typing-dot { animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
     </style>
-<base target="_blank">
 </head>
-<body class="bg-primary text-gray-100 min-h-screen">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <aside class="w-64 bg-secondary border-r border-gray-700 flex flex-col">
-            <div class="p-6 border-b border-gray-700">
-                <h1 class="text-2xl font-bold text-blue-400"><i class="fas fa-chart-line mr-2"></i>Pipways</h1>
-                <p class="text-xs text-gray-400 mt-1">Trading Intelligence Platform</p>
-            </div>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
 
-            <nav class="flex-1 py-4">
-                <a href="#" onclick="showSection('trade-journal')" class="nav-item active flex items-center px-6 py-3 hover:bg-gray-700 transition" id="nav-trade-journal">
-                    <i class="fas fa-book w-6"></i>
-                    <span>Trade Journal</span>
-                </a>
-                <a href="#" onclick="showSection('chart-analysis')" class="nav-item flex items-center px-6 py-3 hover:bg-gray-700 transition" id="nav-chart-analysis">
-                    <i class="fas fa-chart-candlestick w-6"></i>
-                    <span>Chart Analysis</span>
-                </a>
-                <a href="#" onclick="showSection('ai-mentor')" class="nav-item flex items-center px-6 py-3 hover:bg-gray-700 transition" id="nav-ai-mentor">
-                    <i class="fas fa-robot w-6"></i>
-                    <span>AI Mentor</span>
-                </a>
-                <a href="#" onclick="showSection('performance')" class="nav-item flex items-center px-6 py-3 hover:bg-gray-700 transition" id="nav-performance">
-                    <i class="fas fa-analytics w-6"></i>
-                    <span>Performance Analytics</span>
-                </a>
-                <a href="#" onclick="showSection('cms')" class="nav-item flex items-center px-6 py-3 hover:bg-gray-700 transition" id="nav-cms">
-                    <i class="fas fa-folder-open w-6"></i>
-                    <span>My Content</span>
-                </a>
-            </nav>
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden fixed top-4 left-4 z-50">
+        <button id="mobile-menu-btn" class="bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-700 text-white">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
 
-            <div class="p-4 border-t border-gray-700">
-                <div class="flex items-center gap-3">
-                    <img src="https://ui-avatars.com/api/?name=Trader&background=3b82f6&color=fff" class="w-10 h-10 rounded-full">
-                    <div>
-                        <p class="font-medium">Senior Trader</p>
-                        <p class="text-xs text-gray-400">Pro Account</p>
-                    </div>
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <!-- Logo -->
+        <div class="p-6 border-b border-gray-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-xl tracking-tight">Pipways</h1>
+                    <p class="text-xs text-gray-500">Trading Platform</p>
                 </div>
             </div>
-        </aside>
+        </div>
 
-        <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto p-6">
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Main</div>
+            
+            <a href="#" data-section="dashboard" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white bg-purple-600 transition-all">
+                <i class="fas fa-home w-5"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-satellite-dish w-5"></i>
+                <span>Trading Signals</span>
+            </a>
+            
+            <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-book w-5"></i>
+                <span>Trading Journal</span>
+            </a>
+            
+            <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-chart-line w-5"></i>
+                <span>Chart Analysis</span>
+            </a>
+            
+            <a href="#" data-section="performance" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-chart-bar w-5"></i>
+                <span>Performance</span>
+            </a>
+            
+            <a href="#" data-section="mentor" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-robot w-5"></i>
+                <span>AI Mentor</span>
+            </a>
 
-            <!-- Trade Journal Section -->
-            <section id="trade-journal" class="section-content fade-in">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 class="text-3xl font-bold">Trade Journal</h2>
-                        <p class="text-gray-400">Log trades with screenshots and analyze results</p>
-                    </div>
-                    <button onclick="openTradeModal()" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2">
-                        <i class="fas fa-plus"></i> New Trade
-                    </button>
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-2 px-2">Education</div>
+            
+            <a href="#" data-section="courses" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-graduation-cap w-5"></i>
+                <span>Courses</span>
+            </a>
+            
+            <a href="#" data-section="webinars" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-video w-5"></i>
+                <span>Webinars</span>
+            </a>
+            
+            <a href="#" data-section="blog" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-newspaper w-5"></i>
+                <span>Blog</span>
+            </a>
+
+            <!-- Admin Menu - Fixed visibility logic -->
+            <div id="admin-menu-container" class="hidden">
+                <div class="text-xs font-semibold text-red-500 uppercase tracking-wider mt-6 mb-2 px-2">Administration</div>
+                <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all border-l-2 border-red-500">
+                    <i class="fas fa-shield-alt w-5 text-red-400"></i>
+                    <span>Admin Dashboard</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- User Profile -->
+        <div class="p-4 border-t border-gray-800">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <i class="fas fa-user text-sm"></i>
                 </div>
-
-                <!-- Upload Zone -->
-                <div class="upload-zone rounded-xl p-8 text-center mb-6 cursor-pointer" onclick="document.getElementById('tradeScreenshot').click()">
-                    <i class="fas fa-cloud-upload-alt text-4xl text-blue-400 mb-3"></i>
-                    <h3 class="text-lg font-semibold mb-1">Upload Trade Screenshots</h3>
-                    <p class="text-gray-400 text-sm">Drop images here or click to browse. AI will analyze trade results from pictures.</p>
-                    <input type="file" id="tradeScreenshot" class="hidden" accept="image/*" multiple onchange="handleTradeImageUpload(event)">
-                    <p class="text-xs text-gray-500 mt-2">Supports: PNG, JPG, JPEG • Max 10MB</p>
+                <div class="flex-1 min-w-0">
+                    <p id="user-name" class="font-medium text-sm truncate">Loading...</p>
+                    <p id="user-email" class="text-xs text-gray-500 truncate">...</p>
                 </div>
+            </div>
+            <button onclick="dashboard.logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-all text-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </button>
+        </div>
+    </aside>
 
-                <!-- Analysis Results -->
-                <div id="tradeAnalysisResults" class="hidden mb-6 glass-panel rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4"><i class="fas fa-magic mr-2 text-purple-400"></i>AI Analysis Results</h3>
-                    <div id="tradeAnalysisContent"></div>
-                </div>
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto h-screen">
+        <!-- Header -->
+        <header class="bg-gray-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+            <div class="md:hidden w-8"></div>
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-white">Dashboard</h2>
+                <p class="text-sm text-gray-400">Welcome back, <span id="header-user-name">Trader</span></p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative p-2 text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-bell text-xl"></i>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+            </div>
+        </header>
 
-                <!-- Trade List -->
-                <div class="grid gap-4" id="tradeList">
-                    <!-- Sample Trade Entry -->
-                    <div class="trade-entry profit glass-panel rounded-lg p-4">
-                        <div class="flex justify-between items-start">
-                            <div class="flex gap-4">
-                                <img src="https://via.placeholder.com/120x80/10b981/ffffff?text=Trade+IMG" class="rounded w-32 h-20 object-cover">
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="text-green-400 font-bold">EUR/USD</span>
-                                        <span class="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded">BUY</span>
-                                        <span class="text-sm text-gray-400">Today, 14:30</span>
-                                    </div>
-                                    <p class="text-sm text-gray-300">Entry: 1.0850 | Exit: 1.0920 | Size: 0.5 lots</p>
-                                    <p class="text-xs text-gray-400 mt-1">Screenshot analyzed: Pattern confirmed breakout</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-2xl font-bold text-green-400">+$350.00</p>
-                                <p class="text-sm text-gray-400">+2.1 R</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Chart Analysis Section -->
-            <section id="chart-analysis" class="section-content hidden fade-in">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 class="text-3xl font-bold">Chart Analysis</h2>
-                        <p class="text-gray-400">AI-powered symbol detection, signals & risk analysis</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Upload Section -->
-                    <div class="lg:col-span-1 space-y-4">
-                        <div class="upload-zone rounded-xl p-6 text-center cursor-pointer" onclick="document.getElementById('chartUpload').click()">
-                            <i class="fas fa-chart-area text-3xl text-blue-400 mb-2"></i>
-                            <h3 class="font-semibold mb-1">Upload Chart</h3>
-                            <p class="text-xs text-gray-400">AI will detect symbol & generate signals</p>
-                            <input type="file" id="chartUpload" class="hidden" accept="image/*" onchange="analyzeChart(event)">
-                        </div>
-
-                        <!-- Analysis Settings -->
-                        <div class="glass-panel rounded-xl p-4">
-                            <h4 class="font-semibold mb-3">Analysis Settings</h4>
-                            <div class="space-y-3">
-                                <div>
-                                    <label class="text-xs text-gray-400">Timeframe</label>
-                                    <select class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
-                                        <option>Auto-Detect</option>
-                                        <option>1H</option>
-                                        <option>4H</option>
-                                        <option>Daily</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-gray-400">Strategy</label>
-                                    <select class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 mt-1">
-                                        <option>Breakout</option>
-                                        <option>Trend Following</option>
-                                        <option>Reversal</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Signal Results -->
-                        <div id="signalResults" class="hidden glass-panel rounded-xl p-4">
-                            <h4 class="font-semibold mb-3 text-blue-400"><i class="fas fa-signal mr-2"></i>Trade Signal</h4>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Symbol:</span>
-                                    <span class="font-semibold" id="detectedSymbol">--</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Signal:</span>
-                                    <span class="font-semibold text-green-400" id="tradeSignal">--</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Entry:</span>
-                                    <span class="font-semibold" id="entryPrice">--</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Stop Loss:</span>
-                                    <span class="font-semibold text-red-400" id="stopLoss">--</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Take Profit:</span>
-                                    <span class="font-semibold text-green-400" id="takeProfit">--</span>
-                                </div>
-                                <div class="flex justify-between border-t border-gray-600 pt-2 mt-2">
-                                    <span class="text-gray-400">Risk:Reward:</span>
-                                    <span class="font-bold text-blue-400" id="riskReward">--</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-400">Confidence:</span>
-                                    <span class="font-semibold" id="confidence">--</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Chart Display -->
-                    <div class="lg:col-span-2">
-                        <div class="glass-panel rounded-xl p-4 h-full">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="font-semibold">Candlestick Analysis</h3>
-                                <div class="flex gap-2">
-                                    <button class="px-3 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600">1H</button>
-                                    <button class="px-3 py-1 bg-blue-600 rounded text-xs">4H</button>
-                                    <button class="px-3 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600">1D</button>
-                                </div>
-                            </div>
-                            <div id="candlestickChart" class="chart-container"></div>
-                            <p class="text-center text-gray-500 text-sm mt-2" id="chartPlaceholder">Upload a chart to generate AI analysis with candlestick visualization</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- AI Mentor Section -->
-            <section id="ai-mentor" class="section-content hidden fade-in">
-                <div class="mb-6">
-                    <h2 class="text-3xl font-bold">AI Trading Mentor</h2>
-                    <p class="text-gray-400">Personalized coaching based on your experience level</p>
-                </div>
-
-                <!-- Skill Level Selection -->
-                <div class="glass-panel rounded-xl p-6 mb-6">
-                    <h3 class="text-lg font-semibold mb-4">Select Your Experience Level</h3>
-                    <div class="grid grid-cols-3 gap-4">
-                        <button onclick="selectSkillLevel('beginner')" class="skill-btn p-4 border border-gray-600 rounded-xl hover:border-blue-500 transition text-left" data-level="beginner">
-                            <i class="fas fa-seedling text-2xl mb-2 text-green-400"></i>
-                            <h4 class="font-semibold">Beginner</h4>
-                            <p class="text-xs text-gray-400 mt-1">New to trading, learning basics</p>
-                        </button>
-                        <button onclick="selectSkillLevel('intermediate')" class="skill-btn p-4 border border-gray-600 rounded-xl hover:border-blue-500 transition text-left" data-level="intermediate">
-                            <i class="fas fa-chart-bar text-2xl mb-2 text-blue-400"></i>
-                            <h4 class="font-semibold">Intermediate</h4>
-                            <p class="text-xs text-gray-400 mt-1">Some experience, refining edge</p>
-                        </button>
-                        <button onclick="selectSkillLevel('advanced')" class="skill-btn p-4 border border-gray-600 rounded-xl hover:border-blue-500 transition text-left" data-level="advanced">
-                            <i class="fas fa-chess-knight text-2xl mb-2 text-purple-400"></i>
-                            <h4 class="font-semibold">Advanced</h4>
-                            <p class="text-xs text-gray-400 mt-1">Consistent trader, optimization</p>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Chat Interface -->
-                <div class="glass-panel rounded-xl flex flex-col h-[500px]">
-                    <div class="p-4 border-b border-gray-700 flex justify-between items-center">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                                <i class="fas fa-robot"></i>
-                            </div>
-                            <div>
-                                <h3 class="font-semibold">Trading Mentor</h3>
-                                <p class="text-xs text-green-400"><i class="fas fa-circle text-[8px] mr-1"></i>Online</p>
-                            </div>
-                        </div>
-                        <span id="currentLevel" class="text-xs bg-gray-700 px-3 py-1 rounded-full">No level selected</span>
-                    </div>
-
-                    <div id="mentorChat" class="flex-1 overflow-y-auto p-4 space-y-4">
-                        <div class="flex gap-3">
-                            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm flex-shrink-0">AI</div>
-                            <div class="bg-gray-700 rounded-lg p-3 max-w-[80%]">
-                                <p>Hello! I'm your AI Trading Mentor. Please select your experience level above so I can provide personalized guidance tailored to your trading journey.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="p-4 border-t border-gray-700">
+        <!-- Content Sections -->
+        <div class="p-6 max-w-7xl mx-auto">
+            
+            <!-- DASHBOARD SECTION -->
+            <section id="section-dashboard" class="section">
+                <!-- Feature Carousel -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-300">Featured</h3>
                         <div class="flex gap-2">
-                            <input type="text" id="mentorInput" placeholder="Ask about your trades, strategy, or psychology..." 
-                                   class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500">
-                            <button onclick="sendMentorMessage()" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg">
-                                <i class="fas fa-paper-plane"></i>
+                            <button id="carousel-prev" class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors text-gray-400">
+                                <i class="fas fa-chevron-left text-sm"></i>
+                            </button>
+                            <button id="carousel-next" class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors text-gray-400">
+                                <i class="fas fa-chevron-right text-sm"></i>
                             </button>
                         </div>
                     </div>
+                    <div id="feature-carousel" class="relative overflow-hidden rounded-2xl"></div>
                 </div>
 
-                <!-- Learning Resources -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <div class="glass-panel rounded-xl p-4">
-                        <i class="fas fa-book-open text-blue-400 text-xl mb-2"></i>
-                        <h4 class="font-semibold mb-1">Strategy Library</h4>
-                        <p class="text-sm text-gray-400">Access proven strategies matched to your level</p>
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-purple-600/20 rounded-lg">
+                                <i class="fas fa-satellite-dish text-purple-400 text-xl"></i>
+                            </div>
+                            <span class="text-xs text-green-400 flex items-center"><i class="fas fa-arrow-up mr-1"></i> Live</span>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Active Signals</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-signals">--</p>
                     </div>
-                    <div class="glass-panel rounded-xl p-4">
-                        <i class="fas fa-video text-blue-400 text-xl mb-2"></i>
-                        <h4 class="font-semibold mb-1">Video Lessons</h4>
-                        <p class="text-sm text-gray-400">Curated educational content</p>
+                    
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-blue-600/20 rounded-lg">
+                                <i class="fas fa-graduation-cap text-blue-400 text-xl"></i>
+                            </div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Courses</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-courses">--</p>
                     </div>
-                    <div class="glass-panel rounded-xl p-4">
-                        <i class="fas fa-clipboard-check text-blue-400 text-xl mb-2"></i>
-                        <h4 class="font-semibold mb-1">Daily Checklist</h4>
-                        <p class="text-sm text-gray-400">Pre-trade routines and mindset prep</p>
+                    
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-green-600/20 rounded-lg">
+                                <i class="fas fa-chart-line text-green-400 text-xl"></i>
+                            </div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Win Rate</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-winrate">--</p>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-pink-600/20 rounded-lg">
+                                <i class="fas fa-robot text-pink-400 text-xl"></i>
+                            </div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">AI Insights</h4>
+                        <p class="text-2xl font-bold text-white">24</p>
                     </div>
                 </div>
             </section>
 
-            <!-- Performance Analytics Section -->
-            <section id="performance" class="section-content hidden fade-in">
-                <div class="mb-6">
-                    <h2 class="text-3xl font-bold">Performance Analytics</h2>
-                    <p class="text-gray-400">Deep insights from your trade journal data</p>
-                </div>
-
-                <!-- Key Metrics Grid -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="metric-card rounded-xl p-4">
-                        <p class="text-gray-400 text-sm">Total P&L</p>
-                        <p class="text-2xl font-bold text-green-400" id="totalPnL">+$12,450</p>
-                        <p class="text-xs text-gray-500">+15.3% MTD</p>
-                    </div>
-                    <div class="metric-card rounded-xl p-4">
-                        <p class="text-gray-400 text-sm">Win Rate</p>
-                        <p class="text-2xl font-bold text-blue-400" id="winRate">58.3%</p>
-                        <p class="text-xs text-gray-500">42W / 30L</p>
-                    </div>
-                    <div class="metric-card rounded-xl p-4">
-                        <p class="text-gray-400 text-sm">Profit Factor</p>
-                        <p class="text-2xl font-bold text-purple-400" id="profitFactor">1.85</p>
-                        <p class="text-xs text-gray-500">Excellent</p>
-                    </div>
-                    <div class="metric-card rounded-xl p-4">
-                        <p class="text-gray-400 text-sm">Avg R:R</p>
-                        <p class="text-2xl font-bold text-yellow-400" id="avgRR">1:2.4</p>
-                        <p class="text-xs text-gray-500">Per trade average</p>
-                    </div>
-                </div>
-
-                <!-- Charts Row -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <!-- Equity Curve -->
-                    <div class="glass-panel rounded-xl p-4">
-                        <h3 class="font-semibold mb-4">Equity Curve</h3>
-                        <canvas id="equityChart" height="250"></canvas>
-                    </div>
-
-                    <!-- Win/Loss Distribution -->
-                    <div class="glass-panel rounded-xl p-4">
-                        <h3 class="font-semibold mb-4">R-Multiple Distribution</h3>
-                        <canvas id="rMultipleChart" height="250"></canvas>
-                    </div>
-                </div>
-
-                <!-- Performance Insights -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="glass-panel rounded-xl p-4">
-                        <h4 class="font-semibold mb-3">Performance by Day</h4>
-                        <canvas id="dayPerformanceChart" height="200"></canvas>
-                    </div>
-
-                    <div class="glass-panel rounded-xl p-4">
-                        <h4 class="font-semibold mb-3">Strategy Performance</h4>
-                        <div class="space-y-3" id="strategyStats">
-                            <div class="flex justify-between items-center p-2 bg-gray-700/50 rounded">
-                                <span class="text-sm">Breakout</span>
-                                <div class="text-right">
-                                    <p class="text-sm font-semibold text-green-400">+5,230</p>
-                                    <p class="text-xs text-gray-400">62% WR</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center p-2 bg-gray-700/50 rounded">
-                                <span class="text-sm">Trend Follow</span>
-                                <div class="text-right">
-                                    <p class="text-sm font-semibold text-green-400">+4,100</p>
-                                    <p class="text-xs text-gray-400">55% WR</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center p-2 bg-gray-700/50 rounded">
-                                <span class="text-sm">Reversal</span>
-                                <div class="text-right">
-                                    <p class="text-sm font-semibold text-red-400">-980</p>
-                                    <p class="text-xs text-gray-400">45% WR</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="glass-panel rounded-xl p-4">
-                        <h4 class="font-semibold mb-3">Psychology Metrics</h4>
-                        <div class="space-y-3">
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-gray-400">Discipline Score</span>
-                                    <span class="font-semibold">87%</span>
-                                </div>
-                                <div class="w-full bg-gray-700 rounded-full h-2">
-                                    <div class="bg-green-500 h-2 rounded-full" style="width: 87%"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-gray-400">Patience Index</span>
-                                    <span class="font-semibold">74%</span>
-                                </div>
-                                <div class="w-full bg-gray-700 rounded-full h-2">
-                                    <div class="bg-blue-500 h-2 rounded-full" style="width: 74%"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-gray-400">Risk Management</span>
-                                    <span class="font-semibold">92%</span>
-                                </div>
-                                <div class="w-full bg-gray-700 rounded-full h-2">
-                                    <div class="bg-purple-500 h-2 rounded-full" style="width: 92%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Trade Analysis Table -->
-                <div class="glass-panel rounded-xl p-4 mt-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="font-semibold">Recent Trade Analysis</h4>
-                        <button class="text-sm text-blue-400 hover:text-blue-300">View All Trades</button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="text-gray-400 border-b border-gray-700">
-                                    <th class="text-left py-2">Date</th>
-                                    <th class="text-left py-2">Symbol</th>
-                                    <th class="text-left py-2">Setup</th>
-                                    <th class="text-left py-2">Entry/Exit</th>
-                                    <th class="text-left py-2">R-Multiple</th>
-                                    <th class="text-left py-2">Result</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tradeHistoryTable">
-                                <!-- Dynamically populated -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- CMS Section (User Content Management) -->
-            <section id="cms" class="section-content hidden fade-in">
+            <!-- SIGNALS SECTION -->
+            <section id="section-signals" class="section hidden">
                 <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-white">Trading Signals</h3>
+                    <select class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-purple-500">
+                        <option>All Pairs</option>
+                        <option>Forex</option>
+                        <option>Crypto</option>
+                        <option>Indices</option>
+                    </select>
+                </div>
+                <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </section>
+
+            <!-- TRADING JOURNAL SECTION - FIXED UPLOAD -->
+            <section id="section-journal" class="section hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2">
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                            <h3 class="text-lg font-bold text-white mb-4">Upload Trading History</h3>
+                            <div id="journal-dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-12 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900">
+                                <input type="file" id="journal-file-input" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.html,.htm,.png,.jpg,.jpeg,.json,.txt">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                                <p class="text-gray-300 mb-2">Drop your trading statement here</p>
+                                <p class="text-sm text-gray-500">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images, JSON</p>
+                            </div>
+                            <div id="upload-status" class="mt-4 hidden"></div>
+                            <div id="journal-analysis" class="hidden mt-6"></div>
+                        </div>
+                    </div>
+                    
                     <div>
-                        <h2 class="text-3xl font-bold">My Content</h2>
-                        <p class="text-gray-400">Manage your personal trading content library</p>
-                    </div>
-                    <button onclick="openContentModal()" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Add Content
-                    </button>
-                </div>
-
-                <!-- Content Categories -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div class="glass-panel rounded-xl p-4 cursor-pointer hover:border-blue-500 transition" onclick="filterContent('all')">
-                        <i class="fas fa-th-large text-blue-400 mb-2"></i>
-                        <h4 class="font-semibold">All Content</h4>
-                        <p class="text-2xl font-bold mt-1">12</p>
-                    </div>
-                    <div class="glass-panel rounded-xl p-4 cursor-pointer hover:border-blue-500 transition" onclick="filterContent('signals')">
-                        <i class="fas fa-signal text-green-400 mb-2"></i>
-                        <h4 class="font-semibold">My Signals</h4>
-                        <p class="text-2xl font-bold mt-1">5</p>
-                    </div>
-                    <div class="glass-panel rounded-xl p-4 cursor-pointer hover:border-blue-500 transition" onclick="filterContent('blogs')">
-                        <i class="fas fa-blog text-purple-400 mb-2"></i>
-                        <h4 class="font-semibold">Trading Notes</h4>
-                        <p class="text-2xl font-bold mt-1">4</p>
-                    </div>
-                    <div class="glass-panel rounded-xl p-4 cursor-pointer hover:border-blue-500 transition" onclick="filterContent('webinars')">
-                        <i class="fas fa-video text-red-400 mb-2"></i>
-                        <h4 class="font-semibold">Recordings</h4>
-                        <p class="text-2xl font-bold mt-1">3</p>
-                    </div>
-                </div>
-
-                <!-- Content Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="contentGrid">
-                    <!-- Sample Content Items -->
-                    <div class="glass-panel rounded-xl p-4 hover:border-blue-500 transition cursor-pointer">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded">Signal</span>
-                            <span class="text-xs text-gray-400">2 days ago</span>
-                        </div>
-                        <h4 class="font-semibold mb-1">EUR/USD Breakout Setup</h4>
-                        <p class="text-sm text-gray-400 mb-3">Long setup identified on 4H timeframe with ascending triangle...</p>
-                        <div class="flex items-center gap-2 text-xs text-gray-500">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Chart attached</span>
-                        </div>
-                    </div>
-
-                    <div class="glass-panel rounded-xl p-4 hover:border-blue-500 transition cursor-pointer">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="bg-purple-500/20 text-purple-400 text-xs px-2 py-1 rounded">Note</span>
-                            <span class="text-xs text-gray-400">1 week ago</span>
-                        </div>
-                        <h4 class="font-semibold mb-1">Psychology Check: FOMO Management</h4>
-                        <p class="text-sm text-gray-400 mb-3">Key insights from today's session on avoiding emotional entries...</p>
-                        <div class="flex items-center gap-2 text-xs text-gray-500">
-                            <i class="fas fa-file-alt"></i>
-                            <span>5 min read</span>
-                        </div>
-                    </div>
-
-                    <div class="glass-panel rounded-xl p-4 hover:border-blue-500 transition cursor-pointer">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded">Recording</span>
-                            <span class="text-xs text-gray-400">2 weeks ago</span>
-                        </div>
-                        <h4 class="font-semibold mb-1">Live Trading Session - March 1</h4>
-                        <p class="text-sm text-gray-400 mb-3">Recorded live trading with commentary on 3 setups...</p>
-                        <div class="flex items-center gap-2 text-xs text-gray-500">
-                            <i class="fas fa-play-circle"></i>
-                            <span>45 mins</span>
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h4 class="font-bold text-white mb-4">Manual Entry</h4>
+                            <form class="space-y-4" onsubmit="event.preventDefault();">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Symbol</label>
+                                    <input type="text" id="manual-symbol" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500" placeholder="EURUSD">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Direction</label>
+                                    <select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500">
+                                        <option value="BUY">Buy</option>
+                                        <option value="SELL">Sell</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
+                                    <input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500" placeholder="1.08500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Exit Price</label>
+                                    <input type="number" id="manual-exit" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500" placeholder="1.09000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">P&L ($)</label>
+                                    <input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500" placeholder="50.00">
+                                </div>
+                                <button type="button" onclick="dashboard.addManualTrade()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors">Add Trade</button>
+                            </form>
                         </div>
                     </div>
                 </div>
             </section>
-        </main>
-    </div>
 
-    <!-- New Trade Modal -->
-    <div id="tradeModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div class="bg-secondary rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold">Add New Trade</h3>
-                <button onclick="closeTradeModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <form id="newTradeForm" onsubmit="saveTrade(event)">
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">Symbol</label>
-                        <input type="text" name="symbol" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" placeholder="EUR/USD">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">Direction</label>
-                        <select name="direction" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
-                            <option value="buy">Buy (Long)</option>
-                            <option value="sell">Sell (Short)</option>
-                        </select>
-                    </div>
+            <!-- COURSES SECTION -->
+            <section id="section-courses" class="section hidden">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h3 class="text-xl font-bold text-white">Trading Courses</h3>
+                    <div id="course-filters" class="flex flex-wrap gap-2"></div>
                 </div>
-                <div class="grid grid-cols-3 gap-4 mb-4">
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
-                        <input type="number" step="0.00001" name="entry" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">Stop Loss</label>
-                        <input type="number" step="0.00001" name="stopLoss" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">Take Profit</label>
-                        <input type="number" step="0.00001" name="takeProfit" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm text-gray-400 mb-1">Trade Screenshot</label>
-                    <input type="file" accept="image/*" name="screenshot" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm text-gray-400 mb-1">Notes</label>
-                    <textarea name="notes" rows="3" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2" placeholder="Setup description, emotions, market conditions..."></textarea>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-semibold">
-                    Save Trade
-                </button>
-            </form>
+                <div id="courses-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- WEBINARS SECTION -->
+            <section id="section-webinars" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Upcoming Webinars</h3>
+                <div id="webinars-container" class="space-y-4"></div>
+            </section>
+
+            <!-- BLOG SECTION -->
+            <section id="section-blog" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Trading Blog</h3>
+                <div id="blog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- ADMIN SECTION -->
+            <section id="section-admin" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Admin Dashboard</h3>
+                <div id="admin-container"></div>
+            </section>
+
+            <!-- AI MENTOR SECTION - ENHANCED -->
+            <section id="section-mentor" class="section hidden"></section>
+
+            <!-- CHART ANALYSIS SECTION - ENHANCED -->
+            <section id="section-analysis" class="section hidden"></section>
+
+            <!-- PERFORMANCE SECTION -->
+            <section id="section-performance" class="section hidden"></section>
+
         </div>
-    </div>
+    </main>
 
     <script>
-        // Navigation
-        function showSection(sectionId) {
-            // Hide all sections
-            document.querySelectorAll('.section-content').forEach(section => {
-                section.classList.add('hidden');
-            });
-
-            // Show selected section
-            document.getElementById(sectionId).classList.remove('hidden');
-
-            // Update nav
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            document.getElementById('nav-' + sectionId).classList.add('active');
-
-            // Initialize charts if needed
-            if (sectionId === 'performance') {
-                setTimeout(initPerformanceCharts, 100);
+        // API CLIENT
+        const API_BASE = window.location.origin;
+        const api = {
+            async request(endpoint, options = {}) {
+                const token = localStorage.getItem('pipways_token');
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                    ...options.headers
+                };
+                
+                if (options.body instanceof FormData) delete headers['Content-Type'];
+                
+                try {
+                    const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+                    if (!res.ok) {
+                        const err = await res.text();
+                        throw new Error(err || `HTTP ${res.status}`);
+                    }
+                    return res.json();
+                } catch (e) {
+                    console.error(`API Error ${endpoint}:`, e);
+                    throw e;
+                }
+            },
+            
+            getSignals() { return this.request('/signals/active'); },
+            getCourses() { return this.request('/courses/list'); },
+            getWebinars() { return this.request('/webinars/upcoming?upcoming=true'); },
+            getBlogPosts() { return this.request('/blog/posts'); },
+            getAdminStats() { return this.request('/admin/users'); },
+            
+            // Enhanced AI Mentor with professional context
+            askMentor(question, skillLevel = 'intermediate') { 
+                return this.request('/ai/mentor/ask', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ 
+                        question, 
+                        skill_level: skillLevel,
+                        context: "You are an expert trading mentor with 20+ years of experience in forex, stocks, and crypto. Provide detailed, actionable advice with specific examples. Always include risk management considerations and psychological aspects of trading."
+                    }) 
+                }); 
+            },
+            
+            // Enhanced Chart Analysis with professional technical analysis
+            analyzeChart(file, symbol, timeframe) {
+                const formData = new FormData();
+                formData.append('file', file);
+                if (symbol) formData.append('symbol', symbol);
+                if (timeframe) formData.append('timeframe', timeframe);
+                formData.append('analysis_depth', 'detailed');
+                formData.append('include_fibonacci', 'true');
+                formData.append('include_key_levels', 'true');
+                
+                return fetch(`${API_BASE}/ai/chart/analyze`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pipways_token')}` },
+                    body: formData
+                }).then(r => r.json());
+            },
+            
+            analyzeJournal(trades) { 
+                return this.request('/ai/performance/analyze-journal', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ 
+                        trades,
+                        include_psychology: true,
+                        include_risk_analysis: true
+                    }) 
+                }); 
+            },
+            
+            getPerformanceStats(days = 30) { 
+                return this.request(`/ai/performance/dashboard?days=${days}`); 
             }
-        }
+        };
 
-        // Trade Journal Functions
-        function openTradeModal() {
-            document.getElementById('tradeModal').classList.remove('hidden');
-        }
+        // DASHBOARD CONTROLLER
+        class DashboardController {
+            constructor() {
+                this.user = null;
+                this.allCourses = [];
+                this.manualTrades = [];
+                this.init();
+            }
 
-        function closeTradeModal() {
-            document.getElementById('tradeModal').classList.add('hidden');
-        }
+            init() {
+                this.checkAuth();
+                this.setupNavigation();
+                this.setupMobileMenu();
+                this.renderAdminMenu();
+                this.initFeatureCarousel();
+                this.loadDashboardStats();
+                this.navigate('dashboard');
+            }
 
-        function saveTrade(event) {
-            event.preventDefault();
-            // Add trade logic here
-            closeTradeModal();
-            alert('Trade saved successfully!');
-        }
+            checkAuth() {
+                const token = localStorage.getItem('pipways_token');
+                const userStr = localStorage.getItem('pipways_user');
+                
+                if (!token || !userStr) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                try {
+                    this.user = JSON.parse(userStr);
+                    console.log('User loaded:', this.user); // Debug
+                    this.updateUserDisplay();
+                } catch (e) {
+                    console.error('Auth error:', e);
+                    window.location.href = '/';
+                }
+            }
 
-        function handleTradeImageUpload(event) {
-            const files = event.target.files;
-            if (files.length > 0) {
-                const resultsDiv = document.getElementById('tradeAnalysisResults');
-                const contentDiv = document.getElementById('tradeAnalysisContent');
+            updateUserDisplay() {
+                const user = this.user || {};
+                const userNameEl = document.getElementById('user-name');
+                const userEmailEl = document.getElementById('user-email');
+                const headerUserNameEl = document.getElementById('header-user-name');
+                
+                if (userNameEl) userNameEl.textContent = user.full_name || user.email || 'User';
+                if (userEmailEl) userEmailEl.textContent = user.email || '';
+                if (headerUserNameEl) headerUserNameEl.textContent = user.full_name || user.email || 'Trader';
+            }
 
+            // FIXED: Better admin detection
+            renderAdminMenu() {
+                console.log('Checking admin status:', this.user);
+                
+                // Check multiple possible admin indicators
+                const isAdmin = this.user && (
+                    this.user.is_admin === true || 
+                    this.user.role === 'admin' ||
+                    this.user.is_superuser === true ||
+                    this.user.email?.includes('admin') ||
+                    (this.user.full_name && this.user.full_name.toLowerCase().includes('administrator'))
+                );
+                
+                console.log('Is admin:', isAdmin);
+                
+                const adminMenu = document.getElementById('admin-menu-container');
+                if (adminMenu) {
+                    if (isAdmin) {
+                        adminMenu.classList.remove('hidden');
+                        adminMenu.style.display = 'block';
+                        console.log('[Dashboard] Admin access enabled');
+                    } else {
+                        adminMenu.classList.add('hidden');
+                        adminMenu.style.display = 'none';
+                    }
+                }
+            }
+
+            setupNavigation() {
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const section = e.currentTarget.dataset.section;
+                        if (section) this.navigate(section);
+                    });
+                });
+            }
+
+            setupMobileMenu() {
+                const btn = document.getElementById('mobile-menu-btn');
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                
+                if (btn && sidebar) {
+                    btn.addEventListener('click', () => {
+                        sidebar.classList.toggle('-translate-x-full');
+                        overlay?.classList.toggle('hidden');
+                    });
+                }
+                
+                if (overlay) {
+                    overlay.addEventListener('click', () => {
+                        sidebar.classList.add('-translate-x-full');
+                        overlay.classList.add('hidden');
+                    });
+                }
+            }
+
+            navigate(section) {
+                // Update nav active state
+                document.querySelectorAll('.nav-link').forEach(el => {
+                    el.classList.remove('bg-purple-600', 'text-white');
+                    el.classList.add('text-gray-300');
+                });
+                
+                const activeLink = document.querySelector(`[data-section="${section}"]`);
+                if (activeLink) {
+                    activeLink.classList.add('bg-purple-600', 'text-white');
+                    activeLink.classList.remove('text-gray-300');
+                }
+
+                // Hide all sections
+                document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+                
+                // Show target section
+                const target = document.getElementById(`section-${section}`);
+                if (target) {
+                    target.classList.remove('hidden');
+                    this.loadSectionData(section);
+                }
+
+                // Update title
+                const titles = {
+                    'dashboard': 'Dashboard',
+                    'signals': 'Trading Signals',
+                    'journal': 'Trading Journal',
+                    'courses': 'Trading Courses',
+                    'webinars': 'Webinars',
+                    'blog': 'Trading Blog',
+                    'admin': 'Admin Dashboard',
+                    'analysis': 'Chart Analysis',
+                    'performance': 'Performance Analytics',
+                    'mentor': 'AI Mentor'
+                };
+                
+                const pageTitle = document.getElementById('page-title');
+                if (pageTitle) pageTitle.textContent = titles[section] || 'Dashboard';
+
+                // Close mobile menu
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (sidebar) sidebar.classList.add('-translate-x-full');
+                if (overlay) overlay.classList.add('hidden');
+            }
+
+            async loadSectionData(section) {
+                try {
+                    switch(section) {
+                        case 'dashboard': 
+                            this.loadDashboardStats();
+                            break;
+                        case 'signals': 
+                            await this.loadSignals(); 
+                            break;
+                        case 'courses': 
+                            await this.loadCourses(); 
+                            break;
+                        case 'webinars': 
+                            await this.loadWebinars(); 
+                            break;
+                        case 'blog': 
+                            await this.loadBlog(); 
+                            break;
+                        case 'journal': 
+                            this.setupJournalUpload(); 
+                            break;
+                        case 'admin': 
+                            await this.loadAdminData(); 
+                            break;
+                        case 'mentor': 
+                            await this.loadMentor(); 
+                            break;
+                        case 'analysis': 
+                            await this.loadChartAnalysis(); 
+                            break;
+                        case 'performance': 
+                            await this.loadPerformance(); 
+                            break;
+                    }
+                } catch (err) {
+                    console.error(`[Dashboard] Error loading ${section}:`, err);
+                }
+            }
+
+            async loadDashboardStats() {
+                try {
+                    const signals = await api.getSignals();
+                    document.getElementById('stat-signals').textContent = Array.isArray(signals) ? signals.length : '--';
+                } catch (e) {
+                    document.getElementById('stat-signals').textContent = '--';
+                }
+                
+                try {
+                    const courses = await api.getCourses();
+                    const courseList = Array.isArray(courses) ? courses : (courses.courses || []);
+                    document.getElementById('stat-courses').textContent = courseList.length;
+                } catch (e) {
+                    document.getElementById('stat-courses').textContent = '--';
+                }
+            }
+
+            async loadSignals() {
+                const container = document.getElementById('signals-container');
+                if (!container) return;
+                
+                this.showSkeleton(container, 3);
+                
+                try {
+                    const data = await api.getSignals();
+                    const signals = Array.isArray(data) ? data : (data.signals || []);
+                    
+                    if (!signals || signals.length === 0) {
+                        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No active signals available</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = signals.map(signal => `
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-white text-lg">${signal.symbol}</h4>
+                                <span class="px-2 py-1 rounded text-xs font-bold ${signal.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${signal.direction}</span>
+                            </div>
+                            <div class="text-sm text-gray-400 space-y-1">
+                                <div class="flex justify-between"><span>Entry:</span> <span class="text-white font-mono">${signal.entry_price}</span></div>
+                                <div class="flex justify-between"><span>SL:</span> <span class="text-red-400 font-mono">${signal.stop_loss}</span></div>
+                                <div class="flex justify-between"><span>TP:</span> <span class="text-green-400 font-mono">${signal.take_profit}</span></div>
+                                <div class="flex justify-between"><span>Timeframe:</span> <span>${signal.timeframe || 'N/A'}</span></div>
+                            </div>
+                            <div class="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-500 flex justify-between">
+                                <span>${new Date(signal.created_at).toLocaleDateString()}</span>
+                                ${signal.ai_confidence ? `<span class="text-purple-400">AI: ${Math.round(signal.ai_confidence * 100)}%</span>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                } catch (error) {
+                    console.error('[Signals Error]', error);
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load signals. Please try again.</div>';
+                }
+            }
+
+            async loadCourses() {
+                const container = document.getElementById('courses-container');
+                if (!container) return;
+                
+                this.showSkeleton(container, 4);
+                
+                try {
+                    const data = await api.getCourses();
+                    this.allCourses = Array.isArray(data) ? data : (data.courses || []);
+                    
+                    if (this.allCourses.length === 0) {
+                        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available</div>';
+                        return;
+                    }
+                    
+                    this.renderCourses(this.allCourses);
+                    this.setupCourseFilters();
+                } catch (error) {
+                    console.error('[Courses Error]', error);
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load courses</div>';
+                }
+            }
+
+            setupCourseFilters() {
+                const filterContainer = document.getElementById('course-filters');
+                if (!filterContainer) return;
+                
+                const levels = ['All', 'Beginner', 'Intermediate', 'Advanced'];
+                filterContainer.innerHTML = levels.map(level => `
+                    <button onclick="dashboard.filterCourses('${level}')" 
+                            class="filter-btn px-4 py-2 rounded-full text-sm transition-colors ${level === 'All' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
+                            data-level="${level}">
+                        ${level}
+                    </button>
+                `).join('');
+            }
+
+            filterCourses(level) {
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    const isActive = btn.dataset.level === level;
+                    btn.className = `filter-btn px-4 py-2 rounded-full text-sm transition-colors ${isActive ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`;
+                });
+                
+                if (level === 'All') {
+                    this.renderCourses(this.allCourses);
+                } else {
+                    const filtered = this.allCourses.filter(c => c.level?.toLowerCase() === level.toLowerCase());
+                    this.renderCourses(filtered);
+                }
+            }
+
+            renderCourses(courses) {
+                const container = document.getElementById('courses-container');
+                if (!courses || courses.length === 0) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available for this level</div>';
+                    return;
+                }
+                
+                container.innerHTML = courses.map(course => `
+                    <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-all hover:transform hover:-translate-y-1">
+                        <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
+                            <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs text-purple-400 font-semibold">${course.level || 'Beginner'}</span>
+                                ${course.progress > 0 ? `<span class="text-xs text-green-400">${course.progress}% complete</span>` : ''}
+                            </div>
+                            <h4 class="font-bold text-white mb-2">${course.title}</h4>
+                            <p class="text-sm text-gray-400 mb-3 line-clamp-2">${course.description || ''}</p>
+                            <div class="flex justify-between items-center text-xs text-gray-500">
+                                <span>${course.lesson_count || 0} lessons</span>
+                                <button class="text-purple-400 hover:text-purple-300 font-medium">Start Learning →</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            async loadWebinars() {
+                const container = document.getElementById('webinars-container');
+                if (!container) return;
+                
+                this.showSkeleton(container, 2);
+                
+                try {
+                    const data = await api.getWebinars();
+                    const webinars = Array.isArray(data) ? data : (data.webinars || []);
+                    
+                    if (!webinars || webinars.length === 0) {
+                        container.innerHTML = '<div class="text-center py-12 text-gray-500 bg-gray-800 rounded-lg border border-gray-700"><i class="fas fa-calendar-times text-4xl mb-3 opacity-50"></i><p>No upcoming webinars scheduled</p><button onclick="dashboard.navigate(\'courses\')" class="mt-4 text-purple-400 hover:text-purple-300">Browse Courses Instead</button></div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = webinars.map(webinar => {
+                        const date = new Date(webinar.scheduled_at);
+                        const isUpcoming = date > new Date();
+                        
+                        return `
+                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div class="flex gap-4">
+                                    <div class="text-center min-w-[60px] bg-gray-700 rounded-lg p-2">
+                                        <div class="text-xl font-bold text-purple-400">${date.getDate()}</div>
+                                        <div class="text-xs text-gray-400 uppercase">${date.toLocaleString('default', {month: 'short'})}</div>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-white">${webinar.title}</h4>
+                                        <p class="text-sm text-gray-400 line-clamp-2">${webinar.description || ''}</p>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            <span class="mr-3"><i class="fas fa-user mr-1"></i> ${webinar.presenter || 'TBA'}</span>
+                                            <span><i class="fas fa-clock mr-1"></i> ${webinar.duration_minutes || 60} mins</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="${isUpcoming ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 cursor-not-allowed'} text-white px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap" ${!isUpcoming ? 'disabled' : ''}>
+                                    ${isUpcoming ? 'Register Now' : 'Completed'}
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                } catch (error) {
+                    console.error('[Webinars Error]', error);
+                    container.innerHTML = '<div class="text-center py-12 text-gray-500 bg-gray-800 rounded-lg border border-gray-700"><i class="fas fa-exclamation-circle text-4xl mb-3 text-red-400"></i><p>Failed to load webinars</p><button onclick="dashboard.loadWebinars()" class="mt-4 text-purple-400 hover:text-purple-300">Try Again</button></div>';
+                }
+            }
+
+            async loadBlog() {
+                const container = document.getElementById('blog-container');
+                if (!container) return;
+                
+                this.showSkeleton(container, 3);
+                
+                try {
+                    const data = await api.getBlogPosts();
+                    const posts = Array.isArray(data) ? data : (data.posts || []);
+                    
+                    if (!posts || posts.length === 0) {
+                        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500 bg-gray-800 rounded-lg border border-gray-700"><i class="fas fa-newspaper text-4xl mb-3 opacity-50"></i><p>No articles available yet</p></div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = posts.map(post => `
+                        <article class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-all cursor-pointer group" onclick="alert('Article: ${post.title}')">
+                            <div class="h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center relative overflow-hidden">
+                                <i class="fas fa-newspaper text-5xl text-white/20 group-hover:scale-110 transition-transform duration-500"></i>
+                                <div class="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-xs text-white">${post.read_time || '5 min read'}</div>
+                            </div>
+                            <div class="p-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs text-purple-400 uppercase tracking-wide font-semibold">${post.category || 'General'}</span>
+                                    <span class="text-xs text-gray-500">${new Date(post.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <h4 class="font-bold text-white mb-2 group-hover:text-purple-400 transition-colors line-clamp-2">${post.title}</h4>
+                                <p class="text-sm text-gray-400 line-clamp-3 mb-3">${post.excerpt || post.content?.substring(0, 150) + '...' || ''}</p>
+                                <div class="text-purple-400 text-sm font-medium">Read article <i class="fas fa-arrow-right ml-1 text-xs"></i></div>
+                            </div>
+                        </article>
+                    `).join('');
+                } catch (error) {
+                    console.error('[Blog Error]', error);
+                    container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500 bg-gray-800 rounded-lg border border-gray-700"><i class="fas fa-exclamation-circle text-4xl mb-3 text-red-400"></i><p>Failed to load articles</p><button onclick="dashboard.loadBlog()" class="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Retry</button></div>';
+                }
+            }
+
+            async loadAdminData() {
+                const container = document.getElementById('admin-container');
+                if (!container) return;
+                
+                container.innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>';
+                
+                try {
+                    const stats = await api.getAdminStats();
+                    container.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-3xl font-bold text-white">${stats.total_users || 0}</div>
+                                    <div class="p-2 bg-blue-900/50 rounded-lg"><i class="fas fa-users text-blue-400"></i></div>
+                                </div>
+                                <div class="text-sm text-gray-400">Total Users</div>
+                            </div>
+                            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-3xl font-bold text-white">${stats.active_signals || 0}</div>
+                                    <div class="p-2 bg-green-900/50 rounded-lg"><i class="fas fa-satellite-dish text-green-400"></i></div>
+                                </div>
+                                <div class="text-sm text-gray-400">Active Signals</div>
+                            </div>
+                            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-3xl font-bold text-white">${stats.new_today || 0}</div>
+                                    <div class="p-2 bg-purple-900/50 rounded-lg"><i class="fas fa-user-plus text-purple-400"></i></div>
+                                </div>
+                                <div class="text-sm text-gray-400">New Today</div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-6">
+                            <h4 class="font-bold text-white mb-4">Quick Actions</h4>
+                            <div class="flex flex-wrap gap-3">
+                                <button onclick="alert('Create Signal - Admin Feature')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Create Signal</button>
+                                <button onclick="alert('Add Course - Admin Feature')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Add Course</button>
+                                <button onclick="alert('Schedule Webinar - Admin Feature')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Schedule Webinar</button>
+                                <button onclick="alert('New Blog Post - Admin Feature')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> New Blog Post</button>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                            <h4 class="font-bold text-white mb-4">System Status</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-300">API Status</span>
+                                    <span class="text-green-400 flex items-center gap-2"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Operational</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-300">Database</span>
+                                    <span class="text-green-400 flex items-center gap-2"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Connected</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-300">AI Services</span>
+                                    <span class="text-green-400 flex items-center gap-2"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Active</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('[Admin Error]', error);
+                    container.innerHTML = '<div class="text-red-400 p-4 bg-red-900/20 rounded-lg border border-red-800">Error loading admin data. Please ensure you have admin privileges.</div>';
+                }
+            }
+
+            // FIXED: Smart file upload handling for Journal
+            setupJournalUpload() {
+                const dropZone = document.getElementById('journal-dropzone');
+                const fileInput = document.getElementById('journal-file-input');
+                if (!dropZone || !fileInput) return;
+                
+                dropZone.addEventListener('click', () => fileInput.click());
+                
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
+                });
+                
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                });
+                
+                dropZone.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                    const file = e.dataTransfer.files[0];
+                    if (file) await this.handleJournalFile(file);
+                });
+                
+                fileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (file) await this.handleJournalFile(file);
+                });
+            }
+
+            async handleJournalFile(file) {
+                const statusEl = document.getElementById('upload-status');
+                const analysisEl = document.getElementById('journal-analysis');
+                
+                if (statusEl) {
+                    statusEl.classList.remove('hidden');
+                    statusEl.innerHTML = `<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Processing ${file.name}...</span>`;
+                }
+                
+                try {
+                    const fileType = file.type;
+                    const fileName = file.name.toLowerCase();
+                    
+                    // Handle different file types appropriately
+                    if (fileType.startsWith('image/') || fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+                        // Images should go to chart analysis, not journal JSON parser
+                        if (statusEl) {
+                            statusEl.innerHTML = `<span class="text-yellow-400"><i class="fas fa-info-circle mr-2"></i>Image detected. Redirecting to Chart Analysis...</span>`;
+                        }
+                        setTimeout(() => {
+                            this.navigate('analysis');
+                            // Pre-load the image in chart analysis
+                            setTimeout(() => this.handleChartUpload(file), 500);
+                        }, 1000);
+                        return;
+                    }
+                    
+                    if (fileName.endsWith('.json') || fileName.endsWith('.txt')) {
+                        // Parse as JSON
+                        const text = await file.text();
+                        const trades = JSON.parse(text);
+                        await this.processTrades(trades);
+                    } else if (fileName.endsWith('.csv')) {
+                        // Parse CSV
+                        const text = await file.text();
+                        const trades = this.parseCSV(text);
+                        await this.processTrades(trades);
+                    } else {
+                        // For PDF, Excel, HTML - show message that manual entry or JSON export is needed
+                        if (statusEl) {
+                            statusEl.innerHTML = `
+                                <div class="text-yellow-400 mb-2"><i class="fas fa-info-circle mr-2"></i>File type not directly supported</div>
+                                <div class="text-sm text-gray-400">Please convert to JSON format or use manual entry. <a href="#" onclick="dashboard.showJSONTemplate()" class="text-purple-400 underline">View template</a></div>
+                            `;
+                        }
+                    }
+                } catch (error) {
+                    console.error('[Upload Error]', error);
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-circle mr-2"></i>${error.message}</span>`;
+                    }
+                }
+            }
+
+            parseCSV(csvText) {
+                const lines = csvText.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                const trades = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    const trade = {};
+                    headers.forEach((header, index) => {
+                        trade[header] = values[index]?.trim();
+                    });
+                    trades.push(trade);
+                }
+                
+                return trades;
+            }
+
+            async processTrades(trades) {
+                const statusEl = document.getElementById('upload-status');
+                const analysisEl = document.getElementById('journal-analysis');
+                
+                if (!Array.isArray(trades)) {
+                    throw new Error('Invalid data format. Expected array of trades.');
+                }
+                
+                if (statusEl) {
+                    statusEl.innerHTML = `<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Analyzing ${trades.length} trades...</span>`;
+                }
+                
+                try {
+                    const result = await api.analyzeJournal(trades);
+                    
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analysis complete! Found ${result.statistics?.total_trades || 0} trades</span>`;
+                    }
+                    
+                    this.renderJournalAnalysis(result);
+                } catch (error) {
+                    throw new Error('Analysis failed: ' + error.message);
+                }
+            }
+
+            showJSONTemplate() {
+                const template = `[{
+    "entry_date": "2024-01-01",
+    "symbol": "EURUSD",
+    "direction": "BUY",
+    "entry_price": 1.0850,
+    "exit_price": 1.0900,
+    "pnl": 50.00,
+    "outcome": "win",
+    "volume": 0.1,
+    "stop_loss": 1.0800,
+    "take_profit": 1.0950
+}]`;
+                alert('JSON Template:\n\n' + template);
+            }
+
+            addManualTrade() {
+                const symbol = document.getElementById('manual-symbol').value;
+                const direction = document.getElementById('manual-direction').value;
+                const entry = parseFloat(document.getElementById('manual-entry').value);
+                const exit = parseFloat(document.getElementById('manual-exit').value);
+                const pnl = parseFloat(document.getElementById('manual-pnl').value);
+                
+                if (!symbol || !entry || !exit) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+                
+                const trade = {
+                    entry_date: new Date().toISOString().split('T')[0],
+                    symbol: symbol,
+                    direction: direction,
+                    entry_price: entry,
+                    exit_price: exit,
+                    pnl: pnl || 0,
+                    outcome: pnl > 0 ? 'win' : 'loss'
+                };
+                
+                this.manualTrades.push(trade);
+                this.processTrades(this.manualTrades);
+                
+                // Clear form
+                document.getElementById('manual-symbol').value = '';
+                document.getElementById('manual-entry').value = '';
+                document.getElementById('manual-exit').value = '';
+                document.getElementById('manual-pnl').value = '';
+            }
+
+            renderJournalAnalysis(result) {
+                const container = document.getElementById('journal-analysis');
+                if (!container) return;
+                
+                const stats = result.statistics || {};
+                
+                container.innerHTML = `
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="text-lg font-bold text-white">Analysis Results</h4>
+                            <span class="px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm">
+                                Grade: ${result.overall_grade || 'N/A'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                <div class="text-2xl font-bold text-white mb-1">${stats.total_trades || 0}</div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide">Total Trades</div>
+                            </div>
+                            <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                <div class="text-2xl font-bold ${stats.win_rate >= 50 ? 'text-green-400' : 'text-red-400'} mb-1">${stats.win_rate || 0}%</div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide">Win Rate</div>
+                            </div>
+                            <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                <div class="text-2xl font-bold ${stats.profit_factor >= 1 ? 'text-green-400' : 'text-red-400'} mb-1">${stats.profit_factor?.toFixed(2) || '0.00'}</div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide">Profit Factor</div>
+                            </div>
+                            <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                <div class="text-2xl font-bold text-blue-400 mb-1">$${stats.total_pnl?.toFixed(2) || '0.00'}</div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wide">Net P&L</div>
+                            </div>
+                        </div>
+                        
+                        ${result.improvements?.length ? `
+                            <div class="space-y-3">
+                                <h5 class="font-semibold text-gray-300 text-sm uppercase tracking-wide mb-3">AI Recommendations:</h5>
+                                ${result.improvements.map(i => `
+                                    <div class="p-4 bg-blue-900/20 rounded-lg border-l-4 border-blue-500 text-sm text-blue-200 flex items-start gap-3">
+                                        <i class="fas fa-lightbulb text-blue-400 mt-0.5"></i>
+                                        <span>${i}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        ${result.psychology_insights ? `
+                            <div class="mt-6 p-4 bg-purple-900/20 rounded-lg border border-purple-800">
+                                <h5 class="font-semibold text-purple-300 text-sm mb-2"><i class="fas fa-brain mr-2"></i>Psychology Insights</h5>
+                                <p class="text-sm text-gray-300">${result.psychology_insights}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                container.classList.remove('hidden');
+            }
+
+            // ENHANCED AI Mentor with professional interface
+            async loadMentor() {
+                const container = document.getElementById('section-mentor');
+                if (!container) return;
+                
+                container.innerHTML = `
+                    <div class="max-w-6xl mx-auto h-[calc(100vh-200px)]">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                            <div class="lg:col-span-2 bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700 shadow-2xl">
+                                <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gradient-to-r from-gray-800 to-gray-750">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg animate-pulse">
+                                            <i class="fas fa-robot text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-bold text-white text-lg">AI Trading Mentor</h3>
+                                            <p class="text-xs text-green-400 flex items-center gap-1">
+                                                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                                Online • Advanced AI Analysis
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button onclick="dashboard.clearMentorChat()" class="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition-colors" title="Clear chat">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                        <button onclick="dashboard.exportChat()" class="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition-colors" title="Export chat">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900 min-h-0">
+                                    <div class="flex gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0 shadow-lg">
+                                            <i class="fas fa-robot"></i>
+                                        </div>
+                                        <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none max-w-[85%] sm:max-w-[80%] border border-gray-700 shadow-lg">
+                                            <p class="text-gray-200 leading-relaxed">Welcome to your Personal AI Trading Mentor! 🎯</p>
+                                            <p class="text-gray-400 text-sm mt-2">I can help you with:</p>
+                                            <ul class="text-sm text-gray-400 mt-1 space-y-1 ml-4">
+                                                <li>• Advanced technical analysis & pattern recognition</li>
+                                                <li>• Risk management & position sizing strategies</li>
+                                                <li>• Trading psychology & emotional control</li>
+                                                <li>• Market structure & price action analysis</li>
+                                                <li>• Backtesting strategy validation</li>
+                                            </ul>
+                                            <p class="text-gray-300 text-sm mt-3 italic">What would you like to explore today?</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-xl">
+                                    <div class="flex gap-2 mb-3">
+                                        <input type="text" id="mentor-input" 
+                                            placeholder="Ask about trading strategies, risk management, market analysis..." 
+                                            class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                                            onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
+                                        <button onclick="dashboard.sendMentorMessage()" 
+                                            class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg transition-all flex items-center justify-center shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                        <button onclick="dashboard.askMentor('Analyze the current market structure for EURUSD and identify key support/resistance levels')" class="whitespace-nowrap px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full text-xs text-gray-300 transition-colors">Market Analysis</button>
+                                        <button onclick="dashboard.askMentor('What is the optimal position sizing strategy for a $10,000 account with 2% risk per trade?')" class="whitespace-nowrap px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full text-xs text-gray-300 transition-colors">Risk Management</button>
+                                        <button onclick="dashboard.askMentor('How do I overcome FOMO and stick to my trading plan?')" class="whitespace-nowrap px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full text-xs text-gray-300 transition-colors">Psychology</button>
+                                        <button onclick="dashboard.askMentor('Explain the ICT Inner Circle Trader concepts: FVG, OB, andBreaker Blocks')" class="whitespace-nowrap px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-full text-xs text-gray-300 transition-colors">ICT Concepts</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4 hidden lg:block">
+                                <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                                    <h4 class="font-bold text-white mb-4 flex items-center gap-2">
+                                        <i class="fas fa-star text-yellow-400"></i>
+                                        Expert Topics
+                                    </h4>
+                                    <div class="space-y-2">
+                                        <button onclick="dashboard.askMentor('Explain Smart Money Concepts and order flow trading in detail')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-700 text-sm text-gray-300 transition-all flex items-center gap-2 group">
+                                            <i class="fas fa-chart-line text-blue-400 group-hover:scale-110 transition-transform"></i>
+                                            <span>Smart Money Concepts</span>
+                                        </button>
+                                        <button onclick="dashboard.askMentor('What are the best risk management rules for prop firm trading challenges?')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-700 text-sm text-gray-300 transition-all flex items-center gap-2 group">
+                                            <i class="fas fa-shield-alt text-green-400 group-hover:scale-110 transition-transform"></i>
+                                            <span>Prop Firm Strategies</span>
+                                        </button>
+                                        <button onclick="dashboard.askMentor('How to identify and trade institutional order blocks effectively?')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-700 text-sm text-gray-300 transition-all flex items-center gap-2 group">
+                                            <i class="fas fa-university text-purple-400 group-hover:scale-110 transition-transform"></i>
+                                            <span>Order Blocks</span>
+                                        </button>
+                                        <button onclick="dashboard.askMentor('Create a daily trading routine for a forex day trader')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-700 text-sm text-gray-300 transition-all flex items-center gap-2 group">
+                                            <i class="fas fa-calendar-alt text-orange-400 group-hover:scale-110 transition-transform"></i>
+                                            <span>Trading Routine</span>
+                                        </button>
+                                        <button onclick="dashboard.askMentor('Explain liquidity grabs and stop hunting in forex markets')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-700 text-sm text-gray-300 transition-all flex items-center gap-2 group">
+                                            <i class="fas fa-fishing-rod text-red-400 group-hover:scale-110 transition-transform"></i>
+                                            <span>Liquidity Concepts</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 rounded-xl p-5 border border-yellow-800/50">
+                                    <h4 class="font-bold text-white mb-3 flex items-center gap-2">
+                                        <i class="fas fa-lightbulb text-yellow-400"></i>
+                                        Daily Trading Wisdom
+                                    </h4>
+                                    <p class="text-sm text-gray-300 italic leading-relaxed">"The goal of a successful trader is to make the best trades. Money is secondary. If you focus on the process, profits will follow."</p>
+                                    <div class="mt-3 text-xs text-gray-500">— Alexander Elder</div>
+                                </div>
+                                
+                                <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                                    <h4 class="font-bold text-white mb-3 text-sm">Quick Stats</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between text-gray-400">
+                                            <span>Questions Asked</span>
+                                            <span class="text-white" id="mentor-question-count">0</span>
+                                        </div>
+                                        <div class="flex justify-between text-gray-400">
+                                            <span>Last Active</span>
+                                            <span class="text-white">Just now</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async sendMentorMessage() {
+                const input = document.getElementById('mentor-input');
+                if (!input) return;
+                
+                const message = input.value.trim();
+                if (!message) return;
+                
+                const container = document.getElementById('mentor-messages');
+                
+                // Add user message with enhanced styling
+                container.innerHTML += `
+                    <div class="flex gap-3 flex-row-reverse">
+                        <div class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-white text-sm flex-shrink-0 shadow-lg">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-600 to-blue-600 p-4 rounded-2xl rounded-tr-none max-w-[85%] sm:max-w-[80%] shadow-lg">
+                            <p class="text-white leading-relaxed">${message}</p>
+                        </div>
+                    </div>
+                `;
+                
+                input.value = '';
+                container.scrollTop = container.scrollHeight;
+                
+                // Show enhanced typing indicator
+                const typingId = 'typing-' + Date.now();
+                container.innerHTML += `
+                    <div id="${typingId}" class="flex gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0 shadow-lg">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none border border-gray-700">
+                            <div class="flex space-x-2">
+                                <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                                <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                                <div class="w-2 h-2 bg-gray-400 rounded-full typing-dot"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2">AI is analyzing...</div>
+                        </div>
+                    </div>
+                `;
+                container.scrollTop = container.scrollHeight;
+                
+                try {
+                    const response = await api.askMentor(message);
+                    const typingEl = document.getElementById(typingId);
+                    if (typingEl) typingEl.remove();
+                    
+                    // Format response with better styling
+                    const formattedResponse = response.response
+                        .replace(/\n\n/g, '</p><p class="mt-3">')
+                        .replace(/\n/g, '<br>');
+                    
+                    container.innerHTML += `
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0 shadow-lg">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none max-w-[85%] sm:max-w-[80%] border border-gray-700 shadow-lg">
+                                <div class="prose prose-invert prose-sm max-w-none">
+                                    <p class="text-gray-200 leading-relaxed">${formattedResponse}</p>
+                                </div>
+                                ${response.suggested_resources?.length ? `
+                                    <div class="mt-3 pt-3 border-t border-gray-700">
+                                        <div class="text-xs text-gray-500 mb-1">Suggested resources:</div>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${response.suggested_resources.map(r => `<span class="text-xs text-purple-400 bg-purple-900/30 px-2 py-1 rounded">${r}</span>`).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                <div class="mt-2 text-xs text-gray-500 text-right">
+                                    ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Update question count
+                    const countEl = document.getElementById('mentor-question-count');
+                    if (countEl) {
+                        countEl.textContent = parseInt(countEl.textContent) + 1;
+                    }
+                    
+                    container.scrollTop = container.scrollHeight;
+                } catch (e) {
+                    const typingEl = document.getElementById(typingId);
+                    if (typingEl) typingEl.remove();
+                    
+                    container.innerHTML += `
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white text-sm flex-shrink-0 shadow-lg">
+                                <i class="fas fa-exclamation"></i>
+                            </div>
+                            <div class="bg-red-900/30 p-4 rounded-2xl rounded-tl-none border border-red-700 max-w-[80%]">
+                                <p class="text-red-200 text-sm">I apologize, but I'm having trouble processing your request. Please try again or rephrase your question.</p>
+                                <button onclick="dashboard.sendMentorMessage()" class="mt-2 text-xs text-red-400 underline hover:text-red-300">Retry</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            askMentor(question) {
+                const input = document.getElementById('mentor-input');
+                if (input) {
+                    input.value = question;
+                    this.sendMentorMessage();
+                }
+            }
+
+            clearMentorChat() {
+                const container = document.getElementById('mentor-messages');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm flex-shrink-0 shadow-lg">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none max-w-[80%] border border-gray-700 shadow-lg">
+                                <p class="text-gray-200">Chat history cleared. How can I assist you with your trading today?</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            exportChat() {
+                alert('Chat export feature - would download conversation as text file');
+            }
+
+            // ENHANCED Chart Analysis with professional interface
+            async loadChartAnalysis() {
+                const container = document.getElementById('section-analysis');
+                if (!container) return;
+                
+                container.innerHTML = `
+                    <div class="max-w-6xl mx-auto">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-xl">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                                        <i class="fas fa-chart-line text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-white">AI Chart Analysis</h3>
+                                        <p class="text-xs text-gray-400">Powered by Advanced Computer Vision</p>
+                                    </div>
+                                </div>
+                                
+                                <p class="text-gray-400 mb-6 text-sm">Upload your chart for comprehensive technical analysis including pattern recognition, key levels identification, and trade setup validation.</p>
+                                
+                                <div id="chart-dropzone" class="border-2 border-dashed border-gray-600 rounded-xl p-12 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900 relative overflow-hidden group">
+                                    <input type="file" id="chart-input" class="hidden" accept="image/*">
+                                    <div class="absolute inset-0 bg-gradient-to-br from-purple-600/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div class="relative z-10">
+                                        <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-700 flex items-center justify-center text-purple-400 text-3xl group-hover:scale-110 transition-transform shadow-lg">
+                                            <i class="fas fa-cloud-upload-alt"></i>
+                                        </div>
+                                        <p class="text-gray-300 font-medium mb-2 text-lg">Drop chart image here</p>
+                                        <p class="text-sm text-gray-500 mb-4">or click to browse (PNG, JPG, max 5MB)</p>
+                                        <div class="flex justify-center gap-2 text-xs text-gray-600">
+                                            <span class="px-2 py-1 bg-gray-800 rounded">TradingView</span>
+                                            <span class="px-2 py-1 bg-gray-800 rounded">MT4/MT5</span>
+                                            <span class="px-2 py-1 bg-gray-800 rounded">Any Platform</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mt-6">
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-2 font-medium">Symbol</label>
+                                        <input type="text" id="chart-symbol" placeholder="EURUSD" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-2 font-medium">Timeframe</label>
+                                        <select id="chart-timeframe" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all">
+                                            <option value="">Auto-detect</option>
+                                            <option value="1M">1 Minute</option>
+                                            <option value="5M">5 Minutes</option>
+                                            <option value="15M">15 Minutes</option>
+                                            <option value="1H">1 Hour</option>
+                                            <option value="4H">4 Hours</option>
+                                            <option value="1D">Daily</option>
+                                            <option value="1W">Weekly</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 p-4 bg-blue-900/20 rounded-lg border border-blue-800/50">
+                                    <h5 class="text-sm font-semibold text-blue-300 mb-2"><i class="fas fa-info-circle mr-2"></i>Analysis Includes:</h5>
+                                    <ul class="text-xs text-gray-400 space-y-1 ml-4 list-disc">
+                                        <li>Pattern recognition (Head & Shoulders, Triangles, Flags)</li>
+                                        <li>Support/Resistance levels with strength analysis</li>
+                                        <li>Trend direction and momentum assessment</li>
+                                        <li>Fibonacci retracement levels</li>
+                                        <li>Trade setup suggestions with risk management</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div id="chart-results" class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-xl hidden">
+                                <div class="flex items-center justify-center h-64">
+                                    <div class="text-center text-gray-500">
+                                        <i class="fas fa-chart-area text-5xl mb-4 opacity-30"></i>
+                                        <p>Upload a chart to see AI analysis</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                const dropZone = document.getElementById('chart-dropzone');
+                const fileInput = document.getElementById('chart-input');
+                
+                if (dropZone) {
+                    dropZone.addEventListener('click', () => fileInput?.click());
+                    dropZone.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
+                    });
+                    dropZone.addEventListener('dragleave', () => {
+                        dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                    });
+                    dropZone.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                        const file = e.dataTransfer.files[0];
+                        if (file) this.handleChartUpload(file);
+                    });
+                }
+                
+                if (fileInput) {
+                    fileInput.addEventListener('change', (e) => {
+                        const file = e.target.files[0];
+                        if (file) this.handleChartUpload(file);
+                    });
+                }
+            }
+
+            async handleChartUpload(file) {
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File too large (max 5MB)');
+                    return;
+                }
+                
+                const resultsDiv = document.getElementById('chart-results');
+                if (!resultsDiv) return;
+                
                 resultsDiv.classList.remove('hidden');
-                contentDiv.innerHTML = `
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-gray-700/50 rounded p-3">
-                            <h4 class="font-semibold text-sm mb-2">Detected Trade Details</h4>
-                            <p class="text-sm text-gray-300"><strong>Symbol:</strong> EUR/USD</p>
-                            <p class="text-sm text-gray-300"><strong>Direction:</strong> Buy</p>
-                            <p class="text-sm text-gray-300"><strong>Entry:</strong> 1.0850</p>
-                            <p class="text-sm text-gray-300"><strong>Exit:</strong> 1.0920</p>
+                resultsDiv.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-12">
+                        <div class="relative">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                            <div class="absolute inset-0 animate-ping rounded-full h-12 w-12 border-2 border-purple-600 opacity-20"></div>
                         </div>
-                        <div class="bg-gray-700/50 rounded p-3">
-                            <h4 class="font-semibold text-sm mb-2">AI Analysis</h4>
-                            <p class="text-sm text-gray-300">✓ Pattern: Breakout confirmed</p>
-                            <p class="text-sm text-gray-300">✓ Risk Management: Stop loss respected</p>
-                            <p class="text-sm text-gray-300">✓ Result: Target achieved (+70 pips)</p>
-                        </div>
-                    </div>
-                    <div class="mt-4 p-3 bg-green-500/10 border border-green-500/30 rounded">
-                        <p class="text-sm text-green-400"><i class="fas fa-check-circle mr-2"></i>Trade result successfully extracted from image. The system detected a profitable breakout trade with proper risk management.</p>
+                        <span class="mt-4 text-gray-400">Analyzing chart with AI Vision...</span>
+                        <span class="text-xs text-gray-600 mt-2">This may take 10-20 seconds</span>
                     </div>
                 `;
+                
+                const symbol = document.getElementById('chart-symbol')?.value;
+                const timeframe = document.getElementById('chart-timeframe')?.value;
+                
+                try {
+                    const analysis = await api.analyzeChart(file, symbol, timeframe);
+                    
+                    const biasColor = analysis.trading_bias === 'bullish' ? 'text-green-400' : 
+                                     analysis.trading_bias === 'bearish' ? 'text-red-400' : 'text-gray-400';
+                    const biasBg = analysis.trading_bias === 'bullish' ? 'bg-green-900/30 border-green-800' : 
+                                  analysis.trading_bias === 'bearish' ? 'bg-red-900/30 border-red-800' : 'bg-gray-800 border-gray-700';
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-gray-700">
+                                <div>
+                                    <h4 class="text-xl font-bold text-white flex items-center gap-2">
+                                        <i class="fas fa-microscope text-purple-400"></i>
+                                        Analysis Results
+                                    </h4>
+                                    <p class="text-sm text-gray-500 mt-1">${analysis.symbol || symbol || 'Unknown Symbol'} ${analysis.timeframe || timeframe || ''}</p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="px-4 py-2 rounded-full ${analysis.confidence > 0.7 ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-yellow-900/50 text-yellow-300 border border-yellow-700'} text-sm font-bold flex items-center gap-2">
+                                        <i class="fas fa-brain"></i>
+                                        ${Math.round(analysis.confidence * 100)}% Confidence
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="p-5 ${biasBg} rounded-xl border">
+                                    <div class="text-sm text-gray-400 mb-1">Trading Bias</div>
+                                    <div class="text-3xl font-bold ${biasColor} uppercase tracking-wide">${analysis.trading_bias || 'NEUTRAL'}</div>
+                                    <div class="text-xs text-gray-500 mt-2">Based on price action & structure</div>
+                                </div>
+                                
+                                <div class="p-5 bg-gray-900 rounded-xl border border-gray-700">
+                                    <div class="text-sm text-gray-400 mb-1">Trend Strength</div>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <div class="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                                            <div class="h-full bg-gradient-to-r from-purple-600 to-blue-600" style="width: ${(analysis.confidence * 100)}%"></div>
+                                        </div>
+                                        <span class="text-sm font-bold text-white">${Math.round(analysis.confidence * 100)}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="p-4 bg-red-900/20 rounded-xl border border-red-800/50">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <i class="fas fa-arrow-up text-red-400"></i>
+                                        <span class="text-xs text-red-400 font-bold uppercase">Resistance Levels</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        ${analysis.resistance_levels?.map((level, i) => `
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-lg font-bold text-red-300 font-mono">${level}</span>
+                                                <span class="text-xs text-gray-500">R${i + 1}</span>
+                                            </div>
+                                        `).join('') || '<span class="text-gray-500">No clear resistance</span>'}
+                                    </div>
+                                </div>
+                                
+                                <div class="p-4 bg-green-900/20 rounded-xl border border-green-800/50">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <i class="fas fa-arrow-down text-green-400"></i>
+                                        <span class="text-xs text-green-400 font-bold uppercase">Support Levels</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        ${analysis.support_levels?.map((level, i) => `
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-lg font-bold text-green-300 font-mono">${level}</span>
+                                                <span class="text-xs text-gray-500">S${i + 1}</span>
+                                            </div>
+                                        `).join('') || '<span class="text-gray-500">No clear support</span>'}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${analysis.patterns_detected?.length ? `
+                                <div>
+                                    <h5 class="font-semibold text-white mb-3 flex items-center gap-2">
+                                        <i class="fas fa-shapes text-purple-400"></i>
+                                        Patterns Detected
+                                    </h5>
+                                    <div class="flex flex-wrap gap-2">
+                                        ${analysis.patterns_detected.map(p => `
+                                            <span class="px-4 py-2 rounded-lg bg-blue-900/30 text-blue-300 border border-blue-800 text-sm font-medium flex items-center gap-2">
+                                                <i class="fas fa-check-circle text-blue-400"></i>
+                                                ${p.name} ${p.confidence ? `(${(p.confidence * 100).toFixed(0)}%)` : ''}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${analysis.fibonacci_levels ? `
+                                <div class="p-4 bg-purple-900/20 rounded-xl border border-purple-800/50">
+                                    <h5 class="font-semibold text-purple-300 mb-3 text-sm uppercase">Fibonacci Levels</h5>
+                                    <div class="grid grid-cols-5 gap-2 text-center">
+                                        ${['23.6%', '38.2%', '50%', '61.8%', '78.6%'].map(level => `
+                                            <div class="p-2 bg-gray-900 rounded">
+                                                <div class="text-xs text-gray-500">${level}</div>
+                                                <div class="text-sm font-mono text-white">${analysis.fibonacci_levels[level] || '--'}</div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            <div>
+                                <h5 class="font-semibold text-white mb-3 flex items-center gap-2">
+                                    <i class="fas fa-lightbulb text-yellow-400"></i>
+                                    AI Trading Insights
+                                </h5>
+                                <ul class="space-y-2">
+                                    ${analysis.key_insights?.map(i => `
+                                        <li class="flex items-start gap-3 p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                            <i class="fas fa-angle-right text-purple-400 mt-1"></i>
+                                            <span class="text-gray-300 text-sm leading-relaxed">${i}</span>
+                                        </li>
+                                    `).join('') || '<li class="text-gray-500">No specific insights</li>'}
+                                </ul>
+                            </div>
+                            
+                            ${analysis.trade_setup ? `
+                                <div class="p-5 bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl border border-purple-800">
+                                    <h5 class="font-bold text-white mb-4 flex items-center gap-2">
+                                        <i class="fas fa-bullseye text-purple-400"></i>
+                                        Suggested Trade Setup
+                                    </h5>
+                                    <div class="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span class="text-gray-400">Entry:</span>
+                                            <span class="text-white font-mono ml-2">${analysis.trade_setup.entry}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400">Stop Loss:</span>
+                                            <span class="text-red-400 font-mono ml-2">${analysis.trade_setup.stop_loss}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400">Take Profit:</span>
+                                            <span class="text-green-400 font-mono ml-2">${analysis.trade_setup.take_profit}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400">Risk:Reward:</span>
+                                            <span class="text-purple-400 font-mono ml-2">${analysis.trade_setup.risk_reward}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 p-3 bg-black/30 rounded text-xs text-gray-400">
+                                        <i class="fas fa-exclamation-triangle mr-2 text-yellow-500"></i>
+                                        Always use proper risk management. This is educational analysis, not financial advice.
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                } catch (error) {
+                    resultsDiv.innerHTML = `
+                        <div class="p-6 bg-red-900/20 text-red-300 rounded-xl border border-red-800 text-center">
+                            <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
+                            <h4 class="font-bold mb-2">Analysis Failed</h4>
+                            <p class="text-sm mb-4">${error.message}</p>
+                            <button onclick="document.getElementById('chart-input').click()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
+                                Try Again
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+
+            async loadPerformance() {
+                const container = document.getElementById('section-performance');
+                if (!container) return;
+                
+                container.innerHTML = `
+                    <div class="max-w-6xl mx-auto space-y-6">
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-xl">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                                <div>
+                                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                                        <i class="fas fa-chart-bar text-purple-400"></i>
+                                        Performance Analytics
+                                    </h3>
+                                    <p class="text-gray-400 text-sm mt-1">Comprehensive trading statistics and AI insights</p>
+                                </div>
+                                <select id="analysis-period" onchange="dashboard.loadPerformanceStats()" class="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500">
+                                    <option value="30">Last 30 Days</option>
+                                    <option value="90">Last 90 Days</option>
+                                    <option value="365">Last Year</option>
+                                </select>
+                            </div>
+                            
+                            <div id="performance-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="p-5 bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl shadow-lg">
+                                    <div class="text-3xl font-bold text-blue-300 mb-1">--</div>
+                                    <div class="text-sm text-gray-400">Total Trades</div>
+                                </div>
+                                <div class="p-5 bg-gradient-to-br from-green-900 to-green-800 rounded-xl shadow-lg">
+                                    <div class="text-3xl font-bold text-green-300 mb-1">--</div>
+                                    <div class="text-sm text-gray-400">Win Rate</div>
+                                </div>
+                                <div class="p-5 bg-gradient-to-br from-purple-900 to-purple-800 rounded-xl shadow-lg">
+                                    <div class="text-3xl font-bold text-purple-300 mb-1">--</div>
+                                    <div class="text-sm text-gray-400">Net P&L</div>
+                                </div>
+                                <div class="p-5 bg-gradient-to-br from-orange-900 to-orange-800 rounded-xl shadow-lg">
+                                    <div class="text-3xl font-bold text-orange-300 mb-1">--</div>
+                                    <div class="text-sm text-gray-400">Grade</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-xl">
+                                <h4 class="font-bold text-white mb-4 flex items-center gap-2">
+                                    <i class="fas fa-upload text-purple-400"></i>
+                                    Upload Trade Journal
+                                </h4>
+                                <p class="text-gray-400 text-sm mb-4">Paste your trade data in JSON format or upload a file</p>
+                                <textarea id="journal-input" rows="10" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-4 text-white font-mono text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all" placeholder='[
+  {
+    "entry_date": "2024-01-01",
+    "symbol": "EURUSD",
+    "direction": "BUY",
+    "entry_price": 1.0850,
+    "exit_price": 1.0900,
+    "pnl": 50.00,
+    "outcome": "win"
+  }
+]'></textarea>
+                                <button onclick="dashboard.analyzePerformance()" class="mt-4 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 rounded-lg transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                                    <i class="fas fa-brain"></i>
+                                    Analyze Performance
+                                </button>
+                            </div>
+                            
+                            <div id="performance-results" class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-xl hidden">
+                                <div class="flex items-center justify-center h-full text-gray-500">
+                                    <div class="text-center">
+                                        <i class="fas fa-chart-pie text-5xl mb-4 opacity-30"></i>
+                                        <p>Upload trade data to see analysis</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                this.loadPerformanceStats();
+            }
+
+            async loadPerformanceStats() {
+                const days = document.getElementById('analysis-period')?.value || 30;
+                try {
+                    const stats = await api.getPerformanceStats(days);
+                    const container = document.getElementById('performance-stats');
+                    if (container && stats.summary) {
+                        container.innerHTML = `
+                            <div class="p-5 bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl shadow-lg">
+                                <div class="text-3xl font-bold text-blue-300 mb-1">${stats.summary.total_trades || 0}</div>
+                                <div class="text-sm text-gray-400">Total Trades</div>
+                            </div>
+                            <div class="p-5 bg-gradient-to-br from-green-900 to-green-800 rounded-xl shadow-lg">
+                                <div class="text-3xl font-bold text-green-300 mb-1">${stats.summary.win_rate || 0}%</div>
+                                <div class="text-sm text-gray-400">Win Rate</div>
+                            </div>
+                            <div class="p-5 bg-gradient-to-br from-purple-900 to-purple-800 rounded-xl shadow-lg">
+                                <div class="text-3xl font-bold text-purple-300 mb-1">$${stats.summary.total_pnl || 0}</div>
+                                <div class="text-sm text-gray-400">Net P&L</div>
+                            </div>
+                            <div class="p-5 bg-gradient-to-br from-orange-900 to-orange-800 rounded-xl shadow-lg">
+                                <div class="text-3xl font-bold text-orange-300 mb-1">B+</div>
+                                <div class="text-sm text-gray-400">Grade</div>
+                            </div>
+                        `;
+                    }
+                } catch (e) {
+                    console.error('Failed to load stats:', e);
+                }
+            }
+
+            async analyzePerformance() {
+                const input = document.getElementById('journal-input');
+                const resultsDiv = document.getElementById('performance-results');
+                
+                if (!input || !resultsDiv) return;
+                
+                if (!input.value.trim()) {
+                    alert('Please enter trade data');
+                    return;
+                }
+                
+                try {
+                    const trades = JSON.parse(input.value);
+                    resultsDiv.classList.remove('hidden');
+                    resultsDiv.innerHTML = `
+                        <div class="flex flex-col items-center justify-center py-12">
+                            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                            <span class="mt-4 text-gray-400">Analyzing performance...</span>
+                        </div>
+                    `;
+                    
+                    const analysis = await api.analyzeJournal(trades);
+                    const stats = analysis.statistics || {};
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b border-gray-700">
+                                <h4 class="text-lg font-bold text-white">Analysis Results</h4>
+                                <span class="px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold shadow-lg">
+                                    Grade: ${analysis.overall_grade || 'N/A'}
+                                </span>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                    <div class="text-2xl font-bold text-blue-400">${stats.win_rate || 0}%</div>
+                                    <div class="text-xs text-gray-500 uppercase tracking-wide">Win Rate</div>
+                                </div>
+                                <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                    <div class="text-2xl font-bold text-green-400">${stats.profit_factor || 0}</div>
+                                    <div class="text-xs text-gray-500 uppercase tracking-wide">Profit Factor</div>
+                                </div>
+                                <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                    <div class="text-2xl font-bold text-purple-400">$${stats.expectancy || 0}</div>
+                                    <div class="text-xs text-gray-500 uppercase tracking-wide">Expectancy</div>
+                                </div>
+                                <div class="text-center p-4 bg-gray-900 rounded-lg border border-gray-700">
+                                    <div class="text-2xl font-bold text-orange-400">${stats.total_trades || 0}</div>
+                                    <div class="text-xs text-gray-500 uppercase tracking-wide">Total Trades</div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <h5 class="font-semibold text-gray-300 flex items-center gap-2">
+                                    <i class="fas fa-lightbulb text-yellow-400"></i>
+                                    AI Recommendations
+                                </h5>
+                                ${analysis.improvements?.map(i => `
+                                    <div class="p-4 bg-blue-900/20 rounded-lg text-sm text-blue-200 border-l-4 border-blue-500 flex items-start gap-3">
+                                        <i class="fas fa-check-circle text-blue-400 mt-0.5"></i>
+                                        <span>${i}</span>
+                                    </div>
+                                `).join('') || '<p class="text-gray-500">No recommendations</p>'}
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    alert('Invalid JSON format: ' + e.message);
+                }
+            }
+
+            showSkeleton(container, count = 3) {
+                container.innerHTML = Array(count).fill(0).map(() => `
+                    <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-32">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-gray-700 rounded-full"></div>
+                            <div class="flex-1 space-y-2">
+                                <div class="h-4 bg-gray-700 rounded w-3/4"></div>
+                                <div class="h-3 bg-gray-700 rounded w-1/2"></div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            initFeatureCarousel() {
+                const carousel = document.getElementById('feature-carousel');
+                if (!carousel) return;
+                
+                const slides = [
+                    { icon: 'fa-satellite-dish', title: 'Trading Signals', desc: 'AI-powered signals with institutional-grade accuracy', color: 'from-purple-600 to-blue-600', section: 'signals' },
+                    { icon: 'fa-book', title: 'Trading Journal', desc: 'Track, analyze and improve your trading performance', color: 'from-green-600 to-teal-600', section: 'journal' },
+                    { icon: 'fa-chart-line', title: 'Chart Analysis', desc: 'Advanced technical analysis with Computer Vision AI', color: 'from-orange-600 to-red-600', section: 'analysis' },
+                    { icon: 'fa-robot', title: 'AI Mentor', desc: 'Personalized trading coaching from expert AI', color: 'from-pink-600 to-purple-600', section: 'mentor' },
+                    { icon: 'fa-graduation-cap', title: 'Courses', desc: 'Master trading from beginner to advanced levels', color: 'from-blue-600 to-cyan-600', section: 'courses' },
+                    { icon: 'fa-video', title: 'Webinars', desc: 'Live trading sessions with professional traders', color: 'from-indigo-600 to-purple-600', section: 'webinars' },
+                    { icon: 'fa-newspaper', title: 'Trading Blog', desc: 'Latest market insights and strategy breakdowns', color: 'from-yellow-600 to-orange-600', section: 'blog' }
+                ];
+                
+                let currentSlide = 0;
+                
+                const renderSlides = () => {
+                    const slide = slides[currentSlide];
+                    carousel.innerHTML = `
+                        <div class="bg-gradient-to-r ${slide.color} rounded-xl p-6 md:p-8 text-white cursor-pointer hover:shadow-2xl transition-all transform hover:-translate-y-1 relative overflow-hidden group" onclick="dashboard.navigate('${slide.section}')">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                            <div class="flex items-start justify-between relative z-10">
+                                <div>
+                                    <i class="fas ${slide.icon} text-3xl mb-3 opacity-90 group-hover:scale-110 transition-transform"></i>
+                                    <h3 class="text-xl font-bold mb-1">${slide.title}</h3>
+                                    <p class="text-white/80 text-sm">${slide.desc}</p>
+                                </div>
+                                <i class="fas fa-arrow-right text-white/50 text-xl group-hover:translate-x-2 transition-transform"></i>
+                            </div>
+                        </div>
+                    `;
+                };
+                
+                document.getElementById('carousel-next')?.addEventListener('click', () => {
+                    currentSlide = (currentSlide + 1) % slides.length;
+                    renderSlides();
+                });
+                
+                document.getElementById('carousel-prev')?.addEventListener('click', () => {
+                    currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+                    renderSlides();
+                });
+                
+                setInterval(() => {
+                    currentSlide = (currentSlide + 1) % slides.length;
+                    renderSlides();
+                }, 6000);
+                
+                renderSlides();
+            }
+
+            logout() {
+                localStorage.removeItem('pipways_token');
+                localStorage.removeItem('pipways_user');
+                window.location.href = '/';
             }
         }
 
-        // Chart Analysis Functions
-        function analyzeChart(event) {
-            const file = event.target.files[0];
-            if (file) {
-                // Show signal results
-                document.getElementById('signalResults').classList.remove('hidden');
-                document.getElementById('chartPlaceholder').classList.add('hidden');
-
-                // Update signal data
-                document.getElementById('detectedSymbol').textContent = 'GBP/USD';
-                document.getElementById('tradeSignal').textContent = 'STRONG BUY';
-                document.getElementById('entryPrice').textContent = '1.2745';
-                document.getElementById('stopLoss').textContent = '1.2700';
-                document.getElementById('takeProfit').textContent = '1.2850';
-                document.getElementById('riskReward').textContent = '1:2.3';
-                document.getElementById('confidence').textContent = '87%';
-
-                // Render candlestick chart
-                renderCandlestickChart();
-            }
-        }
-
-        function renderCandlestickChart() {
-            const chart = new CanvasJS.Chart("candlestickChart", {
-                theme: "dark1",
-                backgroundColor: "transparent",
-                title: {
-                    text: "GBP/USD Analysis",
-                    fontColor: "#94a3b8"
-                },
-                axisX: {
-                    valueFormatString: "HH:mm",
-                    labelFontColor: "#64748b"
-                },
-                axisY: {
-                    prefix: "$",
-                    labelFontColor: "#64748b",
-                    gridColor: "#334155"
-                },
-                data: [{
-                    type: "candlestick",
-                    risingColor: "#10b981",
-                    fallingColor: "#ef4444",
-                    dataPoints: [
-                        { x: new Date(2024, 2, 1, 10, 0), y: [1.2720, 1.2735, 1.2715, 1.2730] },
-                        { x: new Date(2024, 2, 1, 11, 0), y: [1.2730, 1.2745, 1.2725, 1.2740] },
-                        { x: new Date(2024, 2, 1, 12, 0), y: [1.2740, 1.2755, 1.2735, 1.2750] },
-                        { x: new Date(2024, 2, 1, 13, 0), y: [1.2750, 1.2760, 1.2740, 1.2745] },
-                        { x: new Date(2024, 2, 1, 14, 0), y: [1.2745, 1.2755, 1.2735, 1.2748] },
-                        { x: new Date(2024, 2, 1, 15, 0), y: [1.2748, 1.2770, 1.2745, 1.2765] }
-                    ]
-                }],
-                annotations: [{
-                    type: "line",
-                    x: new Date(2024, 2, 1, 14, 0),
-                    y: 1.2745,
-                    label: "Entry",
-                    color: "#3b82f6"
-                }, {
-                    type: "line",
-                    x: new Date(2024, 2, 1, 14, 0),
-                    y: 1.2700,
-                    label: "SL",
-                    color: "#ef4444"
-                }, {
-                    type: "line",
-                    x: new Date(2024, 2, 1, 14, 0),
-                    y: 1.2850,
-                    label: "TP",
-                    color: "#10b981"
-                }]
-            });
-            chart.render();
-        }
-
-        // AI Mentor Functions
-        function selectSkillLevel(level) {
-            // Update UI
-            document.querySelectorAll('.skill-btn').forEach(btn => {
-                btn.classList.remove('selected');
-            });
-            document.querySelector(`[data-level="${level}"]`).classList.add('selected');
-
-            // Update indicator
-            const labels = {
-                'beginner': '🌱 Beginner Level',
-                'intermediate': '📊 Intermediate Level',
-                'advanced': '♟️ Advanced Level'
-            };
-            document.getElementById('currentLevel').textContent = labels[level];
-
-            // Add welcome message
-            const welcomeMessages = {
-                'beginner': "Welcome to your trading journey! I'll guide you through the basics of technical analysis, risk management, and trading psychology. What would you like to learn first?",
-                'intermediate': "Ready to refine your edge? Let's analyze your recent trades and identify areas for improvement. We can also explore advanced patterns and position sizing strategies.",
-                'advanced': "Let's optimize your performance. We can dive into market microstructure, correlation analysis, and advanced risk management techniques. What aspect of your trading are you looking to enhance?"
-            };
-
-            const chat = document.getElementById('mentorChat');
-            chat.innerHTML += `
-                <div class="flex gap-3 fade-in">
-                    <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm flex-shrink-0">AI</div>
-                    <div class="bg-gray-700 rounded-lg p-3 max-w-[80%]">
-                        <p>${welcomeMessages[level]}</p>
-                    </div>
-                </div>
-            `;
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        function sendMentorMessage() {
-            const input = document.getElementById('mentorInput');
-            const message = input.value.trim();
-            if (!message) return;
-
-            // Add user message
-            const chat = document.getElementById('mentorChat');
-            chat.innerHTML += `
-                <div class="flex gap-3 justify-end fade-in">
-                    <div class="bg-blue-600 rounded-lg p-3 max-w-[80%]">
-                        <p>${message}</p>
-                    </div>
-                </div>
-            `;
-
-            input.value = '';
-            chat.scrollTop = chat.scrollHeight;
-
-            // Simulate AI response
-            setTimeout(() => {
-                chat.innerHTML += `
-                    <div class="flex gap-3 fade-in">
-                        <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm flex-shrink-0">AI</div>
-                        <div class="bg-gray-700 rounded-lg p-3 max-w-[80%]">
-                            <p>That's a great question! Based on your trading journal data, I can see you've had success with breakout setups recently. Would you like me to analyze your last 5 trades to identify patterns?</p>
-                        </div>
-                    </div>
-                `;
-                chat.scrollTop = chat.scrollHeight;
-            }, 1000);
-        }
-
-        // Performance Analytics
-        function initPerformanceCharts() {
-            // Equity Curve
-            const equityCtx = document.getElementById('equityChart').getContext('2d');
-            new Chart(equityCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
-                    datasets: [{
-                        label: 'Account Balance',
-                        data: [10000, 10250, 10150, 10500, 10800, 11250],
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { color: '#64748b' }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748b' }
-                        }
-                    }
-                }
-            });
-
-            // R-Multiple Distribution
-            const rMultipleCtx = document.getElementById('rMultipleChart').getContext('2d');
-            new Chart(rMultipleCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['-2R', '-1R', '-0.5R', '0R', '+0.5R', '+1R', '+2R', '+3R'],
-                    datasets: [{
-                        label: 'Number of Trades',
-                        data: [2, 5, 8, 0, 12, 15, 8, 5],
-                        backgroundColor: [
-                            '#ef4444', '#ef4444', '#ef4444', '#64748b',
-                            '#10b981', '#10b981', '#10b981', '#10b981'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            ticks: { color: '#64748b' }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#64748b' }
-                        }
-                    }
-                }
-            });
-
-            // Day Performance
-            const dayCtx = document.getElementById('dayPerformanceChart').getContext('2d');
-            new Chart(dayCtx, {
-                type: 'radar',
-                data: {
-                    labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-                    datasets: [{
-                        label: 'Win Rate %',
-                        data: [65, 72, 58, 68, 55],
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        r: {
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            pointLabels: { color: '#64748b' },
-                            ticks: { display: false }
-                        }
-                    }
-                }
-            });
-
-            // Populate Trade History
-            const tradeHistory = [
-                { date: '2024-03-14', symbol: 'EUR/USD', setup: 'Breakout', entry: '1.0850/1.0920', r: '+2.1', result: '+$350' },
-                { date: '2024-03-13', symbol: 'GBP/USD', setup: 'Trend', entry: '1.2745/1.2700', r: '-1.0', result: '-$200' },
-                { date: '2024-03-12', symbol: 'USD/JPY', setup: 'Reversal', entry: '147.50/148.20', r: '+1.8', result: '+$280' },
-                { date: '2024-03-11', symbol: 'XAU/USD', setup: 'Support', entry: '2150/2165', r: '+2.5', result: '+$400' }
-            ];
-
-            const tbody = document.getElementById('tradeHistoryTable');
-            tbody.innerHTML = tradeHistory.map(trade => `
-                <tr class="border-b border-gray-700">
-                    <td class="py-2">${trade.date}</td>
-                    <td class="py-2 font-semibold">${trade.symbol}</td>
-                    <td class="py-2"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">${trade.setup}</span></td>
-                    <td class="py-2 text-sm text-gray-400">${trade.entry}</td>
-                    <td class="py-2 ${trade.r.startsWith('+') ? 'text-green-400' : 'text-red-400'}">${trade.r}R</td>
-                    <td class="py-2 ${trade.result.startsWith('+') ? 'text-green-400' : 'text-red-400'} font-semibold">${trade.result}</td>
-                </tr>
-            `).join('');
-        }
-
-        // CMS Functions
-        function openContentModal() {
-            alert('Content creation modal would open here');
-        }
-
-        function filterContent(type) {
-            console.log('Filtering content:', type);
-            // Filter logic would go here
-        }
-
-        // Handle Enter key in mentor chat
-        document.getElementById('mentorInput')?.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMentorMessage();
-        });
+        const dashboard = new DashboardController();
     </script>
 </body>
 </html>

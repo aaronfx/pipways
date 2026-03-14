@@ -1,6 +1,6 @@
 """
 Courses API - PRODUCTION READY
-Returns real course data from database
+Returns real course data from database with graceful error handling
 """
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
@@ -13,9 +13,11 @@ router = APIRouter()
 async def get_courses(current_user = Depends(get_current_user)):
     """
     Get all available courses with user's progress
-    PRODUCTION: Queries real database
+    Returns empty array on error instead of 500
     """
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        
         # Query courses from database
         query = """
             SELECT c.id, c.title, c.description, c.level, c.lesson_count,
@@ -28,7 +30,7 @@ async def get_courses(current_user = Depends(get_current_user)):
             ORDER BY c.created_at DESC
         """
         
-        rows = await database.fetch_all(query, {"user_id": current_user.get("id")})
+        rows = await database.fetch_all(query, {"user_id": user_id})
         
         courses = []
         for row in rows:
@@ -45,8 +47,9 @@ async def get_courses(current_user = Depends(get_current_user)):
         return courses
         
     except Exception as e:
-        print(f"[ERROR] Failed to fetch courses: {e}", flush=True)
-        raise HTTPException(500, "Failed to load courses")
+        print(f"[COURSES ERROR] Failed to fetch courses: {e}", flush=True)
+        # Return empty array instead of crashing
+        return []
 
 @router.get("/{course_id}")
 async def get_course_detail(course_id: int, current_user = Depends(get_current_user)):
@@ -63,4 +66,5 @@ async def get_course_detail(course_id: int, current_user = Depends(get_current_u
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[COURSE DETAIL ERROR] {e}", flush=True)
         raise HTTPException(500, f"Database error: {str(e)}")

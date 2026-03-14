@@ -1,9 +1,13 @@
 /**
- * Pipways API Client - Production Grade
+ * API Client - Production Grade
+ * Handles OAuth2 authentication and JWT Bearer token management
  */
 const API_BASE = window.location.origin;
 
-const api = {
+const API = {
+    /**
+     * Generic request handler with auth header injection
+     */
     async request(endpoint, options = {}) {
         const token = localStorage.getItem('pipways_token');
         const headers = {
@@ -12,19 +16,23 @@ const api = {
             ...options.headers
         };
 
+        // Don't override Content-Type for FormData (file uploads)
         if (options.body && !(options.body instanceof FormData)) {
-            headers['Content-Type'] = 'application/json';
+            headers['Content-Type'] = headers['Content-Type'] || 'application/json';
         }
 
         try {
-            console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
-            const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-            
+            const res = await fetch(`${API_BASE}${endpoint}`, {
+                ...options,
+                headers
+            });
+
             if (res.status === 401) {
+                // Token expired or invalid
                 localStorage.removeItem('pipways_token');
                 localStorage.removeItem('pipways_user');
                 window.location.href = '/';
-                throw new Error('Session expired');
+                throw new Error('Session expired. Please login again.');
             }
 
             if (!res.ok) {
@@ -34,29 +42,48 @@ const api = {
 
             return res.json();
         } catch (error) {
-            console.error('[API Error]', error);
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                throw new Error('Network error. Check your connection.');
+            }
             throw error;
         }
     },
 
-    login(username, password) {
+    /**
+     * OAuth2 Login - Uses URLSearchParams for form-urlencoded format
+     */
+    async login(username, password) {
+        // CRITICAL: URLSearchParams ensures application/x-www-form-urlencoded
         const params = new URLSearchParams();
         params.append('username', username);
         params.append('password', password);
         
-        return fetch(`${API_BASE}/auth/token`, {
+        const res = await fetch(`${API_BASE}/auth/token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json'
             },
             body: params
-        }).then(res => {
-            if (!res.ok) throw new Error('Login failed');
-            return res.json();
         });
+        
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Login failed');
+        }
+        
+        const data = await res.json();
+        
+        // Store credentials
+        localStorage.setItem('pipways_token', data.access_token);
+        localStorage.setItem('pipways_user', JSON.stringify(data.user));
+        
+        return data;
     },
 
+    /**
+     * Registration
+     */
     register(data) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -64,54 +91,163 @@ const api = {
         });
     },
 
+    /**
+     * Get current user profile
+     */
     getMe() {
         return this.request('/auth/me');
     },
 
-    // FIXED: Correct endpoints matching main.py
-    getSignals() {
-        return this.request('/signals');
+    /**
+     * Logout helper
+     */
+    logout() {
+        localStorage.removeItem('pipways_token');
+        localStorage.removeItem('pipways_user');
+        window.location.href = '/';
     },
 
-    getCourses() {
-        return this.request('/courses');
+    // Signals
+    getSignals(params = {}) {
+        const qs = new URLSearchParams(params).toString();
+        return this.request(`/signals/active?${qs}`);
     },
 
-    getWebinars(upcoming = true) {
-        return this.request(`/webinars?upcoming=${upcoming}`);
-    },
-
-    // FIXED: Using /blog instead of /blog/posts (adjust if your blog.py has specific routes)
-    getBlogPosts() {
-        return this.request('/blog');
-    },
-
-    analyzeJournal(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        return fetch(`${API_BASE}/ai/performance/analyze-journal`, {
+    createSignal(data) {
+        return this.request('/signals/create', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
-            },
-            body: formData
-        }).then(res => {
-            if (!res.ok) throw new Error('Analysis failed');
-            return res.json();
+            body: JSON.stringify(data)
         });
     },
 
-    askMentor(question, skillLevel = 'intermediate') {
+    updateSignal(id, data) {
+        return this.request(`/signals/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    },
+
+    deleteSignal(id) {
+        return this.request(`/signals/${id}`, {
+            method: 'DELETE'
+        });
+    },
+
+    // Courses
+    getCourses() {
+        return this.request('/courses/list');
+    },
+
+    getCourseProgress() {
+        return this.request('/courses-enhanced/progress');
+    },
+
+    // Blog
+    getBlogPosts(params = {}) {
+        const qs = new URLSearchParams(params).toString();
+        return this.request(`/blog/posts?${qs}`);
+    },
+
+    getBlogPost(slug) {
+        return this.request(`/blog/posts/${slug}`);
+    },
+
+    // Webinars
+    getWebinars(upcoming = true) {
+        return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
+    },
+
+    // AI Mentor
+    askMentor(question, skillLevel = 'intermediate', topic = null) {
         return this.request('/ai/mentor/ask', {
             method: 'POST',
-            body: JSON.stringify({ question, skill_level: skillLevel })
+            body: JSON.stringify({
+                question,
+                skill_level: skillLevel,
+                topic,
+                context: window.location.hash
+            })
         });
     },
 
+    getLearningPath(goal, currentLevel, timeAvailable, markets = ['forex']) {
+        return this.request('/ai/mentor/learning-path', {
+            method: 'POST',
+            body: JSON.stringify({
+                goal,
+                current_level: currentLevel,
+                time_available: timeAvailable,
+                preferred_markets: markets
+            })
+        });
+    },
+
+    reviewTrade(tradeData) {
+        return this.request('/ai/mentor/review-trade', {
+            method: 'POST',
+            body: JSON.stringify(tradeData)
+        });
+    },
+
+    getDailyWisdom() {
+        return this.request('/ai/mentor/daily-wisdom');
+    },
+
+    // Chart Analysis
+    analyzeChartImage(file, symbol = null, timeframe = null) {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (symbol) formData.append('symbol', symbol);
+        if (timeframe) formData.append('timeframe', timeframe);
+        
+        return this.request('/ai/chart/analyze', {
+            method: 'POST',
+            headers: {}, // Let browser set Content-Type with boundary for FormData
+            body: formData
+        });
+    },
+
+    getPatternLibrary(patternType = null) {
+        const url = patternType 
+            ? `/ai/chart/pattern-library?pattern_type=${patternType}`
+            : '/ai/chart/pattern-library';
+        return this.request(url);
+    },
+
+    // Performance
+    analyzeJournal(trades) {
+        return this.request('/ai/performance/analyze-journal', {
+            method: 'POST',
+            body: JSON.stringify(trades)
+        });
+    },
+
+    getPerformanceStats(days = 30) {
+        return this.request(`/ai/performance/dashboard-stats?days=${days}`);
+    },
+
+    // Admin
     getAdminStats() {
         return this.request('/admin/users');
+    },
+
+    getUsers(params = {}) {
+        const qs = new URLSearchParams(params).toString();
+        return this.request(`/admin/users?${qs}`);
+    },
+
+    // Risk Calculator
+    calculateRisk(data) {
+        return this.request('/risk/calculate', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    getRiskHistory() {
+        return this.request('/risk/history');
     }
 };
 
-window.api = api;
+// Export for global use
+window.API = API;

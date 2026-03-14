@@ -1,64 +1,89 @@
 /**
- * API Client - Complete
+ * API Client - Production Grade
+ * Handles OAuth2 authentication and JWT Bearer token management
  */
 const API_BASE = window.location.origin;
 
 const API = {
+    /**
+     * Generic request handler with auth header injection
+     */
     async request(endpoint, options = {}) {
-        const token = Store.getToken();
+        const token = localStorage.getItem('pipways_token');
         const headers = {
-            'Content-Type': 'application/json',
+            'Accept': 'application/json',
             ...(token && { 'Authorization': `Bearer ${token}` }),
             ...options.headers
         };
 
-        if (options.body instanceof FormData) {
-            delete headers['Content-Type'];
+        // Don't override Content-Type for FormData (file uploads)
+        if (options.body && !(options.body instanceof FormData)) {
+            headers['Content-Type'] = headers['Content-Type'] || 'application/json';
         }
 
         try {
-            Store.setLoading(true);
-            
             const res = await fetch(`${API_BASE}${endpoint}`, {
                 ...options,
                 headers
             });
 
+            if (res.status === 401) {
+                // Token expired or invalid
+                localStorage.removeItem('pipways_token');
+                localStorage.removeItem('pipways_user');
+                window.location.href = '/';
+                throw new Error('Session expired. Please login again.');
+            }
+
             if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || `Error ${res.status}`);
+                const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+                throw new Error(err.detail || `Request failed: ${res.status}`);
             }
 
             return res.json();
         } catch (error) {
-            if (error.message === 'Failed to fetch') {
-                throw new Error('Network error. Please check your connection.');
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                throw new Error('Network error. Check your connection.');
             }
             throw error;
-        } finally {
-            Store.setLoading(false);
         }
     },
 
-    // Auth
+    /**
+     * OAuth2 Login - Uses URLSearchParams for form-urlencoded format
+     */
     async login(username, password) {
-        const formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', password);
+        // CRITICAL: URLSearchParams ensures application/x-www-form-urlencoded
+        const params = new URLSearchParams();
+        params.append('username', username);
+        params.append('password', password);
         
         const res = await fetch(`${API_BASE}/auth/token`, {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
+            body: params
         });
         
         if (!res.ok) {
-            const err = await res.json();
+            const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || 'Login failed');
         }
         
-        return res.json();
+        const data = await res.json();
+        
+        // Store credentials
+        localStorage.setItem('pipways_token', data.access_token);
+        localStorage.setItem('pipways_user', JSON.stringify(data.user));
+        
+        return data;
     },
 
+    /**
+     * Registration
+     */
     register(data) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -66,8 +91,20 @@ const API = {
         });
     },
 
+    /**
+     * Get current user profile
+     */
     getMe() {
         return this.request('/auth/me');
+    },
+
+    /**
+     * Logout helper
+     */
+    logout() {
+        localStorage.removeItem('pipways_token');
+        localStorage.removeItem('pipways_user');
+        window.location.href = '/';
     },
 
     // Signals
@@ -165,7 +202,7 @@ const API = {
         
         return this.request('/ai/chart/analyze', {
             method: 'POST',
-            headers: {},
+            headers: {}, // Let browser set Content-Type with boundary for FormData
             body: formData
         });
     },
@@ -211,3 +248,6 @@ const API = {
         return this.request('/risk/history');
     }
 };
+
+// Export for global use
+window.API = API;

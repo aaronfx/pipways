@@ -22,9 +22,6 @@ services:
         value: "anthropic/claude-3.5-sonnet"
       - key: OPENROUTER_VISION_MODEL
         value: "anthropic/claude-3.5-sonnet"
-      # Optional: Legacy support (remove if not needed)
-      - key: OPENAI_API_KEY
-        sync: false
       - key: ALLOWED_ORIGINS
         value: "*"
     healthCheckPath: /health

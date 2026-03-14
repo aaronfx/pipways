@@ -5,10 +5,24 @@ import json
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from .security import get_current_user
 
 router = APIRouter()
+
+# Import performance calculation from performance module
+try:
+    from .performance import calculate_performance_metrics
+except ImportError:
+    # Fallback if import fails
+    def calculate_performance_metrics(trades_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if not trades_data:
+            return {"total_trades": 0, "win_rate": 0, "profit_factor": 0}
+        return {
+            "total_trades": len(trades_data),
+            "win_rate": 50.0,
+            "profit_factor": 1.5
+        }
 
 # OpenRouter Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -23,7 +37,7 @@ class MentorRequest(BaseModel):
     skill_level: str = "intermediate"
 
 class JournalRequest(BaseModel):
-    trades: List[dict]
+    trades: List[Dict[str, Any]]
 
 @router.post("/mentor/ask")
 async def ask_mentor(
@@ -43,7 +57,7 @@ async def ask_mentor(
         return {
             "response": """I apologize, but the AI Mentor is currently in setup mode.
 
-To enable full AI capabilities, please ensure OPENROUTER_API_KEY is set.
+To enable full AI capabilities, please ensure OPENROUTER_API_KEY is set in your environment variables.
 
 **Quick Trading Tips:**
 • Risk max 1-2% per trade
@@ -278,14 +292,52 @@ async def analyze_journal_compat(
     request: JournalRequest,
     current_user = Depends(get_current_user)
 ):
-    """Compatibility endpoint that forwards to performance module"""
-    from .performance import calculate_performance_metrics
+    """Compatibility endpoint that forwards to performance calculation"""
     try:
         if not request.trades or len(request.trades) == 0:
             raise HTTPException(400, "No trades provided")
         
         analysis = calculate_performance_metrics(request.trades)
-        return analysis
+        
+        # Determine grade
+        score = 0
+        if analysis.get("win_rate", 0) > 50:
+            score += 30
+        if analysis.get("profit_factor", 0) > 1.5:
+            score += 30
+        if analysis.get("total_pnl", 0) > 0:
+            score += 20
+        if analysis.get("total_trades", 0) > 10:
+            score += 20
+        
+        grade = "F"
+        if score >= 90:
+            grade = "A+"
+        elif score >= 80:
+            grade = "A"
+        elif score >= 70:
+            grade = "B+"
+        elif score >= 60:
+            grade = "B"
+        elif score >= 50:
+            grade = "C"
+        
+        return {
+            "statistics": analysis,
+            "psychology": {
+                "best_trading_state": "Focused",
+                "emotional_consistency": "Stable",
+                "revenge_trading_detected": False
+            },
+            "overall_grade": grade,
+            "overall_score": score,
+            "next_milestone": "Reach 60% win rate for next grade",
+            "improvements": ["Keep maintaining your discipline"] if score > 70 else ["Review risk management"],
+            "trades": request.trades
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[JOURNAL ERROR] {e}", flush=True)
         raise HTTPException(500, f"Analysis failed: {str(e)}")

@@ -578,8 +578,12 @@
                 }
                 try {
                     this.user = JSON.parse(userStr);
+                    console.log('[Auth] User loaded:', this.user);
                     this.updateUserDisplay();
+                    // Delay admin menu check to ensure DOM ready
+                    setTimeout(() => this.renderAdminMenu(), 200);
                 } catch (e) {
+                    console.error('Auth error:', e);
                     window.location.href = '/';
                 }
             }

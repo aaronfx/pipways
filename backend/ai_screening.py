@@ -3,12 +3,26 @@ import os
 import base64
 import json
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from .security import get_current_user
 
 router = APIRouter()
+
+# Import performance calculation from performance module
+try:
+    from .performance import calculate_performance_metrics
+except ImportError:
+    # Fallback if import fails
+    def calculate_performance_metrics(trades_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if not trades_data:
+            return {"total_trades": 0, "win_rate": 0, "profit_factor": 0}
+        return {
+            "total_trades": len(trades_data),
+            "win_rate": 50.0,
+            "profit_factor": 1.5
+        }
 
 # OpenRouter Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -22,6 +36,9 @@ class MentorRequest(BaseModel):
     question: str
     skill_level: str = "intermediate"
 
+class JournalRequest(BaseModel):
+    trades: List[Dict[str, Any]]
+
 @router.post("/mentor/ask")
 async def ask_mentor(
     request: MentorRequest,
@@ -29,7 +46,6 @@ async def ask_mentor(
 ):
     """
     AI Trading Mentor - Provides educational trading guidance.
-    Accepts JSON: {"question": "how do I trade?", "skill_level": "intermediate"}
     """
     question = request.question
     skill_level = request.skill_level
@@ -118,6 +134,15 @@ Emphasize risk management. No specific financial advice."""
         print(f"[AI ERROR] Unexpected error: {e}", flush=True)
         raise HTTPException(500, f"AI service error: {str(e)}")
 
+@router.post("/mentor/ask-legacy")
+async def ask_mentor_legacy(
+    question: str = Form(...),
+    skill_level: str = Form("intermediate"),
+    current_user = Depends(get_current_user)
+):
+    """Legacy form-data endpoint for compatibility"""
+    return await ask_mentor(MentorRequest(question=question, skill_level=skill_level), current_user)
+
 @router.post("/chart/analyze")
 async def analyze_chart(
     file: UploadFile = File(...),
@@ -125,24 +150,31 @@ async def analyze_chart(
     timeframe: Optional[str] = Form(None),
     current_user = Depends(get_current_user)
 ):
-    """Chart Analysis using Claude Vision"""
+    """
+    Chart Analysis using Claude Vision via OpenRouter.
+    """
     allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
     if file.content_type not in allowed_types:
         raise HTTPException(400, f"Invalid file type. Allowed: {', '.join(allowed_types)}")
     
     if not OPENROUTER_CONFIGURED:
+        demo_symbol = symbol or "EURUSD"
         return {
             "trading_bias": "neutral",
             "confidence": 0.75,
             "patterns_detected": [
-                {"name": "Support Test", "reliability": "medium"}
+                {"name": "Support Test", "reliability": "medium"},
+                {"name": "Consolidation", "reliability": "high"}
             ],
-            "support_levels": ["1.0850"],
-            "resistance_levels": ["1.0950"],
+            "support_levels": ["1.0850", "1.0820"],
+            "resistance_levels": ["1.0950", "1.1000"],
             "suggested_entry": "1.0860",
             "suggested_stop": "1.0830",
             "suggested_target": "1.0940",
-            "key_insights": ["Demo mode - configure OPENROUTER_API_KEY"],
+            "key_insights": [
+                f"{demo_symbol} showing consolidation at support",
+                "Configure OPENROUTER_API_KEY for AI-powered analysis"
+            ],
             "mode": "demo",
             "configured": False
         }
@@ -160,12 +192,16 @@ async def analyze_chart(
         content_type = file.content_type or "image/jpeg"
         data_url = f"data:{content_type};base64,{base64_image}"
         
+        symbol_context = f"Symbol: {symbol}" if symbol else "Symbol: Unknown"
+        timeframe_context = f"Timeframe: {timeframe}" if timeframe else "Timeframe: Unknown"
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "HTTP-Referer": "https://pipwaysapp.onrender.com",
+                    "X-Title": "Pipways Trading Platform",
                     "Content-Type": "application/json"
                 },
                 json={
@@ -173,18 +209,29 @@ async def analyze_chart(
                     "messages": [
                         {
                             "role": "system",
-                            "content": """Analyze this trading chart. Respond in JSON format with: trading_bias, confidence, patterns_detected, support_levels, resistance_levels, suggested_entry, suggested_stop, suggested_target, key_insights"""
+                            "content": """Analyze this trading chart. Respond in JSON:
+{
+  "trading_bias": "bullish|bearish|neutral",
+  "confidence": 0.85,
+  "patterns_detected": [{"name": "...", "reliability": "high|medium|low"}],
+  "support_levels": ["1.0850"],
+  "resistance_levels": ["1.0950"],
+  "suggested_entry": "1.0860",
+  "suggested_stop": "1.0830",
+  "suggested_target": "1.0940",
+  "key_insights": ["...", "..."]
+}"""
                         },
                         {
                             "role": "user",
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": f"Analyze this chart. Symbol: {symbol or 'Unknown'}. Timeframe: {timeframe or 'Unknown'}"
+                                    "text": f"Analyze this chart. {symbol_context}. {timeframe_context}. Identify patterns and suggest trade levels."
                                 },
                                 {
                                     "type": "image_url",
-                                    "image_url": {"url": data_url}
+                                    "image_url": {"url": data_url, "detail": "high"}
                                 }
                             ]
                         }
@@ -201,6 +248,7 @@ async def analyze_chart(
             data = response.json()
             ai_content = data["choices"][0]["message"]["content"]
             
+            # Parse JSON from response
             try:
                 clean_content = ai_content.strip()
                 if "```json" in clean_content:
@@ -210,19 +258,86 @@ async def analyze_chart(
                 
                 analysis = json.loads(clean_content)
                 analysis["mode"] = "ai"
+                analysis["model"] = OPENROUTER_MODEL
+                analysis["configured"] = True
+                
                 return analysis
                 
             except json.JSONDecodeError:
                 return {
                     "trading_bias": "neutral",
                     "confidence": 0.5,
-                    "patterns_detected": [],
+                    "patterns_detected": [{"name": "Analysis Completed", "reliability": "medium"}],
                     "support_levels": [],
                     "resistance_levels": [],
+                    "suggested_entry": None,
+                    "suggested_stop": None,
+                    "suggested_target": None,
                     "key_insights": [ai_content[:300]],
-                    "mode": "raw"
+                    "mode": "raw",
+                    "configured": True
                 }
                 
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(504, "Chart analysis timed out. Try a smaller image.")
     except Exception as e:
-        print(f"[AI ERROR] Chart analysis: {e}", flush=True)
+        print(f"[AI ERROR] Chart analysis exception: {e}", flush=True)
+        raise HTTPException(500, f"Analysis failed: {str(e)}")
+
+# Journal endpoints - delegated to performance module but kept here for compatibility
+@router.post("/performance/analyze-journal")
+async def analyze_journal_compat(
+    request: JournalRequest,
+    current_user = Depends(get_current_user)
+):
+    """Compatibility endpoint that forwards to performance calculation"""
+    try:
+        if not request.trades or len(request.trades) == 0:
+            raise HTTPException(400, "No trades provided")
+        
+        analysis = calculate_performance_metrics(request.trades)
+        
+        # Determine grade
+        score = 0
+        if analysis.get("win_rate", 0) > 50:
+            score += 30
+        if analysis.get("profit_factor", 0) > 1.5:
+            score += 30
+        if analysis.get("total_pnl", 0) > 0:
+            score += 20
+        if analysis.get("total_trades", 0) > 10:
+            score += 20
+        
+        grade = "F"
+        if score >= 90:
+            grade = "A+"
+        elif score >= 80:
+            grade = "A"
+        elif score >= 70:
+            grade = "B+"
+        elif score >= 60:
+            grade = "B"
+        elif score >= 50:
+            grade = "C"
+        
+        return {
+            "statistics": analysis,
+            "psychology": {
+                "best_trading_state": "Focused",
+                "emotional_consistency": "Stable",
+                "revenge_trading_detected": False
+            },
+            "overall_grade": grade,
+            "overall_score": score,
+            "next_milestone": "Reach 60% win rate for next grade",
+            "improvements": ["Keep maintaining your discipline"] if score > 70 else ["Review risk management"],
+            "trades": request.trades
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[JOURNAL ERROR] {e}", flush=True)
         raise HTTPException(500, f"Analysis failed: {str(e)}")

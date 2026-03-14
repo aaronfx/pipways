@@ -563,7 +563,7 @@
                 this.checkAuth();
                 this.setupNavigation();
                 this.setupMobileMenu();
-                this.renderAdminMenu();
+                // renderAdminMenu will be called after user is loaded in checkAuth/updateUserDisplay
                 this.initFeatureCarousel();
                 this.loadDashboardStats();
                 this.navigate('dashboard');
@@ -589,14 +589,32 @@
                 document.getElementById('user-name').textContent = user.full_name || user.email || 'User';
                 document.getElementById('user-email').textContent = user.email || '';
                 document.getElementById('header-user-name').textContent = user.full_name || user.email || 'Trader';
+                // Now that user data is loaded, render admin menu
+                this.renderAdminMenu();
             }
 
             renderAdminMenu() {
-                const isAdmin = this.user && (this.user.is_admin || this.user.role === 'admin' || this.user.is_superuser);
+                const isAdmin = this.user && (
+                    this.user.is_admin === true || 
+                    this.user.role === 'admin' ||
+                    this.user.is_superuser === true ||
+                    this.user.admin === true ||
+                    this.user.role === 'superuser'
+                );
+
+                console.log('[Admin Check] User:', this.user?.email, 'Is Admin:', isAdmin, 'Role:', this.user?.role);
+
                 const adminMenu = document.getElementById('admin-menu-container');
                 if (adminMenu) {
-                    if (isAdmin) adminMenu.classList.remove('hidden');
-                    else adminMenu.classList.add('hidden');
+                    if (isAdmin) {
+                        adminMenu.classList.remove('hidden');
+                        adminMenu.style.display = 'block';
+                        console.log('[Admin] Menu shown');
+                    } else {
+                        adminMenu.classList.add('hidden');
+                        adminMenu.style.display = 'none';
+                        console.log('[Admin] Menu hidden - User is not admin');
+                    }
                 }
             }
 
@@ -978,6 +996,9 @@
                     alert('File too large (max 5MB)');
                     return;
                 }
+                // Store the file object for FormData upload
+                this.currentChartFile = file;
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const preview = document.getElementById('chart-preview');
@@ -989,13 +1010,12 @@
                     }
                     if (placeholder) placeholder.classList.add('hidden');
                     if (analyzeBtn) analyzeBtn.disabled = false;
-                    this.currentChartBase64 = e.target.result;
                 };
                 reader.readAsDataURL(file);
             }
 
             async analyzeChart() {
-                if (!this.currentChartBase64) {
+                if (!this.currentChartFile) {
                     alert('Please select a chart image');
                     return;
                 }
@@ -1006,10 +1026,26 @@
                     const symbol = document.getElementById('chart-symbol')?.value || 'AUTO';
                     const timeframe = document.getElementById('chart-timeframe')?.value || '';
 
-                    const data = await this.apiRequest('/ai/chart/analyze', {
+                    // Use FormData for file upload
+                    const formData = new FormData();
+                    formData.append('file', this.currentChartFile);
+                    formData.append('symbol', symbol);
+                    formData.append('timeframe', timeframe);
+
+                    const response = await fetch(`${API_BASE}/ai/chart/analyze`, {
                         method: 'POST',
-                        body: JSON.stringify({ image: this.currentChartBase64, symbol, timeframe })
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
+                        },
+                        body: formData
                     });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+
+                    const data = await response.json();
 
                     const resultsEl = document.getElementById('chart-analysis-results');
                     resultsEl.classList.remove('hidden');
@@ -1141,13 +1177,13 @@
                             entry_price: this.currentAnalysis.trade_setup?.entry_price || this.currentAnalysis.trade_setup?.entry,
                             stop_loss: this.currentAnalysis.trade_setup?.stop_loss || this.currentAnalysis.trade_setup?.sl,
                             take_profit: this.currentAnalysis.trade_setup?.take_profit || this.currentAnalysis.trade_setup?.tp,
-                            confidence: this.currentAnalysis.confidence,
-                            chart_image: this.currentChartBase64
+                            confidence: this.currentAnalysis.confidence
                         })
                     });
                     alert('Signal saved successfully!');
                 } catch (error) {
-                    alert('Failed to save signal');
+                    console.error('[Save Signal] Error:', error);
+                    alert('Failed to save signal: ' + error.message);
                 }
             }
 

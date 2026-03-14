@@ -8,7 +8,12 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 import statistics
 
-from .database import database, trades
+from .database import database
+try:
+    from .database import trades
+except ImportError:
+    trades = None
+
 from .auth import get_current_user_info
 
 router = APIRouter(prefix="/performance", tags=["performance"])
@@ -41,13 +46,22 @@ def safe_div(numerator: float, denominator: float) -> float:
     """Safe division avoiding ZeroDivisionError."""
     return numerator / denominator if denominator != 0 else 0.0
 
+async def get_user_trades(user_id: int):
+    """Fetch trades for user, handling missing table gracefully."""
+    if trades is None:
+        return []
+    
+    try:
+        query = trades.select().where(trades.c.user_id == user_id)
+        return await database.fetch_all(query)
+    except Exception:
+        return []
+
 @router.get("/dashboard", response_model=Dict[str, Any])
 async def get_dashboard_stats(current_user = Depends(get_current_user_info)):
     """Get main dashboard performance stats."""
     try:
-        # Query user's trades
-        query = trades.select().where(trades.c.user_id == current_user.id)
-        user_trades = await database.fetch_all(query)
+        user_trades = await get_user_trades(current_user.id)
         
         if not user_trades:
             return {
@@ -55,7 +69,12 @@ async def get_dashboard_stats(current_user = Depends(get_current_user_info)):
                     "total_trades": 0,
                     "win_rate": 0,
                     "total_pnl": 0,
-                    "profit_factor": 0
+                    "profit_factor": 0,
+                    "winning_trades": 0,
+                    "losing_trades": 0,
+                    "average_pnl": 0,
+                    "largest_win": 0,
+                    "largest_loss": 0
                 },
                 "recent_trades": [],
                 "daily_pnl": []
@@ -113,6 +132,10 @@ async def get_equity_curve(
     """Get equity curve for charting."""
     try:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
+        
+        if trades is None:
+            return []
+            
         query = trades.select().where(
             (trades.c.user_id == current_user.id) & 
             (trades.c.entry_time >= cutoff_date)
@@ -143,8 +166,10 @@ async def get_equity_curve(
 async def get_monthly_analysis(current_user = Depends(get_current_user_info)):
     """Get monthly performance breakdown."""
     try:
-        query = trades.select().where(trades.c.user_id == current_user.id)
-        user_trades = await database.fetch_all(query)
+        user_trades = await get_user_trades(current_user.id)
+        
+        if not user_trades:
+            return []
         
         months = {}
         
@@ -194,8 +219,7 @@ async def get_monthly_analysis(current_user = Depends(get_current_user_info)):
 async def get_trade_distribution(current_user = Depends(get_current_user_info)):
     """Get distribution of trade outcomes."""
     try:
-        query = trades.select().where(trades.c.user_id == current_user.id)
-        user_trades = await database.fetch_all(query)
+        user_trades = await get_user_trades(current_user.id)
         
         distribution = {
             "breakeven": 0,
@@ -237,6 +261,14 @@ async def get_trade_distribution(current_user = Depends(get_current_user_info)):
 async def get_consecutive_analysis(current_user = Depends(get_current_user_info)):
     """Analyze winning and losing streaks."""
     try:
+        if trades is None:
+            return {
+                "max_consecutive_wins": 0,
+                "max_consecutive_losses": 0,
+                "current_streak": 0,
+                "current_streak_type": "none"
+            }
+            
         query = trades.select().where(trades.c.user_id == current_user.id).order_by(trades.c.entry_time)
         user_trades = await database.fetch_all(query)
         

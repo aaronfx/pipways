@@ -77,45 +77,78 @@ app.include_router(blog_enhanced.router, prefix="/blog", tags=["Blog Enhanced"])
 app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses Enhanced"])
 
 # ==========================================
-# STATIC FILES - FIXED PATH
+# STATIC FILES - FIXED PATHS
 # ==========================================
 
-# Get absolute path to static directory (inside frontend folder)
+# Get absolute path to project root
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 1. Mount /js folder for JavaScript files
+JS_DIR = os.path.join(BASE_DIR, "js")
+if os.path.exists(JS_DIR):
+    app.mount("/js", StaticFiles(directory=JS_DIR), name="js")
+    print(f"[STATIC] Mounted /js from {JS_DIR}", flush=True)
+else:
+    # Fallback: try js folder in current directory
+    if os.path.exists("js"):
+        app.mount("/js", StaticFiles(directory="js"), name="js")
+        print("[STATIC] Mounted /js from js/", flush=True)
+
+# 2. Mount /static folder for HTML and other static files
 STATIC_DIR = os.path.join(BASE_DIR, "frontend", "static")
-
-print(f"[STATIC] Looking for static files at: {STATIC_DIR}", flush=True)
-print(f"[STATIC] Directory exists: {os.path.exists(STATIC_DIR)}", flush=True)
-
-# Mount static files if directory exists
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    print(f"[STATIC] Mounted successfully from frontend/static", flush=True)
+    print(f"[STATIC] Mounted /static from frontend/static", flush=True)
 else:
     # Fallback: try root static folder
     STATIC_DIR = os.path.join(BASE_DIR, "static")
     if os.path.exists(STATIC_DIR):
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-        print(f"[STATIC] Mounted successfully from root static", flush=True)
+        print(f"[STATIC] Mounted /static from root static", flush=True)
     else:
         print(f"[WARNING] Static directory not found", flush=True)
 
 # ==========================================
-# SPA ROUTING
+# SPA ROUTING - Serve index.html for all non-API routes
 # ==========================================
 
 @app.get("/")
 async def serve_index():
     """Serve index.html for root path"""
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
+    # Try multiple locations for index.html
+    possible_paths = [
+        os.path.join(BASE_DIR, "frontend", "static", "index.html"),
+        os.path.join(BASE_DIR, "static", "index.html"),
+        os.path.join(STATIC_DIR, "index.html") if 'STATIC_DIR' in locals() else "",
+        "static/index.html"
+    ]
+    
+    for index_path in possible_paths:
+        if index_path and os.path.exists(index_path):
+            return FileResponse(index_path)
+    
     return JSONResponse({
         "message": "Pipways API Server",
         "status": "running",
         "docs": "/docs",
         "hint": "Frontend not found"
     })
+
+@app.get("/dashboard.html")
+async def serve_dashboard():
+    """Serve dashboard.html"""
+    possible_paths = [
+        os.path.join(BASE_DIR, "frontend", "static", "dashboard.html"),
+        os.path.join(BASE_DIR, "static", "dashboard.html"),
+        os.path.join(STATIC_DIR, "dashboard.html") if 'STATIC_DIR' in locals() else "",
+        "static/dashboard.html"
+    ]
+    
+    for dashboard_path in possible_paths:
+        if dashboard_path and os.path.exists(dashboard_path):
+            return FileResponse(dashboard_path)
+    
+    raise HTTPException(404, "dashboard.html not found")
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
@@ -127,7 +160,7 @@ async def serve_spa(full_path: str):
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/", 
         "blog/", "ai/", "admin/", "health", "docs", "openapi.json",
-        "static/"
+        "static/", "js/"
     )
     if full_path.startswith(api_prefixes):
         raise HTTPException(404, "Not found")

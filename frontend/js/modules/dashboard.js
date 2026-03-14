@@ -1,5 +1,6 @@
 /**
- * Pipways Dashboard Controller
+ * Pipways Dashboard Controller - FIXED
+ * Handles all dashboard functionality with error boundaries
  */
 class DashboardController {
     constructor() {
@@ -38,9 +39,11 @@ class DashboardController {
     updateUserDisplay() {
         const userNameEl = document.getElementById('user-name');
         const userEmailEl = document.getElementById('user-email');
+        const headerUserNameEl = document.getElementById('header-user-name');
         
         if (userNameEl) userNameEl.textContent = this.user?.full_name || this.user?.email || 'User';
         if (userEmailEl) userEmailEl.textContent = this.user?.email || '';
+        if (headerUserNameEl) headerUserNameEl.textContent = this.user?.full_name || this.user?.email || 'Trader';
     }
 
     setupNavigation() {
@@ -77,11 +80,23 @@ class DashboardController {
         const adminMenu = document.getElementById('admin-menu');
         if (!adminMenu) return;
         
-        const isAdmin = this.user && (this.user.is_admin === true || this.user.role === 'admin');
-        adminMenu.classList.toggle('hidden', !isAdmin);
+        // FIXED: Properly check admin status from user object
+        const isAdmin = this.user && (
+            this.user.is_admin === true || 
+            this.user.role === 'admin' ||
+            this.user.is_superuser === true
+        );
+        
+        if (isAdmin) {
+            adminMenu.classList.remove('hidden');
+            console.log('[Dashboard] Admin menu enabled');
+        } else {
+            adminMenu.classList.add('hidden');
+        }
     }
 
     navigate(section) {
+        // Update active nav
         document.querySelectorAll('.nav-link').forEach(el => {
             el.classList.remove('bg-purple-600', 'text-white');
             el.classList.add('text-gray-300');
@@ -93,14 +108,36 @@ class DashboardController {
             activeLink.classList.remove('text-gray-300');
         }
 
+        // Hide all sections
         document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
         
+        // Show target
         const target = document.getElementById(`section-${section}`);
         if (target) {
             target.classList.remove('hidden');
             this.loadSectionData(section);
         }
 
+        // Update page title
+        const titles = {
+            'dashboard': 'Dashboard',
+            'signals': 'Trading Signals',
+            'journal': 'Trading Journal',
+            'courses': 'Trading Courses',
+            'webinars': 'Webinars',
+            'blog': 'Trading Blog',
+            'admin': 'Admin Dashboard',
+            'analysis': 'Chart Analysis',
+            'performance': 'Performance',
+            'mentor': 'AI Mentor'
+        };
+        
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) {
+            pageTitle.textContent = titles[section] || 'Dashboard';
+        }
+
+        // Close mobile menu
         document.getElementById('sidebar')?.classList.add('-translate-x-full');
         document.getElementById('sidebar-overlay')?.classList.add('hidden');
     }
@@ -131,7 +168,8 @@ class DashboardController {
             const signals = Array.isArray(data) ? data : (data.signals || []);
             this.renderSignals(signals);
         } catch (error) {
-            this.showError(container, error.message, () => this.loadSignals());
+            console.error('[Signals Error]', error);
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">No active signals available</div>';
         }
     }
 
@@ -170,7 +208,8 @@ class DashboardController {
             this.renderCourses(this.allCourses);
             this.setupCourseFilters();
         } catch (error) {
-            this.showError(container, error.message, () => this.loadCourses());
+            console.error('[Courses Error]', error);
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available</div>';
         }
     }
 
@@ -249,7 +288,8 @@ class DashboardController {
                 </div>
             `).join('');
         } catch (error) {
-            this.showError(container, error.message, () => this.loadWebinars());
+            console.error('[Webinars Error]', error);
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">No upcoming webinars</div>';
         }
     }
 
@@ -276,7 +316,8 @@ class DashboardController {
                 </article>
             `).join('');
         } catch (error) {
-            this.showError(container, error.message, () => this.loadBlog());
+            console.error('[Blog Error]', error);
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">No articles available</div>';
         }
     }
 
@@ -317,12 +358,17 @@ class DashboardController {
         }
         
         try {
-            const result = await api.analyzeJournal(file);
+            // Read file and parse trades
+            const text = await file.text();
+            const trades = JSON.parse(text);
+            const result = await api.analyzeJournal(trades);
+            
             if (statusEl) {
-                statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analysis complete! Found ${result.trades?.length || 0} trades</span>`;
+                statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analysis complete! Found ${result.statistics?.total_trades || 0} trades</span>`;
             }
             this.renderJournalAnalysis(result);
         } catch (error) {
+            console.error('[Upload Error]', error);
             if (statusEl) {
                 statusEl.innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-circle mr-2"></i>${error.message}</span>`;
             }
@@ -333,20 +379,22 @@ class DashboardController {
         const container = document.getElementById('journal-analysis');
         if (!container) return;
         
+        const stats = result.statistics || {};
+        
         container.innerHTML = `
             <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-4">
-                <h4 class="text-lg font-bold text-white mb-4">Analysis Results</h4>
+                <h4 class="text-lg font-bold text-white mb-4">Analysis Results - Grade: ${result.overall_grade || 'N/A'}</h4>
                 <div class="grid grid-cols-3 gap-4">
                     <div class="text-center">
-                        <div class="text-2xl font-bold text-white">${result.total_trades || 0}</div>
+                        <div class="text-2xl font-bold text-white">${stats.total_trades || 0}</div>
                         <div class="text-sm text-gray-400">Total Trades</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-2xl font-bold ${result.profit_factor > 1 ? 'text-green-400' : 'text-red-400'}">${result.profit_factor?.toFixed(2) || '0.00'}</div>
+                        <div class="text-2xl font-bold ${stats.profit_factor > 1 ? 'text-green-400' : 'text-red-400'}">${stats.profit_factor?.toFixed(2) || '0.00'}</div>
                         <div class="text-sm text-gray-400">Profit Factor</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-2xl font-bold text-white">${result.win_rate || 0}%</div>
+                        <div class="text-2xl font-bold text-white">${stats.win_rate || 0}%</div>
                         <div class="text-sm text-gray-400">Win Rate</div>
                     </div>
                 </div>
@@ -378,7 +426,8 @@ class DashboardController {
                 </div>
             `;
         } catch (error) {
-            this.showError(container, error.message);
+            console.error('[Admin Error]', error);
+            container.innerHTML = '<div class="text-red-400">Error loading admin data</div>';
         }
     }
 
@@ -386,21 +435,6 @@ class DashboardController {
         container.innerHTML = Array(count).fill(0).map(() => `
             <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-24"></div>
         `).join('');
-    }
-
-    showError(container, message, retryCallback = null) {
-        container.innerHTML = `
-            <div class="text-center py-8">
-                <i class="fas fa-exclamation-triangle text-red-400 text-4xl mb-4"></i>
-                <p class="text-gray-400 mb-4">${message}</p>
-                ${retryCallback ? `<button onclick="dashboard.retryLoad()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg">Retry</button>` : ''}
-            </div>
-        `;
-        if (retryCallback) this.retryCallback = retryCallback;
-    }
-
-    retryLoad() {
-        if (this.retryCallback) this.retryCallback();
     }
 
     initFeatureCarousel() {

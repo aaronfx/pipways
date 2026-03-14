@@ -183,14 +183,15 @@
                 const email = document.getElementById('login-email').value;
                 const password = document.getElementById('login-password').value;
                 
-                // FIXED: Use /auth/token endpoint with FormData (OAuth2 standard)
+                // CRITICAL: Must use FormData for OAuth2 endpoint, not JSON
                 const formData = new FormData();
-                formData.append('username', email);  // OAuth2 uses 'username' field
+                formData.append('username', email);
                 formData.append('password', password);
                 
                 const response = await fetch(`${API_BASE}/auth/token`, {
                     method: 'POST',
-                    body: formData  // Send as form data, not JSON
+                    body: formData
+                    // Note: Do NOT set Content-Type header - browser sets it automatically with boundary for FormData
                 });
                 
                 if (!response.ok) {
@@ -234,7 +235,6 @@
             spinner.classList.remove('hidden');
             
             try {
-                // FIXED: Use full_name instead of name to match backend
                 const full_name = document.getElementById('signup-name').value;
                 const email = document.getElementById('signup-email').value;
                 const password = document.getElementById('signup-password').value;
@@ -245,7 +245,7 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ full_name, email, password })  // FIXED: full_name not name
+                    body: JSON.stringify({ full_name, email, password })
                 });
                 
                 if (!response.ok) {

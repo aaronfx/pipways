@@ -19,7 +19,8 @@ from .security import (
     ALGORITHM
 )
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+# FIXED: Removed prefix="/auth" to prevent double prefixing (main.py already adds /auth)
+router = APIRouter(tags=["auth"])
 
 # OAuth2 scheme for token URL
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")

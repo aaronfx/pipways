@@ -9,20 +9,11 @@ class DashboardController {
     }
 
     init() {
-        // Wait for DOM to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.setup());
-        } else {
-            this.setup();
-        }
-    }
-
-    setup() {
         this.checkAuth();
         this.setupNavigation();
         this.setupMobileMenu();
         this.renderAdminMenu();
-        this.initCarousel();
+        this.initFeatureCarousel();
         this.navigate('dashboard');
     }
 
@@ -47,11 +38,9 @@ class DashboardController {
     updateUserDisplay() {
         const userNameEl = document.getElementById('user-name');
         const userEmailEl = document.getElementById('user-email');
-        const headerUserEl = document.getElementById('header-user-name');
         
         if (userNameEl) userNameEl.textContent = this.user?.full_name || this.user?.email || 'User';
         if (userEmailEl) userEmailEl.textContent = this.user?.email || '';
-        if (headerUserEl) headerUserEl.textContent = this.user?.full_name || this.user?.email || 'Trader';
     }
 
     setupNavigation() {
@@ -93,7 +82,6 @@ class DashboardController {
     }
 
     navigate(section) {
-        // Update active nav
         document.querySelectorAll('.nav-link').forEach(el => {
             el.classList.remove('bg-purple-600', 'text-white');
             el.classList.add('text-gray-300');
@@ -105,30 +93,14 @@ class DashboardController {
             activeLink.classList.remove('text-gray-300');
         }
 
-        // Hide all sections
         document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
         
-        // Show target
         const target = document.getElementById(`section-${section}`);
         if (target) {
             target.classList.remove('hidden');
             this.loadSectionData(section);
         }
 
-        // Update title
-        const titles = {
-            'dashboard': 'Dashboard',
-            'signals': 'Trading Signals',
-            'journal': 'Trading Journal',
-            'courses': 'Trading Courses',
-            'webinars': 'Webinars',
-            'blog': 'Trading Blog',
-            'admin': 'Admin Dashboard'
-        };
-        const titleEl = document.getElementById('page-title');
-        if (titleEl) titleEl.textContent = titles[section] || 'Dashboard';
-
-        // Close mobile menu
         document.getElementById('sidebar')?.classList.add('-translate-x-full');
         document.getElementById('sidebar-overlay')?.classList.add('hidden');
     }
@@ -140,8 +112,8 @@ class DashboardController {
                 case 'courses': await this.loadCourses(); break;
                 case 'webinars': await this.loadWebinars(); break;
                 case 'blog': await this.loadBlog(); break;
-                case 'journal': this.setupJournal(); break;
-                case 'admin': await this.loadAdmin(); break;
+                case 'journal': this.setupJournalUpload(); break;
+                case 'admin': await this.loadAdminData(); break;
             }
         } catch (err) {
             console.error(`[Dashboard] Error loading ${section}:`, err);
@@ -157,32 +129,37 @@ class DashboardController {
         try {
             const data = await api.getSignals();
             const signals = Array.isArray(data) ? data : (data.signals || []);
-            
-            if (signals.length === 0) {
-                container.innerHTML = '<div class="text-center py-8 text-gray-500">No active signals available</div>';
-                return;
-            }
-            
-            container.innerHTML = signals.map(s => `
-                <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                    <div class="flex justify-between items-start mb-2">
-                        <h4 class="font-bold text-white">${s.symbol}</h4>
-                        <span class="text-xs ${s.direction === 'BUY' ? 'text-green-400' : 'text-red-400'}">${s.direction}</span>
-                    </div>
-                    <div class="text-sm text-gray-400 space-y-1">
-                        <div>Entry: <span class="text-white">${s.entry_price}</span></div>
-                        <div>SL: <span class="text-red-400">${s.stop_loss}</span> / TP: <span class="text-green-400">${s.take_profit}</span></div>
-                    </div>
-                </div>
-            `).join('');
-        } catch (err) {
-            this.showError(container, err.message, () => this.loadSignals());
+            this.renderSignals(signals);
+        } catch (error) {
+            this.showError(container, error.message, () => this.loadSignals());
         }
+    }
+
+    renderSignals(signals) {
+        const container = document.getElementById('signals-container');
+        if (!container) return;
+        
+        if (!signals || signals.length === 0) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">No active signals available</div>';
+            return;
+        }
+        
+        container.innerHTML = signals.map(signal => `
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-bold text-white">${signal.symbol}</h4>
+                    <span class="text-xs ${signal.direction === 'BUY' ? 'text-green-400' : 'text-red-400'}">${signal.direction}</span>
+                </div>
+                <div class="text-sm text-gray-400 space-y-1">
+                    <div>Entry: <span class="text-white">${signal.entry_price}</span></div>
+                    <div>SL: <span class="text-red-400">${signal.stop_loss}</span> / TP: <span class="text-green-400">${signal.take_profit}</span></div>
+                </div>
+            </div>
+        `).join('');
     }
 
     async loadCourses() {
         const container = document.getElementById('courses-container');
-        const filters = document.getElementById('course-filters');
         if (!container) return;
         
         this.showSkeleton(container, 4);
@@ -190,19 +167,25 @@ class DashboardController {
         try {
             const data = await api.getCourses();
             this.allCourses = Array.isArray(data) ? data : (data.courses || []);
-            
-            // Setup filters
-            if (filters) {
-                const levels = ['All', 'Beginner', 'Intermediate', 'Advanced'];
-                filters.innerHTML = levels.map(l => `
-                    <button onclick="dashboard.filterCourses('${l}')" class="filter-btn px-4 py-2 rounded-full text-sm ${l === 'All' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}" data-level="${l}">${l}</button>
-                `).join('');
-            }
-            
-            this.filterCourses('All');
-        } catch (err) {
-            this.showError(container, err.message, () => this.loadCourses());
+            this.renderCourses(this.allCourses);
+            this.setupCourseFilters();
+        } catch (error) {
+            this.showError(container, error.message, () => this.loadCourses());
         }
+    }
+
+    setupCourseFilters() {
+        const filterContainer = document.getElementById('course-filters');
+        if (!filterContainer) return;
+        
+        const levels = ['All', 'Beginner', 'Intermediate', 'Advanced'];
+        filterContainer.innerHTML = levels.map(level => `
+            <button onclick="dashboard.filterCourses('${level}')" 
+                    class="filter-btn px-4 py-2 rounded-full text-sm ${level === 'All' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}"
+                    data-level="${level}">
+                ${level}
+            </button>
+        `).join('');
     }
 
     filterCourses(level) {
@@ -211,24 +194,31 @@ class DashboardController {
             btn.className = `filter-btn px-4 py-2 rounded-full text-sm ${isActive ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`;
         });
         
-        const filtered = level === 'All' ? this.allCourses : this.allCourses.filter(c => 
-            c.level?.toLowerCase() === level.toLowerCase()
-        );
-        
+        if (level === 'All') {
+            this.renderCourses(this.allCourses);
+        } else {
+            const filtered = this.allCourses.filter(c => c.level?.toLowerCase() === level.toLowerCase());
+            this.renderCourses(filtered);
+        }
+    }
+
+    renderCourses(courses) {
         const container = document.getElementById('courses-container');
-        if (filtered.length === 0) {
-            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses found for this level</div>';
+        if (!container) return;
+        
+        if (!courses || courses.length === 0) {
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available for this level</div>';
             return;
         }
         
-        container.innerHTML = filtered.map(c => `
+        container.innerHTML = courses.map(course => `
             <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
                 <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900"></div>
                 <div class="p-4">
-                    <div class="text-xs text-purple-400 mb-1">${c.level || 'Beginner'}</div>
-                    <h4 class="font-bold text-white mb-2">${c.title}</h4>
-                    <p class="text-sm text-gray-400 mb-3">${c.description || ''}</p>
-                    <div class="text-xs text-gray-500">${c.lesson_count || 0} lessons</div>
+                    <div class="text-xs text-purple-400 mb-1">${course.level || 'Beginner'}</div>
+                    <h4 class="font-bold text-white mb-2">${course.title}</h4>
+                    <p class="text-sm text-gray-400 mb-3">${course.description || ''}</p>
+                    <div class="text-xs text-gray-500">${course.lesson_count || 0} lessons</div>
                 </div>
             </div>
         `).join('');
@@ -244,22 +234,22 @@ class DashboardController {
             const data = await api.getWebinars();
             const webinars = Array.isArray(data) ? data : (data.webinars || []);
             
-            if (webinars.length === 0) {
+            if (!webinars || webinars.length === 0) {
                 container.innerHTML = '<div class="text-center py-8 text-gray-500">No upcoming webinars</div>';
                 return;
             }
             
-            container.innerHTML = webinars.map(w => `
+            container.innerHTML = webinars.map(webinar => `
                 <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex justify-between items-center">
                     <div>
-                        <h4 class="font-bold text-white">${w.title}</h4>
-                        <p class="text-sm text-gray-400">${new Date(w.scheduled_at).toLocaleDateString()} • ${w.presenter || 'TBA'}</p>
+                        <h4 class="font-bold text-white">${webinar.title}</h4>
+                        <p class="text-sm text-gray-400">${new Date(webinar.scheduled_at).toLocaleDateString()} • ${webinar.presenter || 'TBA'}</p>
                     </div>
                     <button class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm">Register</button>
                 </div>
             `).join('');
-        } catch (err) {
-            this.showError(container, err.message, () => this.loadWebinars());
+        } catch (error) {
+            this.showError(container, error.message, () => this.loadWebinars());
         }
     }
 
@@ -273,70 +263,99 @@ class DashboardController {
             const data = await api.getBlogPosts();
             const posts = Array.isArray(data) ? data : (data.posts || []);
             
-            if (posts.length === 0) {
+            if (!posts || posts.length === 0) {
                 container.innerHTML = '<div class="text-center py-8 text-gray-500">No articles available</div>';
                 return;
             }
             
-            container.innerHTML = posts.map(p => `
+            container.innerHTML = posts.map(post => `
                 <article class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                    <div class="text-xs text-purple-400 mb-2">${p.category || 'General'}</div>
-                    <h4 class="font-bold text-white mb-2">${p.title}</h4>
-                    <p class="text-sm text-gray-400 line-clamp-3">${p.excerpt || p.content?.substring(0, 100) + '...' || ''}</p>
+                    <div class="text-xs text-purple-400 mb-2">${post.category || 'General'}</div>
+                    <h4 class="font-bold text-white mb-2">${post.title}</h4>
+                    <p class="text-sm text-gray-400 line-clamp-3">${post.excerpt || post.content?.substring(0, 100) + '...' || ''}</p>
                 </article>
             `).join('');
-        } catch (err) {
-            this.showError(container, err.message, () => this.loadBlog());
+        } catch (error) {
+            this.showError(container, error.message, () => this.loadBlog());
         }
     }
 
-    setupJournal() {
-        const dropzone = document.getElementById('journal-dropzone');
-        const input = document.getElementById('journal-file-input');
-        if (!dropzone || !input) return;
+    setupJournalUpload() {
+        const dropZone = document.getElementById('journal-dropzone');
+        const fileInput = document.getElementById('journal-file-input');
+        if (!dropZone || !fileInput) return;
         
-        dropzone.onclick = () => input.click();
+        dropZone.addEventListener('click', () => fileInput.click());
         
-        dropzone.ondragover = (e) => {
+        dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropzone.classList.add('border-purple-500', 'bg-purple-900/20');
-        };
+            dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
+        });
         
-        dropzone.ondragleave = () => {
-            dropzone.classList.remove('border-purple-500', 'bg-purple-900/20');
-        };
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+        });
         
-        dropzone.ondrop = (e) => {
+        dropZone.addEventListener('drop', async (e) => {
             e.preventDefault();
-            dropzone.classList.remove('border-purple-500', 'bg-purple-900/20');
-            if (e.dataTransfer.files[0]) this.uploadJournal(e.dataTransfer.files[0]);
-        };
+            dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+            const file = e.dataTransfer.files[0];
+            if (file) await this.handleJournalUpload(file);
+        });
         
-        input.onchange = (e) => {
-            if (e.target.files[0]) this.uploadJournal(e.target.files[0]);
-        };
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) await this.handleJournalUpload(file);
+        });
     }
 
-    async uploadJournal(file) {
-        const status = document.getElementById('upload-status');
-        if (status) {
-            status.classList.remove('hidden');
-            status.innerHTML = '<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Analyzing...</span>';
+    async handleJournalUpload(file) {
+        const statusEl = document.getElementById('upload-status');
+        if (statusEl) {
+            statusEl.classList.remove('hidden');
+            statusEl.innerHTML = '<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Analyzing...</span>';
         }
         
         try {
             const result = await api.analyzeJournal(file);
-            if (status) {
-                status.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analysis complete! Found ${result.trades?.length || 0} trades</span>`;
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analysis complete! Found ${result.trades?.length || 0} trades</span>`;
             }
-        } catch (err) {
-            if (status) {
-                status.innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-circle mr-2"></i>${err.message}</span>`;
+            this.renderJournalAnalysis(result);
+        } catch (error) {
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-circle mr-2"></i>${error.message}</span>`;
             }
         }
     }
 
-    async loadAdmin() {
+    renderJournalAnalysis(result) {
+        const container = document.getElementById('journal-analysis');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-4">
+                <h4 class="text-lg font-bold text-white mb-4">Analysis Results</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-white">${result.total_trades || 0}</div>
+                        <div class="text-sm text-gray-400">Total Trades</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold ${result.profit_factor > 1 ? 'text-green-400' : 'text-red-400'}">${result.profit_factor?.toFixed(2) || '0.00'}</div>
+                        <div class="text-sm text-gray-400">Profit Factor</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-white">${result.win_rate || 0}%</div>
+                        <div class="text-sm text-gray-400">Win Rate</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.classList.remove('hidden');
+    }
+
+    async loadAdminData() {
         const container = document.getElementById('admin-container');
         if (!container) return;
         
@@ -352,31 +371,58 @@ class DashboardController {
                         <div class="text-3xl font-bold text-white">${stats.active_signals || 0}</div>
                         <div class="text-sm text-gray-400">Active Signals</div>
                     </div>
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <div class="text-3xl font-bold text-white">${stats.new_today || 0}</div>
+                        <div class="text-sm text-gray-400">New Today</div>
+                    </div>
                 </div>
             `;
-        } catch (err) {
-            container.innerHTML = `<div class="text-red-400">Error loading admin data: ${err.message}</div>`;
+        } catch (error) {
+            this.showError(container, error.message);
         }
     }
 
-    initCarousel() {
+    showSkeleton(container, count = 3) {
+        container.innerHTML = Array(count).fill(0).map(() => `
+            <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-24"></div>
+        `).join('');
+    }
+
+    showError(container, message, retryCallback = null) {
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-exclamation-triangle text-red-400 text-4xl mb-4"></i>
+                <p class="text-gray-400 mb-4">${message}</p>
+                ${retryCallback ? `<button onclick="dashboard.retryLoad()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg">Retry</button>` : ''}
+            </div>
+        `;
+        if (retryCallback) this.retryCallback = retryCallback;
+    }
+
+    retryLoad() {
+        if (this.retryCallback) this.retryCallback();
+    }
+
+    initFeatureCarousel() {
         const carousel = document.getElementById('feature-carousel');
         if (!carousel) return;
         
         const slides = [
-            { title: 'Trading Signals', desc: 'AI-powered signals', icon: 'fa-satellite-dish', color: 'from-purple-600 to-blue-600', link: 'signals' },
-            { title: 'Trading Journal', desc: 'Track performance', icon: 'fa-book', color: 'from-green-600 to-teal-600', link: 'journal' },
-            { title: 'Chart Analysis', desc: 'Technical tools', icon: 'fa-chart-line', color: 'from-orange-600 to-red-600', link: 'analysis' },
-            { title: 'AI Mentor', desc: 'Personalized coaching', icon: 'fa-robot', color: 'from-pink-600 to-purple-600', link: 'mentor' },
-            { title: 'Courses', desc: 'Learn to trade', icon: 'fa-graduation-cap', color: 'from-blue-600 to-cyan-600', link: 'courses' }
+            { icon: 'fa-satellite-dish', title: 'Trading Signals', desc: 'AI-powered signals with high accuracy', color: 'from-purple-600 to-blue-600', section: 'signals' },
+            { icon: 'fa-book', title: 'Trading Journal', desc: 'Track and analyze your trading performance', color: 'from-green-600 to-teal-600', section: 'journal' },
+            { icon: 'fa-chart-line', title: 'Chart Analysis', desc: 'Advanced technical analysis tools', color: 'from-orange-600 to-red-600', section: 'analysis' },
+            { icon: 'fa-robot', title: 'AI Mentor', desc: 'Personalized trading coaching', color: 'from-pink-600 to-purple-600', section: 'mentor' },
+            { icon: 'fa-graduation-cap', title: 'Courses', desc: 'Learn from beginner to advanced', color: 'from-blue-600 to-cyan-600', section: 'courses' },
+            { icon: 'fa-video', title: 'Webinars', desc: 'Live trading sessions and Q&A', color: 'from-indigo-600 to-purple-600', section: 'webinars' },
+            { icon: 'fa-newspaper', title: 'Trading Blog', desc: 'Latest market insights and strategies', color: 'from-yellow-600 to-orange-600', section: 'blog' }
         ];
         
-        let current = 0;
+        let currentSlide = 0;
         
-        const render = () => {
-            const slide = slides[current];
+        const renderSlides = () => {
+            const slide = slides[currentSlide];
             carousel.innerHTML = `
-                <div class="bg-gradient-to-r ${slide.color} rounded-xl p-6 md:p-8 text-white cursor-pointer" onclick="dashboard.navigate('${slide.link}')">
+                <div class="bg-gradient-to-r ${slide.color} rounded-xl p-6 md:p-8 text-white cursor-pointer" onclick="dashboard.navigate('${slide.section}')">
                     <div class="flex items-start justify-between">
                         <div>
                             <i class="fas ${slide.icon} text-3xl mb-3 opacity-80"></i>
@@ -389,28 +435,19 @@ class DashboardController {
             `;
         };
         
-        render();
-        setInterval(() => {
-            current = (current + 1) % slides.length;
-            render();
-        }, 5000);
-    }
-
-    showSkeleton(container, count) {
-        container.innerHTML = Array(count).fill(0).map(() => `
-            <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-24"></div>
-        `).join('');
-    }
-
-    showError(container, msg, retry) {
-        container.innerHTML = `
-            <div class="text-center py-8 text-red-400">
-                <i class="fas fa-exclamation-triangle mb-2"></i>
-                <p class="mb-3">${msg}</p>
-                ${retry ? `<button onclick="dashboard.retryCallback()" class="bg-purple-600 text-white px-4 py-2 rounded text-sm">Retry</button>` : ''}
-            </div>
-        `;
-        this.retryCallback = retry;
+        const nextSlide = () => {
+            currentSlide = (currentSlide + 1) % slides.length;
+            renderSlides();
+        };
+        
+        document.getElementById('carousel-next')?.addEventListener('click', nextSlide);
+        document.getElementById('carousel-prev')?.addEventListener('click', () => {
+            currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+            renderSlides();
+        });
+        
+        setInterval(nextSlide, 5000);
+        renderSlides();
     }
 
     logout() {
@@ -420,10 +457,5 @@ class DashboardController {
     }
 }
 
-// Initialize when script loads
-let dashboard;
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { dashboard = new DashboardController(); });
-} else {
-    dashboard = new DashboardController();
-}
+// Initialize dashboard
+const dashboard = new DashboardController();

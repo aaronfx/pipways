@@ -105,7 +105,7 @@
             </form>
 
             <div class="mt-6 pt-6 border-t border-gray-200 text-center">
-                <a href="#" onclick="showToast('Contact admin@pipways.com for password reset')" class="text-sm text-blue-600 hover:underline">
+                <a href="#" onclick="alert('Contact admin@pipways.com for password reset')" class="text-sm text-blue-600 hover:underline">
                     Forgot password?
                 </a>
             </div>
@@ -165,6 +165,10 @@
             document.getElementById('success-message').classList.add('hidden');
         }
 
+        /**
+         * PRODUCTION LOGIN - Uses URLSearchParams for OAuth2 compatibility
+         * Content-Type: application/x-www-form-urlencoded (REQUIRED by FastAPI OAuth2)
+         */
         async function handleLogin(e) {
             e.preventDefault();
             hideMessages();
@@ -174,6 +178,7 @@
             const btnIcon = document.getElementById('login-btn-icon');
             const spinner = document.getElementById('login-spinner');
             
+            // Loading state
             btn.disabled = true;
             btnText.textContent = 'Signing In...';
             btnIcon.classList.add('hidden');
@@ -183,34 +188,43 @@
                 const email = document.getElementById('login-email').value;
                 const password = document.getElementById('login-password').value;
                 
-                // CRITICAL: Must use FormData for OAuth2 endpoint, not JSON
-                const formData = new FormData();
-                formData.append('username', email);
-                formData.append('password', password);
+                // CRITICAL: Use URLSearchParams for OAuth2 form-urlencoded format
+                const params = new URLSearchParams();
+                params.append('username', email);  // OAuth2 uses 'username' field
+                params.append('password', password);
+                
+                console.log('[Auth] Sending login request to:', `${API_BASE}/auth/token`);
                 
                 const response = await fetch(`${API_BASE}/auth/token`, {
                     method: 'POST',
-                    body: formData
-                    // Note: Do NOT set Content-Type header - browser sets it automatically with boundary for FormData
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    body: params
                 });
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || `Login failed: ${response.status}`);
+                    throw new Error(errorData.detail || `Authentication failed (${response.status})`);
                 }
                 
                 const data = await response.json();
+                console.log('[Auth] Login successful');
                 
+                // Store authentication data
                 localStorage.setItem('pipways_token', data.access_token);
                 localStorage.setItem('pipways_user', JSON.stringify(data.user));
+                
                 showSuccess('Login successful! Redirecting...');
                 
+                // Redirect to dashboard
                 setTimeout(() => {
                     window.location.href = '/dashboard.html';
-                }, 1000);
+                }, 800);
                 
             } catch (error) {
-                console.error('Login error:', error);
+                console.error('[Auth Error]', error);
                 showError(error.message || 'Network error. Please try again.');
             } finally {
                 btn.disabled = false;
@@ -250,19 +264,22 @@
                 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || `Registration failed: ${response.status}`);
+                    throw new Error(errorData.detail || `Registration failed (${response.status})`);
                 }
                 
                 const data = await response.json();
+                
+                // Auto-login after registration
                 localStorage.setItem('pipways_token', data.access_token);
                 localStorage.setItem('pipways_user', JSON.stringify(data.user));
                 
                 showSuccess('Account created! Redirecting...');
                 setTimeout(() => {
                     window.location.href = '/dashboard.html';
-                }, 1500);
+                }, 1200);
                 
             } catch (error) {
+                console.error('[Signup Error]', error);
                 showError(error.message || 'Network error. Please try again.');
             } finally {
                 btn.disabled = false;
@@ -272,11 +289,7 @@
             }
         }
 
-        function showToast(message) {
-            alert(message);
-        }
-
-        // Check if already logged in
+        // Check existing session
         if (localStorage.getItem('pipways_token')) {
             window.location.href = '/dashboard.html';
         }

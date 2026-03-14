@@ -251,3 +251,6 @@ const API = {
 
 // Export for global use
 window.API = API;
+
+// COMPATIBILITY FIX: Alias for modules using lowercase 'api'
+window.api = API;

@@ -2,9 +2,8 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 python-multipart==0.0.6
-python-magic==0.4.27
 websockets==12.0
-aiohttp==3.9.1
+httpx==0.26.0
 
 # Database
 sqlalchemy==2.0.25
@@ -17,7 +16,6 @@ alembic==1.13.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
-pyjwt==2.8.0
 
 # Validation & Serialization
 pydantic[email]==2.5.3
@@ -27,21 +25,12 @@ email-validator==2.1.0.post1
 slowapi==0.1.9
 redis==5.0.1
 
-# Data Processing
+# Data Processing (Lightweight)
 pandas==2.1.4
 numpy==1.26.3
 Pillow==10.2.0
 openpyxl==3.1.2
 xlsxwriter==3.1.9
-
-# AI Integration
-openai==1.10.0
-anthropic==0.21.0
-langchain-openai==0.0.5
-langchain-community==0.0.13
-transformers==4.37.0
-torch==2.1.0
-scikit-learn==1.4.0
 
 # Payments
 stripe==7.0.0
@@ -51,11 +40,9 @@ celery==5.3.6
 
 # Utilities
 python-dotenv==1.0.0
-httpx==0.26.0
 aiofiles==23.2.1
 python-slugify==8.0.1
 
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.21.1
-httpx>=0.24.0

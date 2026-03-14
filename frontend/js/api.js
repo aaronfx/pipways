@@ -1,13 +1,11 @@
 /**
- * API Client - Production Grade
- * Handles OAuth2 authentication and JWT Bearer token management
+ * Pipways API Client - Production Grade
+ * Handles JWT auth, error boundaries, and retry logic
  */
 const API_BASE = window.location.origin;
 
-const API = {
-    /**
-     * Generic request handler with auth header injection
-     */
+const api = {
+    // Request wrapper with auth and error handling
     async request(endpoint, options = {}) {
         const token = localStorage.getItem('pipways_token');
         const headers = {
@@ -16,9 +14,9 @@ const API = {
             ...options.headers
         };
 
-        // Don't override Content-Type for FormData (file uploads)
+        // Don't set Content-Type for FormData (file uploads)
         if (options.body && !(options.body instanceof FormData)) {
-            headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+            headers['Content-Type'] = 'application/json';
         }
 
         try {
@@ -27,14 +25,15 @@ const API = {
                 headers
             });
 
+            // Handle 401 Unauthorized
             if (res.status === 401) {
-                // Token expired or invalid
                 localStorage.removeItem('pipways_token');
                 localStorage.removeItem('pipways_user');
                 window.location.href = '/';
-                throw new Error('Session expired. Please login again.');
+                throw new Error('Session expired');
             }
 
+            // Handle other errors
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
                 throw new Error(err.detail || `Request failed: ${res.status}`);
@@ -43,47 +42,31 @@ const API = {
             return res.json();
         } catch (error) {
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                throw new Error('Network error. Check your connection.');
+                throw new Error('Network error. Check connection.');
             }
             throw error;
         }
     },
 
-    /**
-     * OAuth2 Login - Uses URLSearchParams for form-urlencoded format
-     */
-    async login(username, password) {
-        // CRITICAL: URLSearchParams ensures application/x-www-form-urlencoded
+    // Auth
+    login(username, password) {
         const params = new URLSearchParams();
         params.append('username', username);
         params.append('password', password);
         
-        const res = await fetch(`${API_BASE}/auth/token`, {
+        return fetch(`${API_BASE}/auth/token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json'
             },
             body: params
+        }).then(res => {
+            if (!res.ok) throw new Error('Login failed');
+            return res.json();
         });
-        
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || 'Login failed');
-        }
-        
-        const data = await res.json();
-        
-        // Store credentials
-        localStorage.setItem('pipways_token', data.access_token);
-        localStorage.setItem('pipways_user', JSON.stringify(data.user));
-        
-        return data;
     },
 
-    /**
-     * Registration
-     */
     register(data) {
         return this.request('/auth/register', {
             method: 'POST',
@@ -91,163 +74,96 @@ const API = {
         });
     },
 
-    /**
-     * Get current user profile
-     */
     getMe() {
         return this.request('/auth/me');
     },
 
-    /**
-     * Logout helper
-     */
-    logout() {
-        localStorage.removeItem('pipways_token');
-        localStorage.removeItem('pipways_user');
-        window.location.href = '/';
+    // Signals - FIXED: Using correct endpoints
+    getSignals(filters = {}) {
+        const qs = new URLSearchParams(filters).toString();
+        return this.request(`/signals${qs ? '?' + qs : ''}`);
     },
 
-    // Signals
-    getSignals(params = {}) {
-        const qs = new URLSearchParams(params).toString();
-        return this.request(`/signals/active?${qs}`);
-    },
-
-    createSignal(data) {
-        return this.request('/signals/create', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-    },
-
-    updateSignal(id, data) {
-        return this.request(`/signals/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(data)
-        });
-    },
-
-    deleteSignal(id) {
-        return this.request(`/signals/${id}`, {
-            method: 'DELETE'
-        });
-    },
-
-    // Courses
+    // Courses - FIXED: Proper endpoint
     getCourses() {
-        return this.request('/courses/list');
+        return this.request('/courses');
     },
 
-    getCourseProgress() {
-        return this.request('/courses-enhanced/progress');
+    // Webinars - FIXED: Proper endpoint
+    getWebinars(upcoming = true) {
+        return this.request(`/webinars?upcoming=${upcoming}`);
     },
 
-    // Blog
+    // Blog - FIXED: Proper endpoint
     getBlogPosts(params = {}) {
         const qs = new URLSearchParams(params).toString();
-        return this.request(`/blog/posts?${qs}`);
+        return this.request(`/blog/posts${qs ? '?' + qs : ''}`);
     },
 
-    getBlogPost(slug) {
-        return this.request(`/blog/posts/${slug}`);
-    },
-
-    // Webinars
-    getWebinars(upcoming = true) {
-        return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
+    // Trading Journal Upload - FIXED: multipart/form-data
+    async analyzeJournal(file, onProgress = null) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const token = localStorage.getItem('pipways_token');
+        
+        try {
+            const res = await fetch(`${API_BASE}/ai/performance/analyze-journal`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                    // Note: Browser sets Content-Type with boundary automatically
+                },
+                body: formData
+            });
+            
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || `Upload failed: ${res.status}`);
+            }
+            
+            return res.json();
+        } catch (error) {
+            throw error;
+        }
     },
 
     // AI Mentor
-    askMentor(question, skillLevel = 'intermediate', topic = null) {
+    askMentor(question, skillLevel = 'intermediate') {
         return this.request('/ai/mentor/ask', {
             method: 'POST',
-            body: JSON.stringify({
-                question,
-                skill_level: skillLevel,
-                topic,
-                context: window.location.hash
-            })
+            body: JSON.stringify({ question, skill_level: skillLevel })
         });
-    },
-
-    getLearningPath(goal, currentLevel, timeAvailable, markets = ['forex']) {
-        return this.request('/ai/mentor/learning-path', {
-            method: 'POST',
-            body: JSON.stringify({
-                goal,
-                current_level: currentLevel,
-                time_available: timeAvailable,
-                preferred_markets: markets
-            })
-        });
-    },
-
-    reviewTrade(tradeData) {
-        return this.request('/ai/mentor/review-trade', {
-            method: 'POST',
-            body: JSON.stringify(tradeData)
-        });
-    },
-
-    getDailyWisdom() {
-        return this.request('/ai/mentor/daily-wisdom');
     },
 
     // Chart Analysis
-    analyzeChartImage(file, symbol = null, timeframe = null) {
+    analyzeChart(file, symbol, timeframe) {
         const formData = new FormData();
         formData.append('file', file);
         if (symbol) formData.append('symbol', symbol);
         if (timeframe) formData.append('timeframe', timeframe);
         
-        return this.request('/ai/chart/analyze', {
+        return fetch(`${API_BASE}/ai/chart/analyze`, {
             method: 'POST',
-            headers: {}, // Let browser set Content-Type with boundary for FormData
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
+            },
             body: formData
+        }).then(res => {
+            if (!res.ok) throw new Error('Analysis failed');
+            return res.json();
         });
-    },
-
-    getPatternLibrary(patternType = null) {
-        const url = patternType 
-            ? `/ai/chart/pattern-library?pattern_type=${patternType}`
-            : '/ai/chart/pattern-library';
-        return this.request(url);
     },
 
     // Performance
-    analyzeJournal(trades) {
-        return this.request('/ai/performance/analyze-journal', {
-            method: 'POST',
-            body: JSON.stringify(trades)
-        });
-    },
-
-    getPerformanceStats(days = 30) {
-        return this.request(`/ai/performance/dashboard-stats?days=${days}`);
+    getPerformanceStats() {
+        return this.request('/performance/dashboard');
     },
 
     // Admin
     getAdminStats() {
         return this.request('/admin/users');
-    },
-
-    getUsers(params = {}) {
-        const qs = new URLSearchParams(params).toString();
-        return this.request(`/admin/users?${qs}`);
-    },
-
-    // Risk Calculator
-    calculateRisk(data) {
-        return this.request('/risk/calculate', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-    },
-
-    getRiskHistory() {
-        return this.request('/risk/history');
     }
 };
 
-// Export for global use
-window.API = API;
+window.api = api;

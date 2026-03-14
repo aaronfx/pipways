@@ -1,14 +1,15 @@
 """
-Performance Analytics module - FIXED
+Performance Analytics module - ENHANCED
 Uses OpenRouter for AI insights, local calculation for statistics
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import statistics
 import os
 import httpx
+import json
 
 from .database import database
 try:
@@ -17,6 +18,13 @@ except ImportError:
     trades = None
 
 from .security import get_current_user
+
+# Import journal parser
+try:
+    from .journal_parser import parse_journal_file, TradeJournalParser
+    JOURNAL_PARSER_AVAILABLE = True
+except ImportError:
+    JOURNAL_PARSER_AVAILABLE = False
 
 router = APIRouter(tags=["performance"])
 
@@ -53,6 +61,24 @@ class MonthlyStats(BaseModel):
 class JournalRequest(BaseModel):
     trades: List[Dict[str, Any]]
 
+class JournalUploadResponse(BaseModel):
+    success: bool
+    trades_parsed: int
+    statistics: Dict[str, Any]
+    psychology: Dict[str, Any]
+    overall_grade: str
+    overall_score: int
+    improvements: List[str]
+
+class TradeDistribution(BaseModel):
+    breakeven: int
+    small_win: int
+    medium_win: int
+    large_win: int
+    small_loss: int
+    medium_loss: int
+    large_loss: int
+
 def safe_div(numerator: float, denominator: float) -> float:
     return numerator / denominator if denominator != 0 else 0.0
 
@@ -71,25 +97,39 @@ def calculate_performance_metrics(trades_data: List[Dict[str, Any]]) -> Dict[str
             "max_drawdown": 0,
             "winning_trades": 0,
             "losing_trades": 0,
-            "expectancy": 0
+            "expectancy": 0,
+            "largest_win": 0,
+            "largest_loss": 0
         }
-    
+
     total_trades = len(trades_data)
     pnls = [float(t.get("pnl", 0)) for t in trades_data]
-    
+
     winning_trades = [p for p in pnls if p > 0]
     losing_trades = [p for p in pnls if p <= 0]
-    
+
     total_profit = sum(winning_trades) if winning_trades else 0
     total_loss = abs(sum(losing_trades)) if losing_trades else 0
     win_rate = (len(winning_trades) / total_trades * 100) if total_trades > 0 else 0
-    
+
     # Calculate expectancy
     avg_win = sum(winning_trades) / len(winning_trades) if winning_trades else 0
     avg_loss = sum(losing_trades) / len(losing_trades) if losing_trades else 0
     loss_rate = 100 - win_rate
     expectancy = ((avg_win * win_rate) + (avg_loss * loss_rate)) / 100 if total_trades > 0 else 0
-    
+
+    # Calculate max drawdown
+    cumulative = 0
+    peak = 0
+    max_drawdown = 0
+    for pnl in pnls:
+        cumulative += pnl
+        if cumulative > peak:
+            peak = cumulative
+        drawdown = peak - cumulative
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
+
     return {
         "total_trades": total_trades,
         "winning_trades": len(winning_trades),
@@ -98,36 +138,94 @@ def calculate_performance_metrics(trades_data: List[Dict[str, Any]]) -> Dict[str
         "profit_factor": round(total_profit / total_loss, 2) if total_loss > 0 else float('inf'),
         "total_pnl": round(sum(pnls), 2),
         "average_pnl": round(statistics.mean(pnls), 2) if pnls else 0,
-        "max_drawdown": round(min(pnls), 2) if pnls else 0,
+        "max_drawdown": round(max_drawdown, 2),
         "expectancy": round(expectancy, 2),
         "largest_win": round(max(winning_trades), 2) if winning_trades else 0,
         "largest_loss": round(min(losing_trades), 2) if losing_trades else 0
     }
 
+def calculate_trade_distribution(trades_data: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Calculate distribution of trade outcomes"""
+    distribution = {
+        "breakeven": 0,
+        "small_win": 0,
+        "medium_win": 0,
+        "large_win": 0,
+        "small_loss": 0,
+        "medium_loss": 0,
+        "large_loss": 0
+    }
+
+    for trade in trades_data:
+        pnl = float(trade.get("pnl", 0))
+
+        if -1 <= pnl <= 1:
+            distribution["breakeven"] += 1
+        elif 1 < pnl <= 50:
+            distribution["small_win"] += 1
+        elif 50 < pnl <= 200:
+            distribution["medium_win"] += 1
+        elif pnl > 200:
+            distribution["large_win"] += 1
+        elif -50 <= pnl < -1:
+            distribution["small_loss"] += 1
+        elif -200 <= pnl < -50:
+            distribution["medium_loss"] += 1
+        elif pnl < -200:
+            distribution["large_loss"] += 1
+
+    return distribution
+
 async def get_user_trades(user_id: int):
     """Fetch trades for user, handling missing table gracefully."""
     if trades is None:
         return []
-    
+
     try:
         query = trades.select().where(trades.c.user_id == user_id)
         return await database.fetch_all(query)
     except Exception:
         return []
 
-async def generate_ai_insights(stats: Dict[str, Any], trades_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+async def generate_ai_psychology_profile(stats: Dict[str, Any], trades_data: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Generate AI-powered psychology profile and recommendations using OpenRouter.
-    Returns 503 if OpenRouter not configured.
     """
     if not OPENROUTER_CONFIGURED:
-        raise HTTPException(
-            status_code=503,
-            detail="AI insights not configured. Set OPENROUTER_API_KEY."
-        )
-    
+        # Fallback psychology profile
+        score = 50
+        if stats["win_rate"] > 50:
+            score += 15
+        if stats["profit_factor"] > 1.5:
+            score += 15
+        if stats["total_pnl"] > 0:
+            score += 10
+        if stats["total_trades"] > 20:
+            score += 10
+
+        return {
+            "psychology": {
+                "best_trading_state": "Focused" if score > 70 else "Developing",
+                "emotional_consistency": "Stable" if score > 60 else "Variable",
+                "revenge_trading_detected": False,
+                "fomo_tendency": "Low" if score > 70 else "Medium",
+                "discipline_score": min(score, 100),
+                "risk_management_adherence": "Good" if stats["profit_factor"] > 1.5 else "Needs Improvement"
+            },
+            "insights": [
+                f"Win rate of {stats['win_rate']}% indicates {'consistent' if stats['win_rate'] > 50 else 'developing'} strategy execution",
+                f"Profit factor of {stats['profit_factor']} suggests {'strong' if stats['profit_factor'] > 1.5 else 'moderate'} risk management"
+            ],
+            "recommendations": [
+                "Maintain detailed trading journal for pattern recognition",
+                "Review losing trades weekly to identify common mistakes",
+                "Set strict risk limits and adhere to them consistently"
+            ],
+            "next_milestone": "Reach 60% win rate with 1:2 risk:reward ratio",
+            "mode": "fallback"
+        }
+
     try:
-        # Prepare trade summary for AI
         trade_summary = f"""
         Trading Statistics:
         - Total Trades: {stats['total_trades']}
@@ -138,28 +236,35 @@ async def generate_ai_insights(stats: Dict[str, Any], trades_data: List[Dict[str
         - Expectancy: ${stats['expectancy']}
         - Largest Win: ${stats['largest_win']}
         - Largest Loss: ${stats['largest_loss']}
+        - Max Drawdown: ${stats['max_drawdown']}
         """
-        
+
         system_prompt = """You are a professional trading psychologist and performance coach. 
-        Analyze the provided trading statistics and generate:
-        1. A trading psychology profile (best state, consistency level, emotional patterns)
-        2. Specific behavioral insights based on the metrics
-        3. 3-4 personalized improvement recommendations
-        
+        Analyze the provided trading statistics and generate a detailed psychology profile.
+
+        Consider:
+        1. Emotional patterns (revenge trading, FOMO, overtrading)
+        2. Discipline level based on consistency metrics
+        3. Risk management psychology
+        4. Areas of strength and weakness
+
         Return STRICT JSON format:
         {
             "psychology": {
-                "best_trading_state": "Focused|Confident|Cautious|Aggressive etc",
+                "best_trading_state": "Focused|Confident|Cautious|Aggressive|Impatient",
                 "emotional_consistency": "High|Medium|Low",
                 "revenge_trading_detected": true|false,
                 "fomo_tendency": "High|Medium|Low",
-                "discipline_score": 0-100
+                "discipline_score": 0-100,
+                "risk_management_adherence": "Excellent|Good|Fair|Poor",
+                "overtrading_tendency": "High|Medium|Low"
             },
             "insights": ["specific observation 1", "observation 2", "observation 3"],
             "recommendations": ["actionable advice 1", "advice 2", "advice 3", "advice 4"],
-            "next_milestone": "description of what to achieve next"
+            "next_milestone": "description of what to achieve next",
+            "trader_archetype": "e.g., Conservative Builder, Aggressive Scalper, Strategic Swing Trader"
         }"""
-        
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
@@ -176,65 +281,71 @@ async def generate_ai_insights(stats: Dict[str, Any], trades_data: List[Dict[str
                         {"role": "user", "content": f"Analyze these trading results and provide psychology profile:\n{trade_summary}"}
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 1000
+                    "max_tokens": 1200
                 },
                 timeout=30.0
             )
-            
+
             if response.status_code != 200:
-                print(f"[PERFORMANCE AI ERROR] HTTP {response.status_code}: {response.text}", flush=True)
                 raise HTTPException(503, "AI insights service unavailable")
-            
+
             data = response.json()
             if "choices" not in data or not data["choices"]:
-                raise HTTPException(503, "Invalid AI response")
-            
+                raise ValueError("Invalid AI response")
+
             content = data["choices"][0]["message"]["content"]
-            
-            # Parse JSON response
-            import json
+
+            # Parse JSON
             import re
-            
             try:
-                # Extract JSON
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
                     ai_data = json.loads(json_match.group())
                 else:
                     ai_data = json.loads(content)
             except json.JSONDecodeError:
-                # Fallback if AI returns non-JSON
                 ai_data = {
                     "psychology": {
                         "best_trading_state": "Focused",
                         "emotional_consistency": "Stable",
                         "revenge_trading_detected": False,
                         "fomo_tendency": "Low",
-                        "discipline_score": 75
+                        "discipline_score": 70,
+                        "risk_management_adherence": "Good"
                     },
-                    "insights": ["Analysis completed", "Review your risk management"],
-                    "recommendations": ["Keep a detailed trading journal", "Stick to your trading plan"],
-                    "next_milestone": "Maintain consistent risk per trade"
+                    "insights": ["Analysis completed based on available data"],
+                    "recommendations": ["Continue maintaining trading journal"],
+                    "next_milestone": "Improve consistency",
+                    "trader_archetype": "Developing Trader"
                 }
-            
+
+            ai_data["mode"] = "ai"
             return ai_data
-            
-    except httpx.TimeoutException:
-        raise HTTPException(504, "AI insights request timed out")
-    except HTTPException:
-        raise
+
     except Exception as e:
-        print(f"[PERFORMANCE AI ERROR] {e}", flush=True)
-        raise HTTPException(503, "AI insights service error")
+        print(f"[PSYCHOLOGY AI ERROR] {e}", flush=True)
+        # Return fallback
+        return {
+            "psychology": {
+                "best_trading_state": "Focused",
+                "emotional_consistency": "Stable",
+                "revenge_trading_detected": False,
+                "discipline_score": 70
+            },
+            "insights": ["Basic analysis completed"],
+            "recommendations": ["Continue trading with discipline"],
+            "next_milestone": "Maintain consistent performance",
+            "mode": "fallback"
+        }
 
 @router.get("/dashboard", response_model=Dict[str, Any])
 async def get_dashboard_stats(current_user = Depends(get_current_user)):
     """Get main dashboard performance stats."""
     try:
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-        
+
         user_trades_list = await get_user_trades(user_id)
-        
+
         if not user_trades_list:
             return {
                 "summary": {
@@ -247,34 +358,24 @@ async def get_dashboard_stats(current_user = Depends(get_current_user)):
                     "average_pnl": 0,
                     "largest_win": 0,
                     "largest_loss": 0,
-                    "expectancy": 0
+                    "expectancy": 0,
+                    "max_drawdown": 0
                 },
                 "recent_trades": [],
                 "daily_pnl": []
             }
-        
-        # Calculate stats
-        total_trades = len(user_trades_list)
-        pnls = [float(t.pnl) for t in user_trades_list if hasattr(t, 'pnl')]
-        
-        winning_trades = [p for p in pnls if p > 0]
-        losing_trades = [p for p in pnls if p <= 0]
-        
-        total_profit = sum(winning_trades) if winning_trades else 0
-        total_loss = abs(sum(losing_trades)) if losing_trades else 0
-        
-        stats = {
-            "total_trades": total_trades,
-            "winning_trades": len(winning_trades),
-            "losing_trades": len(losing_trades),
-            "win_rate": round((len(winning_trades) / total_trades * 100), 2) if total_trades > 0 else 0,
-            "profit_factor": round(total_profit / total_loss, 2) if total_loss > 0 else float('inf'),
-            "total_pnl": round(sum(pnls), 2),
-            "average_pnl": round(statistics.mean(pnls), 2) if pnls else 0,
-            "largest_win": round(max(winning_trades), 2) if winning_trades else 0,
-            "largest_loss": round(min(losing_trades), 2) if losing_trades else 0
-        }
-        
+
+        trades_data = []
+        for t in user_trades_list:
+            trade_dict = {
+                "pnl": float(getattr(t, 'pnl', 0)),
+                "entry_date": str(getattr(t, 'entry_time', datetime.utcnow())),
+                "symbol": getattr(t, 'symbol', 'Unknown')
+            }
+            trades_data.append(trade_dict)
+
+        stats = calculate_performance_metrics(trades_data)
+
         # Recent trades (last 5)
         recent = sorted(user_trades_list, key=lambda x: x.entry_time if hasattr(x, 'entry_time') else datetime.min, reverse=True)[:5]
         recent_formatted = []
@@ -287,13 +388,13 @@ async def get_dashboard_stats(current_user = Depends(get_current_user)):
                 "side": getattr(t, 'side', 'long')
             }
             recent_formatted.append(trade)
-        
+
         return {
             "summary": stats,
             "recent_trades": recent_formatted,
             "daily_pnl": []
         }
-        
+
     except Exception as e:
         print(f"[PERFORMANCE ERROR] {e}", flush=True)
         return {
@@ -314,17 +415,17 @@ async def analyze_journal(
     current_user = Depends(get_current_user)
 ):
     """
-    Analyze trading journal with AI-powered insights using OpenRouter.
-    Returns 503 if OpenRouter not configured.
+    Analyze trading journal with AI-powered insights.
     """
     try:
         if not request.trades:
             raise HTTPException(400, "No trades provided")
-        
-        # Step 1: Calculate local statistics (always accurate)
+
+        # Calculate statistics
         stats = calculate_performance_metrics(request.trades)
-        
-        # Step 2: Calculate grade
+        distribution = calculate_trade_distribution(request.trades)
+
+        # Calculate grade
         score = 0
         if stats["win_rate"] > 50:
             score += 30
@@ -334,7 +435,7 @@ async def analyze_journal(
             score += 20
         if stats["total_trades"] > 10:
             score += 20
-        
+
         grade = "F"
         if score >= 90:
             grade = "A+"
@@ -346,63 +447,101 @@ async def analyze_journal(
             grade = "B"
         elif score >= 50:
             grade = "C"
-        
-        # Step 3: Get AI insights from OpenRouter
-        try:
-            ai_insights = await generate_ai_insights(stats, request.trades)
-            
-            return {
-                "statistics": stats,
-                "psychology": ai_insights.get("psychology", {
-                    "best_trading_state": "Focused",
-                    "emotional_consistency": "Stable",
-                    "revenge_trading_detected": False
-                }),
-                "insights": ai_insights.get("insights", []),
-                "improvements": ai_insights.get("recommendations", ["Keep maintaining your discipline"]),
-                "overall_grade": grade,
-                "overall_score": score,
-                "next_milestone": ai_insights.get("next_milestone", "Reach 60% win rate for next grade"),
-                "ai_powered": True
-            }
-            
-        except HTTPException as he:
-            # If AI unavailable, return basic analysis without AI features
-            if he.status_code == 503:
-                # Generate basic recommendations based on stats
-                basic_improvements = []
-                if stats["win_rate"] < 50:
-                    basic_improvements.append("Improve win rate by cutting losses faster")
-                if stats["profit_factor"] < 1.5:
-                    basic_improvements.append("Work on risk/reward ratio - aim for 1:2 minimum")
-                if stats["total_pnl"] < 0:
-                    basic_improvements.append("Consider paper trading to refine strategy")
-                if not basic_improvements:
-                    basic_improvements.append("Keep maintaining your discipline")
-                
-                return {
-                    "statistics": stats,
-                    "psychology": {
-                        "best_trading_state": "Focused",
-                        "emotional_consistency": "Stable",
-                        "revenge_trading_detected": False,
-                        "discipline_score": min(score, 100)
-                    },
-                    "insights": ["Basic analysis completed - AI insights unavailable"],
-                    "improvements": basic_improvements,
-                    "overall_grade": grade,
-                    "overall_score": score,
-                    "next_milestone": "Reach 60% win rate for next grade",
-                    "ai_powered": False,
-                    "warning": "AI insights service not configured. Set OPENROUTER_API_KEY for personalized analysis."
-                }
-            raise he
-            
+
+        # Get AI psychology profile
+        ai_insights = await generate_ai_psychology_profile(stats, request.trades)
+
+        return {
+            "statistics": stats,
+            "distribution": distribution,
+            "psychology": ai_insights.get("psychology", {}),
+            "insights": ai_insights.get("insights", []),
+            "improvements": ai_insights.get("recommendations", []),
+            "overall_grade": grade,
+            "overall_score": score,
+            "next_milestone": ai_insights.get("next_milestone", "Reach 60% win rate for next grade"),
+            "trader_archetype": ai_insights.get("trader_archetype", "Developing Trader"),
+            "ai_powered": ai_insights.get("mode") == "ai",
+            "trades": request.trades
+        }
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"[ANALYZE ERROR] {e}", flush=True)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@router.post("/upload-journal", response_model=JournalUploadResponse)
+async def upload_journal(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    """
+    Upload and parse trade journal file (multi-format support).
+    Automatically runs performance analysis.
+    """
+    if not JOURNAL_PARSER_AVAILABLE:
+        raise HTTPException(503, "Journal parser not available. Install required dependencies.")
+
+    try:
+        content = await file.read()
+
+        # Parse file
+        trades = parse_journal_file(content, file.filename)
+
+        if not trades:
+            raise HTTPException(400, "No trades found in file")
+
+        # Calculate statistics
+        stats = calculate_performance_metrics(trades)
+        distribution = calculate_trade_distribution(trades)
+
+        # Calculate grade
+        score = 0
+        if stats["win_rate"] > 50:
+            score += 30
+        if stats["profit_factor"] > 1.5:
+            score += 30
+        if stats["total_pnl"] > 0:
+            score += 20
+        if stats["total_trades"] > 10:
+            score += 20
+
+        grade = "F"
+        if score >= 90:
+            grade = "A+"
+        elif score >= 80:
+            grade = "A"
+        elif score >= 70:
+            grade = "B+"
+        elif score >= 60:
+            grade = "B"
+        elif score >= 50:
+            grade = "C"
+
+        # Get AI psychology profile
+        ai_insights = await generate_ai_psychology_profile(stats, trades)
+
+        return {
+            "success": True,
+            "trades_parsed": len(trades),
+            "statistics": stats,
+            "distribution": distribution,
+            "psychology": ai_insights.get("psychology", {}),
+            "insights": ai_insights.get("insights", []),
+            "improvements": ai_insights.get("recommendations", []),
+            "overall_grade": grade,
+            "overall_score": score,
+            "trader_archetype": ai_insights.get("trader_archetype", "Developing Trader"),
+            "next_milestone": ai_insights.get("next_milestone", "Continue improving"),
+            "ai_powered": ai_insights.get("mode") == "ai"
+        }
+
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        print(f"[UPLOAD ERROR] {e}", flush=True)
+        raise HTTPException(500, f"Failed to process file: {str(e)}")
 
 @router.get("/equity-curve", response_model=List[EquityPoint])
 async def get_equity_curve(
@@ -413,33 +552,33 @@ async def get_equity_curve(
     try:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
-        
+
         if trades is None:
             return []
-            
+
         query = trades.select().where(
             (trades.c.user_id == user_id) & 
             (trades.c.entry_time >= cutoff_date)
         ).order_by(trades.c.entry_time)
-        
+
         user_trades_list = await database.fetch_all(query)
-        
+
         equity_curve = []
         running_total = 0
-        
+
         for trade in user_trades_list:
             pnl = float(getattr(trade, 'pnl', 0))
             running_total += pnl
-            
+
             point = {
                 "date": str(getattr(trade, 'entry_time', datetime.utcnow())),
                 "pnl": round(pnl, 2),
                 "equity": round(running_total, 2)
             }
             equity_curve.append(point)
-        
+
         return equity_curve
-        
+
     except Exception as e:
         print(f"[EQUITY ERROR] {e}", flush=True)
         return []
@@ -450,18 +589,18 @@ async def get_monthly_analysis(current_user = Depends(get_current_user)):
     try:
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
         user_trades_list = await get_user_trades(user_id)
-        
+
         if not user_trades_list:
             return []
-        
+
         months = {}
-        
+
         for trade in user_trades_list:
             if not hasattr(trade, 'entry_time') or not trade.entry_time:
                 continue
-                
+
             date_str = str(trade.entry_time)[:7]
-            
+
             if date_str not in months:
                 months[date_str] = {
                     "trades": 0,
@@ -469,16 +608,16 @@ async def get_monthly_analysis(current_user = Depends(get_current_user)):
                     "losses": 0,
                     "pnl": 0.0
                 }
-            
+
             months[date_str]["trades"] += 1
             pnl = float(getattr(trade, 'pnl', 0))
             months[date_str]["pnl"] += pnl
-            
+
             if pnl > 0:
                 months[date_str]["wins"] += 1
             else:
                 months[date_str]["losses"] += 1
-        
+
         result = []
         for month, data in sorted(months.items()):
             stats = {
@@ -490,53 +629,27 @@ async def get_monthly_analysis(current_user = Depends(get_current_user)):
                 "win_rate": round((data["wins"] / data["trades"] * 100), 2) if data["trades"] > 0 else 0
             }
             result.append(stats)
-        
+
         return result
-        
+
     except Exception as e:
         print(f"[MONTHLY ERROR] {e}", flush=True)
         return []
 
 @router.get("/trade-distribution")
-async def get_trade_distribution(current_user = Depends(get_current_user)):
+async def get_trade_distribution_endpoint(current_user = Depends(get_current_user)):
     """Get distribution of trade outcomes."""
     try:
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
         user_trades_list = await get_user_trades(user_id)
-        
-        distribution = {
-            "breakeven": 0,
-            "small_win": 0,
-            "medium_win": 0,
-            "large_win": 0,
-            "small_loss": 0,
-            "medium_loss": 0,
-            "large_loss": 0
-        }
-        
-        for trade in user_trades_list:
-            pnl = float(getattr(trade, 'pnl', 0))
-            
-            if -1 <= pnl <= 1:
-                distribution["breakeven"] += 1
-            elif 1 < pnl <= 50:
-                distribution["small_win"] += 1
-            elif 50 < pnl <= 200:
-                distribution["medium_win"] += 1
-            elif pnl > 200:
-                distribution["large_win"] += 1
-            elif -50 <= pnl < -1:
-                distribution["small_loss"] += 1
-            elif -200 <= pnl < -50:
-                distribution["medium_loss"] += 1
-            elif pnl < -200:
-                distribution["large_loss"] += 1
-        
+
+        distribution = calculate_trade_distribution([{"pnl": float(getattr(t, 'pnl', 0))} for t in user_trades_list])
+
         return {
             "distribution": distribution,
             "total": len(user_trades_list)
         }
-        
+
     except Exception as e:
         print(f"[DISTRIBUTION ERROR] {e}", flush=True)
         return {"distribution": {}, "total": 0}

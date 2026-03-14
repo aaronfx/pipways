@@ -83,8 +83,8 @@ app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses En
 # Get absolute path to project root
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 1. Mount /js folder for JavaScript files
-JS_DIR = os.path.join(BASE_DIR, "js")
+# 1. Mount /js folder for JavaScript files (FIXED: points to frontend/js)
+JS_DIR = os.path.join(BASE_DIR, "frontend", "js")
 if os.path.exists(JS_DIR):
     app.mount("/js", StaticFiles(directory=JS_DIR), name="js")
     print(f"[STATIC] Mounted /js from {JS_DIR}", flush=True)
@@ -156,7 +156,7 @@ async def serve_spa(full_path: str):
     Serve Single Page Application.
     Returns index.html for all non-API routes.
     """
-    # Skip API routes
+    # Skip API routes (FIXED: Added "js/" to prevent SPA routing from catching JS files)
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/", 
         "blog/", "ai/", "admin/", "health", "docs", "openapi.json",

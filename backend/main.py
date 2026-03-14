@@ -13,22 +13,29 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from .database import database, init_database, metadata
 from sqlalchemy import create_engine
 
-# Import all routers
-try:
-    from . import auth
-    from . import signals
-    from . import courses
-    from . import webinars
-    from . import blog
-    from . import ai_screening
-    from . import performance
-    from . import admin
-    from . import blog_enhanced
-    from . import courses_enhanced
-    print("[IMPORT] All modules loaded successfully", flush=True)
-except ImportError as e:
-    print(f"[IMPORT ERROR] {e}", flush=True)
-    raise
+# Import all routers - UPDATED with new modules
+from . import auth
+from . import signals
+from . import courses
+from . import webinars
+from . import blog
+from . import admin
+from . import blog_enhanced
+from . import courses_enhanced
+
+# NEW: Import enhanced AI services (includes mentor, validator, signal saver)
+from . import ai_services
+
+# NEW: Import enhanced chart analysis (includes pattern library, vision analysis)
+from . import chart_analysis
+
+# NEW: Import enhanced performance (includes upload-journal, psychology insights)
+from . import performance
+
+# Keep old imports for backwards compatibility if needed
+# from . import ai_screening  # Can be removed if fully replaced by ai_services
+
+print("[IMPORT] All modules loaded successfully", flush=True)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 
@@ -56,7 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pipways Trading Platform",
-    version="2.1.0",
+    version="2.2.0",  # Bumped version for new features
     lifespan=lifespan
 )
 
@@ -72,20 +79,47 @@ app.add_middleware(
 # Health check
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "2.1.0"}
+    return {
+        "status": "healthy",
+        "version": "2.2.0",
+        "features": [
+            "multi_format_journal",
+            "ai_trade_validator",
+            "signal_generator",
+            "ocr_extraction",
+            "psychology_profile"
+        ]
+    }
 
-# API Routes - FIXED: Removed duplicate prefixes
+# ==========================================
+# API ROUTES - UPDATED WITH NEW ROUTERS
+# ==========================================
+
+# Core modules
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(signals.router, prefix="/signals", tags=["Trading Signals"])
 app.include_router(courses.router, prefix="/courses", tags=["Courses"])
 app.include_router(webinars.router, prefix="/webinars", tags=["Webinars"])
 app.include_router(blog.router, prefix="/blog", tags=["Blog"])
-app.include_router(ai_screening.router, prefix="/ai", tags=["AI Services"])
-# FIXED: Performance router mounted without additional prefix (router has no prefix)
-app.include_router(performance.router, prefix="/ai/performance", tags=["Performance"])
 app.include_router(admin.router, prefix="/admin", tags=["Administration"])
 app.include_router(blog_enhanced.router, prefix="/blog", tags=["Blog Enhanced"])
 app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses Enhanced"])
+
+# UPDATED: AI Services Router (enhanced with validator, signal saver, symbol detection)
+# This router includes: /mentor/ask, /trade/validate, /signal/save, /chart/analyze, /performance/analyze-journal
+app.include_router(ai_services.router, prefix="/ai", tags=["AI Services"])
+
+# NEW: Chart Analysis Router (pattern library, enhanced analysis)
+# Mounted at /ai/chart - provides: /analyze, /pattern-library
+app.include_router(chart_analysis.router, prefix="/ai/chart", tags=["Chart Analysis"])
+
+# UPDATED: Performance Router (upload-journal endpoint, psychology insights)
+# Mounted at /ai/performance - provides: /upload-journal, /analyze-journal, /dashboard, /equity-curve, /monthly-analysis
+app.include_router(performance.router, prefix="/ai/performance", tags=["Performance Analytics"])
+
+# NOTE: If you were using ai_screening before, it can be removed since ai_services replaces it
+# If keeping for backwards compatibility, uncomment:
+# app.include_router(ai_screening.router, prefix="/ai/legacy", tags=["AI Legacy"])
 
 # ==========================================
 # STATIC FILES - FIXED PATHS
@@ -93,7 +127,7 @@ app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses En
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Mount /js folder for JavaScript files (FIXED: points to frontend/js)
+# Mount /js folder for JavaScript files
 JS_DIR = os.path.join(BASE_DIR, "frontend", "js")
 if os.path.exists(JS_DIR):
     app.mount("/js", StaticFiles(directory=JS_DIR), name="js")
@@ -126,14 +160,15 @@ async def serve_index():
         os.path.join(STATIC_DIR, "index.html") if 'STATIC_DIR' in locals() else "",
         "static/index.html"
     ]
-    
+
     for index_path in possible_paths:
         if index_path and os.path.exists(index_path):
             return FileResponse(index_path)
-    
+
     return JSONResponse({
         "message": "Pipways API Server",
         "status": "running",
+        "version": "2.2.0",
         "docs": "/docs",
         "hint": "Frontend not found"
     })
@@ -146,11 +181,11 @@ async def serve_dashboard():
         os.path.join(STATIC_DIR, "dashboard.html") if 'STATIC_DIR' in locals() else "",
         "static/dashboard.html"
     ]
-    
+
     for dashboard_path in possible_paths:
         if dashboard_path and os.path.exists(dashboard_path):
             return FileResponse(dashboard_path)
-    
+
     raise HTTPException(404, "dashboard.html not found")
 
 @app.get("/{full_path:path}")
@@ -162,17 +197,18 @@ async def serve_spa(full_path: str):
     )
     if full_path.startswith(api_prefixes):
         raise HTTPException(404, "Not found")
-    
+
     file_path = os.path.join(STATIC_DIR, full_path)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
-    
+
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    
+
     return JSONResponse({
         "message": "Pipways API Server",
         "status": "running",
+        "version": "2.2.0",
         "path": full_path
     })

@@ -1,4 +1,6 @@
-"""AI Screening & Analysis Services - PRODUCTION READY"""
+"""AI Screening & Analysis Services - PRODUCTION READY
+Fixed: Removed duplicate routes (now in dedicated performance router), cleaned imports
+"""
 import os
 import base64
 import json
@@ -12,18 +14,7 @@ from .security import get_current_user
 router = APIRouter()
 
 # Import performance calculation from performance module
-try:
-    from .performance import calculate_performance_metrics
-except ImportError:
-    # Fallback if import fails
-    def calculate_performance_metrics(trades_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        if not trades_data:
-            return {"total_trades": 0, "win_rate": 0, "profit_factor": 0}
-        return {
-            "total_trades": len(trades_data),
-            "win_rate": 50.0,
-            "profit_factor": 1.5
-        }
+from .performance import calculate_performance_metrics
 
 # OpenRouter Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -39,13 +30,10 @@ COMMON_SYMBOLS = [
     "BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "US30", "US100", "DE30"
 ]
 
-# Request models
+# Request models (unique to this module)
 class MentorRequest(BaseModel):
     question: str
     skill_level: str = "intermediate"
-
-class JournalRequest(BaseModel):
-    trades: List[Dict[str, Any]]
 
 class TradeValidatorRequest(BaseModel):
     entry_price: float
@@ -62,6 +50,12 @@ class SignalSaveRequest(BaseModel):
     take_profit: float
     confidence: float
     analysis: Optional[str] = None
+
+class ChartAnalyzeRequest(BaseModel):
+    """For text-based chart analysis requests"""
+    symbol: str
+    description: str
+    timeframe: Optional[str] = "1H"
 
 def extract_symbol_from_text(text: str) -> Optional[str]:
     """Extract trading symbol from AI response text"""
@@ -160,6 +154,10 @@ def calculate_quality_score(structure_valid: bool, rr_ratio: float, structure_qu
         grade = "C"
 
     return score, probability, grade
+
+# ==========================================
+# AI MENTOR ENDPOINTS
+# ==========================================
 
 @router.post("/mentor/ask")
 async def ask_mentor(
@@ -264,6 +262,10 @@ async def ask_mentor_legacy(
 ):
     """Legacy form-data endpoint for compatibility"""
     return await ask_mentor(MentorRequest(question=question, skill_level=skill_level), current_user)
+
+# ==========================================
+# TRADE VALIDATOR ENDPOINTS
+# ==========================================
 
 @router.post("/trade/validate")
 async def validate_trade(
@@ -370,7 +372,7 @@ async def validate_trade(
                 if json_match:
                     result = json.loads(json_match.group())
                 else:
-                    result = json.loads(clean_content)
+                    result = {}
             except:
                 result = {}
 
@@ -425,6 +427,10 @@ async def validate_trade(
             "mode": "fallback"
         }
 
+# ==========================================
+# SIGNAL MANAGEMENT ENDPOINTS
+# ==========================================
+
 @router.post("/signal/save")
 async def save_signal(
     request: SignalSaveRequest,
@@ -457,58 +463,114 @@ async def save_signal(
     except Exception as e:
         raise HTTPException(500, f"Failed to save signal: {str(e)}")
 
-# Journal endpoints - delegated to performance module but kept here for compatibility
-@router.post("/performance/analyze-journal")
-async def analyze_journal_compat(
-    request: JournalRequest,
+# ==========================================
+# CHART ANALYSIS (Lightweight version)
+# Full chart analysis moved to chart_analysis.py
+# ==========================================
+
+@router.post("/chart/analyze-text")
+async def analyze_chart_text(
+    request: ChartAnalyzeRequest,
     current_user = Depends(get_current_user)
 ):
-    """Compatibility endpoint that forwards to performance calculation"""
-    try:
-        if not request.trades or len(request.trades) == 0:
-            raise HTTPException(400, "No trades provided")
-
-        analysis = calculate_performance_metrics(request.trades)
-
-        # Determine grade
-        score = 0
-        if analysis.get("win_rate", 0) > 50:
-            score += 30
-        if analysis.get("profit_factor", 0) > 1.5:
-            score += 30
-        if analysis.get("total_pnl", 0) > 0:
-            score += 20
-        if analysis.get("total_trades", 0) > 10:
-            score += 20
-
-        grade = "F"
-        if score >= 90:
-            grade = "A+"
-        elif score >= 80:
-            grade = "A"
-        elif score >= 70:
-            grade = "B+"
-        elif score >= 60:
-            grade = "B"
-        elif score >= 50:
-            grade = "C"
-
+    """
+    Text-based chart analysis (for descriptions without image).
+    For image analysis, use /ai/chart/analyze (chart_analysis.py).
+    """
+    if not OPENROUTER_CONFIGURED:
         return {
-            "statistics": analysis,
-            "psychology": {
-                "best_trading_state": "Focused",
-                "emotional_consistency": "Stable",
-                "revenge_trading_detected": False
-            },
-            "overall_grade": grade,
-            "overall_score": score,
-            "next_milestone": "Reach 60% win rate for next grade",
-            "improvements": ["Keep maintaining your discipline"] if score > 70 else ["Review risk management"],
-            "trades": request.trades
+            "symbol": request.symbol,
+            "timeframe": request.timeframe,
+            "trading_bias": "neutral",
+            "confidence": 0.5,
+            "analysis": "AI analysis requires OPENROUTER_API_KEY configuration",
+            "trade_setup": None,
+            "mode": "fallback"
         }
 
-    except HTTPException:
-        raise
+    try:
+        prompt = f"""Analyze this {request.symbol} chart description for {request.timeframe} timeframe:
+
+        Description: {request.description}
+
+        Provide:
+        1. Trading bias (bullish/bearish/neutral)
+        2. Confidence level (0-1)
+        3. Key support/resistance levels
+        4. Suggested trade setup if any
+
+        Return as JSON."""
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "HTTP-Referer": "https://pipwaysapp.onrender.com",
+                    "X-Title": "Pipways Trading Platform",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": OPENROUTER_MODEL,
+                    "messages": [
+                        {"role": "system", "content": "You are a technical analyst. Provide structured analysis."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.5,
+                    "max_tokens": 1000
+                },
+                timeout=30.0
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+
+                # Try to extract JSON
+                try:
+                    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                    if json_match:
+                        analysis = json.loads(json_match.group())
+                    else:
+                        analysis = {
+                            "trading_bias": "neutral",
+                            "confidence": 0.5,
+                            "analysis": content[:500]
+                        }
+                except:
+                    analysis = {
+                        "trading_bias": "neutral", 
+                        "confidence": 0.5,
+                        "analysis": content[:500]
+                    }
+
+                return {
+                    "symbol": request.symbol,
+                    "timeframe": request.timeframe,
+                    **analysis,
+                    "mode": "ai"
+                }
+            else:
+                raise HTTPException(503, "Chart analysis service unavailable")
+
     except Exception as e:
-        print(f"[JOURNAL ERROR] {e}", flush=True)
-        raise HTTPException(500, f"Analysis failed: {str(e)}")
+        print(f"[CHART TEXT ERROR] {e}", flush=True)
+        return {
+            "symbol": request.symbol,
+            "timeframe": request.timeframe,
+            "trading_bias": "neutral",
+            "confidence": 0,
+            "error": str(e),
+            "mode": "fallback"
+        }
+
+# ==========================================
+# COMPATIBILITY NOTE
+# ==========================================
+# The following endpoints have been MOVED to dedicated routers:
+# - /performance/*  -> performance.py (upload-journal, analyze-journal, dashboard, etc.)
+# - /chart/analyze (image) -> chart_analysis.py
+# 
+# This avoids route collisions and maintains clean separation of concerns.
+# The imports above ensure calculate_performance_metrics is still available
+# for any legacy code that needs it.

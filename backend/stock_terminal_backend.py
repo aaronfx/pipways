@@ -137,7 +137,7 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
     # FIX 3: Wrap the Anthropic call so any API error becomes a 502 JSON response.
     try:
         message = await _anthropic.messages.create(
-            model      = "claude-opus-4-5",
+            model      = "claude-sonnet-4-5-20251001",
             max_tokens = max_tokens,
             system     = SYSTEM_PROMPT,
             messages   = [{"role": "user", "content": prompt}],

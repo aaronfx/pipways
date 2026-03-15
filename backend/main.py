@@ -45,6 +45,7 @@ from . import stock_terminal_backend as stock_module
 stock_router = stock_module.router          # same object, same globals
 
 from anthropic import AsyncAnthropic
+import httpx  # Required for chart analysis HTTP client
 
 print("[IMPORT] All modules loaded successfully", flush=True)
 
@@ -62,6 +63,13 @@ async def lifespan(app: FastAPI):
                 print("[DB] Tables created/verified", flush=True)
         except Exception as e:
             print(f"[DB] Table creation skipped: {e}", flush=True)
+
+        # ── Initialise Chart Analysis HTTP client (connection pooling) ──────────
+        try:
+            chart_analysis._http_client = httpx.AsyncClient(timeout=60.0)
+            print("[CHART] HTTP client initialized", flush=True)
+        except Exception as e:
+            print(f"[CHART] HTTP client init error: {e}", flush=True)
 
         # ── Initialise Stock Terminal Anthropic client ─────────────────────
         # httpx removed — data is now fetched via yfinance (no HTTP client needed).
@@ -87,12 +95,20 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-    # No httpx client to close — yfinance handles its own connections
+    # Close chart analysis HTTP client
+    try:
+        if chart_analysis._http_client:
+            await chart_analysis._http_client.aclose()
+            print("[CHART] HTTP client closed", flush=True)
+    except Exception:
+        pass
+
+    # No httpx client to close for stock terminal — yfinance handles its own connections
 
 
 app = FastAPI(
     title="Pipways Trading Platform",
-    version="2.2.0",
+    version="2.3.0",  # Bumped for chart analysis connection pooling
     lifespan=lifespan
 )
 
@@ -115,6 +131,9 @@ async def health_check():
             "anthropic_ready": stock_module._anthropic is not None,
             "data_source":     "yfinance (free)",
         },
+        "chart_analysis": {
+            "http_pooling": chart_analysis._http_client is not None
+        },
         "features": [
             "multi_format_journal",
             "ai_trade_validator",
@@ -122,6 +141,7 @@ async def health_check():
             "ocr_extraction",
             "psychology_profile",
             "ai_stock_research",
+            "chart_analysis_caching"
         ]
     }
 
@@ -180,7 +200,7 @@ async def serve_index():
     ]:
         if path and os.path.exists(path):
             return FileResponse(path)
-    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.2.0", "docs": "/docs"})
+    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.3.0", "docs": "/docs"})
 
 
 @app.get("/dashboard.html")
@@ -214,4 +234,4 @@ async def serve_spa(full_path: str):
     if os.path.exists(index_path):
         return FileResponse(index_path)
 
-    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.2.0", "path": full_path})
+    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.3.0", "path": full_path})

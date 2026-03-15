@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from .database import database, init_database, metadata
 from sqlalchemy import create_engine
 
-# Import all routers - UPDATED with new modules
+# Import all routers
 from . import auth
 from . import signals
 from . import courses
@@ -22,29 +22,29 @@ from . import blog
 from . import admin
 from . import blog_enhanced
 from . import courses_enhanced
-
-# NEW: Import enhanced AI services (includes mentor, validator, signal saver)
 from . import ai_services
-
-# NEW: Import enhanced chart analysis (includes pattern library, vision analysis)
 from . import chart_analysis
-
-# NEW: Import enhanced performance (includes upload-journal, psychology insights)
 from . import performance
-
-# NEW: Import upgraded AI Mentor (Platform Intelligence System v3.0)
 from . import ai_mentor
 
-# NEW: AI Stock Research Terminal
-from .stock_terminal_backend import router as stock_router
+# ── FIX 1 (CRITICAL): Use a SINGLE relative import for stock_terminal_backend.
+#
+#    The previous code had TWO separate import statements:
+#
+#       from .stock_terminal_backend import router as stock_router   ← package module
+#       import stock_terminal_backend as stock_module                ← TOP-LEVEL module
+#
+#    Python treats these as DIFFERENT module objects with DIFFERENT global variables.
+#    The lifespan set  stock_module._anthropic = ...  on the top-level copy,
+#    but the router ran inside the package copy where _anthropic was still None.
+#    This caused AttributeError → FastAPI returned plain-text "Internal Server Error"
+#    → frontend JSON.parse() crashed with "Unexpected token 'I'...".
+#
+#    Fix: use ONE relative import for both the module reference and the router.
+from . import stock_terminal_backend as stock_module
+stock_router = stock_module.router          # same object, same globals
 
-# Import stock terminal globals for initialization
-import httpx
 from anthropic import AsyncAnthropic
-import stock_terminal_backend as stock_module
-
-# Keep old imports for backwards compatibility if needed
-# from . import ai_screening  # Can be removed if fully replaced by ai_services
 
 print("[IMPORT] All modules loaded successfully", flush=True)
 
@@ -54,7 +54,6 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 async def lifespan(app: FastAPI):
     try:
         await init_database()
-        # Create tables if they don't exist
         try:
             database_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+psycopg2://").replace("postgresql+asyncpg://", "postgresql+psycopg2://")
             if database_url:
@@ -63,50 +62,37 @@ async def lifespan(app: FastAPI):
                 print("[DB] Tables created/verified", flush=True)
         except Exception as e:
             print(f"[DB] Table creation skipped: {e}", flush=True)
-        
-        # Initialize Stock Terminal clients
+
+        # ── Initialise Stock Terminal Anthropic client ─────────────────────
+        # httpx removed — data is now fetched via yfinance (no HTTP client needed).
         try:
             anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
             if anthropic_key:
                 stock_module._anthropic = AsyncAnthropic(api_key=anthropic_key)
-                stock_module._http = httpx.AsyncClient(timeout=10.0)
-                print("[STOCK] Terminal clients initialized", flush=True)
+                print("[STOCK] Anthropic client initialised", flush=True)
             else:
-                print("[STOCK] WARNING: ANTHROPIC_API_KEY not set", flush=True)
+                print("[STOCK] WARNING: ANTHROPIC_API_KEY not set — stock terminal disabled", flush=True)
         except Exception as e:
-            print(f"[STOCK] Client initialization error: {e}", flush=True)
+            print(f"[STOCK] Client initialisation error: {e}", flush=True)
 
-        # Initialize shared httpx client for chart analysis (connection pooling)
-        try:
-            chart_analysis._http_client = httpx.AsyncClient(timeout=60.0)
-            print("[CHART] HTTP client initialized", flush=True)
-        except Exception as e:
-            print(f"[CHART] HTTP client init error: {e}", flush=True)
-        
         print("[STARTUP] Database connected", flush=True)
     except Exception as e:
         print(f"[STARTUP ERROR] {e}", flush=True)
+
     yield
+
+    # ── Cleanup ────────────────────────────────────────────────────────────
     try:
         await database.disconnect()
-    except:
+    except Exception:
         pass
-    # Close stock terminal http client
-    try:
-        if stock_module._http:
-            await stock_module._http.aclose()
-    except:
-        pass
-    # Close chart analysis http client
-    try:
-        if chart_analysis._http_client:
-            await chart_analysis._http_client.aclose()
-    except:
-        pass
+
+    # No httpx client to close — yfinance handles its own connections
+
 
 app = FastAPI(
     title="Pipways Trading Platform",
-    version="2.2.0",  # Bumped version for new features
+    version="2.2.0",
     lifespan=lifespan
 )
 
@@ -124,84 +110,61 @@ app.add_middleware(
 async def health_check():
     return {
         "status": "healthy",
-        "version": "2.2.0",
+        "version": "2.3.0",
+        "stock_terminal": {
+            "anthropic_ready": stock_module._anthropic is not None,
+            "data_source":     "yfinance (free)",
+        },
         "features": [
             "multi_format_journal",
             "ai_trade_validator",
             "signal_generator",
             "ocr_extraction",
             "psychology_profile",
-            "ai_stock_research"
+            "ai_stock_research",
         ]
     }
 
 # ==========================================
-# API ROUTES - UPDATED WITH NEW ROUTERS
+# API ROUTES
 # ==========================================
 
-# Core modules
-app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-app.include_router(signals.router, prefix="/signals", tags=["Trading Signals"])
-app.include_router(courses.router, prefix="/courses", tags=["Courses"])
-app.include_router(webinars.router, prefix="/webinars", tags=["Webinars"])
-app.include_router(blog.router, prefix="/blog", tags=["Blog"])
-app.include_router(admin.router, prefix="/admin", tags=["Administration"])
-app.include_router(blog_enhanced.router, prefix="/blog", tags=["Blog Enhanced"])
-app.include_router(courses_enhanced.router, prefix="/courses", tags=["Courses Enhanced"])
+app.include_router(auth.router,             prefix="/auth",           tags=["Authentication"])
+app.include_router(signals.router,          prefix="/signals",        tags=["Trading Signals"])
+app.include_router(courses.router,          prefix="/courses",        tags=["Courses"])
+app.include_router(webinars.router,         prefix="/webinars",       tags=["Webinars"])
+app.include_router(blog.router,             prefix="/blog",           tags=["Blog"])
+app.include_router(admin.router,            prefix="/admin",          tags=["Administration"])
+app.include_router(blog_enhanced.router,    prefix="/blog",           tags=["Blog Enhanced"])
+app.include_router(courses_enhanced.router, prefix="/courses",        tags=["Courses Enhanced"])
+app.include_router(ai_services.router,      prefix="/ai",             tags=["AI Services"])
+app.include_router(chart_analysis.router,   prefix="/ai/chart",       tags=["Chart Analysis"])
+app.include_router(performance.router,      prefix="/ai/performance", tags=["Performance Analytics"])
+app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI Mentor v3.0"])
 
-# Chart Analysis Router MUST be registered before ai_services to avoid the duplicate
-# /ai/chart/analyze route conflict. FastAPI uses the first matched route — registering
-# chart_analysis first ensures the dedicated SMC vision analysis endpoint wins.
-# Provides: /ai/chart/analyze, /ai/chart/pattern-library
-app.include_router(chart_analysis.router, prefix="/ai/chart", tags=["Chart Analysis"])
-
-# AI Services Router (validator, signal saver, symbol detection, mentor, performance)
-# NOTE: /chart/analyze has been removed from this router — chart_analysis.router owns it.
-# This router provides: /mentor/ask, /trade/validate, /signal/save, /performance/analyze-journal
-app.include_router(ai_services.router, prefix="/ai", tags=["AI Services"])
-
-# UPDATED: Performance Router (upload-journal endpoint, psychology insights)
-# Mounted at /ai/performance - provides: /upload-journal, /analyze-journal, /dashboard, /equity-curve, /monthly-analysis
-app.include_router(performance.router, prefix="/ai/performance", tags=["Performance Analytics"])
-
-# NEW: AI Mentor Router (context-aware coach, insights, recommendations)
-# Mounted at /ai/mentor - provides: /ask, /insights, /history, /clear-history
-app.include_router(ai_mentor.router, prefix="/ai/mentor", tags=["AI Mentor v3.0"])
-
-# NEW: AI Stock Research Terminal Router
-# Mounted at /api/stock - provides: /quote, /overview, /analyze, /portfolio, /compare
-app.include_router(stock_router, prefix="/api/stock", tags=["Stock Terminal"])
-
-# NOTE: If you were using ai_screening before, it can be removed since ai_services replaces it
-# If keeping for backwards compatibility, uncomment:
-# app.include_router(ai_screening.router, prefix="/ai/legacy", tags=["AI Legacy"])
+# Stock Terminal — uses the corrected single-import router reference
+app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
 
 # ==========================================
-# STATIC FILES - FIXED PATHS
+# STATIC FILES
 # ==========================================
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Mount /js folder for JavaScript files
 JS_DIR = os.path.join(BASE_DIR, "frontend", "js")
 if os.path.exists(JS_DIR):
     app.mount("/js", StaticFiles(directory=JS_DIR), name="js")
     print(f"[STATIC] Mounted /js from {JS_DIR}", flush=True)
-else:
-    if os.path.exists("js"):
-        app.mount("/js", StaticFiles(directory="js"), name="js")
-        print("[STATIC] Mounted /js from js/", flush=True)
+elif os.path.exists("js"):
+    app.mount("/js", StaticFiles(directory="js"), name="js")
+    print("[STATIC] Mounted /js from js/", flush=True)
 
-# Mount /static folder for HTML and other static files
 STATIC_DIR = os.path.join(BASE_DIR, "frontend", "static")
+if not os.path.exists(STATIC_DIR):
+    STATIC_DIR = os.path.join(BASE_DIR, "static")
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    print(f"[STATIC] Mounted /static from frontend/static", flush=True)
-else:
-    STATIC_DIR = os.path.join(BASE_DIR, "static")
-    if os.path.exists(STATIC_DIR):
-        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-        print(f"[STATIC] Mounted /static from root static", flush=True)
+    print(f"[STATIC] Mounted /static from {STATIC_DIR}", flush=True)
 
 # ==========================================
 # SPA ROUTING
@@ -209,46 +172,36 @@ else:
 
 @app.get("/")
 async def serve_index():
-    possible_paths = [
+    for path in [
         os.path.join(BASE_DIR, "frontend", "static", "index.html"),
         os.path.join(BASE_DIR, "static", "index.html"),
-        os.path.join(STATIC_DIR, "index.html") if 'STATIC_DIR' in locals() else "",
-        "static/index.html"
-    ]
+        os.path.join(STATIC_DIR, "index.html"),
+        "static/index.html",
+    ]:
+        if path and os.path.exists(path):
+            return FileResponse(path)
+    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.2.0", "docs": "/docs"})
 
-    for index_path in possible_paths:
-        if index_path and os.path.exists(index_path):
-            return FileResponse(index_path)
-
-    return JSONResponse({
-        "message": "Pipways API Server",
-        "status": "running",
-        "version": "2.2.0",
-        "docs": "/docs",
-        "hint": "Frontend not found"
-    })
 
 @app.get("/dashboard.html")
 async def serve_dashboard():
-    possible_paths = [
+    for path in [
         os.path.join(BASE_DIR, "frontend", "static", "dashboard.html"),
         os.path.join(BASE_DIR, "static", "dashboard.html"),
-        os.path.join(STATIC_DIR, "dashboard.html") if 'STATIC_DIR' in locals() else "",
-        "static/dashboard.html"
-    ]
-
-    for dashboard_path in possible_paths:
-        if dashboard_path and os.path.exists(dashboard_path):
-            return FileResponse(dashboard_path)
-
+        os.path.join(STATIC_DIR, "dashboard.html"),
+        "static/dashboard.html",
+    ]:
+        if path and os.path.exists(path):
+            return FileResponse(path)
     raise HTTPException(404, "dashboard.html not found")
+
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     api_prefixes = (
-        "auth/", "signals/", "courses/", "webinars/", 
+        "auth/", "signals/", "courses/", "webinars/",
         "blog/", "ai/", "admin/", "health", "docs", "openapi.json",
-        "static/", "js/", "api/"
+        "static/", "js/", "api/",
     )
     if full_path.startswith(api_prefixes):
         raise HTTPException(404, "Not found")
@@ -261,9 +214,4 @@ async def serve_spa(full_path: str):
     if os.path.exists(index_path):
         return FileResponse(index_path)
 
-    return JSONResponse({
-        "message": "Pipways API Server",
-        "status": "running",
-        "version": "2.2.0",
-        "path": full_path
-    })
+    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.2.0", "path": full_path})

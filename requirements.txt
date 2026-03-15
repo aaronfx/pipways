@@ -50,3 +50,6 @@ pytest-asyncio==0.21.1
 beautifulsoup4==4.12.3       # HTML parsing (MT4/MT5 statements)
 pdfplumber==0.10.4           # PDF trade statement extraction  
 pytesseract==0.3.10          # OCR for screenshot trade extraction
+
+# NEW: AI Stock Research Terminal
+anthropic>=0.21.0            # Anthropic AI API client for stock analysis

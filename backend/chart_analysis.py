@@ -36,12 +36,12 @@ def normalize_symbol(symbol: str) -> str:
     """Normalize detected trading symbol to standard format"""
     if not symbol:
         return "Unknown"
-    
+
     symbol_clean = symbol.upper().strip()
-    
+
     # Remove separators and spaces
     symbol_clean = symbol_clean.replace("/", "").replace("-", "").replace(" ", "").replace(".", "")
-    
+
     # Normalization mappings for common assets
     mappings = {
         "GOLD": "XAUUSD",
@@ -71,15 +71,15 @@ def normalize_symbol(symbol: str) -> str:
         "JP225": "JP225",
         "AUS200": "AU200",
     }
-    
+
     # Check exact match
     if symbol_clean in mappings:
         return mappings[symbol_clean]
-    
+
     # Check for common forex patterns (6 chars)
     if len(symbol_clean) == 6 and symbol_clean.isalpha():
         return symbol_clean
-    
+
     return symbol_clean
 
 def extract_symbol_from_text(text: str) -> Optional[str]:
@@ -96,6 +96,20 @@ def extract_symbol_from_text(text: str) -> Optional[str]:
     if match:
         return match.group(0)
     return None
+
+def clean_json_content(content: str) -> str:
+    """Strip markdown and clean JSON content for parsing"""
+    clean_content = content.strip()
+
+    # Remove markdown code blocks
+    if clean_content.startswith("`"):
+        clean_content = clean_content.split("`")[1]
+    if "```json" in clean_content:
+        clean_content = clean_content.split("```json")[1].split("```")[0].strip()
+    elif "```" in clean_content:
+        clean_content = clean_content.split("```")[1].split("```")[0].strip()
+
+    return clean_content
 
 @router.post("/analyze")
 async def analyze_chart_image(
@@ -182,6 +196,17 @@ async def analyze_chart_image(
 
         system_prompt = """You are a professional institutional trader specializing in Smart Money Concepts (SMC). Analyze this trading chart like a prop firm trader using hedge-fund grade analysis.
 
+Perform analysis in this order:
+
+1. Detect market structure (HH HL LH LL)
+2. Identify liquidity pools (equal highs/lows)
+3. Detect BOS or CHOCH
+4. Identify order blocks
+5. Identify fair value gaps
+6. Determine premium/discount zone
+7. Determine trading bias
+8. Generate trade setup
+
 Detect and identify:
 
 MARKET STRUCTURE
@@ -210,6 +235,18 @@ TRADE SETUP
 • Optimal entry points at discount/premium + OB + FVG confluence
 • Logical stop loss placement (beyond structure, beyond liquidity)
 • Take profit targets (next liquidity pool, opposing order block, or 1:2/1:3 RR)
+
+Determine trading_bias using the following rules:
+
+If price forms Higher High + Higher Low + Bullish BOS → bullish
+
+If price forms Lower High + Lower Low + Bearish BOS → bearish
+
+If price is inside a range without BOS → neutral
+
+If BOS is detected, NEVER output neutral.
+
+Trading bias MUST follow BOS direction.
 
 You MUST return analysis in this STRICT JSON format:
 {
@@ -288,16 +325,15 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
 
             content = data["choices"][0]["message"]["content"]
 
-            # Parse JSON
+            # Parse JSON with markdown stripping
             try:
-                # Clean up potential markdown
-                clean_content = content.strip()
-                if "```json" in clean_content:
-                    clean_content = clean_content.split("```json")[1].split("```")[0].strip()
-                elif "```" in clean_content:
-                    clean_content = clean_content.split("```")[1].split("```")[0].strip()
-                
-                result = json.loads(clean_content)
+                clean_content = clean_json_content(content)
+
+                json_match = re.search(r'\{.*\}', clean_content, re.DOTALL)
+                if json_match:
+                    result = json.loads(json_match.group())
+                else:
+                    result = json.loads(clean_content)
             except json.JSONDecodeError:
                 print(f"[CHART ANALYSIS] JSON parse failed, content: {content[:300]}", flush=True)
                 detected_symbol = extract_symbol_from_text(content) or symbol or "Unknown"
@@ -335,37 +371,52 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
             # Add chart image to result
             result["chart_image"] = f"data:{content_type};base64,{base64_image}"
 
-            # Build trade setup if not present but we have levels
-            if not result.get("trade_setup") or not result["trade_setup"].get("entry"):
-                if result.get("suggested_entry") and result.get("suggested_stop") and result.get("suggested_target"):
-                    try:
-                        entry = float(str(result["suggested_entry"]).replace(",", ""))
-                        sl = float(str(result["suggested_stop"]).replace(",", ""))
-                        tp = float(str(result["suggested_target"]).replace(",", ""))
+            # Normalize confidence/probability
+            confidence = result.get("confidence", 0.6)
+            if confidence <= 0:
+                confidence = 0.6
+            if confidence > 1:
+                confidence = 1
+            result["confidence"] = confidence
 
-                        risk = abs(entry - sl)
-                        reward = abs(tp - entry)
-                        rr = f"1:{reward/risk:.1f}" if risk > 0 else "N/A"
-                        direction = "BUY" if result.get("trading_bias") == "bullish" else "SELL" if result.get("trading_bias") == "bearish" else "NEUTRAL"
+            # Build trade setup
+            trade_setup = None
+            if result.get("suggested_entry") and result.get("suggested_stop") and result.get("suggested_target"):
+                try:
+                    entry = float(str(result["suggested_entry"]).replace(",", ""))
+                    sl = float(str(result["suggested_stop"]).replace(",", ""))
+                    tp = float(str(result["suggested_target"]).replace(",", ""))
 
-                        result["trade_setup"] = {
-                            "entry": str(entry),
-                            "stop_loss": str(sl),
-                            "take_profit": str(tp),
-                            "risk_reward": rr,
-                            "probability": result.get("confidence", 0.7),
-                            "direction": direction,
-                            "setup_type": "SMC Institutional",
-                            "quality": result.get("structure_quality", "neutral")
-                        }
-                    except:
-                        result["trade_setup"] = None
-                else:
-                    result["trade_setup"] = None
+                    risk = abs(entry - sl)
+                    reward = abs(tp - entry)
+                    rr = f"1:{reward/risk:.1f}" if risk > 0 else "N/A"
+
+                    # Determine direction based on trading_bias
+                    bias = result.get("trading_bias", "neutral").lower()
+                    if bias == "bullish":
+                        direction = "BUY"
+                    elif bias == "bearish":
+                        direction = "SELL"
+                    else:
+                        direction = "NEUTRAL"
+
+                    trade_setup = {
+                        "entry": str(entry),
+                        "stop_loss": str(sl),
+                        "take_profit": str(tp),
+                        "risk_reward": rr,
+                        "probability": confidence,
+                        "direction": direction,
+                        "setup_type": "SMC Institutional"
+                    }
+                except (ValueError, TypeError):
+                    trade_setup = None
+
+            result["trade_setup"] = trade_setup
 
             # Ensure risk_reward_ratio exists
-            if not result.get("risk_reward_ratio") and result.get("trade_setup"):
-                result["risk_reward_ratio"] = result["trade_setup"].get("risk_reward", "N/A")
+            if not result.get("risk_reward_ratio") and trade_setup:
+                result["risk_reward_ratio"] = trade_setup.get("risk_reward", "N/A")
 
             result["mode"] = "ai"
             result["configured"] = True

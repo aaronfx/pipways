@@ -440,7 +440,221 @@
             </section>
 
             <!-- MENTOR -->
-            <section id="section-mentor" class="section hidden"></section>
+            <section id="section-mentor" class="section hidden">
+    <div class="max-w-7xl mx-auto h-[calc(100vh-140px)]">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+
+            <!-- Main Chat Area -->
+            <div class="lg:col-span-2 flex flex-col h-full">
+                <div class="bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700 overflow-hidden">
+                    <!-- Header -->
+                    <div class="p-4 border-b border-gray-700 bg-gradient-to-r from-purple-900/50 to-blue-900/50 flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center animate-pulse">
+                                <i class="fas fa-robot text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-white">Pipways AI Copilot</h3>
+                                <p class="text-xs text-gray-400">Platform Intelligence System</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="dashboard.clearMentorChat()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors" title="Clear History">
+                                <i class="fas fa-trash-alt mr-1"></i>Clear
+                            </button>
+                            <button onclick="dashboard.toggleMentorHelp()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
+                                <i class="fas fa-question-circle mr-1"></i>Help
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages -->
+                    <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50">
+                        <!-- Welcome Message -->
+                        <div class="flex gap-3 animate-fade-in">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-robot text-xs text-white"></i>
+                            </div>
+                            <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
+                                <p class="text-gray-200 text-sm leading-relaxed">
+                                    👋 Welcome! I'm your <strong>Pipways Trading Copilot</strong>. I have access to your:
+                                </p>
+                                <ul class="mt-2 space-y-1 text-sm text-gray-300">
+                                    <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Trading Journal Performance</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-satellite-dish text-green-400 text-xs"></i> Active Signals</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-graduation-cap text-purple-400 text-xs"></i> Educational Resources</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-xs"></i> Chart Analysis History</li>
+                                </ul>
+                                <p class="mt-2 text-xs text-gray-400">Try typing <code class="bg-gray-800 px-1 rounded">/review-trades</code> or <code class="bg-gray-800 px-1 rounded">/signals</code></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Typing Indicator (Hidden by default) -->
+                    <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700">
+                        <div class="flex items-center gap-2 text-gray-400 text-sm">
+                            <div class="flex gap-1">
+                                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                            </div>
+                            <span class="text-xs">AI is analyzing your data...</span>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="p-4 border-t border-gray-700 bg-gray-800">
+                        <div class="flex gap-2 mb-2 overflow-x-auto pb-2 scrollbar-hide" id="quick-actions">
+                            <button onclick="dashboard.askMentor('/review-trades')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                📊 Review Trades
+                            </button>
+                            <button onclick="dashboard.askMentor('/strategy')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                🎯 Strategy Check
+                            </button>
+                            <button onclick="dashboard.askMentor('/signals')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                📡 Active Signals
+                            </button>
+                            <button onclick="dashboard.askMentor('Why am I losing trades?')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                🤔 Why am I losing?
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="mentor-input" placeholder="Ask about your trading, signals, or type /help..." 
+                                class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                                onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
+                            <button onclick="dashboard.sendMentorMessage()" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg transition-all transform hover:scale-105">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Insights & Recommendations -->
+            <div class="lg:col-span-1 space-y-4 overflow-y-auto">
+
+                <!-- AI Coach Insights Card -->
+                <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i class="fas fa-user-graduate text-purple-400"></i>
+                        <h4 class="font-bold text-white">AI Coach Insights</h4>
+                    </div>
+
+                    <div id="coach-insights-loading" class="text-center py-4">
+                        <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
+                            <i class="fas fa-spinner fa-spin"></i> Analyzing...
+                        </div>
+                    </div>
+
+                    <div id="coach-insights-content" class="hidden space-y-4">
+                        <!-- Trading Personality -->
+                        <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-3 border border-purple-700/30">
+                            <div class="text-xs text-gray-400 mb-1">Trading Personality</div>
+                            <div id="trading-personality" class="text-lg font-bold text-purple-400">--</div>
+                        </div>
+
+                        <!-- Scores Grid -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-gray-900 rounded-lg p-3 text-center">
+                                <div id="discipline-score" class="text-2xl font-bold text-blue-400">--</div>
+                                <div class="text-xs text-gray-500">Discipline</div>
+                            </div>
+                            <div class="bg-gray-900 rounded-lg p-3 text-center">
+                                <div id="consistency-score" class="text-2xl font-bold text-green-400">--</div>
+                                <div class="text-xs text-gray-500">Consistency</div>
+                            </div>
+                        </div>
+
+                        <!-- Strengths -->
+                        <div>
+                            <div class="text-xs text-gray-400 mb-2 flex items-center gap-1">
+                                <i class="fas fa-check-circle text-green-400"></i> Strengths
+                            </div>
+                            <ul id="ai-strengths-list" class="space-y-1">
+                                <li class="text-sm text-gray-300 flex items-start gap-2">
+                                    <span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span>
+                                    <span>Loading...</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Weaknesses -->
+                        <div>
+                            <div class="text-xs text-gray-400 mb-2 flex items-center gap-1">
+                                <i class="fas fa-exclamation-triangle text-yellow-400"></i> Focus Areas
+                            </div>
+                            <ul id="ai-weaknesses-list" class="space-y-1">
+                                <li class="text-sm text-gray-300 flex items-start gap-2">
+                                    <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span>
+                                    <span>Loading...</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Risk Profile -->
+                        <div class="flex justify-between items-center text-sm border-t border-gray-700 pt-3">
+                            <span class="text-gray-400">Risk Profile:</span>
+                            <span id="risk-profile" class="px-2 py-1 bg-gray-700 rounded text-white text-xs">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommended Resources -->
+                <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-lightbulb text-yellow-400"></i>
+                            <h4 class="font-bold text-white">Recommended</h4>
+                        </div>
+                        <span id="rec-count" class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">0</span>
+                    </div>
+
+                    <div id="recommendations-list" class="space-y-3">
+                        <div class="text-center text-gray-500 text-sm py-4">
+                            Ask the AI for personalized recommendations
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Next Steps -->
+                <div class="bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-xl p-5 border border-blue-700/30">
+                    <h4 class="font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fas fa-tasks text-blue-400"></i> Next Steps
+                    </h4>
+                    <ul id="next-steps-list" class="space-y-2 text-sm text-gray-300">
+                        <li class="flex items-start gap-2">
+                            <span class="text-blue-400 mt-0.5">→</span>
+                            <span>Start a conversation with the AI to get personalized steps</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Help Modal (Hidden by default) -->
+                <div id="mentor-help-panel" class="hidden bg-gray-800 rounded-xl p-5 border border-gray-700">
+                    <h4 class="font-bold text-white mb-3">Quick Commands</h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex gap-2">
+                            <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/review-trades</code>
+                            <span class="text-gray-400">Analyze performance</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/strategy</code>
+                            <span class="text-gray-400">Check consistency</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/signals</code>
+                            <span class="text-gray-400">Best active signals</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/help</code>
+                            <span class="text-gray-400">Show commands</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
             <!-- CHART ANALYSIS -->
             <section id="section-analysis" class="section hidden">
@@ -944,29 +1158,298 @@ class DashboardController {
     }
 
     async loadMentor() {
-        const container = document.getElementById('section-mentor');
-        if (!container) return;
-        container.innerHTML = `
-            <div class="max-w-4xl mx-auto h-[calc(100vh-200px)]">
-                <div class="bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700">
-                    <div class="p-4 border-b border-gray-700"><h3 class="font-bold text-white">AI Trading Mentor</h3></div>
-                    <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900">
-                        <div class="flex gap-3">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"><i class="fas fa-robot text-xs"></i></div>
-                            <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%]">
-                                <p class="text-gray-200">Hello! I'm your AI Trading Mentor. Ask me anything about trading, risk management, or strategy!</p>
-                            </div>
-                        </div>
+        // Load coach insights
+        await this.loadCoachInsights();
+        // Load chat history from localStorage
+        this.loadMentorHistory();
+    }
+
+    async loadCoachInsights() {
+        try {
+            const data = await this.apiRequest('/ai/mentor/insights');
+
+            document.getElementById('coach-insights-loading').classList.add('hidden');
+            document.getElementById('coach-insights-content').classList.remove('hidden');
+
+            // Update personality
+            document.getElementById('trading-personality').textContent = data.trading_personality || 'Developing Trader';
+
+            // Update scores
+            document.getElementById('discipline-score').textContent = (data.discipline_score || 0) + '%';
+            document.getElementById('consistency-score').textContent = (data.consistency_score || 0) + '%';
+
+            // Update strengths
+            const strengthsList = document.getElementById('ai-strengths-list');
+            strengthsList.innerHTML = (data.strengths || []).map(s => `
+                <li class="text-sm text-gray-300 flex items-start gap-2">
+                    <span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span>
+                    <span>${s}</span>
+                </li>
+            `).join('');
+
+            // Update weaknesses
+            const weaknessesList = document.getElementById('ai-weaknesses-list');
+            weaknessesList.innerHTML = (data.weaknesses || []).map(w => `
+                <li class="text-sm text-gray-300 flex items-start gap-2">
+                    <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span>
+                    <span>${w}</span>
+                </li>
+            `).join('');
+
+            // Update risk profile
+            document.getElementById('risk-profile').textContent = data.risk_profile || 'Moderate';
+
+            // Update next steps
+            const stepsList = document.getElementById('next-steps-list');
+            stepsList.innerHTML = (data.recommended_next_steps || []).map(step => `
+                <li class="flex items-start gap-2">
+                    <span class="text-blue-400 mt-0.5">→</span>
+                    <span>${step}</span>
+                </li>
+            `).join('');
+
+            // Update recommendations sidebar
+            this.updateRecommendationsList(data.recommended_resources || []);
+
+        } catch (e) {
+            console.error('Failed to load coach insights:', e);
+            document.getElementById('coach-insights-loading').innerHTML = 
+                '<span class="text-gray-500">Upload journal to see insights</span>';
+        }
+    }
+
+    updateRecommendationsList(resources) {
+        const container = document.getElementById('recommendations-list');
+        const countBadge = document.getElementById('rec-count');
+
+        if (!resources || resources.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 text-sm py-4">
+                    Ask the AI for personalized recommendations
+                </div>
+            `;
+            countBadge.textContent = '0';
+            return;
+        }
+
+        countBadge.textContent = resources.length;
+
+        const icons = {
+            'course': 'fa-graduation-cap text-purple-400',
+            'blog': 'fa-newspaper text-blue-400',
+            'signal': 'fa-satellite-dish text-green-400',
+            'strategy': 'fa-chess text-yellow-400',
+            'warning': 'fa-exclamation-triangle text-red-400'
+        };
+
+        container.innerHTML = resources.map(rec => `
+            <div class="bg-gray-900/50 rounded-lg p-3 border border-gray-700 hover:border-purple-500/50 transition-colors cursor-pointer group">
+                <div class="flex items-start gap-3">
+                    <div class="mt-0.5">
+                        <i class="fas ${icons[rec.type] || 'fa-lightbulb text-gray-400'}"></i>
                     </div>
-                    <div class="p-4 border-t border-gray-700 bg-gray-800">
-                        <div class="flex gap-2">
-                            <input type="text" id="mentor-input" placeholder="Ask your question..." class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white" onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
-                            <button onclick="dashboard.sendMentorMessage()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg"><i class="fas fa-paper-plane"></i></button>
-                        </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-white group-hover:text-purple-400 transition-colors truncate">${rec.title}</div>
+                        ${rec.description ? `<div class="text-xs text-gray-400 mt-0.5 line-clamp-2">${rec.description}</div>` : ''}
                     </div>
                 </div>
             </div>
+        `).join('');
+    }
+
+    loadMentorHistory() {
+        try {
+            const history = JSON.parse(localStorage.getItem('mentor_history') || '[]');
+            const container = document.getElementById('mentor-messages');
+
+            if (history.length > 0 && container) {
+                // Clear default welcome message if we have history
+                container.innerHTML = '';
+
+                history.forEach(msg => {
+                    if (msg.role === 'user') {
+                        this.appendMentorMessage(msg.content, 'user', false);
+                    } else {
+                        this.appendMentorMessage(msg.content, 'assistant', false);
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Error loading mentor history:', e);
+        }
+    }
+
+    saveMentorHistory() {
+        try {
+            const container = document.getElementById('mentor-messages');
+            if (!container) return;
+
+            const messages = [];
+            container.querySelectorAll('.message-wrapper').forEach(el => {
+                const role = el.dataset.role;
+                const content = el.dataset.content;
+                if (role && content) {
+                    messages.push({role, content, timestamp: new Date().toISOString()});
+                }
+            });
+
+            // Keep last 20 messages
+            const trimmed = messages.slice(-20);
+            localStorage.setItem('mentor_history', JSON.stringify(trimmed));
+        } catch (e) {
+            console.error('Error saving mentor history:', e);
+        }
+    }
+
+    async sendMentorMessage() {
+        const input = document.getElementById('mentor-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        // Add user message
+        this.appendMentorMessage(message, 'user');
+        input.value = '';
+
+        // Show typing indicator
+        document.getElementById('mentor-typing').classList.remove('hidden');
+
+        try {
+            const response = await this.apiRequest('/ai/mentor/ask', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    question: message, 
+                    skill_level: 'intermediate',
+                    include_platform_context: true
+                })
+            });
+
+            // Hide typing indicator
+            document.getElementById('mentor-typing').classList.add('hidden');
+
+            // Type out the response
+            await this.typeMentorResponse(response.response);
+
+            // Update recommendations if provided
+            if (response.recommendations && response.recommendations.length > 0) {
+                this.updateRecommendationsList(response.recommendations);
+            }
+
+            // Save to history
+            this.saveMentorHistory();
+
+        } catch (e) {
+            document.getElementById('mentor-typing').classList.add('hidden');
+            this.appendMentorMessage('Sorry, I encountered an error analyzing your data. Please try again.', 'error');
+        }
+    }
+
+    async askMentor(question) {
+        const input = document.getElementById('mentor-input');
+        input.value = question;
+        await this.sendMentorMessage();
+    }
+
+    appendMentorMessage(text, sender, animate = true) {
+        const container = document.getElementById('mentor-messages');
+        if (!container) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = `message-wrapper flex gap-3 ${animate ? 'animate-fade-in' : ''}`;
+        wrapper.dataset.role = sender;
+        wrapper.dataset.content = text;
+
+        if (sender === 'user') {
+            wrapper.classList.add('flex-row-reverse');
+            wrapper.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-user text-xs text-white"></i>
+                </div>
+                <div class="bg-purple-600 p-3 rounded-2xl rounded-tr-none max-w-[80%]">
+                    <p class="text-white text-sm">${text}</p>
+                </div>
+            `;
+        } else if (sender === 'error') {
+            wrapper.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-red-900 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-exclamation text-xs text-red-400"></i>
+                </div>
+                <div class="bg-red-900/30 border border-red-700/50 p-3 rounded-2xl rounded-tl-none max-w-[80%]">
+                    <p class="text-red-200 text-sm">${text}</p>
+                </div>
+            `;
+        } else {
+            wrapper.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-robot text-xs text-white"></i>
+                </div>
+                <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%] border border-gray-600">
+                    <p class="text-gray-200 text-sm whitespace-pre-wrap">${text}</p>
+                </div>
+            `;
+        }
+
+        container.appendChild(wrapper);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    async typeMentorResponse(text) {
+        const container = document.getElementById('mentor-messages');
+        if (!container) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'message-wrapper flex gap-3 animate-fade-in';
+        wrapper.dataset.role = 'assistant';
+        wrapper.dataset.content = text;
+
+        wrapper.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-robot text-xs text-white"></i>
+            </div>
+            <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%] border border-gray-600">
+                <p class="text-gray-200 text-sm typing-text"></p>
+            </div>
         `;
+
+        container.appendChild(wrapper);
+        container.scrollTop = container.scrollHeight;
+
+        // Typewriter effect
+        const textEl = wrapper.querySelector('.typing-text');
+        const words = text.split(' ');
+        let currentText = '';
+
+        for (let i = 0; i < words.length; i++) {
+            currentText += words[i] + ' ';
+            textEl.textContent = currentText;
+            container.scrollTop = container.scrollHeight;
+            await new Promise(r => setTimeout(r, 30)); // Typing speed
+        }
+
+        wrapper.dataset.content = text;
+    }
+
+    toggleMentorHelp() {
+        const panel = document.getElementById('mentor-help-panel');
+        panel.classList.toggle('hidden');
+    }
+
+    clearMentorChat() {
+        if (confirm('Clear conversation history?')) {
+            localStorage.removeItem('mentor_history');
+            const container = document.getElementById('mentor-messages');
+            if (container) {
+                container.innerHTML = `
+                    <div class="flex gap-3 animate-fade-in">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-robot text-xs text-white"></i>
+                        </div>
+                        <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
+                            <p class="text-gray-200 text-sm">Chat history cleared. How can I help you today?</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
     }
 
     async sendMentorMessage() {

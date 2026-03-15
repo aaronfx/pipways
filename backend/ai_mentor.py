@@ -2,7 +2,7 @@
 AI Trading Mentor - PLATFORM INTELLIGENCE SYSTEM v3.0
 Central AI brain with contextual access to all platform modules
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, timedelta
@@ -21,7 +21,6 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_CONFIGURED = OPENROUTER_API_KEY is not None and OPENROUTER_API_KEY != ""
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-BASE_API_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # In-memory conversation storage (use Redis in production)
 conversation_history = defaultdict(list)  # user_id -> list of messages
@@ -82,53 +81,60 @@ class CoachInsights(BaseModel):
 # CONTEXT ENGINE
 # ==========================================
 
-async def fetch_journal_performance(client: httpx.AsyncClient, token: str) -> Optional[Dict]:
+async def fetch_journal_performance(client: httpx.AsyncClient, token: str, base_url: str) -> Optional[Dict]:
     """Fetch user trading journal performance"""
     try:
+        url = f"{base_url}/ai/performance/dashboard"
+        print(f"[FETCH] Calling {url}", flush=True)
         resp = await client.get(
-            f"{BASE_API_URL}/ai/performance/dashboard",
+            url,
             headers={"Authorization": f"Bearer {token}"},
-            timeout=5.0
+            timeout=10.0
         )
+        print(f"[FETCH] Journal response status: {resp.status_code}", flush=True)
         if resp.status_code == 200:
-            return resp.json()
+            data = resp.json()
+            print(f"[FETCH] Journal data keys: {list(data.keys()) if data else 'empty'}", flush=True)
+            return data
+        else:
+            print(f"[FETCH] Journal error: {resp.text[:200]}", flush=True)
     except Exception as e:
-        print(f"[CONTEXT] Journal fetch error: {e}")
+        print(f"[CONTEXT] Journal fetch error: {e}", flush=True)
     return None
 
-async def fetch_active_signals(client: httpx.AsyncClient) -> List[Dict]:
+async def fetch_active_signals(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
     """Fetch active trading signals"""
     try:
         resp = await client.get(
-            f"{BASE_API_URL}/signals/active",
+            f"{base_url}/signals/active",
             timeout=5.0
         )
         if resp.status_code == 200:
             data = resp.json()
             return data if isinstance(data, list) else data.get("signals", [])
     except Exception as e:
-        print(f"[CONTEXT] Signals fetch error: {e}")
+        print(f"[CONTEXT] Signals fetch error: {e}", flush=True)
     return []
 
-async def fetch_courses(client: httpx.AsyncClient) -> List[Dict]:
+async def fetch_courses(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
     """Fetch available courses"""
     try:
         resp = await client.get(
-            f"{BASE_API_URL}/courses/list",
+            f"{base_url}/courses/list",
             timeout=5.0
         )
         if resp.status_code == 200:
             data = resp.json()
             return data if isinstance(data, list) else data.get("courses", [])
     except Exception as e:
-        print(f"[CONTEXT] Courses fetch error: {e}")
+        print(f"[CONTEXT] Courses fetch error: {e}", flush=True)
     return []
 
-async def fetch_blog_posts(client: httpx.AsyncClient) -> List[Dict]:
+async def fetch_blog_posts(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
     """Fetch recent blog posts"""
     try:
         resp = await client.get(
-            f"{BASE_API_URL}/blog/list",
+            f"{base_url}/blog/list",
             timeout=5.0
         )
         if resp.status_code == 200:
@@ -136,30 +142,50 @@ async def fetch_blog_posts(client: httpx.AsyncClient) -> List[Dict]:
             posts = data if isinstance(data, list) else data.get("posts", [])
             return posts[:5]  # Only recent 5
     except Exception as e:
-        print(f"[CONTEXT] Blog fetch error: {e}")
+        print(f"[CONTEXT] Blog fetch error: {e}", flush=True)
     return []
 
-async def fetch_last_chart_analysis(client: httpx.AsyncClient, token: str) -> Optional[Dict]:
+async def fetch_last_chart_analysis(client: httpx.AsyncClient, token: str, base_url: str) -> Optional[Dict]:
     """Fetch user's last chart analysis (simulated via session or cache)"""
     # In production, this would query a cache/DB for last analysis
     # For now, return None to allow AI to respond generically
     return None
 
-async def get_user_trading_context(client: httpx.AsyncClient, token: str, user_id: str) -> UserContext:
+async def get_user_trading_context(client: httpx.AsyncClient, token: str, user_id: str, base_url: str) -> UserContext:
     """
     Gather comprehensive user context from all platform modules
     Parallel async fetching for performance
     """
-    journal_task = fetch_journal_performance(client, token)
-    signals_task = fetch_active_signals(client)
-    courses_task = fetch_courses(client)
-    blogs_task = fetch_blog_posts(client)
-    chart_task = fetch_last_chart_analysis(client, token)
+    print(f"[CONTEXT] Fetching for user {user_id} from {base_url}", flush=True)
 
-    journal, signals, courses, blogs, chart = await asyncio.gather(
-        journal_task, signals_task, courses_task, blogs_task, chart_task,
-        return_exceptions=True
-    )
+    journal_task = fetch_journal_performance(client, token, base_url)
+    signals_task = fetch_active_signals(client, base_url)
+    courses_task = fetch_courses(client, base_url)
+    blogs_task = fetch_blog_posts(client, base_url)
+    chart_task = fetch_last_chart_analysis(client, token, base_url)
+
+    try:
+        journal, signals, courses, blogs, chart = await asyncio.gather(
+            journal_task, signals_task, courses_task, blogs_task, chart_task,
+            return_exceptions=True
+        )
+
+        # Log results
+        if isinstance(journal, Exception):
+            print(f"[CONTEXT] Journal fetch failed: {journal}", flush=True)
+            journal = None
+        else:
+            print(f"[CONTEXT] Journal fetched successfully: {journal is not None}", flush=True)
+
+        if isinstance(signals, Exception):
+            print(f"[CONTEXT] Signals fetch failed: {signals}", flush=True)
+            signals = []
+        else:
+            print(f"[CONTEXT] Signals fetched: {len(signals) if signals else 0}", flush=True)
+
+    except Exception as e:
+        print(f"[CONTEXT] Gather failed: {e}", flush=True)
+        journal, signals, courses, blogs, chart = None, [], [], [], None
 
     # Handle exceptions
     journal = None if isinstance(journal, Exception) else journal
@@ -196,8 +222,24 @@ async def get_user_trading_context(client: httpx.AsyncClient, token: str, user_i
 async def process_review_trades(context: UserContext) -> str:
     """Process /review-trades command"""
     stats = context.trading_stats
-    if not stats:
+    journal = context.journal_performance
+
+    print(f"[REVIEW] Stats: {stats}, Journal: {journal is not None}", flush=True)
+
+    if not stats and not journal:
         return "I don't see any trading data in your journal yet. Please upload your trading history first so I can analyze your performance."
+
+    # Use journal data directly if stats not parsed
+    if not stats and journal:
+        stats = {
+            "win_rate": journal.get("win_rate", 0),
+            "total_trades": journal.get("total_trades", 0),
+            "profit_factor": journal.get("profit_factor", 0),
+            "max_drawdown": journal.get("max_drawdown", 0),
+            "expectancy": journal.get("expectancy", 0),
+            "grade": journal.get("overall_grade", "N/A")
+        }
+        print(f"[REVIEW] Using journal stats: {stats}", flush=True)
 
     win_rate = stats.get("win_rate", 0)
     grade = stats.get("grade", "N/A")
@@ -438,6 +480,7 @@ Provide clear, structured advice. Use bullet points for actionable steps."""
 @router.post("/ask", response_model=MentorResponse)
 async def ask_mentor(
     query: MentorQuery,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user = Depends(get_current_user)
 ):
@@ -458,15 +501,28 @@ async def ask_mentor(
     # Gather context if enabled (and not a simple greeting)
     if query.include_platform_context and not query.question.lower() in ["hi", "hello", "hey"]:
         try:
-            async with httpx.AsyncClient() as client:
-                token = "dummy_token"  # In real impl, extract from request
-                context_data = await get_user_trading_context(client, token, user_id)
-        except Exception as e:
-            print(f"[MENTOR] Context gathering failed: {e}")
+            # Extract token from request headers
+            auth_header = request.headers.get("authorization", "")
+            token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
 
-    # Process special commands immediately
+            # Determine base URL - use request base URL or environment variable
+            base_url = str(request.base_url).rstrip("/")
+            if not base_url or base_url == "http://":
+                base_url = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+
+            print(f"[MENTOR] Gathering context from {base_url} for user {user_id}", flush=True)
+
+            async with httpx.AsyncClient() as client:
+                context_data = await get_user_trading_context(client, token, user_id, base_url)
+
+            print(f"[MENTOR] Context gathered: journal={context_data.journal_performance is not None}, signals={len(context_data.active_signals)}", flush=True)
+        except Exception as e:
+            print(f"[MENTOR] Context gathering failed: {e}", flush=True)
+
+    # Process special commands immediately (before AI call)
     if command == "review-trades":
         ai_response = await process_review_trades(context_data)
+        print(f"[MENTOR] Processed /review-trades command", flush=True)
     elif command == "strategy":
         ai_response = await process_strategy_analysis(context_data)
     elif command == "signals":
@@ -480,76 +536,77 @@ async def ask_mentor(
 
 Or ask me anything about trading!"""
 
-    # Check OpenRouter configuration
-    if not OPENROUTER_CONFIGURED and not command:
-        # Fallback response with context
-        ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
-        recommendations = generate_recommendations(query.question, context_data, ai_response)
+    # Only call AI if not a special command OR if command processing returned empty
+    if not ai_response:
+        # Check OpenRouter configuration
+        if not OPENROUTER_CONFIGURED:
+            ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
+            recommendations = generate_recommendations(query.question, context_data, ai_response)
 
-        return MentorResponse(
-            response=ai_response,
-            recommendations=recommendations,
-            context_used={"fallback": True, "data": context_data.dict()},
-            confidence=0.6
-        )
+            return MentorResponse(
+                response=ai_response,
+                recommendations=recommendations,
+                context_used={"fallback": True, "data": context_data.dict()},
+                confidence=0.6
+            )
 
-    # Get conversation history
-    history = conversation_history.get(user_id, [])
+        # Get conversation history
+        history = conversation_history.get(user_id, [])
 
-    # Build messages for AI
-    messages = [{"role": "system", "content": build_system_prompt(context_data, query.skill_level)}]
+        # Build messages for AI
+        messages = [{"role": "system", "content": build_system_prompt(context_data, query.skill_level)}]
 
-    # Add recent history (last 5 exchanges)
-    for msg in history[-10:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
+        # Add recent history (last 5 exchanges)
+        for msg in history[-10:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Add current question with context hint
-    user_msg = query.question
-    if context_data.trading_stats and "performance" in query.question.lower():
-        user_msg += f"\n\n[User Performance Context: Win Rate {context_data.trading_stats.get('win_rate', 0)}%, Grade {context_data.trading_stats.get('grade', 'N/A')}]"
+        # Add current question with context hint
+        user_msg = query.question
+        if context_data.trading_stats and "performance" in query.question.lower():
+            user_msg += f"\n\n[User Performance Context: Win Rate {context_data.trading_stats.get('win_rate', 0)}%, Grade {context_data.trading_stats.get('grade', 'N/A')}]"
 
-    messages.append({"role": "user", "content": user_msg})
+        messages.append({"role": "user", "content": user_msg})
 
-    # Call AI with retry logic
-    max_retries = 2
-    for attempt in range(max_retries):
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{OPENROUTER_BASE_URL}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                        "HTTP-Referer": "https://pipwaysapp.onrender.com",
-                        "X-Title": "Pipways Trading Platform",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": OPENROUTER_MODEL,
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 500
-                    },
-                    timeout=15.0
-                )
+        # Call AI with retry logic
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        f"{OPENROUTER_BASE_URL}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                            "HTTP-Referer": "https://pipwaysapp.onrender.com",
+                            "X-Title": "Pipways Trading Platform",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": OPENROUTER_MODEL,
+                            "messages": messages,
+                            "temperature": 0.7,
+                            "max_tokens": 500
+                        },
+                        timeout=15.0
+                    )
 
-                if response.status_code == 200:
-                    data = response.json()
-                    ai_response = data["choices"][0]["message"]["content"]
-                    break
-                elif response.status_code == 429:
-                    await asyncio.sleep(1)
-                    continue
-                else:
-                    raise HTTPException(status_code=503, detail="AI service error")
+                    if response.status_code == 200:
+                        data = response.json()
+                        ai_response = data["choices"][0]["message"]["content"]
+                        break
+                    elif response.status_code == 429:
+                        await asyncio.sleep(1)
+                        continue
+                    else:
+                        raise HTTPException(status_code=503, detail="AI service error")
 
-        except httpx.TimeoutException:
-            if attempt == max_retries - 1:
-                ai_response = "I'm taking longer than usual to analyze your data. Please try again in a moment."
-            await asyncio.sleep(1)
-        except Exception as e:
-            print(f"[AI ERROR] Attempt {attempt}: {e}")
-            if attempt == max_retries - 1:
-                ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
+            except httpx.TimeoutException:
+                if attempt == max_retries - 1:
+                    ai_response = "I'm taking longer than usual to analyze your data. Please try again in a moment."
+                await asyncio.sleep(1)
+            except Exception as e:
+                print(f"[AI ERROR] Attempt {attempt}: {e}", flush=True)
+                if attempt == max_retries - 1:
+                    ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
 
     # Generate recommendations based on AI response and context
     recommendations = generate_recommendations(query.question, context_data, ai_response)
@@ -588,9 +645,10 @@ async def get_coach_insights(
     try:
         async with httpx.AsyncClient() as client:
             token = "dummy_token"
-            context = await get_user_trading_context(client, token, user_id)
+            base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+            context = await get_user_trading_context(client, token, user_id, base_url)
     except Exception as e:
-        print(f"[INSIGHTS] Error fetching context: {e}")
+        print(f"[INSIGHTS] Error fetching context: {e}", flush=True)
         context = UserContext()
 
     # Analyze trading personality
@@ -703,12 +761,9 @@ async def review_trade_endpoint(
     current_user = Depends(get_current_user)
 ):
     """Legacy endpoint - redirects to new system"""
-    return await ask_mentor(
-        MentorQuery(
-            question=f"/review-trades",
-            skill_level="intermediate",
-            include_platform_context=True
-        ),
-        None,
-        current_user
-    )
+    # This would need Request object, so simplified for now
+    return {
+        "response": "Please use the main chat interface with /review-trades command",
+        "recommendations": [],
+        "context_used": {}
+    }

@@ -19,6 +19,86 @@
         .chart-container { position: relative; height: 300px; width: 100%; }
         .stat-card { transition: all 0.3s ease; }
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.3); }
+        
+        /* Chart Analysis Styles */
+        .page-header { margin-bottom: 2rem; }
+        .page-header h1 { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.5rem; }
+        .page-header p { color: #9ca3af; }
+        .upload-area { 
+            border: 2px dashed #4b5563; 
+            border-radius: 0.75rem; 
+            padding: 2rem; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: all 0.2s;
+            background: #111827;
+        }
+        .upload-area:hover { border-color: #7c3aed; background: #1f2937; }
+        .card { background: #1f2937; border: 1px solid #374151; border-radius: 0.75rem; padding: 1.5rem; }
+        .card-header { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #374151; }
+        .card-title { font-size: 1.125rem; font-weight: 600; color: white; margin: 0; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.875rem; color: #9ca3af; margin-bottom: 0.5rem; }
+        .form-control { 
+            width: 100%; 
+            background: #111827; 
+            border: 1px solid #374151; 
+            border-radius: 0.5rem; 
+            padding: 0.5rem 0.75rem; 
+            color: white;
+            box-sizing: border-box;
+        }
+        .form-control:focus { outline: none; border-color: #7c3aed; }
+        .btn { 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 0.5rem; 
+            padding: 0.5rem 1rem; 
+            border-radius: 0.5rem; 
+            font-weight: 500; 
+            cursor: pointer; 
+            border: none; 
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #7c3aed; color: white; }
+        .btn-primary:hover { background: #6d28d9; }
+        .btn-success { background: #059669; color: white; }
+        .btn-success:hover { background: #047857; }
+        .btn-block { width: 100%; }
+        .badge { 
+            display: inline-flex; 
+            align-items: center; 
+            padding: 0.25rem 0.75rem; 
+            border-radius: 9999px; 
+            font-size: 0.75rem; 
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-info { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .alert { padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+        .alert-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; }
+        .alert-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; }
+        .loading { text-align: center; padding: 2rem; }
+        .spinner { 
+            width: 40px; height: 40px; 
+            border: 3px solid #374151; 
+            border-top-color: #7c3aed; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .text-primary { color: #7c3aed; }
+        .text-success { color: #10b981; }
+        .text-danger { color: #ef4444; }
+        .text-warning { color: #f59e0b; }
+        .text-muted { color: #6b7280; }
+        .mr-2 { margin-right: 0.5rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mb-0 { margin-bottom: 0 !important; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
@@ -951,10 +1031,10 @@ const DashboardController = class {
         document.getElementById('ai-recommendation').textContent = aiCoach.recommendation || 'Keep maintaining your trading journal';
 
         const strengthsList = document.getElementById('ai-strengths');
-        strengthsList.innerHTML = (aiCoach.strengths || ['Consistent trading']).map(s => `<li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-1"></i>${s}</li>`).join('');
+        strengthsList.innerHTML = (aiCoach.strengths || ['Consistent trading']).map(s => `<li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-1"></i> ${s}</li>`).join('');
 
         const improvementsList = document.getElementById('ai-improvements');
-        improvementsList.innerHTML = (aiCoach.improvements || ['Continue current approach']).map(i => `<li class="flex items-start gap-2"><i class="fas fa-arrow-up text-yellow-400 mt-1"></i>${i}</li>`).join('');
+        improvementsList.innerHTML = (aiCoach.improvements || ['Continue current approach']).map(i => `<li class="flex items-start gap-2"><i class="fas fa-arrow-up text-yellow-400 mt-1"></i> ${i}</li>`).join('');
 
         this.renderEquityCurve(result.equity_curve || []);
         this.renderTradeDistribution(result.trade_distribution || {});

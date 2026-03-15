@@ -491,6 +491,8 @@
                             <div id="validation-warnings" class="text-sm mb-2"></div>
                             <div id="validation-suggestions" class="text-sm text-blue-400"></div>
                         </div>
+                        
+                        <div id="validatorResults" style="display: none;" class="mt-4"></div>
                     </div>
                 </div>
             </section>
@@ -1244,9 +1246,11 @@
                     return;
                 }
 
-                const resultEl = document.getElementById('validation-result');
+                const resultEl = document.getElementById('validatorResults');
+                
+                // Show loading state
                 if (resultEl) {
-                    resultEl.classList.remove('hidden');
+                    resultEl.style.display = "block";
                     resultEl.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-blue-400 mr-2"></i>Validating...</div>';
                 }
 
@@ -1266,36 +1270,39 @@
                     });
                     console.log('[Validate] Success:', result);
 
-                    if (resultEl) resultEl.classList.remove('hidden');
-
-                    const score = result.quality_score || 0;
-                    const scoreEl = document.getElementById('validation-score');
-                    if (scoreEl) {
-                        scoreEl.textContent = score;
-                        scoreEl.className = `score-circle ${score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-warning' : 'score-danger'}`;
-                    }
-
-                    const recEl = document.getElementById('validation-recommendation');
-                    if (recEl) recEl.textContent = result.recommendation || (result.valid ? 'Valid Setup' : 'Review Setup');
-                    
-                    const rrEl = document.getElementById('validation-rr');
-                    if (rrEl) rrEl.textContent = result.risk_reward_ratio || result.rr || '--';
-                    
-                    const probEl = document.getElementById('validation-probability');
-                    if (probEl) probEl.textContent = (result.probability || result.win_probability || 0) + '%';
-
-                    const warningsEl = document.getElementById('validation-warnings');
-                    if (warningsEl) {
-                        if (result.warnings && result.warnings.length > 0) {
-                            warningsEl.innerHTML = result.warnings.map(w => `<div class="text-yellow-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i>${w}</div>`).join('');
-                        } else {
-                            warningsEl.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>No warnings!</div>';
+                    // Render results
+                    if (resultEl) {
+                        const score = result.quality_score || 0;
+                        const rr = result.risk_reward_ratio || result.rr || 0;
+                        const probability = result.probability || result.win_probability || 0;
+                        const structureValid = result.structure_valid || false;
+                        const warnings = result.warnings || [];
+                        
+                        let html = '<div class="bg-gray-900 rounded-lg p-4 border border-gray-700">';
+                        
+                        // Metrics Grid
+                        html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+                        html += `<div class="p-3 bg-gray-800 rounded"><span class="text-xs text-gray-500 block mb-1">Risk Reward</span><span class="text-xl font-bold text-white">1:${parseFloat(rr).toFixed(1)}</span></div>`;
+                        html += `<div class="p-3 bg-gray-800 rounded"><span class="text-xs text-gray-500 block mb-1">Probability</span><span class="text-xl font-bold text-white">${Math.round(probability)}%</span></div>`;
+                        html += `<div class="p-3 bg-gray-800 rounded"><span class="text-xs text-gray-500 block mb-1">Structure Validity</span><span class="text-xl font-bold ${structureValid ? 'text-green-400' : 'text-red-400'}">${structureValid ? 'Valid' : 'Invalid'}</span></div>`;
+                        html += `<div class="p-3 bg-gray-800 rounded"><span class="text-xs text-gray-500 block mb-1">Quality Score</span><span class="text-xl font-bold ${score >= 70 ? 'text-green-400' : score >= 40 ? 'text-yellow-400' : 'text-red-400'}">${score}</span></div>`;
+                        html += '</div>';
+                        
+                        // Warnings
+                        if (warnings.length > 0) {
+                            html += '<div class="border-t border-gray-700 pt-4 mt-4">';
+                            html += '<h5 class="text-sm font-semibold text-yellow-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Warnings:</h5>';
+                            html += '<ul class="list-disc list-inside text-sm text-gray-400">';
+                            warnings.forEach(warning => {
+                                html += `<li>• ${warning}</li>`;
+                            });
+                            html += '</ul>';
+                            html += '</div>';
                         }
-                    }
-
-                    const suggestionsEl = document.getElementById('validation-suggestions');
-                    if (suggestionsEl && result.suggestions) {
-                        suggestionsEl.innerHTML = result.suggestions.map(s => `<div class="mb-1"><i class="fas fa-lightbulb mr-2"></i>${s}</div>`).join('');
+                        
+                        html += '</div>';
+                        resultEl.innerHTML = html;
+                        resultEl.style.display = "block";
                     }
                 } catch (error) {
                     console.error('[Validate] Error:', error);
@@ -1306,14 +1313,13 @@
                                     <i class="fas fa-exclamation-triangle text-red-400"></i>
                                     <span class="text-red-400 font-semibold">Validation Failed</span>
                                 </div>
-                                <p class="text-red-300 text-sm mb-2">${error.message}</p>
-                                <button onclick="dashboard.validateTradeSetup()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm mt-2">
+                                <p class="text-red-300 text-sm">${error.message}</p>
+                                <button onclick="dashboard.validateTradeSetup()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm mt-3">
                                     <i class="fas fa-redo mr-1"></i>Retry
                                 </button>
                             </div>
                         `;
-                    } else {
-                        alert('Validation failed: ' + error.message);
+                        resultEl.style.display = "block";
                     }
                 }
             }

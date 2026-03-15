@@ -35,6 +35,9 @@ from . import performance
 # NEW: Import upgraded AI Mentor (Platform Intelligence System v3.0)
 from . import ai_mentor
 
+# NEW: AI Stock Research Terminal
+from .stock_terminal_backend import router as stock_router
+
 # Keep old imports for backwards compatibility if needed
 # from . import ai_screening  # Can be removed if fully replaced by ai_services
 
@@ -90,7 +93,8 @@ async def health_check():
             "ai_trade_validator",
             "signal_generator",
             "ocr_extraction",
-            "psychology_profile"
+            "psychology_profile",
+            "ai_stock_research"
         ]
     }
 
@@ -123,6 +127,10 @@ app.include_router(performance.router, prefix="/ai/performance", tags=["Performa
 # NEW: AI Mentor Router (context-aware coach, insights, recommendations)
 # Mounted at /ai/mentor - provides: /ask, /insights, /history, /clear-history
 app.include_router(ai_mentor.router, prefix="/ai/mentor", tags=["AI Mentor v3.0"])
+
+# NEW: AI Stock Research Terminal Router
+# Mounted at /api/stock - provides: /quote, /overview, /analyze, /portfolio, /compare
+app.include_router(stock_router, prefix="/api/stock", tags=["Stock Terminal"])
 
 # NOTE: If you were using ai_screening before, it can be removed since ai_services replaces it
 # If keeping for backwards compatibility, uncomment:
@@ -200,7 +208,7 @@ async def serve_spa(full_path: str):
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/", 
         "blog/", "ai/", "admin/", "health", "docs", "openapi.json",
-        "static/", "js/"
+        "static/", "js/", "api/"
     )
     if full_path.startswith(api_prefixes):
         raise HTTPException(404, "Not found")

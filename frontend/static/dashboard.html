@@ -22,11 +22,8 @@
         .score-good { border-color: #3b82f6; color: #3b82f6; }
         .score-warning { border-color: #f59e0b; color: #f59e0b; }
         .score-danger { border-color: #ef4444; color: #ef4444; }
-        /* SMC specific styles */
-        .smc-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
-        .smc-bullish { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-        .smc-bearish { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
     </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
@@ -62,13 +59,13 @@
                 <i class="fas fa-home w-5"></i><span>Dashboard</span>
             </a>
             <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-satellite-dish w-5"></i><span>AI Signal Engine</span>
+                <i class="fas fa-satellite-dish w-5"></i><span>Trading Signals</span>
             </a>
             <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
                 <i class="fas fa-book w-5"></i><span>Trading Journal</span>
             </a>
             <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-chart-line w-5"></i><span>SMC Analysis</span>
+                <i class="fas fa-chart-line w-5"></i><span>Chart Analysis</span>
             </a>
             <a href="#" data-section="performance" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
                 <i class="fas fa-chart-bar w-5"></i><span>Performance</span>
@@ -182,7 +179,7 @@
             <!-- SIGNALS -->
             <section id="section-signals" class="section hidden">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold text-white"><i class="fas fa-satellite-dish mr-2 text-purple-400"></i>AI Signal Engine</h3>
+                    <h3 class="text-xl font-bold text-white">Trading Signals</h3>
                     <select class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300">
                         <option>All Pairs</option><option>Forex</option><option>Crypto</option><option>Indices</option>
                     </select>
@@ -351,8 +348,8 @@
                 <div class="max-w-6xl mx-auto">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                            <h3 class="text-xl font-bold text-white mb-2"><i class="fas fa-chart-line mr-2 text-purple-400"></i>SMC Analysis</h3>
-                            <p class="text-gray-400 mb-6 text-sm">Smart Money Concepts institutional-grade analysis</p>
+                            <h3 class="text-xl font-bold text-white mb-4"><i class="fas fa-chart-line mr-2 text-purple-400"></i>AI Chart Analysis</h3>
+                            <p class="text-gray-400 mb-6">Smart Money Concepts institutional analysis</p>
 
                             <div id="chart-dropzone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900 mb-4">
                                 <input type="file" id="chart-file-input" class="hidden" accept="image/*">
@@ -408,7 +405,7 @@
                             <!-- SMC Market Structure Display -->
                             <div id="smc-market-structure" class="hidden mb-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
                                 <span class="text-xs text-gray-500 uppercase block mb-1">Market Structure</span>
-                                <span id="market-structure-value" class="text-lg font-bold">--</span>
+                                <span id="market-structure-value" class="text-lg font-bold text-purple-400">--</span>
                             </div>
 
                             <!-- SMC Signals Display -->
@@ -586,6 +583,7 @@
                 this.checkAuth();
                 this.setupNavigation();
                 this.setupMobileMenu();
+                // renderAdminMenu will be called after user is loaded in checkAuth/updateUserDisplay
                 this.initFeatureCarousel();
                 this.loadDashboardStats();
                 this.navigate('dashboard');
@@ -602,6 +600,7 @@
                     this.user = JSON.parse(userStr);
                     console.log('[Auth] User loaded:', this.user);
                     this.updateUserDisplay();
+                    // Delay admin menu check to ensure DOM ready
                     setTimeout(() => this.renderAdminMenu(), 200);
                 } catch (e) {
                     console.error('Auth error:', e);
@@ -618,13 +617,15 @@
                 if (userNameEl) userNameEl.textContent = user.full_name || user.email || 'User';
                 if (userEmailEl) userEmailEl.textContent = user.email || '';
                 if (headerUserNameEl) headerUserNameEl.textContent = user.full_name || user.email || 'Trader';
-                
+                // Now that user data is loaded, render admin menu
                 this.renderAdminMenu();
             }
 
             renderAdminMenu() {
+                // Check all possible admin indicators including email pattern
                 const email = this.user?.email || '';
                 const name = this.user?.full_name || '';
+
                 const isAdminEmail = email.includes('admin') || email === 'admin@pipways.com';
                 const isAdminName = name.toLowerCase().includes('administrator') || name.toLowerCase().includes('admin');
 
@@ -638,7 +639,10 @@
                     isAdminName
                 );
 
-              const adminMenu = document.getElementById('admin-menu-container');
+                console.log('[Admin Check] Email:', email, 'Name:', name, 'Is Admin:', isAdmin, 'Role:', this.user?.role);
+                console.log('[Admin Check] Email pattern match:', isAdminEmail, 'Name pattern match:', isAdminName);
+
+                const adminMenu = document.getElementById('admin-menu-container');
                 if (adminMenu) {
                     if (isAdmin) {
                         adminMenu.classList.remove('hidden');
@@ -1076,9 +1080,8 @@
 
                 try {
                     const symbol = document.getElementById('chart-symbol')?.value || 'AUTO';
-                    const timeframe = document.getElementById('chart-timeframe')?.value || '';
-
-                    // Use FormData for file upload
+                                        const timeframe = document.getElementById('chart-timeframe')?.value || '';
+                    
                     const formData = new FormData();
                     formData.append('file', this.currentChartFile);
                     formData.append('symbol', symbol);
@@ -1098,7 +1101,6 @@
                     }
 
                     const data = await response.json();
-                    // Store annotations for future use
                     if (data.chart_annotations) {
                         console.log('[Chart Analysis] Annotations received:', data.chart_annotations);
                     }
@@ -1126,7 +1128,6 @@
                         biasEl.className = `text-2xl font-bold ml-2 uppercase ${data.trading_bias === 'bullish' ? 'text-green-400' : data.trading_bias === 'bearish' ? 'text-red-400' : 'text-gray-400'}`;
                     }
 
-                    // Display SMC Market Structure
                     const msContainer = document.getElementById('smc-market-structure');
                     const msValue = document.getElementById('market-structure-value');
                     if (data.market_structure) {
@@ -1139,7 +1140,6 @@
                         if (msContainer) msContainer.classList.add('hidden');
                     }
 
-                    // Display SMC Signals
                     const smcContainer = document.getElementById('smc-signals-container');
                     const smcList = document.getElementById('smc-signals-list');
                     if (data.smc_signals && data.smc_signals.length > 0) {
@@ -1151,7 +1151,6 @@
                         if (smcContainer) smcContainer.classList.add('hidden');
                     }
 
-                    // Fix: Use patterns_detected array (BUG 3)
                     if (patternEl) {
                         if (data.patterns_detected && data.patterns_detected.length > 0) {
                             patternEl.textContent = data.patterns_detected.map(p => p.name).join(', ');
@@ -1160,7 +1159,6 @@
                         }
                     }
 
-                    // Trade setup
                     if (data.trade_setup) {
                         const setup = data.trade_setup;
                         const entryEl = document.getElementById('setup-entry');
@@ -1189,7 +1187,6 @@
                         insightsEl.innerHTML = data.key_insights.map(i => `<li>${i}</li>`).join('');
                     }
 
-                    // Fix: Use data.chart_image from server response (BUG 2)
                     const attachedChart = document.getElementById('attached-chart-preview');
                     if (attachedChart && data.chart_image) {
                         attachedChart.src = data.chart_image;
@@ -1201,8 +1198,6 @@
                     console.error('[Chart Analysis] Error:', error);
                     alert('Failed to analyze chart');
                 } finally {
-                    const loadingEl = document.getElementById('chart-analysis-loading');
-                    const analyzeBtn = document.getElementById('analyze-chart-btn');
                     if (loadingEl) loadingEl.classList.add('hidden');
                     if (analyzeBtn) analyzeBtn.disabled = false;
                 }
@@ -1224,7 +1219,6 @@
                         if (slEl) slEl.value = setup.stop_loss || setup.sl || '';
                         if (tpEl) tpEl.value = setup.take_profit || setup.tp || '';
                         if (symbolEl) symbolEl.value = this.currentAnalysis.symbol || '';
-                        // Fix: Set direction from analysis bias if available (BUG 1)
                         const direction = this.currentAnalysis.trading_bias === 'bullish' ? 'BUY' : 
                                          this.currentAnalysis.trading_bias === 'bearish' ? 'SELL' : 'BUY';
                         if (dirEl) dirEl.value = direction;
@@ -1233,19 +1227,23 @@
             }
 
             async validateTradeSetup() {
-                const entry = parseFloat(document.getElementById('validator-entry')?.value);
-                const sl = parseFloat(document.getElementById('validator-sl')?.value);
-                const tp = parseFloat(document.getElementById('validator-tp')?.value);
-                const symbol = document.getElementById('validator-symbol')?.value || 'EURUSD';
-                // Fix: Get direction from the select input (BUG 1)
-                const direction = document.getElementById('validator-direction')?.value || 'BUY';
+                const entryEl = document.getElementById('validator-entry');
+                const slEl = document.getElementById('validator-sl');
+                const tpEl = document.getElementById('validator-tp');
+                const symbolEl = document.getElementById('validator-symbol');
+                const dirEl = document.getElementById('validator-direction');
+                
+                const entry = entryEl ? parseFloat(entryEl.value) : NaN;
+                const sl = slEl ? parseFloat(slEl.value) : NaN;
+                const tp = tpEl ? parseFloat(tpEl.value) : NaN;
+                const symbol = symbolEl ? symbolEl.value : 'EURUSD';
+                const direction = dirEl ? dirEl.value : 'BUY';
 
                 if (!entry || !sl || !tp) {
                     alert('Please fill in all values');
                     return;
                 }
 
-                // Show loading state
                 const resultEl = document.getElementById('validation-result');
                 if (resultEl) {
                     resultEl.classList.remove('hidden');
@@ -1253,7 +1251,6 @@
                 }
 
                 try {
-                    // Fix: Send correct payload with direction and proper field names (BUG 1)
                     const payload = { 
                         entry_price: entry, 
                         stop_loss: sl, 
@@ -1269,23 +1266,31 @@
                     });
                     console.log('[Validate] Success:', result);
 
-                    const resultEl = document.getElementById('validation-result');
-                    resultEl.classList.remove('hidden');
+                    if (resultEl) resultEl.classList.remove('hidden');
 
                     const score = result.quality_score || 0;
                     const scoreEl = document.getElementById('validation-score');
-                    scoreEl.textContent = score;
-                    scoreEl.className = `score-circle ${score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-warning' : 'score-danger'}`;
+                    if (scoreEl) {
+                        scoreEl.textContent = score;
+                        scoreEl.className = `score-circle ${score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-warning' : 'score-danger'}`;
+                    }
 
-                    document.getElementById('validation-recommendation').textContent = result.recommendation || (result.valid ? 'Valid Setup' : 'Review Setup');
-                    document.getElementById('validation-rr').textContent = result.risk_reward_ratio || result.rr || '--';
-                    document.getElementById('validation-probability').textContent = (result.probability || result.win_probability || 0) + '%';
+                    const recEl = document.getElementById('validation-recommendation');
+                    if (recEl) recEl.textContent = result.recommendation || (result.valid ? 'Valid Setup' : 'Review Setup');
+                    
+                    const rrEl = document.getElementById('validation-rr');
+                    if (rrEl) rrEl.textContent = result.risk_reward_ratio || result.rr || '--';
+                    
+                    const probEl = document.getElementById('validation-probability');
+                    if (probEl) probEl.textContent = (result.probability || result.win_probability || 0) + '%';
 
                     const warningsEl = document.getElementById('validation-warnings');
-                    if (result.warnings && result.warnings.length > 0) {
-                        warningsEl.innerHTML = result.warnings.map(w => `<div class="text-yellow-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i>${w}</div>`).join('');
-                    } else {
-                        warningsEl.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>No warnings!</div>';
+                    if (warningsEl) {
+                        if (result.warnings && result.warnings.length > 0) {
+                            warningsEl.innerHTML = result.warnings.map(w => `<div class="text-yellow-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i>${w}</div>`).join('');
+                        } else {
+                            warningsEl.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>No warnings!</div>';
+                        }
                     }
 
                     const suggestionsEl = document.getElementById('validation-suggestions');
@@ -1294,7 +1299,6 @@
                     }
                 } catch (error) {
                     console.error('[Validate] Error:', error);
-                    const resultEl = document.getElementById('validation-result');
                     if (resultEl) {
                         resultEl.innerHTML = `
                             <div class="bg-red-900/30 border border-red-700 rounded-lg p-4">
@@ -1338,7 +1342,6 @@
                 }
             }
 
-            // ===== JOURNAL METHODS =====
             setJournalFormat(format) {
                 this.currentJournalFormat = format;
                 console.log('[Journal] Format selected:', format);
@@ -1492,15 +1495,24 @@
 
                 if (statsEl) {
                     statsEl.classList.remove('hidden');
-                    document.getElementById('stat-total-trades').textContent = result.statistics?.total_trades || 0;
-                    document.getElementById('stat-win-rate').textContent = (result.statistics?.win_rate || 0) + '%';
-                    document.getElementById('stat-profit-factor').textContent = result.statistics?.profit_factor || 0;
+                    const totalTradesEl = document.getElementById('stat-total-trades');
+                    const winRateEl = document.getElementById('stat-win-rate');
+                    const profitFactorEl = document.getElementById('stat-profit-factor');
+                    const netPnlEl = document.getElementById('stat-net-pnl');
+                    const gradeEl = document.getElementById('stat-grade');
+                    const progressEl = document.getElementById('stat-progress');
+                    
+                    if (totalTradesEl) totalTradesEl.textContent = result.statistics?.total_trades || 0;
+                    if (winRateEl) winRateEl.textContent = (result.statistics?.win_rate || 0) + '%';
+                    if (profitFactorEl) profitFactorEl.textContent = result.statistics?.profit_factor || 0;
+                    
                     const pnl = result.statistics?.total_pnl || 0;
-                    const pnlEl = document.getElementById('stat-net-pnl');
-                    pnlEl.textContent = '$' + Math.abs(pnl).toFixed(2);
-                    pnlEl.className = 'font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
-                    document.getElementById('stat-grade').textContent = result.overall_grade || 'N/A';
-                    document.getElementById('stat-progress').style.width = (result.overall_score || 0) + '%';
+                    if (netPnlEl) {
+                        netPnlEl.textContent = '$' + Math.abs(pnl).toFixed(2);
+                        netPnlEl.className = 'font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
+                    }
+                    if (gradeEl) gradeEl.textContent = result.overall_grade || 'N/A';
+                    if (progressEl) progressEl.style.width = (result.overall_score || 0) + '%';
                 }
 
                 if (analysisEl) {
@@ -1527,23 +1539,35 @@
 
                 if (tradesContainer && result.trades) {
                     tradesContainer.classList.remove('hidden');
-                    document.getElementById('trades-table-body').innerHTML = result.trades.slice(0, 10).map(trade => `
-                        <tr class="border-b border-gray-700">
-                            <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
-                            <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
-                            <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
-                            <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
-                            <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
-                        </tr>
-                    `).join('');
+                    const tbody = document.getElementById('trades-table-body');
+                    if (tbody) {
+                        tbody.innerHTML = result.trades.slice(0, 10).map(trade => `
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
+                                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
+                                <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
+                                <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
+                                <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
+                            </tr>
+                        `).join('');
+                    }
                 }
             }
 
             addManualTrade() {
-                const symbol = document.getElementById('manual-symbol').value;
-                const direction = document.getElementById('manual-direction').value;
-                const entry = parseFloat(document.getElementById('manual-entry').value);
-                const pnl = parseFloat(document.getElementById('manual-pnl').value);
+                const symbolEl = document.getElementById('manual-symbol');
+                const directionEl = document.getElementById('manual-direction');
+                const entryEl = document.getElementById('manual-entry');
+                const exitEl = document.getElementById('manual-exit');
+                const pnlEl = document.getElementById('manual-pnl');
+                const slEl = document.getElementById('manual-sl');
+                const tpEl = document.getElementById('manual-tp');
+                
+                const symbol = symbolEl ? symbolEl.value : '';
+                const direction = directionEl ? directionEl.value : 'BUY';
+                const entry = entryEl ? parseFloat(entryEl.value) : NaN;
+                const pnl = pnlEl ? parseFloat(pnlEl.value) : NaN;
+                
                 if (!symbol || isNaN(entry) || isNaN(pnl)) {
                     alert('Please fill required fields');
                     return;
@@ -1553,9 +1577,9 @@
                     symbol: symbol.toUpperCase(),
                     direction,
                     entry_price: entry,
-                    exit_price: parseFloat(document.getElementById('manual-exit').value) || 0,
-                    stop_loss: parseFloat(document.getElementById('manual-sl').value) || 0,
-                    take_profit: parseFloat(document.getElementById('manual-tp').value) || 0,
+                    exit_price: exitEl ? parseFloat(exitEl.value) || 0 : 0,
+                    stop_loss: slEl ? parseFloat(slEl.value) || 0 : 0,
+                    take_profit: tpEl ? parseFloat(tpEl.value) || 0 : 0,
                     pnl,
                     outcome: pnl > 0 ? 'win' : (pnl < 0 ? 'loss' : 'breakeven')
                 };
@@ -1566,7 +1590,6 @@
                 }).then(result => this.displayJournalAnalysis({...result, trades: this.manualTrades}));
             }
 
-            // ===== PERFORMANCE METHODS =====
             async loadPerformance() {
                 await this.loadPerformanceStats();
                 await this.loadEquityCurve();
@@ -1574,14 +1597,20 @@
             }
 
             async loadPerformanceStats() {
-                const days = document.getElementById('performance-period')?.value || 30;
+                const daysEl = document.getElementById('performance-period');
+                const days = daysEl ? daysEl.value : 30;
                 try {
                     const data = await this.apiRequest(`/ai/performance/dashboard?days=${days}`);
                     if (data.summary) {
-                        document.getElementById('perf-total-trades').textContent = data.summary.total_trades || 0;
-                        document.getElementById('perf-win-rate').textContent = (data.summary.win_rate || 0) + '%';
-                        document.getElementById('perf-profit-factor').textContent = data.summary.profit_factor || '0.0';
-                        document.getElementById('perf-expectancy').textContent = '$' + (data.summary.expectancy || 0);
+                        const totalTradesEl = document.getElementById('perf-total-trades');
+                        const winRateEl = document.getElementById('perf-win-rate');
+                        const profitFactorEl = document.getElementById('perf-profit-factor');
+                        const expectancyEl = document.getElementById('perf-expectancy');
+                        
+                        if (totalTradesEl) totalTradesEl.textContent = data.summary.total_trades || 0;
+                        if (winRateEl) winRateEl.textContent = (data.summary.win_rate || 0) + '%';
+                        if (profitFactorEl) profitFactorEl.textContent = data.summary.profit_factor || '0.0';
+                        if (expectancyEl) expectancyEl.textContent = '$' + (data.summary.expectancy || 0);
                     }
                     if (data.psychology_profile) {
                         const psychContainer = document.getElementById('performance-psychology');
@@ -1686,8 +1715,8 @@
                 }
             }
 
-            // ===== UTILITY METHODS =====
             showSkeleton(container, count = 3) {
+                if (!container) return;
                 container.innerHTML = Array(count).fill(0).map(() => `
                     <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-32"></div>
                 `).join('');
@@ -1714,8 +1743,10 @@
                         </div>
                     `;
                 };
-                document.getElementById('carousel-next')?.addEventListener('click', () => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); });
-                document.getElementById('carousel-prev')?.addEventListener('click', () => { currentSlide = (currentSlide - 1 + slides.length) % slides.length; renderSlides(); });
+                const nextBtn = document.getElementById('carousel-next');
+                const prevBtn = document.getElementById('carousel-prev');
+                if (nextBtn) nextBtn.addEventListener('click', () => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); });
+                if (prevBtn) prevBtn.addEventListener('click', () => { currentSlide = (currentSlide - 1 + slides.length) % slides.length; renderSlides(); });
                 setInterval(() => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); }, 5000);
                 renderSlides();
             }

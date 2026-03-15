@@ -3,8 +3,11 @@ const ChartAnalysisPage = {
     uploadedImage: null,
     chartAnnotations: null, // Store annotations for future rendering
 
-    async render() {
-        const app = document.getElementById('app');
+    // FIX: accept an optional containerId so this component can be mounted into
+    // dashboard.html's section-analysis div (or any other container) instead of
+    // always targeting the SPA root #app element.
+    async render(containerId = 'app') {
+        const app = document.getElementById(containerId);
         if (!app) return;
 
         app.innerHTML = `
@@ -91,7 +94,7 @@ const ChartAnalysisPage = {
                 <div id="chartResults">
                     <div class="card" style="text-align: center; padding: 3rem;">
                         <p class="text-muted">Upload a chart to see AI analysis</p>
-                        <small>Supports: PNG, JPG, JPEG (max 5MB)</small>
+                        <small>Supports: PNG, JPG, JPEG (max 10MB)</small>
                     </div>
                 </div>
             </div>
@@ -131,11 +134,13 @@ const ChartAnalysisPage = {
     handleFile(file) {
         if (!file) return;
 
-        if (file.size > 5 * 1024 * 1024) {
+        // FIX: backend accepts up to 10MB — JS limit was previously 5MB causing
+        // valid uploads to be silently rejected with a confusing error message.
+        if (file.size > 10 * 1024 * 1024) {
             if (typeof UI !== 'undefined' && UI.showToast) {
-                UI.showToast('File too large (max 5MB)', 'error');
+                UI.showToast('File too large (max 10MB)', 'error');
             } else {
-                alert('File too large (max 5MB)');
+                alert('File too large (max 10MB)');
             }
             return;
         }
@@ -173,7 +178,7 @@ const ChartAnalysisPage = {
             results.innerHTML = `
                 <div class="card" style="text-align: center; padding: 3rem;">
                     <p class="text-muted">Upload a chart to see AI analysis</p>
-                    <small>Supports: PNG, JPG, JPEG (max 5MB)</small>
+                    <small>Supports: PNG, JPG, JPEG (max 10MB)</small>
                 </div>
             `;
         }
@@ -592,18 +597,42 @@ const ChartAnalysisPage = {
     }
 };
 
-// API Helper functions that need to be added to the global API object
+// API Helper functions — appended to the global API object.
+//
+// FIX: dashboard.html has no global `API` object (it uses `dashboard.apiRequest`
+// instead). The block below creates a minimal shim if API is missing, so
+// ChartAnalysisPage works in both the SPA context (where API is fully defined)
+// and the dashboard context (where only dashboard.apiRequest exists).
+//
+// In dashboard.html, place this AFTER the DashboardController class definition
+// so that `dashboard` is available when this script executes:
+//
+//   const API = {
+//     _base: window.location.origin,
+//     request: (endpoint, opts = {}) => dashboard.apiRequest(endpoint, opts)
+//   };
+//
+// Or simply load chart_analysis.js after that shim is created.
+
+if (typeof API === 'undefined') {
+    console.warn('[ChartAnalysisPage] Global API object not found. ' +
+        'Create an API shim before loading chart_analysis.js. See comment above.');
+}
+
 if (typeof API !== 'undefined') {
+    const API_BASE_URL = (typeof API_BASE !== 'undefined') ? API_BASE : window.location.origin;
+
     API.analyzeChartImage = async function(file, symbol, timeframe) {
         const formData = new FormData();
         formData.append('file', file);
         if (symbol) formData.append('symbol', symbol);
         if (timeframe) formData.append('timeframe', timeframe);
 
-        const response = await fetch(`${API_BASE}/ai/chart/analyze`, {
+        const token = localStorage.getItem('pipways_token');
+        const response = await fetch(`${API_BASE_URL}/ai/chart/analyze`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
+                'Authorization': `Bearer ${token}`
             },
             body: formData
         });

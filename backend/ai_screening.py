@@ -89,6 +89,78 @@ def extract_symbol_from_text(text: str) -> Optional[str]:
 
     return None
 
+def calculate_directional_rr(entry: float, sl: float, tp: float, direction: str) -> tuple:
+    """
+    Calculate direction-aware risk-reward ratio.
+    Returns (rr_ratio, risk_reward_text, is_valid_structure)
+    """
+    direction = direction.upper()
+
+    if direction == "BUY":
+        risk = entry - sl
+        reward = tp - entry
+        is_valid = sl < entry < tp
+    elif direction == "SELL":
+        risk = sl - entry
+        reward = entry - tp
+        is_valid = tp < entry < sl
+    else:
+        risk = abs(entry - sl)
+        reward = abs(tp - entry)
+        is_valid = False
+
+    risk = abs(risk)
+    reward = abs(reward)
+
+    rr_ratio = reward / risk if risk > 0 else 0
+
+    # Clamp extreme values
+    if rr_ratio > 10:
+        rr_ratio = 10
+
+    risk_reward_text = f"1:{rr_ratio:.2f}"
+
+    return rr_ratio, risk_reward_text, is_valid
+
+def calculate_quality_score(structure_valid: bool, rr_ratio: float, structure_quality: str) -> tuple:
+    """
+    Calculate deterministic trade quality score and grade.
+    Returns (score, probability, grade)
+    """
+    score = 0
+
+    if structure_valid:
+        score += 25
+
+    if rr_ratio >= 2:
+        score += 25
+    if rr_ratio >= 3:
+        score += 10
+
+    quality = structure_quality.lower() if structure_quality else ""
+    if quality == "excellent":
+        score += 20
+    elif quality == "good":
+        score += 10
+
+    # Cap at 100
+    score = min(score, 100)
+
+    # Convert to probability
+    probability = score / 100
+
+    # Determine grade
+    if score >= 85:
+        grade = "A+"
+    elif score >= 75:
+        grade = "A"
+    elif score >= 60:
+        grade = "B"
+    else:
+        grade = "C"
+
+    return score, probability, grade
+
 @router.post("/mentor/ask")
 async def ask_mentor(
     request: MentorRequest,
@@ -193,10 +265,6 @@ async def ask_mentor_legacy(
     """Legacy form-data endpoint for compatibility"""
     return await ask_mentor(MentorRequest(question=question, skill_level=skill_level), current_user)
 
-# REMOVED: Duplicate route /chart/analyze - now handled by chart_analysis.py
-# @router.post("/chart/analyze")
-# async def analyze_chart(...)
-
 @router.post("/trade/validate")
 async def validate_trade(
     request: TradeValidatorRequest,
@@ -205,41 +273,27 @@ async def validate_trade(
     """
     AI Trade Validator - Analyze trade setup quality.
     """
+    entry = request.entry_price
+    sl = request.stop_loss
+    tp = request.take_profit
+    direction = request.direction.upper()
+    symbol = request.symbol or "Unknown"
+
+    # Calculate direction-aware RR
+    rr_ratio, risk_reward_text, is_valid = calculate_directional_rr(entry, sl, tp, direction)
+
     if not OPENROUTER_CONFIGURED:
-        # Calculate basic metrics locally
-        entry = request.entry_price
-        sl = request.stop_loss
-        tp = request.take_profit
-        direction = request.direction.upper()
-
-        risk = abs(entry - sl)
-        reward = abs(tp - entry)
-        rr_ratio = reward / risk if risk > 0 else 0
-
-        # Basic structure validation
-        is_valid = False
-        if direction == "BUY":
-            is_valid = sl < entry < tp
-        elif direction == "SELL":
-            is_valid = tp < entry < sl
-
-        # Quality score calculation
-        score = 50
-        if rr_ratio >= 2:
-            score += 20
-        elif rr_ratio >= 1.5:
-            score += 10
-
-        if is_valid:
-            score += 20
+        # Calculate deterministic score
+        score, prob, grade = calculate_quality_score(is_valid, rr_ratio, "good")
 
         return {
             "risk_reward_ratio": round(rr_ratio, 2),
-            "risk_reward_text": f"1:{rr_ratio:.1f}" if rr_ratio > 0 else "N/A",
-            "probability_estimate": 0.65,
+            "risk_reward_text": risk_reward_text,
+            "probability_estimate": prob,
             "structure_valid": is_valid,
             "structure_quality": "valid" if is_valid else "invalid",
-            "quality_score": min(score, 100),
+            "quality_score": score,
+            "trade_grade": grade,
             "recommendations": [
                 "Configure OPENROUTER_API_KEY for advanced AI validation",
                 "Ensure risk:reward is at least 1:2"
@@ -249,27 +303,17 @@ async def validate_trade(
         }
 
     try:
-        entry = request.entry_price
-        sl = request.stop_loss
-        tp = request.take_profit
-        direction = request.direction.upper()
-        symbol = request.symbol or "Unknown"
-
-        risk = abs(entry - sl)
-        reward = abs(tp - entry)
-        rr_ratio = reward / risk if risk > 0 else 0
-
         prompt = f"""Analyze this trade setup:
         Symbol: {symbol}
         Direction: {direction}
         Entry: {entry}
         Stop Loss: {sl}
         Take Profit: {tp}
-        Risk:Reward: 1:{rr_ratio:.1f}
+        Risk:Reward: {risk_reward_text}
 
         Evaluate:
         1. Is the structure valid (SL below entry for BUY, above for SELL)?
-        2. Risk management quality (is 1:{rr_ratio:.1f} favorable?)
+        2. Risk management quality (is {risk_reward_text} favorable?)
         3. Probability estimate based on typical price action
         4. Trade quality score 0-100
         5. Any warnings or recommendations
@@ -312,23 +356,51 @@ async def validate_trade(
             data = response.json()
             content = data["choices"][0]["message"]["content"]
 
-            # Parse JSON
+            # Parse JSON with markdown stripping
             try:
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                clean_content = content.strip()
+                if clean_content.startswith("`"):
+                    clean_content = clean_content.split("`")[1]
+                if "```json" in clean_content:
+                    clean_content = clean_content.split("```json")[1].split("```")[0].strip()
+                elif "```" in clean_content:
+                    clean_content = clean_content.split("```")[1].split("```")[0].strip()
+
+                json_match = re.search(r'\{.*\}', clean_content, re.DOTALL)
                 if json_match:
                     result = json.loads(json_match.group())
                 else:
-                    result = json.loads(content)
+                    result = json.loads(clean_content)
             except:
                 result = {}
 
+            # Normalize probability
+            prob = result.get("probability_estimate", 0.6)
+            if prob <= 0:
+                prob = 0.6
+            if prob > 1:
+                prob = 1
+            result["probability_estimate"] = prob
+
+            # Calculate deterministic quality score
+            structure_quality = result.get("structure_quality", "good")
+            score, deterministic_prob, grade = calculate_quality_score(
+                result.get("structure_valid", is_valid), 
+                rr_ratio, 
+                structure_quality
+            )
+
+            # Blend AI probability with deterministic probability
+            final_prob = (prob + deterministic_prob) / 2
+
             return {
                 "risk_reward_ratio": round(rr_ratio, 2),
-                "risk_reward_text": f"1:{rr_ratio:.1f}" if rr_ratio > 0 else "N/A",
-                "probability_estimate": result.get("probability_estimate", 0.65),
-                "structure_valid": result.get("structure_valid", True),
-                "structure_quality": result.get("structure_quality", "good"),
-                "quality_score": result.get("quality_score", 70),
+                "risk_reward_text": risk_reward_text,
+                "probability_estimate": round(final_prob, 2),
+                "structure_valid": result.get("structure_valid", is_valid),
+                "structure_quality": structure_quality,
+                "quality_score": score,
+                "trade_grade": grade,
                 "risk_reward_assessment": result.get("risk_reward_assessment", "good"),
                 "recommendations": result.get("recommendations", []),
                 "warnings": result.get("warnings", []),
@@ -338,7 +410,20 @@ async def validate_trade(
 
     except Exception as e:
         print(f"[VALIDATOR ERROR] {e}", flush=True)
-        raise HTTPException(500, f"Validation failed: {str(e)}")
+        # Fallback to deterministic calculation
+        score, prob, grade = calculate_quality_score(is_valid, rr_ratio, "good")
+        return {
+            "risk_reward_ratio": round(rr_ratio, 2),
+            "risk_reward_text": risk_reward_text,
+            "probability_estimate": prob,
+            "structure_valid": is_valid,
+            "structure_quality": "valid" if is_valid else "invalid",
+            "quality_score": score,
+            "trade_grade": grade,
+            "recommendations": ["AI service temporarily unavailable - using fallback calculation"],
+            "warnings": [] if is_valid else ["Invalid structure: Check entry/SL/TP alignment"],
+            "mode": "fallback"
+        }
 
 @router.post("/signal/save")
 async def save_signal(

@@ -14,45 +14,36 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(75, 85, 99, 0.4);
         }
-        .gradient-text {
-            background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
         .loading-shimmer {
             background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
         }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Error toast */
-        #error-toast {
-            transition: all 0.3s ease;
-        }
     </style>
     <base target="_blank">
 </head>
 <body class="text-gray-100 min-h-screen bg-gray-900">
 
-    <!-- Error Toast (replaces browser alert) -->
-    <div id="error-toast" class="hidden fixed top-4 right-4 z-50 max-w-md bg-red-900/90 border border-red-500/50 text-red-200 px-5 py-4 rounded-xl shadow-2xl backdrop-blur-md">
+    <!-- Error Toast -->
+    <div id="error-toast" class="hidden fixed top-4 right-4 z-50 max-w-md bg-red-900/90 border border-red-500/50 text-red-200 px-5 py-4 rounded-xl shadow-2xl backdrop-blur-md" style="transition:all 0.3s ease">
         <div class="flex items-start gap-3">
             <i class="fas fa-exclamation-circle text-red-400 mt-0.5 flex-shrink-0"></i>
             <div>
                 <div class="font-semibold text-red-300 text-sm mb-1">Error</div>
                 <div id="error-message" class="text-sm leading-relaxed"></div>
             </div>
-            <button onclick="hideError()" class="ml-2 text-red-400 hover:text-red-200 flex-shrink-0">
-                <i class="fas fa-times"></i>
-            </button>
+            <button onclick="hideError()" class="ml-2 text-red-400 hover:text-red-200 flex-shrink-0"><i class="fas fa-times"></i></button>
         </div>
+    </div>
+
+    <!-- AI Estimate Banner -->
+    <div id="ai-estimate-banner" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-900/90 border border-yellow-600/50 text-yellow-200 px-5 py-3 rounded-xl shadow-2xl backdrop-blur-md text-sm flex items-center gap-2">
+        <i class="fas fa-robot text-yellow-400"></i>
+        <span>Live market data unavailable — showing AI estimates from training knowledge</span>
+        <button onclick="document.getElementById('ai-estimate-banner').classList.add('hidden')" class="ml-2 text-yellow-400 hover:text-yellow-200"><i class="fas fa-times"></i></button>
     </div>
 
     <!-- Header -->
@@ -91,7 +82,6 @@
 
         <!-- Stock Analyzer Tab -->
         <div id="view-analyzer" class="space-y-6">
-            <!-- Search Bar -->
             <div class="glass-panel rounded-2xl p-6">
                 <div class="flex gap-4">
                     <div class="flex-1 relative">
@@ -102,9 +92,8 @@
                             onkeypress="if(event.key==='Enter') analyzeStock()">
                     </div>
                     <button onclick="analyzeStock()" id="analyze-btn"
-                        class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center gap-2">
-                        <span>Analyze</span>
-                        <i class="fas fa-arrow-right"></i>
+                        class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all flex items-center gap-2">
+                        <span>Analyze</span><i class="fas fa-arrow-right"></i>
                     </button>
                 </div>
             </div>
@@ -124,17 +113,17 @@
                 <div class="glass-panel rounded-2xl p-6">
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                         <div>
-                            <h2 id="res-symbol" class="text-3xl font-bold text-white mb-1">AAPL</h2>
-                            <p id="res-name" class="text-gray-400">Apple Inc.</p>
+                            <h2 id="res-symbol" class="text-3xl font-bold text-white mb-1"></h2>
+                            <p id="res-name" class="text-gray-400"></p>
+                            <p id="res-datasource" class="hidden text-xs text-yellow-500 mt-1 flex items-center gap-1">
+                                <i class="fas fa-robot"></i> AI estimates (live data unavailable)
+                            </p>
                         </div>
-                        <div class="flex items-center gap-4">
-                            <div id="res-rating-badge"
-                                class="px-6 py-3 rounded-xl bg-green-500/20 border border-green-500/50 text-green-400 font-bold text-xl">
-                                STRONG BUY
-                            </div>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <div id="res-rating-badge" class="px-6 py-3 rounded-xl border font-bold text-xl"></div>
                             <div class="text-right">
-                                <div id="res-price" class="text-3xl font-bold text-white">$178.50</div>
-                                <div id="res-change" class="text-green-400 font-medium">+2.35 (+1.33%)</div>
+                                <div id="res-price" class="text-3xl font-bold text-white"></div>
+                                <div id="res-change" class="font-medium"></div>
                             </div>
                         </div>
                     </div>
@@ -143,27 +132,27 @@
                     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">Market Cap</div>
-                            <div id="res-market-cap" class="text-sm font-semibold text-white">2.8T</div>
+                            <div id="res-market-cap" class="text-sm font-semibold text-white"></div>
                         </div>
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">P/E Ratio</div>
-                            <div id="res-pe" class="text-sm font-semibold text-white">28.5</div>
+                            <div id="res-pe" class="text-sm font-semibold text-white"></div>
                         </div>
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">Beta</div>
-                            <div id="res-beta" class="text-sm font-semibold text-white">1.2</div>
+                            <div id="res-beta" class="text-sm font-semibold text-white"></div>
                         </div>
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">52W Range</div>
-                            <div id="res-52w" class="text-sm font-semibold text-white">$150-$199</div>
+                            <div id="res-52w" class="text-sm font-semibold text-white"></div>
                         </div>
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">Sector</div>
-                            <div id="res-sector" class="text-sm font-semibold text-white">Technology</div>
+                            <div id="res-sector" class="text-sm font-semibold text-white"></div>
                         </div>
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">Dividend Yield</div>
-                            <div id="res-dividend" class="text-sm font-semibold text-white">0.52%</div>
+                            <div id="res-dividend" class="text-sm font-semibold text-white"></div>
                         </div>
                     </div>
 
@@ -172,54 +161,53 @@
                         <h3 class="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
                             <i class="fas fa-robot"></i> AI Investment Summary
                         </h3>
-                        <p id="res-summary" class="text-gray-300 leading-relaxed">Loading analysis...</p>
+                        <p id="res-summary" class="text-gray-300 leading-relaxed"></p>
                     </div>
                 </div>
 
-                <!-- AI Scores -->
+                <!-- AI Scores + Analysis Details -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="glass-panel rounded-2xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-4">AI Scores</h3>
                         <div class="space-y-4" id="scores-container"></div>
                     </div>
-
                     <div class="glass-panel rounded-2xl p-6 md:col-span-2">
                         <h3 class="text-lg font-semibold text-white mb-4">Analysis Details</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="space-y-3">
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Trend</span>
-                                    <span id="res-trend" class="text-green-400 font-medium">Bullish</span>
+                                    <span id="res-trend" class="font-medium"></span>
                                 </div>
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Momentum</span>
-                                    <span id="res-momentum" class="text-green-400 font-medium">Strong</span>
+                                    <span id="res-momentum" class="font-medium"></span>
                                 </div>
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Risk Level</span>
-                                    <span id="res-risk" class="text-yellow-400 font-medium">Medium</span>
+                                    <span id="res-risk" class="font-medium"></span>
                                 </div>
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Hold Period</span>
-                                    <span id="res-hold" class="text-white font-medium">Long Term</span>
+                                    <span id="res-hold" class="text-white font-medium"></span>
                                 </div>
                             </div>
                             <div class="space-y-3">
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Revenue Growth</span>
-                                    <span id="res-revenue" class="text-green-400 font-medium">Strong</span>
+                                    <span id="res-revenue" class="font-medium"></span>
                                 </div>
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Profit Margin</span>
-                                    <span id="res-profit" class="text-green-400 font-medium">High</span>
+                                    <span id="res-profit" class="font-medium"></span>
                                 </div>
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Debt Level</span>
-                                    <span id="res-debt" class="text-green-400 font-medium">Low</span>
+                                    <span id="res-debt" class="font-medium"></span>
                                 </div>
                                 <div class="flex justify-between items-center py-2 border-b border-gray-800">
                                     <span class="text-gray-400">Analyst Consensus</span>
-                                    <span id="res-consensus" class="text-green-400 font-medium">Buy</span>
+                                    <span id="res-consensus" class="font-medium"></span>
                                 </div>
                             </div>
                         </div>
@@ -256,8 +244,7 @@
                     </div>
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Risk Tolerance</label>
-                        <select id="portfolio-risk"
-                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                        <select id="portfolio-risk" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
                             <option value="conservative">Conservative</option>
                             <option value="moderate" selected>Moderate</option>
                             <option value="aggressive">Aggressive</option>
@@ -265,8 +252,7 @@
                     </div>
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Time Horizon</label>
-                        <select id="portfolio-horizon"
-                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                        <select id="portfolio-horizon" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
                             <option value="short">Short Term</option>
                             <option value="medium">Medium Term</option>
                             <option value="long" selected>Long Term</option>
@@ -278,31 +264,30 @@
                     <i class="fas fa-magic mr-2"></i>Generate AI Portfolio
                 </button>
             </div>
-
             <div id="portfolio-results" class="hidden space-y-6 fade-in">
                 <div class="glass-panel rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-6">
                         <div>
                             <h3 class="text-xl font-bold text-white">Recommended Allocation</h3>
-                            <p id="portfolio-summary" class="text-gray-400 mt-1">Diversified growth portfolio</p>
+                            <p id="portfolio-summary" class="text-gray-400 mt-1"></p>
                         </div>
                         <div class="text-right">
-                            <div id="portfolio-return" class="text-2xl font-bold text-green-400">10-14%</div>
+                            <div id="portfolio-return" class="text-2xl font-bold text-green-400"></div>
                             <div class="text-sm text-gray-500">Expected Annual Return</div>
                         </div>
                     </div>
                     <div id="portfolio-allocations" class="space-y-3"></div>
                     <div class="mt-6 pt-6 border-t border-gray-800 grid grid-cols-3 gap-4 text-center">
                         <div>
-                            <div id="portfolio-volatility" class="text-lg font-semibold text-white">Moderate</div>
+                            <div id="portfolio-volatility" class="text-lg font-semibold text-white"></div>
                             <div class="text-xs text-gray-500">Volatility</div>
                         </div>
                         <div>
-                            <div id="portfolio-diversification" class="text-lg font-semibold text-white">85</div>
+                            <div id="portfolio-diversification" class="text-lg font-semibold text-white"></div>
                             <div class="text-xs text-gray-500">Diversification Score</div>
                         </div>
                         <div>
-                            <div id="portfolio-rebalance" class="text-lg font-semibold text-white">Quarterly</div>
+                            <div id="portfolio-rebalance" class="text-lg font-semibold text-white"></div>
                             <div class="text-xs text-gray-500">Rebalance Frequency</div>
                         </div>
                     </div>
@@ -325,7 +310,6 @@
                     </button>
                 </div>
             </div>
-
             <div id="compare-results" class="hidden space-y-4 fade-in">
                 <div class="glass-panel rounded-2xl p-6">
                     <h3 class="text-lg font-semibold text-white mb-4">AI Comparison Results</h3>
@@ -339,55 +323,54 @@
     <script>
         const API_BASE = window.location.origin + '/api/stock';
 
-        // ── FIX 7: Replace browser alert() with a styled toast.
-        //    Also used to surface the correct error message extracted from the response.
+        // ── Safe value formatter — never shows NaN, null, undefined, 0-as-price ──
+        function fmt(val, opts = {}) {
+            const { prefix = '', suffix = '', fallback = 'N/A', isPrice = false, decimals = 2 } = opts;
+            if (val === null || val === undefined || val === '' || val === 'N/A' || val === 'None') return fallback;
+            const num = parseFloat(val);
+            if (isPrice && (isNaN(num) || num === 0)) return fallback;
+            if (!isNaN(num) && (prefix === '$' || isPrice)) {
+                return prefix + num.toFixed(decimals) + suffix;
+            }
+            if (!isNaN(num) && decimals !== null) {
+                return prefix + num.toFixed(decimals) + suffix;
+            }
+            return prefix + String(val) + suffix;
+        }
+
+        function colorClass(val, positive = 'text-green-400', neutral = 'text-yellow-400', negative = 'text-red-400') {
+            const map = {
+                'Bullish': positive, 'Strong': positive, 'High': positive,
+                'Low': positive,     'Positive': positive, 'Buy': positive, 'Strong Buy': positive,
+                'Bearish': negative, 'Weak': negative, 'Sell': negative, 'Negative': negative,
+                'Neutral': neutral,  'Hold': neutral, 'Medium': neutral, 'Moderate': neutral,
+            };
+            return map[val] || 'text-white';
+        }
+
         function showError(msg) {
             document.getElementById('error-message').textContent = msg;
             document.getElementById('error-toast').classList.remove('hidden');
             clearTimeout(window._errorTimer);
             window._errorTimer = setTimeout(hideError, 8000);
         }
-        function hideError() {
-            document.getElementById('error-toast').classList.add('hidden');
-        }
+        function hideError() { document.getElementById('error-toast').classList.add('hidden'); }
 
-        // ── FIX 8: Safe API helper — extracts meaningful error messages from
-        //    BOTH FastAPI HTTPException format {"detail":"..."} and our custom
-        //    {"error":"..."} format, AND from plain-text responses that would
-        //    otherwise crash JSON.parse() with "Unexpected token 'I'...".
         async function apiFetch(url, options = {}) {
             let response;
             try {
                 response = await fetch(url, options);
-            } catch (networkErr) {
-                throw new Error('Network error — is the server running? ' + networkErr.message);
+            } catch (e) {
+                throw new Error('Network error — is the server running? ' + e.message);
             }
-
-            const contentType = response.headers.get('content-type') || '';
-
-            // ── FIX: Don't call .json() blindly — check content-type first.
-            //    A plain-text "Internal Server Error" causes .json() to throw
-            //    "Unexpected token 'I'..." which hides the real error.
-            if (!contentType.includes('application/json')) {
+            const ct = response.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) {
                 const text = await response.text();
                 throw new Error(`Server error (${response.status}): ${text.slice(0, 200)}`);
             }
-
             const result = await response.json();
-
-            if (!response.ok) {
-                // FastAPI HTTPException → {"detail": "..."}
-                // Our OkResponse error path → {"error": "..."}
-                const msg = result.detail || result.error || `HTTP ${response.status}`;
-                throw new Error(msg);
-            }
-
-            // Our OkResponse always has ok:true on success.
-            // Belt-and-suspenders: catch any ok:false that slips through.
-            if (result.ok === false) {
-                throw new Error(result.detail || result.error || 'Unknown error');
-            }
-
+            if (!response.ok) throw new Error(result.detail || result.error || `HTTP ${response.status}`);
+            if (result.ok === false) throw new Error(result.detail || result.error || 'Unknown error');
             return result;
         }
 
@@ -412,6 +395,7 @@
             btn.disabled = true;
             document.getElementById('loading-state').classList.remove('hidden');
             document.getElementById('analysis-results').classList.add('hidden');
+            document.getElementById('ai-estimate-banner').classList.add('hidden');
             hideError();
 
             try {
@@ -429,26 +413,57 @@
         function displayAnalysis(data) {
             const ai     = data.ai_analysis;
             const market = data.market_data;
+            const isAiEstimate = market.data_source === 'ai_estimate';
 
+            // ── Symbol + Name ──
             document.getElementById('res-symbol').textContent = data.symbol;
-            document.getElementById('res-name').textContent   = market.name || data.symbol;
-            document.getElementById('res-price').textContent  = market.price ? '$' + parseFloat(market.price).toFixed(2) : 'N/A';
+            document.getElementById('res-name').textContent   = market.name && market.name !== data.symbol ? market.name : '';
 
+            // ── Data source banner ──
+            const dsEl = document.getElementById('res-datasource');
+            if (isAiEstimate) {
+                dsEl.classList.remove('hidden');
+                document.getElementById('ai-estimate-banner').classList.remove('hidden');
+            } else {
+                dsEl.classList.add('hidden');
+            }
+
+            // ── Price (never show $NaN or $0.00) ──
+            const price    = parseFloat(market.price);
+            const priceEl  = document.getElementById('res-price');
+            priceEl.textContent = (!isNaN(price) && price > 0) ? '$' + price.toFixed(2) : 'N/A';
+
+            // ── Change ──
             const changeEl  = document.getElementById('res-change');
-            const change    = parseFloat(market.change) || 0;
+            const change    = parseFloat(market.change)     || 0;
             const changePct = parseFloat(market.change_pct) || 0;
-            changeEl.textContent  = (change >= 0 ? '+' : '') + change.toFixed(2) + ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%)';
-            changeEl.className    = change >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium';
+            if (!isNaN(price) && price > 0) {
+                changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) +
+                                       ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%)';
+                changeEl.className   = (change >= 0 ? 'text-green-400' : 'text-red-400') + ' font-medium';
+            } else {
+                changeEl.textContent = '';
+            }
 
+            // ── Metrics ──
             document.getElementById('res-market-cap').textContent = market.market_cap || 'N/A';
             document.getElementById('res-pe').textContent         = market.pe_ratio   || 'N/A';
             document.getElementById('res-beta').textContent       = market.beta       || 'N/A';
-            document.getElementById('res-52w').textContent        = (market['52_week_low'] || '?') + ' – ' + (market['52_week_high'] || '?');
             document.getElementById('res-sector').textContent     = market.sector     || 'N/A';
             document.getElementById('res-dividend').textContent   = market.div_yield  || 'N/A';
 
+            // ── 52W Range (never show ? – ?) ──
+            const lo = market['52_week_low'];
+            const hi = market['52_week_high'];
+            const loOk = lo && lo !== 'N/A' && parseFloat(lo) > 0;
+            const hiOk = hi && hi !== 'N/A' && parseFloat(hi) > 0;
+            document.getElementById('res-52w').textContent =
+                (loOk && hiOk) ? `$${parseFloat(lo).toFixed(2)} – $${parseFloat(hi).toFixed(2)}` : 'N/A';
+
+            // ── Rating badge ──
             const ratingBadge  = document.getElementById('res-rating-badge');
-            ratingBadge.textContent = (ai.rating || 'HOLD').replace('_', ' ');
+            const rating       = (ai.rating || 'HOLD');
+            ratingBadge.textContent = rating.replace('_', ' ');
             const ratingColors = {
                 'STRONG_BUY': 'bg-green-500/20 border-green-500/50 text-green-400',
                 'BUY':        'bg-green-500/20 border-green-500/50 text-green-400',
@@ -456,19 +471,27 @@
                 'SELL':       'bg-red-500/20 border-red-500/50 text-red-400',
             };
             ratingBadge.className = 'px-6 py-3 rounded-xl border font-bold text-xl ' +
-                (ratingColors[ai.rating] || ratingColors['HOLD']);
+                (ratingColors[rating] || ratingColors['HOLD']);
 
-            document.getElementById('res-summary').textContent   = ai.summary           || 'No summary available.';
-            document.getElementById('res-trend').textContent     = ai.trend             || 'Neutral';
-            document.getElementById('res-momentum').textContent  = ai.momentum          || 'Moderate';
-            document.getElementById('res-risk').textContent      = ai.risk_level        || 'Medium';
-            document.getElementById('res-hold').textContent      = ai.hold_period       || 'Long Term';
-            document.getElementById('res-revenue').textContent   = ai.revenue_growth    || 'Moderate';
-            document.getElementById('res-profit').textContent    = ai.profit_margin_rating || 'Moderate';
-            document.getElementById('res-debt').textContent      = ai.debt_level        || 'Moderate';
-            document.getElementById('res-consensus').textContent = ai.analyst_consensus || 'Hold';
+            // ── AI Summary ──
+            document.getElementById('res-summary').textContent = ai.summary || 'No summary available.';
 
-            // Scores
+            // ── Analysis details with colour coding ──
+            function setColored(id, val) {
+                const el = document.getElementById(id);
+                el.textContent  = val || 'N/A';
+                el.className    = 'font-medium ' + colorClass(val);
+            }
+            setColored('res-trend',    ai.trend);
+            setColored('res-momentum', ai.momentum);
+            setColored('res-risk',     ai.risk_level);
+            setColored('res-revenue',  ai.revenue_growth);
+            setColored('res-profit',   ai.profit_margin_rating);
+            setColored('res-debt',     ai.debt_level);
+            setColored('res-consensus',ai.analyst_consensus);
+            document.getElementById('res-hold').textContent = ai.hold_period || 'N/A';
+
+            // ── Score bars ──
             const scoresContainer = document.getElementById('scores-container');
             scoresContainer.innerHTML = '';
             if (ai.scores) {
@@ -481,24 +504,24 @@
                                 <span class="text-white font-semibold">${value}</span>
                             </div>
                             <div class="w-full bg-gray-700 rounded-full h-2">
-                                <div class="${color} h-2 rounded-full" style="width: ${value}%"></div>
+                                <div class="${color} h-2 rounded-full" style="width:${value}%"></div>
                             </div>
                         </div>`;
                 });
             }
 
-            // Risks
+            // ── Risks ──
             const risksContainer = document.getElementById('res-risks');
             risksContainer.innerHTML = '';
             (ai.risks || []).forEach(risk => {
-                risksContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-minus text-red-400 mt-1 text-xs"></i>${risk}</li>`;
+                risksContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-minus text-red-400 mt-1 text-xs flex-shrink-0"></i>${risk}</li>`;
             });
 
-            // Opportunities
+            // ── Opportunities ──
             const oppContainer = document.getElementById('res-opportunities');
             oppContainer.innerHTML = '';
             (ai.opportunities || []).forEach(opp => {
-                oppContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-plus text-green-400 mt-1 text-xs"></i>${opp}</li>`;
+                oppContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-plus text-green-400 mt-1 text-xs flex-shrink-0"></i>${opp}</li>`;
             });
         }
 
@@ -514,9 +537,9 @@
 
             try {
                 const result = await apiFetch(`${API_BASE}/portfolio`, {
-                    method:  'POST',
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ amount: parseFloat(amount), risk, horizon }),
+                    body: JSON.stringify({ amount: parseFloat(amount), risk, horizon }),
                 });
                 displayPortfolio(result.data);
             } catch (error) {
@@ -528,15 +551,16 @@
         }
 
         function displayPortfolio(data) {
-            document.getElementById('portfolio-summary').textContent         = data.summary                || 'AI-generated portfolio';
-            document.getElementById('portfolio-return').textContent          = data.expected_annual_return  || '8-12%';
-            document.getElementById('portfolio-volatility').textContent      = data.expected_volatility     || 'Moderate';
-            document.getElementById('portfolio-diversification').textContent = data.diversification_score   || '80';
-            document.getElementById('portfolio-rebalance').textContent       = data.rebalance_frequency     || 'Quarterly';
+            document.getElementById('portfolio-summary').textContent         = data.summary                || '';
+            document.getElementById('portfolio-return').textContent          = data.expected_annual_return  || 'N/A';
+            document.getElementById('portfolio-volatility').textContent      = data.expected_volatility     || 'N/A';
+            document.getElementById('portfolio-diversification').textContent = data.diversification_score   || 'N/A';
+            document.getElementById('portfolio-rebalance').textContent       = data.rebalance_frequency     || 'N/A';
 
             const container = document.getElementById('portfolio-allocations');
             container.innerHTML = '';
             (data.allocations || []).forEach(alloc => {
+                const amt = typeof alloc.amount === 'number' ? '$' + alloc.amount.toLocaleString() : 'N/A';
                 container.innerHTML += `
                     <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                         <div class="flex items-center gap-4">
@@ -545,12 +569,12 @@
                             </div>
                             <div>
                                 <div class="font-semibold text-white">${alloc.name}</div>
-                                <div class="text-sm text-gray-400">${alloc.asset_type} • ${alloc.rationale}</div>
+                                <div class="text-sm text-gray-400">${alloc.asset_type || ''} • ${alloc.rationale || ''}</div>
                             </div>
                         </div>
                         <div class="text-right">
                             <div class="text-xl font-bold text-white">${alloc.pct}%</div>
-                            <div class="text-sm text-gray-400">$${(alloc.amount || 0).toLocaleString()}</div>
+                            <div class="text-sm text-gray-400">${amt}</div>
                         </div>
                     </div>`;
             });
@@ -559,7 +583,7 @@
 
         async function compareStocks() {
             const input   = document.getElementById('compare-input').value;
-            const symbols = input.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            const symbols = input.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
             const btn     = document.getElementById('compare-btn');
 
             if (symbols.length < 2) { showError('Please enter at least 2 symbols separated by commas.'); return; }
@@ -570,9 +594,9 @@
 
             try {
                 const result = await apiFetch(`${API_BASE}/compare`, {
-                    method:  'POST',
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ symbols }),
+                    body: JSON.stringify({ symbols }),
                 });
                 displayComparison(result.data);
                 document.getElementById('compare-results').classList.remove('hidden');
@@ -589,24 +613,24 @@
             container.innerHTML = '';
             (data.stocks || []).sort((a, b) => a.overall_rank - b.overall_rank).forEach(stock => {
                 const rankColor = stock.overall_rank === 1 ? 'text-green-400' : stock.overall_rank === 2 ? 'text-yellow-400' : 'text-gray-400';
+                const ratingColor = stock.rating === 'BUY' ? 'text-green-400' : stock.rating === 'SELL' ? 'text-red-400' : 'text-yellow-400';
                 container.innerHTML += `
-                    <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 flex items-center justify-between">
+                    <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 flex items-center justify-between flex-wrap gap-4">
                         <div class="flex items-center gap-4">
                             <div class="text-2xl font-bold ${rankColor}">#${stock.overall_rank}</div>
                             <div>
                                 <div class="font-bold text-white text-lg">${stock.symbol}</div>
-                                <div class="text-sm text-gray-400">${stock.one_line_summary}</div>
+                                <div class="text-sm text-gray-400">${stock.one_line_summary || ''}</div>
                             </div>
                         </div>
-                        <div class="flex gap-6 text-sm">
-                            <div class="text-center"><div class="text-gray-500">Growth</div><div class="text-white font-semibold">${stock.growth_score}</div></div>
-                            <div class="text-center"><div class="text-gray-500">Value</div><div class="text-white font-semibold">${stock.valuation_score}</div></div>
-                            <div class="text-center"><div class="text-gray-500">Risk</div><div class="text-white font-semibold">${stock.risk_score}</div></div>
-                            <div class="text-center"><div class="${stock.rating === 'BUY' ? 'text-green-400' : 'text-yellow-400'} font-bold">${stock.rating}</div></div>
+                        <div class="flex gap-6 text-sm flex-wrap">
+                            <div class="text-center"><div class="text-gray-500">Growth</div><div class="text-white font-semibold">${stock.growth_score ?? 'N/A'}</div></div>
+                            <div class="text-center"><div class="text-gray-500">Value</div><div class="text-white font-semibold">${stock.valuation_score ?? 'N/A'}</div></div>
+                            <div class="text-center"><div class="text-gray-500">Risk</div><div class="text-white font-semibold">${stock.risk_score ?? 'N/A'}</div></div>
+                            <div class="text-center"><div class="${ratingColor} font-bold">${stock.rating || ''}</div></div>
                         </div>
                     </div>`;
             });
-
             if (data.winner) {
                 container.innerHTML += `
                     <div class="mt-4 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
@@ -618,7 +642,6 @@
             }
         }
 
-        // Initialize
         switchTab('analyzer');
     </script>
 </body>

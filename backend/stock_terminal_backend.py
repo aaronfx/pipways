@@ -133,7 +133,7 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
 
     try:
         message = await _anthropic.messages.create(
-            model      = "claude-sonnet-4-5-20251001",  # cost-efficient, fast, accurate
+            model      = "claude-sonnet-4-5",  # cost-efficient, fast, accurate
             max_tokens = max_tokens,
             system     = SYSTEM_PROMPT,
             messages   = [{"role": "user", "content": prompt}],

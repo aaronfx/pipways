@@ -6,15 +6,10 @@ Mount the router into your existing FastAPI app:
     from . import stock_terminal_backend as stock_module
     app.include_router(stock_module.router, prefix="/api/stock", tags=["Stock Terminal"])
 
-In your lifespan, initialise the shared clients:
+Optionally initialise clients in your lifespan (not required — lazy init handles it):
 
     stock_module._anthropic = AsyncAnthropic(api_key=anthropic_key)
     stock_module._http      = httpx.AsyncClient(timeout=10.0)
-
-And close them on shutdown:
-
-    if stock_module._http:
-        await stock_module._http.aclose()
 
 Dependencies:
     pip install fastapi anthropic httpx python-dotenv uvicorn
@@ -49,14 +44,12 @@ ALPHA_BASE        = "https://www.alphavantage.co/query"
 CACHE_TTL         = 300  # seconds (5 min)
 
 # ── Shared async clients ──────────────────────────────────────────────────────
-# Initialised externally (via main.py lifespan) or by the standalone lifespan below.
+# Can be set externally by main.py lifespan, OR lazily self-initialised on
+# first request via _require_clients() below — whichever happens first.
 _anthropic: AsyncAnthropic | None    = None
 _http:      httpx.AsyncClient | None = None
 
-# ── FIX 1: asyncio.Lock created lazily, NOT at module-import time.
-#    Creating asyncio primitives at import time silently binds them to a
-#    stale/non-existent event loop, causing "Future attached to different loop"
-#    errors at runtime on some Python/uvicorn versions.
+# ── Async-safe cache (lock created lazily to avoid event-loop binding issues) ─
 _cache_lock: asyncio.Lock | None = None
 _cache:      dict[str, dict]     = {}
 
@@ -82,31 +75,30 @@ async def cache_set(key: str, data: Any) -> None:
         _cache[key] = {"data": data, "ts": time.monotonic()}
 
 
-# ── FIX 2: Guard helper raises a structured 503 JSON error if the clients
-#    were never initialised (e.g. ANTHROPIC_API_KEY missing).
-#    Without this, _anthropic.messages.create() throws AttributeError which
-#    FastAPI serialises as plain-text "Internal Server Error", causing the
-#    frontend's response.json() to fail with "Unexpected token 'I'...".
+# ── Client guard — lazy self-initialisation ───────────────────────────────────
+# If main.py's lifespan didn't set the clients (e.g. dual-import bug or old
+# deploy), this function initialises them on the first incoming request using
+# the environment variable directly.  This makes the module self-sufficient.
 def _require_clients() -> None:
     global _anthropic, _http
-    # Lazy init — works even if main.py lifespan didn't set us up
+
     if _anthropic is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
             raise HTTPException(
                 status_code=503,
-                detail="ANTHROPIC_API_KEY environment variable is not set.",
+                detail=(
+                    "ANTHROPIC_API_KEY environment variable is not set. "
+                    "Add it in your Render → Environment settings."
+                ),
             )
         _anthropic = AsyncAnthropic(api_key=api_key)
+        print("[STOCK] Anthropic client lazy-initialised", flush=True)
+
     if _http is None:
         _http = httpx.AsyncClient(timeout=10.0)
-```
+        print("[STOCK] HTTP client lazy-initialised", flush=True)
 
-This way the module **initialises itself** on the first request using the env var directly — no dependency on `main.py`'s lifespan order.
-
-**Deploy that one change**, then hit:
-```
-https://pipwaysapp.onrender.com/api/stock/health
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
@@ -139,10 +131,9 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
     """Call Claude asynchronously and return parsed JSON."""
     _require_clients()
 
-    # FIX 3: Wrap the Anthropic call so any API error becomes a 502 JSON response.
     try:
         message = await _anthropic.messages.create(
-            model      = "claude-sonnet-4-5-20251001",
+            model      = "claude-sonnet-4-5-20251001",  # cost-efficient, fast, accurate
             max_tokens = max_tokens,
             system     = SYSTEM_PROMPT,
             messages   = [{"role": "user", "content": prompt}],
@@ -150,16 +141,12 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
 
-    raw = "".join(b.text for b in message.content if hasattr(b, "text"))
-
-    # FIX 4: More robust markdown fence stripping.
-    #    removeprefix("```json") misses "```json\n{...}\n```" because the
-    #    newline is part of the prefix.  Split on the first newline instead.
+    raw   = "".join(b.text for b in message.content if hasattr(b, "text"))
     clean = raw.strip()
     if clean.startswith("```"):
-        clean = clean.split("\n", 1)[-1]           # drop "```json" or "```" line
+        clean = clean.split("\n", 1)[-1]           # drop ```json opening line
     if clean.endswith("```"):
-        clean = clean.rsplit("```", 1)[0].strip()  # drop trailing fence
+        clean = clean.rsplit("```", 1)[0].strip()  # drop closing fence
 
     try:
         return json.loads(clean)
@@ -172,12 +159,11 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
 
 # ── Market data helpers ───────────────────────────────────────────────────────
 
-# FIX 5: Alpha Vantage returns informational/rate-limit JSON instead of data
-#    when the key is exhausted.  Detect these keys and raise a clear error.
 _AV_ERROR_KEYS = {"Note", "Information", "Error Message"}
 
 
 def _check_av_response(payload: dict, symbol: str) -> None:
+    """Raise a clear error if Alpha Vantage returned a rate-limit or error payload."""
     for key in _AV_ERROR_KEYS:
         if key in payload:
             raise HTTPException(
@@ -286,8 +272,6 @@ router = APIRouter()
 
 @router.get("/quote/{symbol}", response_model=OkResponse, summary="Live market quote")
 async def quote(symbol: str) -> OkResponse:
-    # FIX 6: All routes have a catch-all except so ANY unhandled exception
-    #    returns a structured JSON 500 rather than plain-text "Internal Server Error".
     try:
         data = await fetch_quote(symbol.upper())
         return OkResponse(data=data)
@@ -322,6 +306,7 @@ async def analyze(symbol: str) -> OkResponse:
         if cached := await cache_get(cache_key):
             return OkResponse(data=cached, cached=True)
 
+        # Fetch quote + overview concurrently; degrade gracefully if either fails
         quote_data: dict = {"price": "N/A", "change_pct": "N/A"}
         ov:         dict = {"name": sym, "sector": "Unknown"}
 
@@ -531,16 +516,22 @@ async def cache_stats() -> dict:
 
 @router.get("/health", include_in_schema=False)
 async def health() -> dict:
+    # Trigger lazy init so health check reflects true readiness
+    try:
+        _require_clients()
+    except Exception:
+        pass
     return {
         "ok":              True,
         "service":         "Pipways Stock Terminal",
         "anthropic_ready": _anthropic is not None,
         "http_ready":      _http is not None,
         "alpha_vantage":   "demo (25 req/day)" if ALPHA_VANTAGE_KEY == "demo" else "configured",
+        "model":           "claude-sonnet-4-5-20251001",
     }
 
 
-# ── Standalone app (dev only — not used when imported by main.py) ─────────────
+# ── Standalone app (dev only) ─────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _anthropic, _http
@@ -549,13 +540,14 @@ async def lifespan(application: FastAPI):
     _anthropic = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     _http      = httpx.AsyncClient(timeout=10.0)
     print("✓  Pipways Stock Terminal started (standalone)")
+    print(f"   Model        : claude-sonnet-4-5-20251001")
     print(f"   Alpha Vantage: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (25 req/day limit)'}")
     yield
     await _http.aclose()
     print("✓  Pipways Stock Terminal shut down")
 
 
-app = FastAPI(title="Pipways AI Stock Research Terminal", version="2.1.0", lifespan=lifespan)
+app = FastAPI(title="Pipways AI Stock Research Terminal", version="2.2.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router, prefix="/api/stock", tags=["Stock Terminal"])
 

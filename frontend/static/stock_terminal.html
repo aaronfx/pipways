@@ -1,396 +1,580 @@
-"""
-Pipways AI Stock Research Terminal - Backend Module
-====================================================
-Flask blueprint you can register into your existing app:
-
-    from stock_terminal_backend import stock_bp
-    app.register_blueprint(stock_bp, url_prefix="/api/stock")
-
-Dependencies:
-    pip install flask anthropic requests python-dotenv
-
-Environment variables required:
-    ANTHROPIC_API_KEY   - your Anthropic key
-    ALPHA_VANTAGE_KEY   - free key from alphavantage.co  (market data)
-
-Alpha Vantage free tier: 25 requests/day, 5/min — sufficient for a demo/MVP.
-Swap to Polygon.io or Yahoo Finance (yfinance) for production.
-"""
-
-import os
-import json
-import time
-import threading
-from functools import lru_cache
-from flask import Blueprint, request, jsonify
-import anthropic
-import requests
-
-# ── Blueprint ────────────────────────────────────────────────────────────────
-stock_bp = Blueprint("stock", __name__)
-
-# ── Clients ───────────────────────────────────────────────────────────────────
-_anthropic_client = None
-
-def get_anthropic_client():
-    global _anthropic_client
-    if _anthropic_client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY environment variable not set")
-        _anthropic_client = anthropic.Anthropic(api_key=api_key)
-    return _anthropic_client
-
-ALPHA_VANTAGE_KEY = os.environ.get("ALPHA_VANTAGE_KEY", "demo")
-ALPHA_BASE = "https://www.alphavantage.co/query"
-
-# ── Simple in-process cache (replace with Redis in production) ────────────────
-_cache: dict = {}
-_cache_lock = threading.Lock()
-CACHE_TTL = 300  # 5 minutes
-
-def cache_get(key: str):
-    with _cache_lock:
-        item = _cache.get(key)
-        if item and time.time() - item["ts"] < CACHE_TTL:
-            return item["data"]
-    return None
-
-def cache_set(key: str, data):
-    with _cache_lock:
-        _cache[key] = {"data": data, "ts": time.time()}
-
-# ── Market Data Helpers ───────────────────────────────────────────────────────
-
-def fetch_quote(symbol: str) -> dict:
-    """Fetch real-time quote from Alpha Vantage."""
-    cached = cache_get(f"quote:{symbol}")
-    if cached:
-        return cached
-
-    r = requests.get(ALPHA_BASE, params={
-        "function": "GLOBAL_QUOTE",
-        "symbol": symbol,
-        "apikey": ALPHA_VANTAGE_KEY,
-    }, timeout=8)
-    r.raise_for_status()
-    data = r.json().get("Global Quote", {})
-
-    result = {
-        "symbol": symbol,
-        "price": float(data.get("05. price", 0) or 0),
-        "change": float(data.get("09. change", 0) or 0),
-        "change_pct": data.get("10. change percent", "0%").replace("%", "").strip(),
-        "volume": int(data.get("06. volume", 0) or 0),
-        "prev_close": float(data.get("08. previous close", 0) or 0),
-        "high": float(data.get("03. high", 0) or 0),
-        "low": float(data.get("04. low", 0) or 0),
-    }
-    cache_set(f"quote:{symbol}", result)
-    return result
-
-
-def fetch_overview(symbol: str) -> dict:
-    """Fetch company overview from Alpha Vantage."""
-    cached = cache_get(f"overview:{symbol}")
-    if cached:
-        return cached
-
-    r = requests.get(ALPHA_BASE, params={
-        "function": "OVERVIEW",
-        "symbol": symbol,
-        "apikey": ALPHA_VANTAGE_KEY,
-    }, timeout=8)
-    r.raise_for_status()
-    data = r.json()
-
-    result = {
-        "name": data.get("Name", symbol),
-        "sector": data.get("Sector", "N/A"),
-        "industry": data.get("Industry", "N/A"),
-        "market_cap": data.get("MarketCapitalization", "N/A"),
-        "pe_ratio": data.get("PERatio", "N/A"),
-        "eps": data.get("EPS", "N/A"),
-        "beta": data.get("Beta", "N/A"),
-        "div_yield": data.get("DividendYield", "N/A"),
-        "52_week_high": data.get("52WeekHigh", "N/A"),
-        "52_week_low": data.get("52WeekLow", "N/A"),
-        "profit_margin": data.get("ProfitMargin", "N/A"),
-        "revenue_ttm": data.get("RevenueTTM", "N/A"),
-        "gross_profit_ttm": data.get("GrossProfitTTM", "N/A"),
-        "ebitda": data.get("EBITDA", "N/A"),
-        "description": data.get("Description", ""),
-        "exchange": data.get("Exchange", "N/A"),
-        "currency": data.get("Currency", "USD"),
-        "country": data.get("Country", "N/A"),
-        "fiscal_year_end": data.get("FiscalYearEnd", "N/A"),
-        "analyst_target": data.get("AnalystTargetPrice", "N/A"),
-        "forward_pe": data.get("ForwardPE", "N/A"),
-        "peg_ratio": data.get("PEGRatio", "N/A"),
-        "book_value": data.get("BookValue", "N/A"),
-        "revenue_per_share": data.get("RevenuePerShareTTM", "N/A"),
-        "return_on_equity": data.get("ReturnOnEquityTTM", "N/A"),
-        "return_on_assets": data.get("ReturnOnAssetsTTM", "N/A"),
-        "debt_to_equity": data.get("DebtToEquityRatio", "N/A"),
-        "current_ratio": data.get("CurrentRatio", "N/A"),
-    }
-    cache_set(f"overview:{symbol}", result)
-    return result
-
-
-# ── Claude AI Helpers ─────────────────────────────────────────────────────────
-
-SYSTEM_PROMPT = (
-    "You are an elite quantitative financial analyst and portfolio manager. "
-    "You provide data-driven, objective investment analysis. "
-    "Always respond with valid JSON only — no markdown, no preamble, no explanation."
-)
-
-def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
-    """Call Claude and return parsed JSON."""
-    client = get_anthropic_client()
-    message = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = "".join(b.text for b in message.content if hasattr(b, "text"))
-    # Strip any accidental markdown fences
-    clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-    return json.loads(clean)
-
-
-# ── Routes ────────────────────────────────────────────────────────────────────
-
-@stock_bp.route("/quote/<symbol>", methods=["GET"])
-def quote(symbol: str):
-    """Live market quote for a symbol."""
-    try:
-        data = fetch_quote(symbol.upper())
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@stock_bp.route("/overview/<symbol>", methods=["GET"])
-def overview(symbol: str):
-    """Company overview / fundamentals."""
-    try:
-        data = fetch_overview(symbol.upper())
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-@stock_bp.route("/analyze/<symbol>", methods=["GET"])
-def analyze(symbol: str):
-    """
-    Full AI analysis: rating, scores, outlook, technicals, risk, summary.
-    Cached for CACHE_TTL seconds to avoid repeated AI calls for the same symbol.
-    """
-    sym = symbol.upper()
-    cache_key = f"analysis:{sym}"
-    cached = cache_get(cache_key)
-    if cached:
-        return jsonify({"ok": True, "data": cached, "cached": True})
-
-    try:
-        quote_data = fetch_quote(sym)
-        ov = fetch_overview(sym)
-    except Exception as e:
-        # Graceful degradation — proceed with partial data
-        quote_data = {"price": "N/A", "change_pct": "N/A"}
-        ov = {"name": sym, "sector": "Unknown"}
-
-    prompt = f"""
-Analyze the stock {sym} using the following real market data:
-
-Company: {ov.get('name')}
-Sector: {ov.get('sector')} | Industry: {ov.get('industry')}
-Current Price: ${quote_data.get('price')} | Change: {quote_data.get('change_pct')}%
-Market Cap: {ov.get('market_cap')} | P/E: {ov.get('pe_ratio')} | Forward P/E: {ov.get('forward_pe')}
-EPS: {ov.get('eps')} | PEG Ratio: {ov.get('peg_ratio')}
-Beta: {ov.get('beta')} | 52w High: {ov.get('52_week_high')} | 52w Low: {ov.get('52_week_low')}
-Dividend Yield: {ov.get('div_yield')} | Analyst Target: {ov.get('analyst_target')}
-Profit Margin: {ov.get('profit_margin')} | ROE: {ov.get('return_on_equity')} | ROA: {ov.get('return_on_assets')}
-Debt/Equity: {ov.get('debt_to_equity')} | Current Ratio: {ov.get('current_ratio')}
-Revenue TTM: {ov.get('revenue_ttm')} | EBITDA: {ov.get('ebitda')}
-Exchange: {ov.get('exchange')} | Country: {ov.get('country')}
-
-Return exactly this JSON structure:
-{{
-  "rating": "BUY" | "HOLD" | "SELL" | "STRONG_BUY",
-  "confidence": <integer 50-99>,
-  "hold_period": "<e.g. Long Term (2-5 years)>",
-  "scores": {{
-    "Financial Strength": <0-100>,
-    "Price Momentum": <0-100>,
-    "Market Sentiment": <0-100>,
-    "Sector Performance": <0-100>,
-    "Growth Potential": <0-100>,
-    "Risk Level": <0-100>
-  }},
-  "overall_score": <float 0.0-10.0, one decimal>,
-  "weighted_score": <float 0.0-100.0>,
-  "long_term_outlook": "<one clear sentence>",
-  "growth_window": "<e.g. 3-7 years>",
-  "risk_level": "Low" | "Medium" | "High",
-  "trend": "Bullish" | "Bearish" | "Neutral",
-  "momentum": "Strong" | "Moderate" | "Weak",
-  "key_support": <number>,
-  "key_resistance": <number>,
-  "risks": ["<risk 1>", "<risk 2>", "<risk 3>"],
-  "opportunities": ["<opportunity 1>", "<opportunity 2>"],
-  "summary": "<3-4 sentence human-style investment summary>",
-  "short_term": "Not recommended" | "Moderate opportunity" | "Strong opportunity",
-  "medium_term": "Not recommended" | "Moderate opportunity" | "Strong opportunity",
-  "long_term": "Not recommended" | "Moderate opportunity" | "Strong investment candidate",
-  "revenue_growth": "Weak" | "Moderate" | "Strong",
-  "profit_margin_rating": "Low" | "Moderate" | "High",
-  "debt_level": "Low" | "Moderate" | "High",
-  "cash_flow": "Negative" | "Moderate" | "Strong",
-  "competitive_moat": "Narrow" | "Wide" | "None",
-  "insider_sentiment": "Bearish" | "Neutral" | "Bullish",
-  "analyst_consensus": "Underperform" | "Hold" | "Buy" | "Strong Buy"
-}}
-"""
-    try:
-        ai_data = claude_json(prompt)
-        result = {
-            "symbol": sym,
-            "market_data": {**quote_data, **ov},
-            "ai_analysis": ai_data,
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Stock Research Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        .glass-panel {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(75, 85, 99, 0.4);
         }
-        cache_set(cache_key, result)
-        return jsonify({"ok": True, "data": result, "cached": False})
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"AI analysis failed: {str(e)}"}), 500
+        .gradient-text {
+            background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .score-ring {
+            background: conic-gradient(var(--color) var(--percent), #374151 0);
+        }
+        .loading-shimmer {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<base target="_blank">
+</head>
+<body class="text-gray-100 min-h-screen bg-gray-900">
 
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-gray-900/95 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-chart-pie text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">AI Stock Research</h1>
+                        <p class="text-xs text-gray-400">Powered by Claude AI</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="switchTab('analyzer')" id="tab-analyzer" class="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white transition-all">
+                        <i class="fas fa-search mr-2"></i>Analyze
+                    </button>
+                    <button onclick="switchTab('portfolio')" id="tab-portfolio" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
+                        <i class="fas fa-briefcase mr-2"></i>Portfolio
+                    </button>
+                    <button onclick="switchTab('compare')" id="tab-compare" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
+                        <i class="fas fa-code-compare mr-2"></i>Compare
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
 
-@stock_bp.route("/portfolio", methods=["POST"])
-def portfolio():
-    """
-    Build an AI-optimised portfolio.
-    Body: { "amount": 10000, "risk": "moderate", "horizon": "long" }
-    """
-    body = request.get_json(force=True) or {}
-    amount = body.get("amount", 10000)
-    risk = body.get("risk", "moderate")
-    horizon = body.get("horizon", "long")
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    prompt = f"""
-Build an optimal diversified stock portfolio for an investor with these parameters:
-- Investment amount: ${amount:,}
-- Risk tolerance: {risk}
-- Investment horizon: {horizon} term
+        <!-- Stock Analyzer Tab -->
+        <div id="view-analyzer" class="space-y-6">
+            <!-- Search Bar -->
+            <div class="glass-panel rounded-2xl p-6">
+                <div class="flex gap-4">
+                    <div class="flex-1 relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="stock-symbol" placeholder="Enter stock symbol (e.g., AAPL, MSFT, NVDA)" 
+                            class="w-full bg-gray-800 border border-gray-700 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all uppercase"
+                            onkeypress="if(event.key==='Enter') analyzeStock()">
+                    </div>
+                    <button onclick="analyzeStock()" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center gap-2">
+                        <span>Analyze</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
 
-Return exactly this JSON:
-{{
-  "allocations": [
-    {{
-      "symbol": "<TICKER>",
-      "name": "<Company Name>",
-      "pct": <integer, allocations must sum to 100>,
-      "amount": <dollar amount>,
-      "rationale": "<one sentence why>",
-      "asset_type": "Stock" | "ETF" | "Bond ETF"
-    }}
-  ],
-  "expected_annual_return": "<e.g. 10-14%>",
-  "expected_volatility": "Low" | "Moderate" | "High",
-  "risk_profile": "<Conservative|Moderate|Aggressive>",
-  "diversification_score": <0-100>,
-  "summary": "<2 sentence portfolio thesis>",
-  "rebalance_frequency": "Quarterly" | "Semi-Annual" | "Annual"
-}}
+            <!-- Loading State -->
+            <div id="loading-state" class="hidden glass-panel rounded-2xl p-12 text-center">
+                <div class="inline-flex items-center gap-3 text-purple-400">
+                    <i class="fas fa-circle-notch fa-spin text-2xl"></i>
+                    <span class="text-lg">AI is analyzing market data...</span>
+                </div>
+            </div>
 
-Rules:
-- 4 to 7 positions total
-- Include at least 1 ETF for diversification
-- Allocations must be whole numbers and sum to exactly 100
-- dollar amounts must reflect the allocation percentage of ${amount:,}
-"""
-    try:
-        data = claude_json(prompt, max_tokens=1000)
-        # Ensure dollar amounts are correct (recalculate server-side)
-        for a in data.get("allocations", []):
-            a["amount"] = round(float(amount) * int(a.get("pct", 0)) / 100, 2)
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+            <!-- Results -->
+            <div id="analysis-results" class="hidden space-y-6 fade-in">
+                <!-- Top Summary Card -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                        <div>
+                            <h2 id="res-symbol" class="text-3xl font-bold text-white mb-1">AAPL</h2>
+                            <p id="res-name" class="text-gray-400">Apple Inc.</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div id="res-rating-badge" class="px-6 py-3 rounded-xl bg-green-500/20 border border-green-500/50 text-green-400 font-bold text-xl">
+                                STRONG BUY
+                            </div>
+                            <div class="text-right">
+                                <div id="res-price" class="text-3xl font-bold text-white">$178.50</div>
+                                <div id="res-change" class="text-green-400 font-medium">+2.35 (+1.33%)</div>
+                            </div>
+                        </div>
+                    </div>
 
+                    <!-- Key Metrics Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Market Cap</div>
+                            <div id="res-market-cap" class="text-sm font-semibold text-white">2.8T</div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">P/E Ratio</div>
+                            <div id="res-pe" class="text-sm font-semibold text-white">28.5</div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Beta</div>
+                            <div id="res-beta" class="text-sm font-semibold text-white">1.2</div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">52W Range</div>
+                            <div id="res-52w" class="text-sm font-semibold text-white">$150-$199</div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Sector</div>
+                            <div id="res-sector" class="text-sm font-semibold text-white">Technology</div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Dividend Yield</div>
+                            <div id="res-dividend" class="text-sm font-semibold text-white">0.52%</div>
+                        </div>
+                    </div>
 
-@stock_bp.route("/compare", methods=["POST"])
-def compare():
-    """
-    Compare multiple stocks side-by-side.
-    Body: { "symbols": ["AAPL", "NVDA", "MSFT"] }
-    """
-    body = request.get_json(force=True) or {}
-    symbols = [s.upper() for s in body.get("symbols", []) if s][:5]
-    if len(symbols) < 2:
-        return jsonify({"ok": False, "error": "Provide at least 2 symbols"}), 400
+                    <!-- AI Summary -->
+                    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-5 border border-purple-700/30">
+                        <h3 class="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                            <i class="fas fa-robot"></i> AI Investment Summary
+                        </h3>
+                        <p id="res-summary" class="text-gray-300 leading-relaxed">
+                            Loading analysis...
+                        </p>
+                    </div>
+                </div>
 
-    # Fetch overview for each to enrich the prompt
-    overviews = {}
-    for sym in symbols:
-        try:
-            overviews[sym] = fetch_overview(sym)
-        except Exception:
-            overviews[sym] = {"name": sym}
+                <!-- AI Scores -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-panel rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">AI Scores</h3>
+                        <div class="space-y-4" id="scores-container">
+                            <!-- Scores injected here -->
+                        </div>
+                    </div>
 
-    stock_context = "\n".join(
-        f"- {sym}: {overviews[sym].get('name','?')}, Sector: {overviews[sym].get('sector','?')}, "
-        f"P/E: {overviews[sym].get('pe_ratio','?')}, Beta: {overviews[sym].get('beta','?')}"
-        for sym in symbols
-    )
+                    <div class="glass-panel rounded-2xl p-6 md:col-span-2">
+                        <h3 class="text-lg font-semibold text-white mb-4">Analysis Details</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Trend</span>
+                                    <span id="res-trend" class="text-green-400 font-medium">Bullish</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Momentum</span>
+                                    <span id="res-momentum" class="text-green-400 font-medium">Strong</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Risk Level</span>
+                                    <span id="res-risk" class="text-yellow-400 font-medium">Medium</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Hold Period</span>
+                                    <span id="res-hold" class="text-white font-medium">Long Term</span>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Revenue Growth</span>
+                                    <span id="res-revenue" class="text-green-400 font-medium">Strong</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Profit Margin</span>
+                                    <span id="res-profit" class="text-green-400 font-medium">High</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Debt Level</span>
+                                    <span id="res-debt" class="text-green-400 font-medium">Low</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Analyst Consensus</span>
+                                    <span id="res-consensus" class="text-green-400 font-medium">Buy</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    prompt = f"""
-Compare these stocks for an investor and rank them objectively:
+                <!-- Risks & Opportunities -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-panel rounded-2xl p-6 border-l-4 border-red-500/50">
+                        <h3 class="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle"></i> Key Risks
+                        </h3>
+                        <ul id="res-risks" class="space-y-2 text-gray-300 text-sm">
+                        </ul>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-6 border-l-4 border-green-500/50">
+                        <h3 class="text-lg font-semibold text-green-400 mb-3 flex items-center gap-2">
+                            <i class="fas fa-lightbulb"></i> Opportunities
+                        </h3>
+                        <ul id="res-opportunities" class="space-y-2 text-gray-300 text-sm">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-{stock_context}
+        <!-- Portfolio Builder Tab -->
+        <div id="view-portfolio" class="hidden space-y-6">
+            <div class="glass-panel rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-6">AI Portfolio Builder</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Investment Amount ($)</label>
+                        <input type="number" id="portfolio-amount" value="10000" min="1000" step="1000"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Risk Tolerance</label>
+                        <select id="portfolio-risk" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                            <option value="conservative">Conservative</option>
+                            <option value="moderate" selected>Moderate</option>
+                            <option value="aggressive">Aggressive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Time Horizon</label>
+                        <select id="portfolio-horizon" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                            <option value="short">Short Term</option>
+                            <option value="medium">Medium Term</option>
+                            <option value="long" selected>Long Term</option>
+                        </select>
+                    </div>
+                </div>
 
-Return exactly this JSON:
-{{
-  "stocks": [
-    {{
-      "symbol": "<TICKER>",
-      "rating": "BUY" | "HOLD" | "SELL",
-      "overall_rank": <1 to {len(symbols)}>,
-      "growth_score": <0-100>,
-      "valuation_score": <0-100>,
-      "risk_score": <0-100>,
-      "momentum_score": <0-100>,
-      "dividend_score": <0-100>,
-      "one_line_summary": "<concise analyst opinion>",
-      "best_for": "Growth investors" | "Income investors" | "Value investors" | "Traders"
-    }}
-  ],
-  "winner": "<symbol>",
-  "winner_reason": "<one sentence>",
-  "avoid": "<symbol or null>",
-  "avoid_reason": "<one sentence or null>"
-}}
-Provide one object per symbol. Rank 1 = best.
-"""
-    try:
-        data = claude_json(prompt, max_tokens=900)
-        return jsonify({"ok": True, "data": data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+                <button onclick="buildPortfolio()" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 rounded-xl font-semibold transition-all">
+                    <i class="fas fa-magic mr-2"></i>Generate AI Portfolio
+                </button>
+            </div>
 
+            <div id="portfolio-results" class="hidden space-y-6 fade-in">
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Recommended Allocation</h3>
+                            <p id="portfolio-summary" class="text-gray-400 mt-1">Diversified growth portfolio</p>
+                        </div>
+                        <div class="text-right">
+                            <div id="portfolio-return" class="text-2xl font-bold text-green-400">10-14%</div>
+                            <div class="text-sm text-gray-500">Expected Annual Return</div>
+                        </div>
+                    </div>
 
-# ── Standalone runner (for development) ──────────────────────────────────────
-if __name__ == "__main__":
-    from flask import Flask
-    from flask_cors import CORS
+                    <div id="portfolio-allocations" class="space-y-3">
+                        <!-- Allocations injected here -->
+                    </div>
 
-    app = Flask(__name__)
-    CORS(app)  # Allow requests from your frontend during dev
-    app.register_blueprint(stock_bp, url_prefix="/api/stock")
+                    <div class="mt-6 pt-6 border-t border-gray-800 grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div id="portfolio-volatility" class="text-lg font-semibold text-white">Moderate</div>
+                            <div class="text-xs text-gray-500">Volatility</div>
+                        </div>
+                        <div>
+                            <div id="portfolio-diversification" class="text-lg font-semibold text-white">85</div>
+                            <div class="text-xs text-gray-500">Diversification Score</div>
+                        </div>
+                        <div>
+                            <div id="portfolio-rebalance" class="text-lg font-semibold text-white">Quarterly</div>
+                            <div class="text-xs text-gray-500">Rebalance Frequency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    print("Pipways Stock Terminal Backend running on http://localhost:5050")
-    print(f"Anthropic key set: {'YES' if os.environ.get('ANTHROPIC_API_KEY') else 'NO - set ANTHROPIC_API_KEY'}")
-    print(f"Alpha Vantage key: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (limited)'}")
-    app.run(port=5050, debug=True)
+        <!-- Compare Tab -->
+        <div id="view-compare" class="hidden space-y-6">
+            <div class="glass-panel rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4">Compare Stocks</h2>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="compare-input" placeholder="Enter symbols separated by commas (e.g., AAPL, MSFT, GOOGL)" 
+                        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 uppercase"
+                        onkeypress="if(event.key==='Enter') compareStocks()">
+                    <button onclick="compareStocks()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                        Compare
+                    </button>
+                </div>
+            </div>
+
+            <div id="compare-results" class="hidden space-y-4 fade-in">
+                <div class="glass-panel rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">AI Comparison Results</h3>
+                    <div id="compare-stocks-container" class="space-y-4">
+                        <!-- Comparison results here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin + '/api/stock';
+
+        function switchTab(tab) {
+            // Hide all views
+            document.getElementById('view-analyzer').classList.add('hidden');
+            document.getElementById('view-portfolio').classList.add('hidden');
+            document.getElementById('view-compare').classList.add('hidden');
+            
+            // Reset tab styles
+            ['analyzer', 'portfolio', 'compare'].forEach(t => {
+                const btn = document.getElementById('tab-' + t);
+                btn.classList.remove('bg-purple-600', 'text-white');
+                btn.classList.add('text-gray-400');
+            });
+            
+            // Show selected view
+            document.getElementById('view-' + tab).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-' + tab);
+            activeBtn.classList.remove('text-gray-400');
+            activeBtn.classList.add('bg-purple-600', 'text-white');
+        }
+
+        async function analyzeStock() {
+            const symbol = document.getElementById('stock-symbol').value.trim();
+            if (!symbol) return;
+
+            document.getElementById('loading-state').classList.remove('hidden');
+            document.getElementById('analysis-results').classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/analyze/${symbol}`);
+                const result = await response.json();
+                
+                if (!result.ok) throw new Error(result.error);
+
+                displayAnalysis(result.data);
+            } catch (error) {
+                alert('Error analyzing stock: ' + error.message);
+            } finally {
+                document.getElementById('loading-state').classList.add('hidden');
+            }
+        }
+
+        function displayAnalysis(data) {
+            const ai = data.ai_analysis;
+            const market = data.market_data;
+
+            document.getElementById('res-symbol').textContent = data.symbol;
+            document.getElementById('res-name').textContent = market.name || data.symbol;
+            document.getElementById('res-price').textContent = '$' + (market.price || '0.00');
+            
+            const changeEl = document.getElementById('res-change');
+            const change = parseFloat(market.change);
+            changeEl.textContent = (change >= 0 ? '+' : '') + market.change + ' (' + market.change_pct + '%)';
+            changeEl.className = change >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium';
+
+            document.getElementById('res-market-cap').textContent = market.market_cap || 'N/A';
+            document.getElementById('res-pe').textContent = market.pe_ratio || 'N/A';
+            document.getElementById('res-beta').textContent = market.beta || 'N/A';
+            document.getElementById('res-52w').textContent = (market['52_week_low'] || '0') + '-' + (market['52_week_high'] || '0');
+            document.getElementById('res-sector').textContent = market.sector || 'N/A';
+            document.getElementById('res-dividend').textContent = market.div_yield || '0%';
+
+            const ratingBadge = document.getElementById('res-rating-badge');
+            ratingBadge.textContent = ai.rating || 'HOLD';
+            const ratingColors = {
+                'STRONG_BUY': 'bg-green-500/20 border-green-500/50 text-green-400',
+                'BUY': 'bg-green-500/20 border-green-500/50 text-green-400',
+                'HOLD': 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
+                'SELL': 'bg-red-500/20 border-red-500/50 text-red-400'
+            };
+            ratingBadge.className = 'px-6 py-3 rounded-xl border font-bold text-xl ' + (ratingColors[ai.rating] || ratingColors['HOLD']);
+
+            document.getElementById('res-summary').textContent = ai.summary || 'No summary available.';
+            document.getElementById('res-trend').textContent = ai.trend || 'Neutral';
+            document.getElementById('res-momentum').textContent = ai.momentum || 'Moderate';
+            document.getElementById('res-risk').textContent = ai.risk_level || 'Medium';
+            document.getElementById('res-hold').textContent = ai.hold_period || 'Long Term';
+            document.getElementById('res-revenue').textContent = ai.revenue_growth || 'Moderate';
+            document.getElementById('res-profit').textContent = ai.profit_margin_rating || 'Moderate';
+            document.getElementById('res-debt').textContent = ai.debt_level || 'Moderate';
+            document.getElementById('res-consensus').textContent = ai.analyst_consensus || 'Hold';
+
+            // Scores
+            const scoresContainer = document.getElementById('scores-container');
+            scoresContainer.innerHTML = '';
+            if (ai.scores) {
+                Object.entries(ai.scores).forEach(([key, value]) => {
+                    const color = value >= 70 ? 'bg-green-500' : value >= 40 ? 'bg-yellow-500' : 'bg-red-500';
+                    scoresContainer.innerHTML += `
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-400">${key}</span>
+                                <span class="text-white font-semibold">${value}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="${color} h-2 rounded-full" style="width: ${value}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Risks
+            const risksContainer = document.getElementById('res-risks');
+            risksContainer.innerHTML = '';
+            (ai.risks || []).forEach(risk => {
+                risksContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-minus text-red-400 mt-1 text-xs"></i>${risk}</li>`;
+            });
+
+            // Opportunities
+            const oppContainer = document.getElementById('res-opportunities');
+            oppContainer.innerHTML = '';
+            (ai.opportunities || []).forEach(opp => {
+                oppContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-plus text-green-400 mt-1 text-xs"></i>${opp}</li>`;
+            });
+
+            document.getElementById('analysis-results').classList.remove('hidden');
+        }
+
+        async function buildPortfolio() {
+            const amount = document.getElementById('portfolio-amount').value;
+            const risk = document.getElementById('portfolio-risk').value;
+            const horizon = document.getElementById('portfolio-horizon').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/portfolio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: parseFloat(amount), risk, horizon })
+                });
+                
+                const result = await response.json();
+                if (!result.ok) throw new Error(result.error);
+
+                displayPortfolio(result.data);
+            } catch (error) {
+                alert('Error building portfolio: ' + error.message);
+            }
+        }
+
+        function displayPortfolio(data) {
+            document.getElementById('portfolio-summary').textContent = data.summary || 'AI-generated portfolio';
+            document.getElementById('portfolio-return').textContent = data.expected_annual_return || '8-12%';
+            document.getElementById('portfolio-volatility').textContent = data.expected_volatility || 'Moderate';
+            document.getElementById('portfolio-diversification').textContent = data.diversification_score || '80';
+            document.getElementById('portfolio-rebalance').textContent = data.rebalance_frequency || 'Quarterly';
+
+            const container = document.getElementById('portfolio-allocations');
+            container.innerHTML = '';
+            
+            (data.allocations || []).forEach(alloc => {
+                container.innerHTML += `
+                    <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                                <span class="text-purple-400 font-bold">${alloc.symbol}</span>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-white">${alloc.name}</div>
+                                <div class="text-sm text-gray-400">${alloc.asset_type} • ${alloc.rationale}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xl font-bold text-white">${alloc.pct}%</div>
+                            <div class="text-sm text-gray-400">$${alloc.amount.toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('portfolio-results').classList.remove('hidden');
+        }
+
+        async function compareStocks() {
+            const input = document.getElementById('compare-input').value;
+            const symbols = input.split(',').map(s => s.trim()).filter(s => s);
+            
+            if (symbols.length < 2) {
+                alert('Please enter at least 2 symbols');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols })
+                });
+                
+                const result = await response.json();
+                if (!result.ok) throw new Error(result.error);
+
+                displayComparison(result.data);
+            } catch (error) {
+                alert('Error comparing stocks: ' + error.message);
+            }
+        }
+
+        function displayComparison(data) {
+            const container = document.getElementById('compare-stocks-container');
+            container.innerHTML = '';
+
+            (data.stocks || []).forEach(stock => {
+                const rankColor = stock.overall_rank === 1 ? 'text-green-400' : stock.overall_rank === 2 ? 'text-yellow-400' : 'text-gray-400';
+                container.innerHTML += `
+                    <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="text-2xl font-bold ${rankColor}">#${stock.overall_rank}</div>
+                            <div>
+                                <div class="font-bold text-white text-lg">${stock.symbol}</div>
+                                <div class="text-sm text-gray-400">${stock.one_line_summary}</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-6 text-sm">
+                            <div class="text-center">
+                                <div class="text-gray-500">Growth</div>
+                                <div class="text-white font-semibold">${stock.growth_score}</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-500">Value</div>
+                                <div class="text-white font-semibold">${stock.valuation_score}</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-500">Risk</div>
+                                <div class="text-white font-semibold">${stock.risk_score}</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="${stock.rating === 'BUY' ? 'text-green-400' : 'text-yellow-400'} font-bold">${stock.rating}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (data.winner) {
+                container.innerHTML += `
+                    <div class="mt-4 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+                        <div class="flex items-center gap-2 text-green-400 font-semibold">
+                            <i class="fas fa-trophy"></i> Winner: ${data.winner}
+                        </div>
+                        <div class="text-gray-400 text-sm mt-1">${data.winner_reason}</div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('compare-results').classList.remove('hidden');
+        }
+
+        // Initialize
+        switchTab('analyzer');
+    </script>
+</body>
+</html>

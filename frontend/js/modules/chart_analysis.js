@@ -1,6 +1,7 @@
 const ChartAnalysisPage = {
     currentAnalysis: null,
     uploadedImage: null,
+    chartAnnotations: null, // Store annotations for future rendering
 
     async render() {
         const app = document.getElementById('app');
@@ -9,7 +10,7 @@ const ChartAnalysisPage = {
         app.innerHTML = `
             <div class="page-header">
                 <h1>📊 AI Chart Analysis</h1>
-                <p>Smart Money Concepts (SMC) institutional analysis</p>
+                <p>Smart Money Concepts (SMC) Institutional Analysis</p>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
@@ -192,10 +193,13 @@ const ChartAnalysisPage = {
         try {
             const analysis = await API.analyzeChartImage(file, symbol, timeframe);
             this.currentAnalysis = analysis;
-            // Store chart_annotations for future rendering
+            
+            // Store chart annotations for future overlay rendering
             if (analysis.chart_annotations) {
-                console.log('[Chart Analysis] Annotations received:', analysis.chart_annotations);
+                this.chartAnnotations = analysis.chart_annotations;
+                console.log('[Chart Analysis] Annotations stored:', this.chartAnnotations);
             }
+            
             this.displayResults(analysis);
         } catch (error) {
             if (results) {
@@ -214,6 +218,23 @@ const ChartAnalysisPage = {
         const biasBg = analysis.trading_bias === 'bullish' ? 'rgba(16, 185, 129, 0.1)' : 
                       analysis.trading_bias === 'bearish' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)';
 
+        // Build SMC Market Structure HTML
+        let marketStructureHTML = '';
+        if (analysis.market_structure) {
+            const msColor = analysis.market_structure === 'bullish' ? 'var(--success)' : 
+                           analysis.market_structure === 'bearish' ? 'var(--danger)' : 'var(--gray-500)';
+            marketStructureHTML = `
+                <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid ${msColor};">
+                    <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; margin-bottom: 0.5rem;">
+                        Market Structure
+                    </div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: ${msColor}; text-transform: uppercase;">
+                        ${analysis.market_structure}
+                    </div>
+                </div>
+            `;
+        }
+
         // Build SMC Signals HTML
         let smcSignalsHTML = '';
         if (analysis.smc_signals && analysis.smc_signals.length > 0) {
@@ -222,30 +243,14 @@ const ChartAnalysisPage = {
                     <strong style="display: block; margin-bottom: 0.75rem; color: var(--gray-300);">
                         <i class="fas fa-university mr-2" style="color: var(--primary);"></i>SMC Signals:
                     </strong>
-                    <ul style="padding-left: 1.5rem; margin: 0; list-style: none;">
+                    <ul style="padding-left: 0; margin: 0; list-style: none;">
                         ${analysis.smc_signals.map(signal => `
-                            <li style="margin-bottom: 0.5rem; color: var(--gray-400); display: flex; align-items: center;">
-                                <i class="fas fa-chevron-right mr-2" style="font-size: 0.6rem; color: var(--primary);"></i>${signal}
+                            <li style="margin-bottom: 0.5rem; color: var(--gray-400); display: flex; align-items: flex-start;">
+                                <i class="fas fa-check-circle mr-2 mt-1" style="font-size: 0.75rem; color: var(--success);"></i>
+                                <span>${signal}</span>
                             </li>
                         `).join('')}
                     </ul>
-                </div>
-            `;
-        }
-
-        // Build Market Structure HTML
-        let marketStructureHTML = '';
-        if (analysis.market_structure) {
-            const msColor = analysis.market_structure === 'bullish' ? 'var(--success)' : 
-                           analysis.market_structure === 'bearish' ? 'var(--danger)' : 'var(--gray-500)';
-            marketStructureHTML = `
-                <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem;">
-                    <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; margin-bottom: 0.5rem;">
-                        Market Structure
-                    </div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: ${msColor}; text-transform: uppercase;">
-                        ${analysis.market_structure}
-                    </div>
                 </div>
             `;
         }
@@ -259,7 +264,7 @@ const ChartAnalysisPage = {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h4 style="margin: 0; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
                             <i class="fas fa-robot"></i>
-                            Institutional Trade Setup
+                            AI Signal Engine
                         </h4>
                         <span style="background: var(--primary); color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
                             ${Math.round((setup.probability || 0.7) * 100)}% Confidence
@@ -293,7 +298,7 @@ const ChartAnalysisPage = {
                     </div>
 
                     <button onclick="ChartAnalysisPage.saveSignal()" class="btn btn-success btn-block" style="background: linear-gradient(90deg, var(--success) 0%, #059669 100%);">
-                        <i class="fas fa-save"></i> Save as Signal
+                        <i class="fas fa-save"></i> Save Signal to Dashboard
                     </button>
                 </div>
             `;
@@ -310,9 +315,9 @@ const ChartAnalysisPage = {
             if (dirEl) dirEl.value = (setup.direction === 'BULLISH' || setup.direction === 'BUY') ? 'BUY' : 'SELL';
         }
 
-        // Build patterns HTML using patterns_detected array
+        // Build patterns HTML using patterns_detected array with null safety
         let patternsHTML = '';
-        if (analysis.patterns_detected && analysis.patterns_detected.length > 0) {
+        if (analysis.patterns_detected && Array.isArray(analysis.patterns_detected) && analysis.patterns_detected.length > 0) {
             patternsHTML = analysis.patterns_detected.map(p => 
                 `<span class="badge badge-info" style="margin: 0.25rem; padding: 0.5rem 1rem;">${p.name || 'Pattern'} <small style="opacity: 0.7;">(${p.reliability || 'medium'})</small></span>`
             ).join('');
@@ -320,15 +325,32 @@ const ChartAnalysisPage = {
             patternsHTML = '<span class="text-muted">No patterns detected</span>';
         }
 
+        // Build annotations preview if available
+        let annotationsHTML = '';
+        if (analysis.chart_annotations && (analysis.chart_annotations.order_blocks?.length > 0 || analysis.chart_annotations.fair_value_gaps?.length > 0)) {
+            annotationsHTML = `
+                <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(124, 58, 237, 0.05); border: 1px solid rgba(124, 58, 237, 0.2); border-radius: var(--radius);">
+                    <strong style="display: block; margin-bottom: 0.5rem; color: var(--primary); font-size: 0.875rem;">
+                        <i class="fas fa-layer-group mr-2"></i>Chart Annotations Ready
+                    </strong>
+                    <div style="font-size: 0.75rem; color: var(--gray-500);">
+                        ${analysis.chart_annotations.order_blocks?.length || 0} Order Blocks, 
+                        ${analysis.chart_annotations.fair_value_gaps?.length || 0} FVGs,
+                        ${analysis.chart_annotations.liquidity_zones?.length || 0} Liquidity Zones
+                    </div>
+                </div>
+            `;
+        }
+
         container.innerHTML = `
             <div class="card" style="max-height: 80vh; overflow-y: auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gray-700);">
                     <h3 style="margin: 0;">${analysis.symbol || 'Unknown Symbol'}</h3>
                     <div style="display: flex; gap: 0.5rem;">
-                        <span class="badge badge-${analysis.confidence > 0.7 ? 'success' : 'warning'}">
+                        <span class="badge badge-${(analysis.confidence || 0) > 0.7 ? 'success' : 'warning'}">
                             ${Math.round((analysis.confidence || 0) * 100)}% Confidence
                         </span>
-                        ${analysis.mode === 'ai' ? '<span class="badge badge-info">AI Powered</span>' : ''}
+                        ${analysis.mode === 'ai' ? '<span class="badge badge-info">SMC AI</span>' : ''}
                     </div>
                 </div>
 
@@ -347,6 +369,8 @@ const ChartAnalysisPage = {
                         <img src="${analysis.chart_image}" style="width: 100%; border-radius: var(--radius); border: 1px solid var(--gray-700);" />
                     </div>
                 ` : ''}
+
+                ${annotationsHTML}
 
                 ${tradeSetupHTML}
 
@@ -374,7 +398,7 @@ const ChartAnalysisPage = {
 
                 <div>
                     <strong style="display: block; margin-bottom: 0.75rem; color: var(--gray-300);">
-                        <i class="fas fa-lightbulb mr-2" style="color: var(--warning);"></i>Key Insights:
+                        <i class="fas fa-lightbulb mr-2" style="color: var(--warning);"></i>Institutional Insights:
                     </strong>
                     <ul style="padding-left: 1.5rem; margin: 0;">
                         ${analysis.key_insights?.length ? analysis.key_insights.map(i => `<li style="margin-bottom: 0.5rem; color: var(--gray-400);">${i}</li>`).join('') : '<li class="text-muted">No specific insights</li>'}
@@ -390,10 +414,16 @@ const ChartAnalysisPage = {
         const tpEl = document.getElementById('validatorTP');
         const dirEl = document.getElementById('validatorDirection');
         
-        const entry = parseFloat(entryEl ? entryEl.value : 0);
-        const sl = parseFloat(slEl ? slEl.value : 0);
-        const tp = parseFloat(tpEl ? tpEl.value : 0);
-        const direction = dirEl ? dirEl.value : 'BUY';
+        // Safe DOM access - check elements exist
+        if (!entryEl || !slEl || !tpEl || !dirEl) {
+            console.error('[Validator] DOM elements not found');
+            return;
+        }
+        
+        const entry = parseFloat(entryEl.value);
+        const sl = parseFloat(slEl.value);
+        const tp = parseFloat(tpEl.value);
+        const direction = dirEl.value;
         const symbol = this.currentAnalysis?.symbol || 'Unknown';
 
         if (!entry || !sl || !tp) {
@@ -408,19 +438,27 @@ const ChartAnalysisPage = {
         const resultsDiv = document.getElementById('validatorResults');
         if (!resultsDiv) return;
         
+        // Show loading state
         resultsDiv.style.display = 'block';
         resultsDiv.innerHTML = '<div class="loading"><div class="spinner" style="width: 24px; height: 24px;"></div><small>Validating...</small></div>';
 
         try {
-            // Fix: Send correct payload with entry_price, stop_loss, take_profit
-            const result = await API.validateTrade({
+            // Fix: Send correct payload matching backend schema exactly
+            const payload = {
                 entry_price: entry,
                 stop_loss: sl,
                 take_profit: tp,
                 direction: direction,
                 symbol: symbol
-            });
+            };
+            
+            console.log('[Validate] Sending payload:', payload);
 
+            const result = await API.validateTrade(payload);
+            
+            console.log('[Validate] Received result:', result);
+
+            // Hide loading and render results
             const score = result.quality_score || 0;
             const scoreColor = score >= 80 ? 'var(--success)' : 
                               score >= 60 ? 'var(--warning)' : 'var(--danger)';
@@ -437,7 +475,7 @@ const ChartAnalysisPage = {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.875rem;">
                         <div>
                             <span style="color: var(--gray-500);">R:R Ratio:</span>
-                            <span style="color: var(--gray-200); font-weight: 600; margin-left: 0.5rem;">${result.risk_reward_text || 'N/A'}</span>
+                            <span style="color: var(--gray-200); font-weight: 600; margin-left: 0.5rem;">${result.risk_reward_text || result.risk_reward_ratio || 'N/A'}</span>
                         </div>
                         <div>
                             <span style="color: var(--gray-500);">Probability:</span>
@@ -464,9 +502,11 @@ const ChartAnalysisPage = {
                     ` : ''}
                 </div>
             `;
+            
         } catch (error) {
+            console.error('[Validate] Error:', error);
             if (resultsDiv) {
-                resultsDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+                resultsDiv.innerHTML = `<div class="alert alert-error">Validation failed: ${error.message}</div>`;
             }
         }
     },
@@ -496,7 +536,7 @@ const ChartAnalysisPage = {
 
             if (result.success) {
                 if (typeof UI !== 'undefined' && UI.showToast) {
-                    UI.showToast('Signal saved successfully!', 'success');
+                    UI.showToast('Signal saved to AI Signal Engine!', 'success');
                 } else {
                     alert('Signal saved successfully!');
                 }
@@ -504,6 +544,7 @@ const ChartAnalysisPage = {
                 throw new Error('Failed to save signal');
             }
         } catch (error) {
+            console.error('[Save Signal] Error:', error);
             if (typeof UI !== 'undefined' && UI.showToast) {
                 UI.showToast('Error saving signal: ' + error.message, 'error');
             } else {

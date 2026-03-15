@@ -1,7 +1,6 @@
 """
-Multi-Format Trade Journal Parser - PRODUCTION READY
-Supports: MT4/MT5 HTML, CSV, Excel, PDF, Images (OCR), JSON, TXT
-FIXED: Enhanced column detection, OCR graceful fallback, Robust normalization
+Multi-Format Trade Journal Parser - FIXED VERSION
+Supports: MT4/MT5 HTML, CSV, Excel, PDF, Images (OCR)
 """
 import json
 import re
@@ -9,9 +8,8 @@ import io
 import csv
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from pathlib import Path
 
-# Optional imports - handled gracefully if not installed
+# Optional imports
 try:
     import pandas as pd
     PANDAS_AVAILABLE = True
@@ -32,22 +30,17 @@ except ImportError:
 
 try:
     import pytesseract
-    from PIL import Image, ImageOps, ImageFilter, ImageEnhance
+    from PIL import Image, ImageOps, ImageEnhance
     TESSERACT_AVAILABLE = True
-except ImportError:
-    TESSERACT_AVAILABLE = False
-
-try:
-    from PIL import Image as PILImage
     PIL_AVAILABLE = True
 except ImportError:
+    TESSERACT_AVAILABLE = False
     PIL_AVAILABLE = False
 
 
 class TradeJournalParser:
-    """Unified trade journal parser supporting multiple formats with enhanced normalization"""
+    """Unified trade journal parser supporting multiple formats"""
 
-    # ENHANCED: Comprehensive column alias mapping
     COLUMN_ALIASES = {
         "symbol": ["symbol", "pair", "instrument", "currency", "forex", "ticker", "sym", "name", "market", "ccy", "fx"],
         "direction": ["direction", "type", "action", "order type", "buy/sell", "side", "bs", "long/short", "position", "cmd"],
@@ -64,33 +57,12 @@ class TradeJournalParser:
         "comment": ["comment", "comments", "notes", "note", "description", "desc"]
     }
 
-    # Standard trade structure output
-    TRADE_SCHEMA = {
-        "symbol": str,
-        "direction": str,  # BUY/SELL
-        "entry_price": float,
-        "exit_price": float,
-        "stop_loss": float,
-        "take_profit": float,
-        "pnl": float,
-        "entry_date": str,
-        "exit_date": str,
-        "volume": float,
-        "commission": float,
-        "swap": float,
-        "comment": str,
-        "outcome": str  # win/loss/breakeven
-    }
-
     @staticmethod
     def parse_file(file_content: bytes, filename: str, file_type: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Main entry point - parse any supported file format
-        FIXED: Better error messages, format detection
-        """
+        """Main entry point - parse any supported file format"""
         filename_lower = filename.lower()
 
-        # Determine file type from extension if not provided
+        # Determine file type from extension if not provided or if 'auto'
         if not file_type or file_type == "auto":
             if filename_lower.endswith('.json'):
                 file_type = 'json'
@@ -107,7 +79,12 @@ class TradeJournalParser:
             elif filename_lower.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.gif', '.webp')):
                 file_type = 'image'
             else:
-                raise ValueError(f"Unsupported file format: {filename}. Supported: CSV, Excel, PDF, HTML, JSON, TXT, Images")
+                raise ValueError(f"Unsupported file format: {filename}")
+
+        # FIX: Map format aliases to actual parser types
+        # MT4 and MT5 are both HTML formats
+        if file_type in ['mt4', 'mt5']:
+            file_type = 'html'
 
         # Route to appropriate parser
         parsers = {
@@ -139,26 +116,21 @@ class TradeJournalParser:
             if isinstance(data, list):
                 return [TradeJournalParser.normalize_trade(trade) for trade in data]
             elif isinstance(data, dict):
-                # Check if it's a wrapped object
                 if 'trades' in data and isinstance(data['trades'], list):
                     return [TradeJournalParser.normalize_trade(trade) for trade in data['trades']]
                 elif 'data' in data and isinstance(data['data'], list):
                     return [TradeJournalParser.normalize_trade(trade) for trade in data['data']]
                 else:
-                    # Single trade object
                     return [TradeJournalParser.normalize_trade(data)]
             else:
                 raise ValueError("JSON must contain an array of trades or a trade object")
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON format: {str(e)}")
-        except Exception as e:
-            raise ValueError(f"JSON parsing error: {str(e)}")
 
     @staticmethod
     def parse_csv(content: bytes) -> List[Dict[str, Any]]:
         """Parse CSV trade data with automatic delimiter detection"""
         try:
-            # Try different encodings
             encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
             content_str = None
 
@@ -183,20 +155,17 @@ class TradeJournalParser:
             delimiter = max(delimiter_counts, key=delimiter_counts.get)
 
             if delimiter_counts[delimiter] == 0:
-                raise ValueError("Could not detect CSV delimiter (comma, semicolon, or tab)")
+                raise ValueError("Could not detect CSV delimiter")
 
             reader = csv.DictReader(lines, delimiter=delimiter)
             trades = []
 
-            for row_num, row in enumerate(reader, start=2):  # Start at 2 (1 is header)
+            for row_num, row in enumerate(reader, start=2):
                 try:
                     trade = TradeJournalParser.normalize_trade(row)
-                    # Only include if has minimum data
-                    if trade.get('symbol') or trade.get('pnl') != 0 or trade.get('entry_price') != 0:
+                    if trade.get('symbol') or trade.get('pnl') != 0:
                         trades.append(trade)
-                except Exception as row_error:
-                    # Log but continue processing other rows
-                    print(f"[CSV Parser] Warning: Could not parse row {row_num}: {row_error}")
+                except Exception:
                     continue
 
             return trades
@@ -208,10 +177,9 @@ class TradeJournalParser:
     def parse_excel(content: bytes) -> List[Dict[str, Any]]:
         """Parse Excel file (.xlsx, .xls)"""
         if not PANDAS_AVAILABLE:
-            raise ValueError("pandas library required for Excel parsing. Install: pip install pandas openpyxl xlrd")
+            raise ValueError("pandas library required for Excel parsing")
 
         try:
-            # Try xlsx first, then xls
             try:
                 df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
             except:
@@ -223,11 +191,9 @@ class TradeJournalParser:
             trades = []
             for idx, row in df.iterrows():
                 try:
-                    # Convert row to dict, handling NaN values
                     row_dict = {}
                     for col in df.columns:
                         val = row[col]
-                        # Handle NaN, NaT, etc.
                         if pd.isna(val):
                             row_dict[col] = ''
                         elif isinstance(val, pd.Timestamp):
@@ -238,8 +204,7 @@ class TradeJournalParser:
                     trade = TradeJournalParser.normalize_trade(row_dict)
                     if trade.get('symbol') or trade.get('pnl') != 0:
                         trades.append(trade)
-                except Exception as row_error:
-                    print(f"[Excel Parser] Warning: Could not parse row {idx + 2}: {row_error}")
+                except Exception:
                     continue
 
             return trades
@@ -251,43 +216,38 @@ class TradeJournalParser:
     def parse_html(content: bytes) -> List[Dict[str, Any]]:
         """Parse MT4/MT5 HTML statement"""
         if not BS4_AVAILABLE:
-            raise ValueError("beautifulsoup4 required for HTML parsing. Install: pip install beautifulsoup4 lxml")
+            raise ValueError("beautifulsoup4 required for HTML parsing")
 
         try:
             soup = BeautifulSoup(content.decode('utf-8', errors='ignore'), 'html.parser')
             trades = []
 
-            # Try to find trade tables
             tables = soup.find_all('table')
 
             if not tables:
                 raise ValueError("No tables found in HTML file")
 
-            for table_idx, table in enumerate(tables):
+            for table in tables:
                 rows = table.find_all('tr')
                 if len(rows) < 2:
                     continue
 
-                # Try to identify header
                 headers = []
                 header_row = rows[0]
                 for th in header_row.find_all(['th', 'td']):
                     text = th.get_text(strip=True).lower()
-                    # Clean up header text (remove newlines, extra spaces)
                     text = ' '.join(text.split())
                     headers.append(text)
 
                 if not headers:
                     continue
 
-                # Map common column names
                 column_map = TradeJournalParser._detect_columns(headers)
 
                 if not column_map or ('symbol' not in column_map and 'pnl' not in column_map):
-                    continue  # Skip tables that don't look like trade tables
+                    continue
 
-                # Parse data rows
-                for row_idx, row in enumerate(rows[1:], start=2):
+                for row in rows[1:]:
                     cells = row.find_all(['td', 'th'])
                     if len(cells) < len(headers):
                         continue
@@ -297,7 +257,6 @@ class TradeJournalParser:
                         if i < len(headers):
                             row_data[headers[i]] = cell.get_text(strip=True)
 
-                    # Remap to standard format
                     trade = {}
                     for std_col, html_col in column_map.items():
                         if html_col in row_data:
@@ -307,12 +266,11 @@ class TradeJournalParser:
                         normalized = TradeJournalParser.normalize_trade(trade)
                         if normalized.get('symbol') or normalized.get('pnl') != 0:
                             trades.append(normalized)
-                    except Exception as norm_error:
-                        print(f"[HTML Parser] Warning: Row {row_idx} normalization failed: {norm_error}")
+                    except Exception:
                         continue
 
             if not trades:
-                raise ValueError("No valid trade data found in HTML tables. Expected columns: Symbol, Type/Direction, Open Price, Close Price, Profit")
+                raise ValueError("No valid trade data found in HTML tables")
 
             return trades
 
@@ -323,12 +281,12 @@ class TradeJournalParser:
     def parse_pdf(content: bytes) -> List[Dict[str, Any]]:
         """Parse PDF statement"""
         if not PDFPLUMBER_AVAILABLE:
-            raise ValueError("pdfplumber required for PDF parsing. Install: pip install pdfplumber")
+            raise ValueError("pdfplumber required for PDF parsing")
 
         try:
             trades = []
             with pdfplumber.open(io.BytesIO(content)) as pdf:
-                for page_num, page in enumerate(pdf.pages, start=1):
+                for page in pdf.pages:
                     try:
                         tables = page.extract_tables()
                         for table in tables:
@@ -341,7 +299,7 @@ class TradeJournalParser:
                             if not column_map:
                                 continue
 
-                            for row_idx, row in enumerate(table[1:], start=2):
+                            for row in table[1:]:
                                 row_data = {}
                                 for i, cell in enumerate(row):
                                     if i < len(headers):
@@ -358,8 +316,7 @@ class TradeJournalParser:
                                         trades.append(normalized)
                                 except:
                                     continue
-                    except Exception as page_error:
-                        print(f"[PDF Parser] Warning: Page {page_num} error: {page_error}")
+                    except Exception:
                         continue
 
             if not trades:
@@ -372,29 +329,25 @@ class TradeJournalParser:
 
     @staticmethod
     def parse_txt(content: bytes) -> List[Dict[str, Any]]:
-        """Parse text file - try to detect structure"""
+        """Parse text file"""
         try:
             text = content.decode('utf-8', errors='ignore')
             lines = text.strip().split('\n')
 
-            # Try to detect CSV-like structure in text (tab-separated)
             if '\t' in text:
                 return TradeJournalParser.parse_csv(content.replace(b'\t', b','))
 
-            # Try to parse as simple list of JSON objects
             trades = []
             for line in lines:
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
 
-                # Try JSON parsing per line
                 try:
                     if line.startswith('{') and line.endswith('}'):
                         trade = json.loads(line)
                         trades.append(TradeJournalParser.normalize_trade(trade))
                 except:
-                    # Try to parse simple format: SYMBOL DIRECTION ENTRY EXIT PNL
                     parts = line.split()
                     if len(parts) >= 5:
                         try:
@@ -415,94 +368,65 @@ class TradeJournalParser:
 
     @staticmethod
     def parse_image_ocr(content: bytes) -> List[Dict[str, Any]]:
-        """
-        Parse image using OCR with enhanced preprocessing.
-        FIXED: Graceful fallback if libraries missing.
-        """
+        """Parse image using OCR"""
         if not TESSERACT_AVAILABLE or not PIL_AVAILABLE:
-            raise ValueError(
-                "OCR unavailable. Required libraries not installed: pytesseract, Pillow. "
-                "Please upload CSV, Excel, PDF, or HTML files instead. "
-                "To enable OCR: pip install pytesseract pillow"
-            )
+            raise ValueError("OCR unavailable. Install pytesseract and Pillow")
 
         try:
-            # Open and preprocess image
-            image = PILImage.open(io.BytesIO(content))
+            image = Image.open(io.BytesIO(content))
 
-            # Convert to RGB if necessary (handle RGBA, P, etc.)
             if image.mode != 'RGB':
                 image = image.convert('RGB')
 
-            # Convert to grayscale
             gray_image = ImageOps.grayscale(image)
-
-            # Enhance contrast
             enhancer = ImageEnhance.Contrast(gray_image)
             gray_image = enhancer.enhance(2.0)
 
-            # Resize for better OCR (if too small)
             if gray_image.width < 1000:
                 scale_factor = 2
                 gray_image = gray_image.resize(
                     (gray_image.width * scale_factor, gray_image.height * scale_factor),
-                    resample=PILImage.LANCZOS
+                    resample=Image.LANCZOS
                 )
 
-            # Apply adaptive thresholding for better text extraction
             thresholded = gray_image.point(lambda x: 0 if x < 128 else 255, '1')
 
-            # OCR with specific config for table data
-            custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,;:$()-/ '
+            custom_config = r'--oem 3 --psm 6'
             text = pytesseract.image_to_string(thresholded, config=custom_config)
 
             if not text.strip():
                 raise ValueError("OCR could not extract any text from image")
 
-            # Extract trades from text using pattern matching
             trades = TradeJournalParser._extract_trades_from_text(text)
 
             if not trades:
-                raise ValueError(
-                    "OCR extracted text but could not identify trade patterns. "
-                    "Ensure the image shows a clear trading statement with Symbol, Direction, Entry, Exit, and PnL columns."
-                )
+                raise ValueError("OCR extracted text but could not identify trade patterns")
 
             return trades
 
-        except ValueError:
-            raise
         except Exception as e:
             raise ValueError(f"OCR processing error: {str(e)}")
 
     @staticmethod
     def _detect_columns(headers: List[str]) -> Dict[str, str]:
-        """
-        Detect column mapping from headers using comprehensive alias matching.
-        FIXED: Fuzzy matching for header names.
-        """
+        """Detect column mapping from headers"""
         mapping = {}
 
-        # Clean headers
         clean_headers = []
         for h in headers:
-            # Remove special chars, normalize spaces
             clean = re.sub(r'[^\w\s]', ' ', h.lower())
             clean = ' '.join(clean.split())
             clean_headers.append(clean)
 
         for std_col, patterns in TradeJournalParser.COLUMN_ALIASES.items():
             for pattern in patterns:
-                # Exact match
                 if pattern in clean_headers:
                     idx = clean_headers.index(pattern)
                     mapping[std_col] = headers[idx]
                     break
 
-                # Partial match (e.g., "open price" matches "price open")
                 for i, clean_h in enumerate(clean_headers):
                     if pattern in clean_h or clean_h in pattern:
-                        # Check word similarity to avoid false positives
                         pattern_words = set(pattern.split())
                         header_words = set(clean_h.split())
                         if len(pattern_words & header_words) >= min(len(pattern_words), 2):
@@ -516,10 +440,7 @@ class TradeJournalParser:
 
     @staticmethod
     def normalize_trade(trade: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Normalize trade data to standard format.
-        FIXED: Handles various formats, currency symbols, parentheses for negatives.
-        """
+        """Normalize trade data to standard format"""
         normalized = {
             "symbol": "",
             "direction": "",
@@ -537,17 +458,14 @@ class TradeJournalParser:
             "outcome": ""
         }
 
-        # Helper to clean numeric strings
         def clean_number(val):
             if val is None or val == '':
                 return 0.0
             if isinstance(val, (int, float)):
                 return float(val)
             val_str = str(val)
-            # Remove currency symbols, commas, spaces
             val_str = val_str.replace('$', '').replace('€', '').replace('£', '')
             val_str = val_str.replace(',', '').replace(' ', '')
-            # Handle parentheses for negative (accounting format)
             if '(' in val_str and ')' in val_str:
                 val_str = '-' + val_str.replace('(', '').replace(')', '')
             try:
@@ -555,23 +473,14 @@ class TradeJournalParser:
             except:
                 return 0.0
 
-        # Helper to clean date strings
         def clean_date(val):
             if not val:
                 return ""
             val_str = str(val).strip()
-            # Try to parse various date formats
             date_patterns = [
-                '%Y-%m-%d %H:%M:%S',
-                '%Y-%m-%d',
-                '%d/%m/%Y %H:%M:%S',
-                '%d/%m/%Y',
-                '%m/%d/%Y %H:%M:%S',
-                '%m/%d/%Y',
-                '%d.%m.%Y %H:%M:%S',
-                '%d.%m.%Y',
-                '%Y/%m/%d %H:%M:%S',
-                '%Y/%m/%d'
+                '%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%d/%m/%Y %H:%M:%S',
+                '%d/%m/%Y', '%m/%d/%Y %H:%M:%S', '%m/%d/%Y',
+                '%d.%m.%Y %H:%M:%S', '%d.%m.%Y'
             ]
             for pattern in date_patterns:
                 try:
@@ -581,45 +490,38 @@ class TradeJournalParser:
                     continue
             return val_str
 
-        # Symbol extraction
+        # Symbol
         for key in TradeJournalParser.COLUMN_ALIASES["symbol"]:
             if key in trade and trade[key]:
                 sym = str(trade[key]).upper().strip()
-                # Remove common separators
                 sym = sym.replace('/', '').replace('-', '').replace(' ', '')
                 normalized['symbol'] = sym
                 break
 
-        # Direction extraction
+        # Direction
         for key in TradeJournalParser.COLUMN_ALIASES["direction"]:
             if key in trade and trade[key]:
                 val = str(trade[key]).upper().strip()
-                if val in ['BUY', 'LONG', 'B', 'BOUGHT', 'OPEN BUY']:
+                if val in ['BUY', 'LONG', 'B', 'BOUGHT']:
                     normalized['direction'] = 'BUY'
-                elif val in ['SELL', 'SHORT', 'S', 'SOLD', 'OPEN SELL']:
+                elif val in ['SELL', 'SHORT', 'S', 'SOLD']:
                     normalized['direction'] = 'SELL'
                 else:
                     normalized['direction'] = val
                 break
 
         # Numeric fields
-        numeric_fields = ['entry_price', 'exit_price', 'stop_loss', 'take_profit', 'volume', 'commission', 'swap']
-        for field in numeric_fields:
+        for field in ['entry_price', 'exit_price', 'stop_loss', 'take_profit', 'volume', 'commission', 'swap']:
             for key in TradeJournalParser.COLUMN_ALIASES.get(field, [field]):
                 if key in trade and trade[key]:
                     normalized[field] = clean_number(trade[key])
                     break
 
-        # PnL (special handling for gross vs net)
+        # PnL
         for key in TradeJournalParser.COLUMN_ALIASES["pnl"]:
             if key in trade and trade[key]:
                 normalized['pnl'] = clean_number(trade[key])
                 break
-
-        # If we have commission and swap but PnL looks like gross, adjust
-        if normalized['commission'] != 0 or normalized['swap'] != 0:
-            # PnL might already include these, so we keep as is
-            pass
 
         # Dates
         for key in TradeJournalParser.COLUMN_ALIASES["entry_date"]:
@@ -638,7 +540,7 @@ class TradeJournalParser:
                 normalized['comment'] = str(trade[key]).strip()
                 break
 
-        # Determine outcome
+        # Outcome
         if normalized['pnl'] > 0:
             normalized['outcome'] = 'win'
         elif normalized['pnl'] < 0:
@@ -650,40 +552,13 @@ class TradeJournalParser:
 
     @staticmethod
     def _extract_trades_from_text(text: str) -> List[Dict[str, Any]]:
-        """
-        Extract structured trades from OCR text using pattern matching.
-        ENHANCED: Better patterns for common trading platforms.
-        """
+        """Extract trades from OCR text"""
         trades = []
         lines = text.split('\n')
 
-        # Enhanced patterns for various trade formats
         patterns = [
-            # Pattern 1: EURUSD BUY 1.0850 1.0900 50.00
-            re.compile(
-                r'(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD|XAUUSD|XAGUSD|BTCUSD|ETHUSD|[A-Z]{3,6})\s+'
-                r'(BUY|SELL|LONG|SHORT)\s+'
-                r'(\d+\.\d+)\s+'
-                r'(\d+\.\d+)\s*'
-                r'([+-]?\d+\.?\d*)'
-            ),
-            # Pattern 2: Symbol Direction Entry Exit Lots PnL
-            re.compile(
-                r'(EURUSD|GBPUSD|USDJPY|[A-Z]{3,6})\s+'
-                r'(BUY|SELL)\s+'
-                r'(\d+\.\d+)\s+'
-                r'(\d+\.\d+)\s+'
-                r'(\d+\.?\d*)\s+'
-                r'([+-]?\$?\d+\.?\d*)'
-            ),
-            # Pattern 3: MT4/MT5 style with date
-            re.compile(
-                r'(\d{4}[-\.]\d{2}[-\.]\d{2})?\s*'
-                r'(EURUSD|GBPUSD|USDJPY|[A-Z]{3,6})\s+'
-                r'(BUY|SELL)\s+'
-                r'(\d+\.\d+)\s+'
-                r'(\d+\.\d+)'
-            )
+            re.compile(r'(EURUSD|GBPUSD|USDJPY|USDCHF|AUDUSD|USDCAD|NZDUSD|XAUUSD|XAGUSD|BTCUSD|ETHUSD|[A-Z]{3,6})\s+(BUY|SELL|LONG|SHORT)\s+(\d+\.\d+)\s+(\d+\.\d+)\s*([+-]?\d+\.?\d*)'),
+            re.compile(r'(EURUSD|GBPUSD|USDJPY|[A-Z]{3,6})\s+(BUY|SELL)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.?\d*)\s+([+-]?\$?\d+\.?\d*)')
         ]
 
         for line in lines:
@@ -715,7 +590,7 @@ class TradeJournalParser:
         return trades
 
 
-# Convenience function for API usage (backward compatibility)
+# Backward compatibility
 def parse_journal_file(file_content: bytes, filename: str) -> List[Dict[str, Any]]:
-    """Parse any supported journal file format - convenience wrapper"""
+    """Parse any supported journal file format"""
     return TradeJournalParser.parse_file(file_content, filename)

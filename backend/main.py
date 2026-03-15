@@ -32,6 +32,9 @@ from . import chart_analysis
 # NEW: Import enhanced performance (includes upload-journal, psychology insights)
 from . import performance
 
+# NEW: Import upgraded AI Mentor (Platform Intelligence System v3.0)
+from . import ai_mentor
+
 # Keep old imports for backwards compatibility if needed
 # from . import ai_screening  # Can be removed if fully replaced by ai_services
 
@@ -116,6 +119,10 @@ app.include_router(chart_analysis.router, prefix="/ai/chart", tags=["Chart Analy
 # UPDATED: Performance Router (upload-journal endpoint, psychology insights)
 # Mounted at /ai/performance - provides: /upload-journal, /analyze-journal, /dashboard, /equity-curve, /monthly-analysis
 app.include_router(performance.router, prefix="/ai/performance", tags=["Performance Analytics"])
+
+# NEW: AI Mentor Router (context-aware coach, insights, recommendations)
+# Mounted at /ai/mentor - provides: /ask, /insights, /history, /clear-history
+app.include_router(ai_mentor.router, prefix="/ai/mentor", tags=["AI Mentor v3.0"])
 
 # NOTE: If you were using ai_screening before, it can be removed since ai_services replaces it
 # If keeping for backwards compatibility, uncomment:

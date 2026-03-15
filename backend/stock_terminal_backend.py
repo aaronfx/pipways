@@ -6,16 +6,8 @@ Mount the router into your existing FastAPI app:
     from . import stock_terminal_backend as stock_module
     app.include_router(stock_module.router, prefix="/api/stock", tags=["Stock Terminal"])
 
-Optionally initialise clients in your lifespan (not required — lazy init handles it):
-
-    stock_module._anthropic = AsyncAnthropic(api_key=anthropic_key)
-    stock_module._http      = httpx.AsyncClient(timeout=10.0)
-
 Dependencies:
     pip install fastapi anthropic httpx python-dotenv uvicorn
-
-Run standalone (dev):
-    uvicorn stock_terminal_backend:app --port 5050 --reload
 
 Environment variables required:
     ANTHROPIC_API_KEY   - your Anthropic key
@@ -44,18 +36,15 @@ ALPHA_BASE        = "https://www.alphavantage.co/query"
 CACHE_TTL         = 300  # seconds (5 min)
 
 # ── Shared async clients ──────────────────────────────────────────────────────
-# Can be set externally by main.py lifespan, OR lazily self-initialised on
-# first request via _require_clients() below — whichever happens first.
 _anthropic: AsyncAnthropic | None    = None
 _http:      httpx.AsyncClient | None = None
 
-# ── Async-safe cache (lock created lazily to avoid event-loop binding issues) ─
+# ── Async-safe cache ──────────────────────────────────────────────────────────
 _cache_lock: asyncio.Lock | None = None
 _cache:      dict[str, dict]     = {}
 
 
 def _get_lock() -> asyncio.Lock:
-    """Return (creating on first call) the cache lock bound to the running loop."""
     global _cache_lock
     if _cache_lock is None:
         _cache_lock = asyncio.Lock()
@@ -75,26 +64,18 @@ async def cache_set(key: str, data: Any) -> None:
         _cache[key] = {"data": data, "ts": time.monotonic()}
 
 
-# ── Client guard — lazy self-initialisation ───────────────────────────────────
-# If main.py's lifespan didn't set the clients (e.g. dual-import bug or old
-# deploy), this function initialises them on the first incoming request using
-# the environment variable directly.  This makes the module self-sufficient.
+# ── Lazy self-initialisation ──────────────────────────────────────────────────
 def _require_clients() -> None:
     global _anthropic, _http
-
     if _anthropic is None:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key:
             raise HTTPException(
                 status_code=503,
-                detail=(
-                    "ANTHROPIC_API_KEY environment variable is not set. "
-                    "Add it in your Render → Environment settings."
-                ),
+                detail="ANTHROPIC_API_KEY environment variable is not set. Add it in Render → Environment.",
             )
         _anthropic = AsyncAnthropic(api_key=api_key)
         print("[STOCK] Anthropic client lazy-initialised", flush=True)
-
     if _http is None:
         _http = httpx.AsyncClient(timeout=10.0)
         print("[STOCK] HTTP client lazy-initialised", flush=True)
@@ -109,7 +90,7 @@ class OkResponse(BaseModel):
 
 
 class PortfolioRequest(BaseModel):
-    amount:  float = Field(default=10_000, gt=0, description="Investment amount in USD")
+    amount:  float = Field(default=10_000, gt=0)
     risk:    str   = Field(default="moderate", pattern="^(conservative|moderate|aggressive)$")
     horizon: str   = Field(default="long",     pattern="^(short|medium|long)$")
 
@@ -128,12 +109,10 @@ SYSTEM_PROMPT = (
 
 
 async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
-    """Call Claude asynchronously and return parsed JSON."""
     _require_clients()
-
     try:
         message = await _anthropic.messages.create(
-            model      = "claude-sonnet-4-6",  # cost-efficient, fast, accurate
+            model      = "claude-sonnet-4-6",
             max_tokens = max_tokens,
             system     = SYSTEM_PROMPT,
             messages   = [{"role": "user", "content": prompt}],
@@ -144,16 +123,16 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
     raw   = "".join(b.text for b in message.content if hasattr(b, "text"))
     clean = raw.strip()
     if clean.startswith("```"):
-        clean = clean.split("\n", 1)[-1]           # drop ```json opening line
+        clean = clean.split("\n", 1)[-1]
     if clean.endswith("```"):
-        clean = clean.rsplit("```", 1)[0].strip()  # drop closing fence
+        clean = clean.rsplit("```", 1)[0].strip()
 
     try:
         return json.loads(clean)
     except json.JSONDecodeError as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Claude returned invalid JSON: {exc}. Raw (first 300 chars): {raw[:300]}",
+            detail=f"Claude returned invalid JSON: {exc}. Raw: {raw[:300]}",
         ) from exc
 
 
@@ -163,7 +142,6 @@ _AV_ERROR_KEYS = {"Note", "Information", "Error Message"}
 
 
 def _check_av_response(payload: dict, symbol: str) -> None:
-    """Raise a clear error if Alpha Vantage returned a rate-limit or error payload."""
     for key in _AV_ERROR_KEYS:
         if key in payload:
             raise HTTPException(
@@ -171,14 +149,10 @@ def _check_av_response(payload: dict, symbol: str) -> None:
                 detail=f"Alpha Vantage limit/error for '{symbol}': {payload[key][:200]}",
             )
     if not payload:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No data returned for '{symbol}'. Verify the ticker symbol.",
-        )
+        raise HTTPException(status_code=404, detail=f"No data for '{symbol}'.")
 
 
 async def fetch_quote(symbol: str) -> dict:
-    """Async real-time quote from Alpha Vantage."""
     _require_clients()
     key = f"quote:{symbol}"
     if cached := await cache_get(key):
@@ -191,12 +165,13 @@ async def fetch_quote(symbol: str) -> dict:
             "apikey":   ALPHA_VANTAGE_KEY,
         })
         resp.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Market data fetch error: {exc}") from exc
-
-    payload = resp.json()
-    _check_av_response(payload, symbol)
-    raw = payload.get("Global Quote", {})
+        payload = resp.json()
+        _check_av_response(payload, symbol)
+        raw = payload.get("Global Quote", {})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Market data error: {exc}") from exc
 
     result = {
         "symbol":     symbol,
@@ -213,7 +188,6 @@ async def fetch_quote(symbol: str) -> dict:
 
 
 async def fetch_overview(symbol: str) -> dict:
-    """Async company overview / fundamentals from Alpha Vantage."""
     _require_clients()
     key = f"overview:{symbol}"
     if cached := await cache_get(key):
@@ -226,11 +200,12 @@ async def fetch_overview(symbol: str) -> dict:
             "apikey":   ALPHA_VANTAGE_KEY,
         })
         resp.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Market data fetch error: {exc}") from exc
-
-    d = resp.json()
-    _check_av_response(d, symbol)
+        d = resp.json()
+        _check_av_response(d, symbol)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Market data error: {exc}") from exc
 
     result = {
         "name":              d.get("Name",                 symbol),
@@ -264,6 +239,49 @@ async def fetch_overview(symbol: str) -> dict:
     }
     await cache_set(key, result)
     return result
+
+
+# ── Ask Claude to fill in missing market data from its own knowledge ──────────
+async def enrich_with_claude(symbol: str) -> dict:
+    """
+    When Alpha Vantage is unavailable/rate-limited, ask Claude to provide
+    approximate market data from its training knowledge so the UI is not empty.
+    """
+    prompt = f"""
+Provide approximate but realistic market data for the stock {symbol} based on your training knowledge.
+Use recent/typical values. If you are uncertain about a specific number, provide a reasonable estimate.
+
+Return ONLY this JSON (no markdown):
+{{
+  "name": "<Full company name>",
+  "sector": "<sector>",
+  "industry": "<industry>",
+  "price": <approximate current price as number>,
+  "change": <typical daily change as number, e.g. 1.25>,
+  "change_pct": "<e.g. 0.65>",
+  "market_cap": "<formatted e.g. $2.8T or $450B>",
+  "pe_ratio": "<e.g. 32.5 or N/A>",
+  "eps": "<e.g. 6.43 or N/A>",
+  "beta": "<e.g. 1.24 or N/A>",
+  "div_yield": "<e.g. 0.52% or N/A>",
+  "52_week_high": "<e.g. 220.00 or N/A>",
+  "52_week_low": "<e.g. 150.00 or N/A>",
+  "profit_margin": "<e.g. 24.5% or N/A>",
+  "return_on_equity": "<e.g. 18.2% or N/A>",
+  "debt_to_equity": "<e.g. 0.45 or N/A>",
+  "revenue_ttm": "<formatted e.g. $383B or N/A>",
+  "analyst_target": "<e.g. 210.00 or N/A>",
+  "exchange": "<e.g. NASDAQ>",
+  "country": "<e.g. USA>",
+  "forward_pe": "<e.g. 28.5 or N/A>",
+  "ebitda": "<formatted e.g. $120B or N/A>",
+  "data_source": "AI estimate (live data unavailable)"
+}}
+"""
+    try:
+        return await claude_json(prompt, max_tokens=600)
+    except Exception:
+        return {"name": symbol, "sector": "N/A", "data_source": "unavailable"}
 
 
 # ── Router ────────────────────────────────────────────────────────────────────
@@ -306,34 +324,63 @@ async def analyze(symbol: str) -> OkResponse:
         if cached := await cache_get(cache_key):
             return OkResponse(data=cached, cached=True)
 
-        # Fetch quote + overview concurrently; degrade gracefully if either fails
-        quote_data: dict = {"price": "N/A", "change_pct": "N/A"}
-        ov:         dict = {"name": sym, "sector": "Unknown"}
+        # ── Step 1: Try to get live market data from Alpha Vantage ────────────
+        quote_data: dict | None = None
+        ov:         dict | None = None
+        market_data_source = "live"
 
         try:
             quote_data, ov = await asyncio.gather(
                 fetch_quote(sym),
                 fetch_overview(sym),
             )
-        except HTTPException as exc:
-            print(f"[STOCK] Market data degraded for {sym}: {exc.detail}", flush=True)
         except Exception as exc:
-            print(f"[STOCK] Market data failed for {sym}: {exc}", flush=True)
+            print(f"[STOCK] Alpha Vantage unavailable for {sym}: {exc} — using AI estimates", flush=True)
+            market_data_source = "ai_estimate"
+
+        # ── Step 2: If live data failed, ask Claude to fill it in ─────────────
+        if ov is None or not ov.get("name") or ov.get("name") == sym:
+            print(f"[STOCK] Enriching {sym} with Claude knowledge", flush=True)
+            ai_market = await enrich_with_claude(sym)
+            # Merge: use AI estimates for anything missing
+            if ov is None:
+                ov = ai_market
+            else:
+                for k, v in ai_market.items():
+                    if not ov.get(k) or ov.get(k) == "N/A":
+                        ov[k] = v
+            if quote_data is None:
+                quote_data = {
+                    "symbol":     sym,
+                    "price":      ai_market.get("price", 0),
+                    "change":     ai_market.get("change", 0),
+                    "change_pct": str(ai_market.get("change_pct", "0")),
+                    "volume":     0,
+                    "prev_close": 0,
+                    "high":       0,
+                    "low":        0,
+                }
+
+        # ── Step 3: Build the AI analysis prompt ──────────────────────────────
+        data_note = (
+            "NOTE: Live market data is unavailable. Use your training knowledge for current prices and metrics."
+            if market_data_source == "ai_estimate" else ""
+        )
 
         prompt = f"""
-Analyze the stock {sym} using the following real market data:
+Analyze the stock {sym} using the following data:
+{data_note}
 
 Company: {ov.get('name')}
 Sector: {ov.get('sector')} | Industry: {ov.get('industry')}
 Current Price: ${quote_data.get('price')} | Change: {quote_data.get('change_pct')}%
 Market Cap: {ov.get('market_cap')} | P/E: {ov.get('pe_ratio')} | Forward P/E: {ov.get('forward_pe')}
-EPS: {ov.get('eps')} | PEG Ratio: {ov.get('peg_ratio')}
-Beta: {ov.get('beta')} | 52w High: {ov.get('52_week_high')} | 52w Low: {ov.get('52_week_low')}
+EPS: {ov.get('eps')} | Beta: {ov.get('beta')}
+52w High: {ov.get('52_week_high')} | 52w Low: {ov.get('52_week_low')}
 Dividend Yield: {ov.get('div_yield')} | Analyst Target: {ov.get('analyst_target')}
-Profit Margin: {ov.get('profit_margin')} | ROE: {ov.get('return_on_equity')} | ROA: {ov.get('return_on_assets')}
-Debt/Equity: {ov.get('debt_to_equity')} | Current Ratio: {ov.get('current_ratio')}
-Revenue TTM: {ov.get('revenue_ttm')} | EBITDA: {ov.get('ebitda')}
-Exchange: {ov.get('exchange')} | Country: {ov.get('country')}
+Profit Margin: {ov.get('profit_margin')} | ROE: {ov.get('return_on_equity')}
+Debt/Equity: {ov.get('debt_to_equity')} | Revenue TTM: {ov.get('revenue_ttm')}
+EBITDA: {ov.get('ebitda')} | Exchange: {ov.get('exchange')} | Country: {ov.get('country')}
 
 Return exactly this JSON structure:
 {{
@@ -373,9 +420,13 @@ Return exactly this JSON structure:
 }}
 """
         ai_data = await claude_json(prompt)
-        result  = {
+
+        # ── Step 4: Merge everything into a clean market_data dict ────────────
+        merged_market = {**quote_data, **ov, "data_source": market_data_source}
+
+        result = {
             "symbol":      sym,
-            "market_data": {**quote_data, **ov},
+            "market_data": merged_market,
             "ai_analysis": ai_data,
         }
         await cache_set(cache_key, result)
@@ -450,15 +501,16 @@ async def compare(body: CompareRequest) -> OkResponse:
         overviews = dict(pairs)
 
         stock_context = "\n".join(
-            f"- {sym}: {overviews[sym].get('name','?')}, "
-            f"Sector: {overviews[sym].get('sector','?')}, "
-            f"P/E: {overviews[sym].get('pe_ratio','?')}, "
-            f"Beta: {overviews[sym].get('beta','?')}"
+            f"- {sym}: {overviews[sym].get('name', sym)}, "
+            f"Sector: {overviews[sym].get('sector', '?')}, "
+            f"P/E: {overviews[sym].get('pe_ratio', '?')}, "
+            f"Beta: {overviews[sym].get('beta', '?')}"
             for sym in symbols
         )
 
         prompt = f"""
-Compare these stocks for an investor and rank them objectively:
+Compare these stocks for an investor and rank them objectively.
+Use your training knowledge if live data is missing.
 
 {stock_context}
 
@@ -516,7 +568,6 @@ async def cache_stats() -> dict:
 
 @router.get("/health", include_in_schema=False)
 async def health() -> dict:
-    # Trigger lazy init so health check reflects true readiness
     try:
         _require_clients()
     except Exception:
@@ -527,11 +578,11 @@ async def health() -> dict:
         "anthropic_ready": _anthropic is not None,
         "http_ready":      _http is not None,
         "alpha_vantage":   "demo (25 req/day)" if ALPHA_VANTAGE_KEY == "demo" else "configured",
-        "model":           "claude-sonnet-4-5-20251001",
+        "model":           "claude-sonnet-4-6",
     }
 
 
-# ── Standalone app (dev only) ─────────────────────────────────────────────────
+# ── Standalone app ────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _anthropic, _http
@@ -539,15 +590,14 @@ async def lifespan(application: FastAPI):
         raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
     _anthropic = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     _http      = httpx.AsyncClient(timeout=10.0)
-    print("✓  Pipways Stock Terminal started (standalone)")
-    print(f"   Model        : claude-sonnet-4-5-20251001")
-    print(f"   Alpha Vantage: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (25 req/day limit)'}")
+    print("✓  Pipways Stock Terminal started")
+    print(f"   Model        : claude-sonnet-4-6")
+    print(f"   Alpha Vantage: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (25 req/day)'}")
     yield
     await _http.aclose()
-    print("✓  Pipways Stock Terminal shut down")
 
 
-app = FastAPI(title="Pipways AI Stock Research Terminal", version="2.2.0", lifespan=lifespan)
+app = FastAPI(title="Pipways AI Stock Research Terminal", version="2.3.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router, prefix="/api/stock", tags=["Stock Terminal"])
 

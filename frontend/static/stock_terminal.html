@@ -1,0 +1,396 @@
+"""
+Pipways AI Stock Research Terminal - Backend Module
+====================================================
+Flask blueprint you can register into your existing app:
+
+    from stock_terminal_backend import stock_bp
+    app.register_blueprint(stock_bp, url_prefix="/api/stock")
+
+Dependencies:
+    pip install flask anthropic requests python-dotenv
+
+Environment variables required:
+    ANTHROPIC_API_KEY   - your Anthropic key
+    ALPHA_VANTAGE_KEY   - free key from alphavantage.co  (market data)
+
+Alpha Vantage free tier: 25 requests/day, 5/min — sufficient for a demo/MVP.
+Swap to Polygon.io or Yahoo Finance (yfinance) for production.
+"""
+
+import os
+import json
+import time
+import threading
+from functools import lru_cache
+from flask import Blueprint, request, jsonify
+import anthropic
+import requests
+
+# ── Blueprint ────────────────────────────────────────────────────────────────
+stock_bp = Blueprint("stock", __name__)
+
+# ── Clients ───────────────────────────────────────────────────────────────────
+_anthropic_client = None
+
+def get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY environment variable not set")
+        _anthropic_client = anthropic.Anthropic(api_key=api_key)
+    return _anthropic_client
+
+ALPHA_VANTAGE_KEY = os.environ.get("ALPHA_VANTAGE_KEY", "demo")
+ALPHA_BASE = "https://www.alphavantage.co/query"
+
+# ── Simple in-process cache (replace with Redis in production) ────────────────
+_cache: dict = {}
+_cache_lock = threading.Lock()
+CACHE_TTL = 300  # 5 minutes
+
+def cache_get(key: str):
+    with _cache_lock:
+        item = _cache.get(key)
+        if item and time.time() - item["ts"] < CACHE_TTL:
+            return item["data"]
+    return None
+
+def cache_set(key: str, data):
+    with _cache_lock:
+        _cache[key] = {"data": data, "ts": time.time()}
+
+# ── Market Data Helpers ───────────────────────────────────────────────────────
+
+def fetch_quote(symbol: str) -> dict:
+    """Fetch real-time quote from Alpha Vantage."""
+    cached = cache_get(f"quote:{symbol}")
+    if cached:
+        return cached
+
+    r = requests.get(ALPHA_BASE, params={
+        "function": "GLOBAL_QUOTE",
+        "symbol": symbol,
+        "apikey": ALPHA_VANTAGE_KEY,
+    }, timeout=8)
+    r.raise_for_status()
+    data = r.json().get("Global Quote", {})
+
+    result = {
+        "symbol": symbol,
+        "price": float(data.get("05. price", 0) or 0),
+        "change": float(data.get("09. change", 0) or 0),
+        "change_pct": data.get("10. change percent", "0%").replace("%", "").strip(),
+        "volume": int(data.get("06. volume", 0) or 0),
+        "prev_close": float(data.get("08. previous close", 0) or 0),
+        "high": float(data.get("03. high", 0) or 0),
+        "low": float(data.get("04. low", 0) or 0),
+    }
+    cache_set(f"quote:{symbol}", result)
+    return result
+
+
+def fetch_overview(symbol: str) -> dict:
+    """Fetch company overview from Alpha Vantage."""
+    cached = cache_get(f"overview:{symbol}")
+    if cached:
+        return cached
+
+    r = requests.get(ALPHA_BASE, params={
+        "function": "OVERVIEW",
+        "symbol": symbol,
+        "apikey": ALPHA_VANTAGE_KEY,
+    }, timeout=8)
+    r.raise_for_status()
+    data = r.json()
+
+    result = {
+        "name": data.get("Name", symbol),
+        "sector": data.get("Sector", "N/A"),
+        "industry": data.get("Industry", "N/A"),
+        "market_cap": data.get("MarketCapitalization", "N/A"),
+        "pe_ratio": data.get("PERatio", "N/A"),
+        "eps": data.get("EPS", "N/A"),
+        "beta": data.get("Beta", "N/A"),
+        "div_yield": data.get("DividendYield", "N/A"),
+        "52_week_high": data.get("52WeekHigh", "N/A"),
+        "52_week_low": data.get("52WeekLow", "N/A"),
+        "profit_margin": data.get("ProfitMargin", "N/A"),
+        "revenue_ttm": data.get("RevenueTTM", "N/A"),
+        "gross_profit_ttm": data.get("GrossProfitTTM", "N/A"),
+        "ebitda": data.get("EBITDA", "N/A"),
+        "description": data.get("Description", ""),
+        "exchange": data.get("Exchange", "N/A"),
+        "currency": data.get("Currency", "USD"),
+        "country": data.get("Country", "N/A"),
+        "fiscal_year_end": data.get("FiscalYearEnd", "N/A"),
+        "analyst_target": data.get("AnalystTargetPrice", "N/A"),
+        "forward_pe": data.get("ForwardPE", "N/A"),
+        "peg_ratio": data.get("PEGRatio", "N/A"),
+        "book_value": data.get("BookValue", "N/A"),
+        "revenue_per_share": data.get("RevenuePerShareTTM", "N/A"),
+        "return_on_equity": data.get("ReturnOnEquityTTM", "N/A"),
+        "return_on_assets": data.get("ReturnOnAssetsTTM", "N/A"),
+        "debt_to_equity": data.get("DebtToEquityRatio", "N/A"),
+        "current_ratio": data.get("CurrentRatio", "N/A"),
+    }
+    cache_set(f"overview:{symbol}", result)
+    return result
+
+
+# ── Claude AI Helpers ─────────────────────────────────────────────────────────
+
+SYSTEM_PROMPT = (
+    "You are an elite quantitative financial analyst and portfolio manager. "
+    "You provide data-driven, objective investment analysis. "
+    "Always respond with valid JSON only — no markdown, no preamble, no explanation."
+)
+
+def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
+    """Call Claude and return parsed JSON."""
+    client = get_anthropic_client()
+    message = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=max_tokens,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = "".join(b.text for b in message.content if hasattr(b, "text"))
+    # Strip any accidental markdown fences
+    clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+    return json.loads(clean)
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+
+@stock_bp.route("/quote/<symbol>", methods=["GET"])
+def quote(symbol: str):
+    """Live market quote for a symbol."""
+    try:
+        data = fetch_quote(symbol.upper())
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@stock_bp.route("/overview/<symbol>", methods=["GET"])
+def overview(symbol: str):
+    """Company overview / fundamentals."""
+    try:
+        data = fetch_overview(symbol.upper())
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@stock_bp.route("/analyze/<symbol>", methods=["GET"])
+def analyze(symbol: str):
+    """
+    Full AI analysis: rating, scores, outlook, technicals, risk, summary.
+    Cached for CACHE_TTL seconds to avoid repeated AI calls for the same symbol.
+    """
+    sym = symbol.upper()
+    cache_key = f"analysis:{sym}"
+    cached = cache_get(cache_key)
+    if cached:
+        return jsonify({"ok": True, "data": cached, "cached": True})
+
+    try:
+        quote_data = fetch_quote(sym)
+        ov = fetch_overview(sym)
+    except Exception as e:
+        # Graceful degradation — proceed with partial data
+        quote_data = {"price": "N/A", "change_pct": "N/A"}
+        ov = {"name": sym, "sector": "Unknown"}
+
+    prompt = f"""
+Analyze the stock {sym} using the following real market data:
+
+Company: {ov.get('name')}
+Sector: {ov.get('sector')} | Industry: {ov.get('industry')}
+Current Price: ${quote_data.get('price')} | Change: {quote_data.get('change_pct')}%
+Market Cap: {ov.get('market_cap')} | P/E: {ov.get('pe_ratio')} | Forward P/E: {ov.get('forward_pe')}
+EPS: {ov.get('eps')} | PEG Ratio: {ov.get('peg_ratio')}
+Beta: {ov.get('beta')} | 52w High: {ov.get('52_week_high')} | 52w Low: {ov.get('52_week_low')}
+Dividend Yield: {ov.get('div_yield')} | Analyst Target: {ov.get('analyst_target')}
+Profit Margin: {ov.get('profit_margin')} | ROE: {ov.get('return_on_equity')} | ROA: {ov.get('return_on_assets')}
+Debt/Equity: {ov.get('debt_to_equity')} | Current Ratio: {ov.get('current_ratio')}
+Revenue TTM: {ov.get('revenue_ttm')} | EBITDA: {ov.get('ebitda')}
+Exchange: {ov.get('exchange')} | Country: {ov.get('country')}
+
+Return exactly this JSON structure:
+{{
+  "rating": "BUY" | "HOLD" | "SELL" | "STRONG_BUY",
+  "confidence": <integer 50-99>,
+  "hold_period": "<e.g. Long Term (2-5 years)>",
+  "scores": {{
+    "Financial Strength": <0-100>,
+    "Price Momentum": <0-100>,
+    "Market Sentiment": <0-100>,
+    "Sector Performance": <0-100>,
+    "Growth Potential": <0-100>,
+    "Risk Level": <0-100>
+  }},
+  "overall_score": <float 0.0-10.0, one decimal>,
+  "weighted_score": <float 0.0-100.0>,
+  "long_term_outlook": "<one clear sentence>",
+  "growth_window": "<e.g. 3-7 years>",
+  "risk_level": "Low" | "Medium" | "High",
+  "trend": "Bullish" | "Bearish" | "Neutral",
+  "momentum": "Strong" | "Moderate" | "Weak",
+  "key_support": <number>,
+  "key_resistance": <number>,
+  "risks": ["<risk 1>", "<risk 2>", "<risk 3>"],
+  "opportunities": ["<opportunity 1>", "<opportunity 2>"],
+  "summary": "<3-4 sentence human-style investment summary>",
+  "short_term": "Not recommended" | "Moderate opportunity" | "Strong opportunity",
+  "medium_term": "Not recommended" | "Moderate opportunity" | "Strong opportunity",
+  "long_term": "Not recommended" | "Moderate opportunity" | "Strong investment candidate",
+  "revenue_growth": "Weak" | "Moderate" | "Strong",
+  "profit_margin_rating": "Low" | "Moderate" | "High",
+  "debt_level": "Low" | "Moderate" | "High",
+  "cash_flow": "Negative" | "Moderate" | "Strong",
+  "competitive_moat": "Narrow" | "Wide" | "None",
+  "insider_sentiment": "Bearish" | "Neutral" | "Bullish",
+  "analyst_consensus": "Underperform" | "Hold" | "Buy" | "Strong Buy"
+}}
+"""
+    try:
+        ai_data = claude_json(prompt)
+        result = {
+            "symbol": sym,
+            "market_data": {**quote_data, **ov},
+            "ai_analysis": ai_data,
+        }
+        cache_set(cache_key, result)
+        return jsonify({"ok": True, "data": result, "cached": False})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"AI analysis failed: {str(e)}"}), 500
+
+
+@stock_bp.route("/portfolio", methods=["POST"])
+def portfolio():
+    """
+    Build an AI-optimised portfolio.
+    Body: { "amount": 10000, "risk": "moderate", "horizon": "long" }
+    """
+    body = request.get_json(force=True) or {}
+    amount = body.get("amount", 10000)
+    risk = body.get("risk", "moderate")
+    horizon = body.get("horizon", "long")
+
+    prompt = f"""
+Build an optimal diversified stock portfolio for an investor with these parameters:
+- Investment amount: ${amount:,}
+- Risk tolerance: {risk}
+- Investment horizon: {horizon} term
+
+Return exactly this JSON:
+{{
+  "allocations": [
+    {{
+      "symbol": "<TICKER>",
+      "name": "<Company Name>",
+      "pct": <integer, allocations must sum to 100>,
+      "amount": <dollar amount>,
+      "rationale": "<one sentence why>",
+      "asset_type": "Stock" | "ETF" | "Bond ETF"
+    }}
+  ],
+  "expected_annual_return": "<e.g. 10-14%>",
+  "expected_volatility": "Low" | "Moderate" | "High",
+  "risk_profile": "<Conservative|Moderate|Aggressive>",
+  "diversification_score": <0-100>,
+  "summary": "<2 sentence portfolio thesis>",
+  "rebalance_frequency": "Quarterly" | "Semi-Annual" | "Annual"
+}}
+
+Rules:
+- 4 to 7 positions total
+- Include at least 1 ETF for diversification
+- Allocations must be whole numbers and sum to exactly 100
+- dollar amounts must reflect the allocation percentage of ${amount:,}
+"""
+    try:
+        data = claude_json(prompt, max_tokens=1000)
+        # Ensure dollar amounts are correct (recalculate server-side)
+        for a in data.get("allocations", []):
+            a["amount"] = round(float(amount) * int(a.get("pct", 0)) / 100, 2)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@stock_bp.route("/compare", methods=["POST"])
+def compare():
+    """
+    Compare multiple stocks side-by-side.
+    Body: { "symbols": ["AAPL", "NVDA", "MSFT"] }
+    """
+    body = request.get_json(force=True) or {}
+    symbols = [s.upper() for s in body.get("symbols", []) if s][:5]
+    if len(symbols) < 2:
+        return jsonify({"ok": False, "error": "Provide at least 2 symbols"}), 400
+
+    # Fetch overview for each to enrich the prompt
+    overviews = {}
+    for sym in symbols:
+        try:
+            overviews[sym] = fetch_overview(sym)
+        except Exception:
+            overviews[sym] = {"name": sym}
+
+    stock_context = "\n".join(
+        f"- {sym}: {overviews[sym].get('name','?')}, Sector: {overviews[sym].get('sector','?')}, "
+        f"P/E: {overviews[sym].get('pe_ratio','?')}, Beta: {overviews[sym].get('beta','?')}"
+        for sym in symbols
+    )
+
+    prompt = f"""
+Compare these stocks for an investor and rank them objectively:
+
+{stock_context}
+
+Return exactly this JSON:
+{{
+  "stocks": [
+    {{
+      "symbol": "<TICKER>",
+      "rating": "BUY" | "HOLD" | "SELL",
+      "overall_rank": <1 to {len(symbols)}>,
+      "growth_score": <0-100>,
+      "valuation_score": <0-100>,
+      "risk_score": <0-100>,
+      "momentum_score": <0-100>,
+      "dividend_score": <0-100>,
+      "one_line_summary": "<concise analyst opinion>",
+      "best_for": "Growth investors" | "Income investors" | "Value investors" | "Traders"
+    }}
+  ],
+  "winner": "<symbol>",
+  "winner_reason": "<one sentence>",
+  "avoid": "<symbol or null>",
+  "avoid_reason": "<one sentence or null>"
+}}
+Provide one object per symbol. Rank 1 = best.
+"""
+    try:
+        data = claude_json(prompt, max_tokens=900)
+        return jsonify({"ok": True, "data": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ── Standalone runner (for development) ──────────────────────────────────────
+if __name__ == "__main__":
+    from flask import Flask
+    from flask_cors import CORS
+
+    app = Flask(__name__)
+    CORS(app)  # Allow requests from your frontend during dev
+    app.register_blueprint(stock_bp, url_prefix="/api/stock")
+
+    print("Pipways Stock Terminal Backend running on http://localhost:5050")
+    print(f"Anthropic key set: {'YES' if os.environ.get('ANTHROPIC_API_KEY') else 'NO - set ANTHROPIC_API_KEY'}")
+    print(f"Alpha Vantage key: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (limited)'}")
+    app.run(port=5050, debug=True)

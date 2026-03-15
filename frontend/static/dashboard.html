@@ -437,7 +437,7 @@
 
                     <div id="trade-validator-modal" class="hidden mt-6 bg-gray-800 rounded-xl p-6 border border-gray-700">
                         <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-shield-alt mr-2 text-blue-400"></i>AI Trade Validator</h4>
-                        <div class="grid grid-cols-4 gap-4 mb-4">
+                        <div class="grid grid-cols-5 gap-4 mb-4">
                             <div>
                                 <label class="block text-xs text-gray-400 mb-1">Entry</label>
                                 <input type="number" id="validator-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
@@ -453,6 +453,13 @@
                             <div>
                                 <label class="block text-xs text-gray-400 mb-1">Symbol</label>
                                 <input type="text" id="validator-symbol" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Direction</label>
+                                <select id="validator-direction" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+                                    <option value="BUY">BUY</option>
+                                    <option value="SELL">SELL</option>
+                                </select>
                             </div>
                         </div>
                         <button onclick="dashboard.validateTradeSetup()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg mb-4">Validate Setup</button>
@@ -1077,7 +1084,13 @@
                     biasEl.textContent = data.trading_bias || data.bias || 'Neutral';
                     biasEl.className = `text-2xl font-bold ml-2 uppercase ${data.trading_bias === 'bullish' ? 'text-green-400' : data.trading_bias === 'bearish' ? 'text-red-400' : 'text-gray-400'}`;
 
-                    document.getElementById('analysis-pattern').textContent = data.pattern || 'No pattern detected';
+                    // FIX BUG 3: Use patterns_detected array instead of pattern
+                    const patternEl = document.getElementById('analysis-pattern');
+                    if (data.patterns_detected && data.patterns_detected.length > 0) {
+                        patternEl.textContent = data.patterns_detected.map(p => p.name).join(', ');
+                    } else {
+                        patternEl.textContent = 'No pattern detected';
+                    }
 
                     if (data.trade_setup) {
                         const setup = data.trade_setup;
@@ -1102,9 +1115,10 @@
                         insightsEl.innerHTML = data.key_insights.map(i => `<li>${i}</li>`).join('');
                     }
 
+                    // FIX BUG 2: Use data.chart_image from server response
                     const attachedChart = document.getElementById('attached-chart-preview');
-                    if (attachedChart) {
-                        attachedChart.src = this.currentChartBase64;
+                    if (attachedChart && data.chart_image) {
+                        attachedChart.src = data.chart_image;
                         attachedChart.classList.remove('hidden');
                     }
 
@@ -1128,6 +1142,10 @@
                         document.getElementById('validator-sl').value = setup.stop_loss || setup.sl || '';
                         document.getElementById('validator-tp').value = setup.take_profit || setup.tp || '';
                         document.getElementById('validator-symbol').value = this.currentAnalysis.symbol || '';
+                        // FIX BUG 1: Set direction from analysis bias if available
+                        const direction = this.currentAnalysis.trading_bias === 'bullish' ? 'BUY' : 
+                                         this.currentAnalysis.trading_bias === 'bearish' ? 'SELL' : 'BUY';
+                        document.getElementById('validator-direction').value = direction;
                     }
                 }
             }
@@ -1137,6 +1155,8 @@
                 const sl = parseFloat(document.getElementById('validator-sl')?.value);
                 const tp = parseFloat(document.getElementById('validator-tp')?.value);
                 const symbol = document.getElementById('validator-symbol')?.value || 'EURUSD';
+                // FIX BUG 1: Get direction from the select input
+                const direction = document.getElementById('validator-direction')?.value || 'BUY';
 
                 if (!entry || !sl || !tp) {
                     alert('Please fill in all values');
@@ -1151,15 +1171,13 @@
                 }
 
                 try {
+                    // FIX BUG 1: Send correct payload with direction and proper field names
                     const payload = { 
                         entry_price: entry, 
                         stop_loss: sl, 
                         take_profit: tp, 
-                        symbol, 
-                        setup_type: this.currentAnalysis?.pattern || 'manual',
-                        entry: entry,
-                        sl: sl,
-                        tp: tp
+                        direction: direction,
+                        symbol: symbol
                     };
                     console.log('[Validate] Sending:', payload);
 

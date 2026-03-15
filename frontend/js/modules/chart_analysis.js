@@ -4,11 +4,12 @@ const ChartAnalysisPage = {
 
     async render() {
         const app = document.getElementById('app');
+        if (!app) return;
 
         app.innerHTML = `
             <div class="page-header">
                 <h1>📊 AI Chart Analysis</h1>
-                <p>Upload your charts for instant pattern recognition and trade setup generation</p>
+                <p>Smart Money Concepts (SMC) institutional analysis</p>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
@@ -104,22 +105,24 @@ const ChartAnalysisPage = {
 
         // Setup drag and drop
         const dropZone = document.getElementById('dropZone');
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.style.borderColor = 'var(--primary)';
-            dropZone.style.background = '#eff6ff';
-        });
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.style.borderColor = 'var(--gray-300)';
-            dropZone.style.background = 'var(--gray-50)';
-        });
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                this.handleFile(file);
-            }
-        });
+        if (dropZone) {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = 'var(--primary)';
+                dropZone.style.background = '#eff6ff';
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.borderColor = 'var(--gray-300)';
+                dropZone.style.background = 'var(--gray-50)';
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    this.handleFile(file);
+                }
+            });
+        }
 
         this.loadPatterns();
     },
@@ -128,7 +131,11 @@ const ChartAnalysisPage = {
         if (!file) return;
 
         if (file.size > 5 * 1024 * 1024) {
-            UI.showToast('File too large (max 5MB)', 'error');
+            if (typeof UI !== 'undefined' && UI.showToast) {
+                UI.showToast('File too large (max 5MB)', 'error');
+            } else {
+                alert('File too large (max 5MB)');
+            }
             return;
         }
 
@@ -140,8 +147,12 @@ const ChartAnalysisPage = {
         reader.onload = (e) => {
             const previewDiv = document.getElementById('imagePreview');
             const previewImg = document.getElementById('previewImg');
-            previewImg.src = e.target.result;
-            previewDiv.style.display = 'block';
+            if (previewImg) {
+                previewImg.src = e.target.result;
+            }
+            if (previewDiv) {
+                previewDiv.style.display = 'block';
+            }
         };
         reader.readAsDataURL(file);
 
@@ -151,40 +162,93 @@ const ChartAnalysisPage = {
 
     clearImage() {
         this.uploadedImage = null;
-        document.getElementById('imagePreview').style.display = 'none';
-        document.getElementById('chartInput').value = '';
-        document.getElementById('chartResults').innerHTML = `
-            <div class="card" style="text-align: center; padding: 3rem;">
-                <p class="text-muted">Upload a chart to see AI analysis</p>
-                <small>Supports: PNG, JPG, JPEG (max 5MB)</small>
-            </div>
-        `;
+        const previewDiv = document.getElementById('imagePreview');
+        const chartInput = document.getElementById('chartInput');
+        const results = document.getElementById('chartResults');
+        
+        if (previewDiv) previewDiv.style.display = 'none';
+        if (chartInput) chartInput.value = '';
+        if (results) {
+            results.innerHTML = `
+                <div class="card" style="text-align: center; padding: 3rem;">
+                    <p class="text-muted">Upload a chart to see AI analysis</p>
+                    <small>Supports: PNG, JPG, JPEG (max 5MB)</small>
+                </div>
+            `;
+        }
     },
 
     async analyzeChart(file) {
         const results = document.getElementById('chartResults');
+        if (!results) return;
+        
         results.innerHTML = '<div class="loading" style="text-align: center; padding: 3rem;"><div class="spinner" style="margin: 0 auto 1rem;"></div><p>Analyzing chart with AI Vision...</p><small>This may take 10-20 seconds</small></div>';
 
-        const symbol = document.getElementById('chartSymbol')?.value;
-        const timeframe = document.getElementById('chartTimeframe')?.value;
+        const symbolInput = document.getElementById('chartSymbol');
+        const timeframeInput = document.getElementById('chartTimeframe');
+        const symbol = symbolInput ? symbolInput.value : null;
+        const timeframe = timeframeInput ? timeframeInput.value : null;
 
         try {
             const analysis = await API.analyzeChartImage(file, symbol, timeframe);
             this.currentAnalysis = analysis;
+            // Store chart_annotations for future rendering
+            if (analysis.chart_annotations) {
+                console.log('[Chart Analysis] Annotations received:', analysis.chart_annotations);
+            }
             this.displayResults(analysis);
         } catch (error) {
-            results.innerHTML = `<div class="alert alert-error">Analysis failed: ${error.message}</div>`;
+            if (results) {
+                results.innerHTML = `<div class="alert alert-error">Analysis failed: ${error.message}</div>`;
+            }
         }
     },
 
     displayResults(analysis) {
         const container = document.getElementById('chartResults');
+        if (!container) return;
 
         const biasColor = analysis.trading_bias === 'bullish' ? 'var(--success)' : 
                          analysis.trading_bias === 'bearish' ? 'var(--danger)' : 'var(--gray-500)';
 
         const biasBg = analysis.trading_bias === 'bullish' ? 'rgba(16, 185, 129, 0.1)' : 
                       analysis.trading_bias === 'bearish' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)';
+
+        // Build SMC Signals HTML
+        let smcSignalsHTML = '';
+        if (analysis.smc_signals && analysis.smc_signals.length > 0) {
+            smcSignalsHTML = `
+                <div style="margin-bottom: 1.5rem;">
+                    <strong style="display: block; margin-bottom: 0.75rem; color: var(--gray-300);">
+                        <i class="fas fa-university mr-2" style="color: var(--primary);"></i>SMC Signals:
+                    </strong>
+                    <ul style="padding-left: 1.5rem; margin: 0; list-style: none;">
+                        ${analysis.smc_signals.map(signal => `
+                            <li style="margin-bottom: 0.5rem; color: var(--gray-400); display: flex; align-items: center;">
+                                <i class="fas fa-chevron-right mr-2" style="font-size: 0.6rem; color: var(--primary);"></i>${signal}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Build Market Structure HTML
+        let marketStructureHTML = '';
+        if (analysis.market_structure) {
+            const msColor = analysis.market_structure === 'bullish' ? 'var(--success)' : 
+                           analysis.market_structure === 'bearish' ? 'var(--danger)' : 'var(--gray-500)';
+            marketStructureHTML = `
+                <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; margin-bottom: 0.5rem;">
+                        Market Structure
+                    </div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: ${msColor}; text-transform: uppercase;">
+                        ${analysis.market_structure}
+                    </div>
+                </div>
+            `;
+        }
 
         // Build trade setup HTML if available
         let tradeSetupHTML = '';
@@ -195,7 +259,7 @@ const ChartAnalysisPage = {
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h4 style="margin: 0; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
                             <i class="fas fa-robot"></i>
-                            AI Trade Setup
+                            Institutional Trade Setup
                         </h4>
                         <span style="background: var(--primary); color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
                             ${Math.round((setup.probability || 0.7) * 100)}% Confidence
@@ -205,15 +269,15 @@ const ChartAnalysisPage = {
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
                         <div style="text-align: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: var(--radius);">
                             <div style="font-size: 0.75rem; color: var(--gray-500); margin-bottom: 0.25rem;">Entry</div>
-                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--gray-100);">${setup.entry}</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--gray-100);">${setup.entry || '--'}</div>
                         </div>
                         <div style="text-align: center; padding: 0.75rem; background: rgba(239, 68, 68, 0.2); border-radius: var(--radius);">
                             <div style="font-size: 0.75rem; color: var(--gray-500); margin-bottom: 0.25rem;">Stop Loss</div>
-                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--danger);">${setup.stop_loss}</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--danger);">${setup.stop_loss || '--'}</div>
                         </div>
                         <div style="text-align: center; padding: 0.75rem; background: rgba(16, 185, 129, 0.2); border-radius: var(--radius);">
                             <div style="font-size: 0.75rem; color: var(--gray-500); margin-bottom: 0.25rem;">Take Profit</div>
-                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--success);">${setup.take_profit}</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--success);">${setup.take_profit || '--'}</div>
                         </div>
                     </div>
 
@@ -234,11 +298,26 @@ const ChartAnalysisPage = {
                 </div>
             `;
 
-            // Auto-fill validator
-            document.getElementById('validatorEntry').value = setup.entry;
-            document.getElementById('validatorSL').value = setup.stop_loss;
-            document.getElementById('validatorTP').value = setup.take_profit;
-            document.getElementById('validatorDirection').value = setup.direction === 'BULLISH' ? 'BUY' : (setup.direction === 'BEARISH' ? 'SELL' : 'BUY');
+            // Auto-fill validator with null checks
+            const entryEl = document.getElementById('validatorEntry');
+            const slEl = document.getElementById('validatorSL');
+            const tpEl = document.getElementById('validatorTP');
+            const dirEl = document.getElementById('validatorDirection');
+            
+            if (entryEl) entryEl.value = setup.entry || '';
+            if (slEl) slEl.value = setup.stop_loss || '';
+            if (tpEl) tpEl.value = setup.take_profit || '';
+            if (dirEl) dirEl.value = (setup.direction === 'BULLISH' || setup.direction === 'BUY') ? 'BUY' : 'SELL';
+        }
+
+        // Build patterns HTML using patterns_detected array
+        let patternsHTML = '';
+        if (analysis.patterns_detected && analysis.patterns_detected.length > 0) {
+            patternsHTML = analysis.patterns_detected.map(p => 
+                `<span class="badge badge-info" style="margin: 0.25rem; padding: 0.5rem 1rem;">${p.name || 'Pattern'} <small style="opacity: 0.7;">(${p.reliability || 'medium'})</small></span>`
+            ).join('');
+        } else {
+            patternsHTML = '<span class="text-muted">No patterns detected</span>';
         }
 
         container.innerHTML = `
@@ -247,7 +326,7 @@ const ChartAnalysisPage = {
                     <h3 style="margin: 0;">${analysis.symbol || 'Unknown Symbol'}</h3>
                     <div style="display: flex; gap: 0.5rem;">
                         <span class="badge badge-${analysis.confidence > 0.7 ? 'success' : 'warning'}">
-                            ${Math.round(analysis.confidence * 100)}% Confidence
+                            ${Math.round((analysis.confidence || 0) * 100)}% Confidence
                         </span>
                         ${analysis.mode === 'ai' ? '<span class="badge badge-info">AI Powered</span>' : ''}
                     </div>
@@ -256,9 +335,11 @@ const ChartAnalysisPage = {
                 <div style="background: ${biasBg}; border: 1px solid ${biasColor}; border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; text-align: center;">
                     <div style="font-size: 0.875rem; color: var(--gray-500); margin-bottom: 0.5rem;">Trading Bias</div>
                     <div style="font-size: 1.5rem; font-weight: 700; color: ${biasColor}; text-transform: uppercase; letter-spacing: 0.05em;">
-                        ${analysis.trading_bias}
+                        ${analysis.trading_bias || 'Neutral'}
                     </div>
                 </div>
+
+                ${marketStructureHTML}
 
                 ${analysis.chart_image ? `
                     <div style="margin-bottom: 1.5rem;">
@@ -269,11 +350,11 @@ const ChartAnalysisPage = {
 
                 ${tradeSetupHTML}
 
+                ${smcSignalsHTML}
+
                 <div style="margin-bottom: 1.5rem;">
                     <strong style="display: block; margin-bottom: 0.75rem; color: var(--gray-300);">Patterns Detected:</strong>
-                    ${analysis.patterns_detected?.length ? analysis.patterns_detected.map(p => 
-                        `<span class="badge badge-info" style="margin: 0.25rem; padding: 0.5rem 1rem;">${p.name} <small style="opacity: 0.7;">(${p.reliability})</small></span>`
-                    ).join('') : '<span class="text-muted">No clear patterns</span>'}
+                    ${patternsHTML}
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
@@ -292,9 +373,11 @@ const ChartAnalysisPage = {
                 </div>
 
                 <div>
-                    <strong style="display: block; margin-bottom: 0.75rem; color: var(--gray-300);">AI Insights:</strong>
+                    <strong style="display: block; margin-bottom: 0.75rem; color: var(--gray-300);">
+                        <i class="fas fa-lightbulb mr-2" style="color: var(--warning);"></i>Key Insights:
+                    </strong>
                     <ul style="padding-left: 1.5rem; margin: 0;">
-                        ${analysis.key_insights?.map(i => `<li style="margin-bottom: 0.5rem; color: var(--gray-400);">${i}</li>`).join('') || '<li class="text-muted">No specific insights</li>'}
+                        ${analysis.key_insights?.length ? analysis.key_insights.map(i => `<li style="margin-bottom: 0.5rem; color: var(--gray-400);">${i}</li>`).join('') : '<li class="text-muted">No specific insights</li>'}
                     </ul>
                 </div>
             </div>
@@ -302,22 +385,34 @@ const ChartAnalysisPage = {
     },
 
     async validateTrade() {
-        const entry = parseFloat(document.getElementById('validatorEntry').value);
-        const sl = parseFloat(document.getElementById('validatorSL').value);
-        const tp = parseFloat(document.getElementById('validatorTP').value);
-        const direction = document.getElementById('validatorDirection').value;
+        const entryEl = document.getElementById('validatorEntry');
+        const slEl = document.getElementById('validatorSL');
+        const tpEl = document.getElementById('validatorTP');
+        const dirEl = document.getElementById('validatorDirection');
+        
+        const entry = parseFloat(entryEl ? entryEl.value : 0);
+        const sl = parseFloat(slEl ? slEl.value : 0);
+        const tp = parseFloat(tpEl ? tpEl.value : 0);
+        const direction = dirEl ? dirEl.value : 'BUY';
         const symbol = this.currentAnalysis?.symbol || 'Unknown';
 
         if (!entry || !sl || !tp) {
-            UI.showToast('Please fill in all price levels', 'warning');
+            if (typeof UI !== 'undefined' && UI.showToast) {
+                UI.showToast('Please fill in all price levels', 'warning');
+            } else {
+                alert('Please fill in all price levels');
+            }
             return;
         }
 
         const resultsDiv = document.getElementById('validatorResults');
+        if (!resultsDiv) return;
+        
         resultsDiv.style.display = 'block';
         resultsDiv.innerHTML = '<div class="loading"><div class="spinner" style="width: 24px; height: 24px;"></div><small>Validating...</small></div>';
 
         try {
+            // Fix: Send correct payload with entry_price, stop_loss, take_profit
             const result = await API.validateTrade({
                 entry_price: entry,
                 stop_loss: sl,
@@ -326,31 +421,32 @@ const ChartAnalysisPage = {
                 symbol: symbol
             });
 
-            const scoreColor = result.quality_score >= 80 ? 'var(--success)' : 
-                              result.quality_score >= 60 ? 'var(--warning)' : 'var(--danger)';
+            const score = result.quality_score || 0;
+            const scoreColor = score >= 80 ? 'var(--success)' : 
+                              score >= 60 ? 'var(--warning)' : 'var(--danger)';
 
             resultsDiv.innerHTML = `
                 <div style="background: var(--gray-900); border-radius: var(--radius); padding: 1rem; border: 1px solid var(--gray-700);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <span style="color: var(--gray-500);">Quality Score</span>
-                        <span style="font-size: 1.5rem; font-weight: 700; color: ${scoreColor};">${result.quality_score}/100</span>
+                        <span style="font-size: 1.5rem; font-weight: 700; color: ${scoreColor};">${score}/100</span>
                     </div>
                     <div style="width: 100%; height: 6px; background: var(--gray-700); border-radius: 3px; margin-bottom: 1rem; overflow: hidden;">
-                        <div style="width: ${result.quality_score}%; height: 100%; background: ${scoreColor}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                        <div style="width: ${score}%; height: 100%; background: ${scoreColor}; border-radius: 3px; transition: width 0.5s ease;"></div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.875rem;">
                         <div>
                             <span style="color: var(--gray-500);">R:R Ratio:</span>
-                            <span style="color: var(--gray-200); font-weight: 600; margin-left: 0.5rem;">${result.risk_reward_text}</span>
+                            <span style="color: var(--gray-200); font-weight: 600; margin-left: 0.5rem;">${result.risk_reward_text || 'N/A'}</span>
                         </div>
                         <div>
                             <span style="color: var(--gray-500);">Probability:</span>
-                            <span style="color: var(--gray-200); font-weight: 600; margin-left: 0.5rem;">${Math.round(result.probability_estimate * 100)}%</span>
+                            <span style="color: var(--gray-200); font-weight: 600; margin-left: 0.5rem;">${Math.round((result.probability_estimate || 0) * 100)}%</span>
                         </div>
                         <div>
                             <span style="color: var(--gray-500);">Structure:</span>
                             <span style="color: ${result.structure_valid ? 'var(--success)' : 'var(--danger)'}; font-weight: 600; margin-left: 0.5rem;">
-                                ${result.structure_quality}
+                                ${result.structure_quality || 'unknown'}
                             </span>
                         </div>
                     </div>
@@ -369,13 +465,19 @@ const ChartAnalysisPage = {
                 </div>
             `;
         } catch (error) {
-            resultsDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+            }
         }
     },
 
     async saveSignal() {
         if (!this.currentAnalysis || !this.currentAnalysis.trade_setup) {
-            UI.showToast('No trade setup to save', 'warning');
+            if (typeof UI !== 'undefined' && UI.showToast) {
+                UI.showToast('No trade setup to save', 'warning');
+            } else {
+                alert('No trade setup to save');
+            }
             return;
         }
 
@@ -393,12 +495,20 @@ const ChartAnalysisPage = {
             });
 
             if (result.success) {
-                UI.showToast('Signal saved successfully!', 'success');
+                if (typeof UI !== 'undefined' && UI.showToast) {
+                    UI.showToast('Signal saved successfully!', 'success');
+                } else {
+                    alert('Signal saved successfully!');
+                }
             } else {
                 throw new Error('Failed to save signal');
             }
         } catch (error) {
-            UI.showToast('Error saving signal: ' + error.message, 'error');
+            if (typeof UI !== 'undefined' && UI.showToast) {
+                UI.showToast('Error saving signal: ' + error.message, 'error');
+            } else {
+                alert('Error saving signal: ' + error.message);
+            }
         }
     },
 
@@ -406,18 +516,20 @@ const ChartAnalysisPage = {
         try {
             const patterns = await API.getPatternLibrary();
             const container = document.getElementById('patternGrid');
+            if (!container) return;
 
             const allPatterns = [
                 ...(patterns.reversal || []),
                 ...(patterns.continuation || []),
-                ...(patterns.candlestick || [])
+                ...(patterns.candlestick || []),
+                ...(patterns.smc || [])
             ];
 
             container.innerHTML = allPatterns.slice(0, 6).map(p => `
                 <div class="card" style="transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <h4 style="margin: 0; font-size: 1rem; color: var(--gray-200);">${p.name}</h4>
-                        <span class="badge badge-${p.type === 'reversal' ? 'danger' : p.type === 'continuation' ? 'success' : 'info'}" style="font-size: 0.75rem;">
+                        <span class="badge badge-${p.type === 'reversal' ? 'danger' : p.type === 'continuation' ? 'success' : p.type === 'smc' ? 'primary' : 'info'}" style="font-size: 0.75rem;">
                             ${p.type}
                         </span>
                     </div>
@@ -431,7 +543,10 @@ const ChartAnalysisPage = {
                 </div>
             `).join('');
         } catch (e) {
-            document.getElementById('patternGrid').innerHTML = '<span class="text-muted">Failed to load patterns</span>';
+            const container = document.getElementById('patternGrid');
+            if (container) {
+                container.innerHTML = '<span class="text-muted">Failed to load patterns</span>';
+            }
         }
     }
 };

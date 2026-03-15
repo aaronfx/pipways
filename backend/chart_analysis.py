@@ -19,9 +19,6 @@ from .security import get_current_user
 router = APIRouter()
 
 # Module-level HTTP client — reused across all requests for connection pooling.
-# Initialized to None here; the FastAPI lifespan handler in main.py must set
-# chart_analysis._http_client = httpx.AsyncClient(timeout=60.0) on startup
-# and call await chart_analysis._http_client.aclose() on shutdown.
 _http_client: Optional[httpx.AsyncClient] = None
 
 # OpenRouter Configuration
@@ -128,20 +125,37 @@ async def analyze_chart_image(
     Smart Money Concepts Chart Analysis using OpenRouter Vision API.
     Returns institutional-grade analysis with SMC signals and annotations.
     """
-    if not file.content_type.startswith('image/'):
+    print(f"[CHART ANALYSIS] Upload started: {file.filename}, Content-Type: {file.content_type}", flush=True)
+    
+    # Enhanced content type validation
+    if not file.content_type or not file.content_type.startswith('image/'):
+        print(f"[CHART ANALYSIS ERROR] Invalid content type: {file.content_type}", flush=True)
         raise HTTPException(400, "File must be an image (PNG, JPG, JPEG, WEBP)")
-
+    
+    # Validate file extension as secondary check
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif']
+    file_ext = os.path.splitext(file.filename.lower())[1]
+    if file_ext not in allowed_extensions:
+        print(f"[CHART ANALYSIS ERROR] Invalid file extension: {file_ext}", flush=True)
+        raise HTTPException(400, f"File extension {file_ext} not allowed. Use: PNG, JPG, JPEG, WEBP")
+    
     try:
         contents = await file.read()
+        print(f"[CHART ANALYSIS] File read: {len(contents)} bytes", flush=True)
+        
         if len(contents) > 10 * 1024 * 1024:
+            print(f"[CHART ANALYSIS ERROR] File too large: {len(contents)} bytes", flush=True)
             raise HTTPException(400, "Image too large (max 10MB)")
-
+        
         if len(contents) == 0:
+            print(f"[CHART ANALYSIS ERROR] Empty file", flush=True)
             raise HTTPException(400, "Empty file uploaded")
 
         # Store image for response
         base64_image = base64.b64encode(contents).decode('utf-8')
         content_type = file.content_type or "image/jpeg"
+        
+        print(f"[CHART ANALYSIS] Image processed, base64 length: {len(base64_image)}", flush=True)
 
         if not OPENROUTER_CONFIGURED:
             demo_symbol = normalize_symbol(symbol or "EURUSD")
@@ -378,8 +392,6 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
         result["chart_image"] = f"data:{content_type};base64,{base64_image}"
 
         # Normalize confidence/probability.
-        # FIX: was `<= 0` which silently converted a genuine "no signal" (0.0)
-        # into a fabricated 60% confidence. Now only negative values are clamped.
         confidence = result.get("confidence", 0.6)
         if confidence < 0:
             confidence = 0.0
@@ -407,16 +419,25 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
                 else:
                     direction = "NEUTRAL"
 
+                # FIX: Ensure probability is properly calculated and passed
+                setup_probability = result.get("confidence", 0.7)
+                if setup_probability < 0:
+                    setup_probability = 0.0
+                if setup_probability > 1:
+                    setup_probability = setup_probability / 100 if setup_probability > 1 else 1.0
+
                 trade_setup = {
                     "entry": str(entry),
                     "stop_loss": str(sl),
                     "take_profit": str(tp),
                     "risk_reward": rr,
-                    "probability": confidence,
+                    "probability": setup_probability,
                     "direction": direction,
                     "setup_type": "SMC Institutional"
                 }
-            except (ValueError, TypeError):
+                print(f"[CHART ANALYSIS] Trade setup created: prob={setup_probability}, rr={rr}", flush=True)
+            except (ValueError, TypeError) as e:
+                print(f"[CHART ANALYSIS] Trade setup calculation error: {e}", flush=True)
                 trade_setup = None
 
         result["trade_setup"] = trade_setup

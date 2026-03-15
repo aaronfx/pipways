@@ -383,7 +383,7 @@ async def generate_ai_psychology_profile(stats: Dict[str, Any], trades_data: Lis
             # Parse JSON with robust error handling
             import re
             try:
-                json_match = re.search(r\'{.*?}\'', content, re.DOTALL)
+                json_match = re.search(r'{.*}', content, re.DOTALL)
                 if json_match:
                     ai_data = json.loads(json_match.group())
                 else:

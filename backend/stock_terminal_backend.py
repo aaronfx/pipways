@@ -131,6 +131,78 @@ async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
         ) from exc
 
 
+# ── AI market data fallback ───────────────────────────────────────────────────
+
+async def enrich_with_claude(symbol: str) -> dict:
+    """
+    When yfinance is unavailable, ask Claude to provide realistic market data
+    from its training knowledge so the UI shows real values instead of all N/A.
+    """
+    prompt = f"""
+Provide realistic and accurate market data for the stock {symbol} based on your training knowledge.
+Use the most recent figures you know. Estimate conservatively if uncertain.
+
+Return ONLY this JSON (no markdown, no explanation):
+{{
+  "name": "<Full company name>",
+  "sector": "<sector e.g. Technology>",
+  "industry": "<industry e.g. Consumer Electronics>",
+  "exchange": "<e.g. NASDAQ>",
+  "country": "<e.g. USA>",
+  "currency": "USD",
+  "price": <current approximate price as a number, e.g. 213.49>,
+  "change": <typical daily change as number, e.g. 1.25>,
+  "change_pct": "<e.g. 0.59>",
+  "market_cap": "<formatted e.g. $3.2T or $450B>",
+  "pe_ratio": "<e.g. 33.2 or N/A>",
+  "forward_pe": "<e.g. 29.5 or N/A>",
+  "peg_ratio": "<e.g. 2.1 or N/A>",
+  "eps": "<e.g. 6.43 or N/A>",
+  "beta": "<e.g. 1.24 or N/A>",
+  "div_yield": "<e.g. 0.52% or N/A>",
+  "52_week_high": "<e.g. 237.23 or N/A>",
+  "52_week_low": "<e.g. 164.08 or N/A>",
+  "50_day_avg": "<e.g. 220.5 or N/A>",
+  "200_day_avg": "<e.g. 210.2 or N/A>",
+  "analyst_target": "<e.g. 230.00 or N/A>",
+  "profit_margin": "<e.g. 24.30% or N/A>",
+  "gross_margin": "<e.g. 45.60% or N/A>",
+  "operating_margin": "<e.g. 30.10% or N/A>",
+  "return_on_equity": "<e.g. 160.50% or N/A>",
+  "return_on_assets": "<e.g. 22.60% or N/A>",
+  "revenue_ttm": "<formatted e.g. $383B or N/A>",
+  "ebitda": "<formatted e.g. $130B or N/A>",
+  "free_cashflow": "<formatted e.g. $90B or N/A>",
+  "debt_to_equity": "<e.g. 1.87 or N/A>",
+  "current_ratio": "<e.g. 0.95 or N/A>",
+  "price_to_book": "<e.g. 48.5 or N/A>",
+  "book_value": "<e.g. 4.38 or N/A>",
+  "data_source": "ai_estimate"
+}}
+"""
+    try:
+        data = await claude_json(prompt, max_tokens=700)
+        data["data_source"] = "ai_estimate"
+        return data
+    except Exception as exc:
+        print(f"[STOCK] enrich_with_claude failed for {symbol}: {exc}", flush=True)
+        return {
+            "name": symbol, "sector": "N/A", "industry": "N/A",
+            "exchange": "N/A", "country": "N/A", "currency": "USD",
+            "price": 0, "change": 0, "change_pct": "0",
+            "market_cap": "N/A", "pe_ratio": "N/A", "forward_pe": "N/A",
+            "peg_ratio": "N/A", "eps": "N/A", "beta": "N/A",
+            "div_yield": "N/A", "52_week_high": "N/A", "52_week_low": "N/A",
+            "50_day_avg": "N/A", "200_day_avg": "N/A", "analyst_target": "N/A",
+            "profit_margin": "N/A", "gross_margin": "N/A", "operating_margin": "N/A",
+            "return_on_equity": "N/A", "return_on_assets": "N/A",
+            "revenue_ttm": "N/A", "ebitda": "N/A", "free_cashflow": "N/A",
+            "debt_to_equity": "N/A", "current_ratio": "N/A",
+            "price_to_book": "N/A", "book_value": "N/A",
+            "data_source": "ai_estimate",
+        }
+
+
 # ── yfinance market data helpers ──────────────────────────────────────────────
 
 def _safe(val, fallback="N/A"):
@@ -296,20 +368,23 @@ async def analyze(symbol: str) -> OkResponse:
             return OkResponse(data=cached, cached=True)
 
         # ── Fetch market data ─────────────────────────────────────────────
-        market: dict = {}
-        data_source  = "live"
+        market:      dict = {}
+        data_source: str  = "live"
 
         try:
             market = await fetch_market_data(sym)
+            print(f"[STOCK] yfinance data fetched for {sym}", flush=True)
         except Exception as exc:
-            print(f"[STOCK] yfinance failed for {sym}: {exc} — using AI estimates", flush=True)
+            print(f"[STOCK] yfinance failed for {sym}: {exc} — falling back to AI estimates", flush=True)
             data_source = "ai_estimate"
-            market = {"name": sym, "sector": "N/A", "data_source": "ai_estimate"}
+            # Ask Claude to fill in realistic market data from its knowledge
+            market = await enrich_with_claude(sym)
 
         # ── Build prompt ──────────────────────────────────────────────────
         data_note = (
-            "NOTE: Live market data is unavailable. Use your training knowledge to fill in current figures."
-            if data_source == "ai_estimate" else ""
+            "NOTE: Live market data is unavailable — figures below are AI estimates from training knowledge."
+            if data_source == "ai_estimate" else
+            "NOTE: Live market data from Yahoo Finance."
         )
 
         prompt = f"""

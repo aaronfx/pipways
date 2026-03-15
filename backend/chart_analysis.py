@@ -31,6 +31,55 @@ COMMON_SYMBOLS = [
     "BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "US30", "US100", "DE30"
 ]
 
+def normalize_symbol(symbol: str) -> str:
+    """Normalize detected trading symbol"""
+    if not symbol:
+        return "Unknown"
+    
+    symbol_clean = symbol.upper().strip()
+    
+    # Remove separators and spaces
+    symbol_clean = symbol_clean.replace("/", "").replace("-", "").replace(" ", "").replace(".", "")
+    
+    # Normalization mappings
+    mappings = {
+        "GOLD": "XAUUSD",
+        "XAU": "XAUUSD", 
+        "SILVER": "XAGUSD",
+        "XAG": "XAGUSD",
+        "BITCOIN": "BTCUSD",
+        "BTC": "BTCUSD",
+        "ETHEREUM": "ETHUSD",
+        "ETH": "ETHUSD",
+        "US30": "US30",
+        "US100": "US100",
+        "NAS100": "US100",
+        "NAS": "US100",
+        "NASDAQ": "US100",
+        "SP500": "US500",
+        "SPX": "US500",
+        "DXY": "DXY",
+        "DOLLARINDEX": "DXY",
+        "USDOLLARINDEX": "DXY",
+        "USDX": "DXY",
+        "U.S.DOLLARINDEX": "DXY",
+        "GER30": "DE30",
+        "DE30": "DE30",
+        "UK100": "UK100",
+        "JP225": "JP225",
+        "AUS200": "AU200",
+    }
+    
+    # Check exact match
+    if symbol_clean in mappings:
+        return mappings[symbol_clean]
+    
+    # Check for common forex patterns (6 chars)
+    if len(symbol_clean) == 6 and symbol_clean.isalpha():
+        return symbol_clean
+    
+    return symbol_clean
+
 def extract_symbol_from_text(text: str) -> Optional[str]:
     """Extract trading symbol from AI response"""
     if not text:
@@ -54,8 +103,8 @@ async def analyze_chart_image(
     current_user = Depends(get_current_user)
 ):
     """
-    Chart Analysis using OpenRouter Vision API.
-    Returns structured analysis with trade setup.
+    Chart Analysis using OpenRouter Vision API with Smart Money Concepts.
+    Returns structured analysis with trade setup and annotations.
     """
     if not file.content_type.startswith('image/'):
         raise HTTPException(400, "File must be an image (PNG, JPG, JPEG, WEBP)")
@@ -73,9 +122,11 @@ async def analyze_chart_image(
         content_type = file.content_type or "image/jpeg"
 
         if not OPENROUTER_CONFIGURED:
-            demo_symbol = symbol or "EURUSD"
+            demo_symbol = normalize_symbol(symbol or "EURUSD")
             return {
                 "symbol": demo_symbol,
+                "market_structure": "bullish",
+                "smc_signals": ["demo liquidity sweep", "demo order block"],
                 "trading_bias": "neutral",
                 "confidence": 0.75,
                 "patterns_detected": [
@@ -92,6 +143,12 @@ async def analyze_chart_image(
                     "Configure OPENROUTER_API_KEY for AI-powered analysis"
                 ],
                 "chart_image": f"data:{content_type};base64,{base64_image}",
+                "chart_annotations": {
+                    "bos_levels": ["1.0850"],
+                    "liquidity_zones": ["1.0820"],
+                    "order_blocks": [{"price": "1.0840", "type": "bullish"}],
+                    "fair_value_gaps": [{"start": "1.0860", "end": "1.0875"}]
+                },
                 "trade_setup": {
                     "entry": "1.0860",
                     "stop_loss": "1.0830",
@@ -117,20 +174,46 @@ async def analyze_chart_image(
         symbol_context = f"Symbol: {symbol}" if symbol else "Symbol: Unknown - detect from chart"
         timeframe_context = f"Timeframe: {timeframe}" if timeframe else "Timeframe: Unknown"
 
-        system_prompt = """You are a professional trading chart analyst. Analyze the provided chart image and identify:
-1. The trading symbol/pair if visible on the chart
-2. Chart patterns (head & shoulders, triangles, flags, wedges, double tops/bottoms, etc.)
-3. Support and resistance levels (with approximate price values)
-4. Trend direction (bullish, bearish, or neutral)
-5. Specific trade suggestions: entry price, stop loss, and take profit levels if a setup is present
-6. Confidence level (0.0 to 1.0) in your analysis
+        system_prompt = """You are a professional institutional trader specializing in Smart Money Concepts (SMC). Analyze this trading chart like a prop firm trader.
+
+Detect and identify:
+
+MARKET STRUCTURE
+• Higher Highs / Higher Lows (HH/HL) or Lower Highs / Lower Lows (LH/LL)
+• Break of Structure (BOS)
+• Change of Character (CHOCH)
+
+LIQUIDITY ZONES
+• Equal highs / equal lows (liquidity pools)
+• Liquidity sweeps/grabs
+• Stop hunts
+
+INSTITUTIONAL FOOTPRINT
+• Order Blocks (OB) - bullish and bearish
+• Fair Value Gaps (FVG)
+• Imbalances
+
+VALUATION ZONES
+• Premium vs Discount zones relative to dealing range
+
+TRADE SETUP
+• High-probability institutional trade setups
+• Optimal entry points with confluence
+• Logical stop loss placement (below/above key structure)
+• Take profit targets (next liquidity pool or opposing structure)
 
 Return your analysis in strict JSON format:
 {
-    "symbol": "detected symbol or Unknown",
-    "patterns_detected": [
-        {"name": "pattern name", "reliability": "high|medium|low", "description": "brief description"}
-    ],
+    "symbol": "detected symbol like EURUSD",
+    "market_structure": "bullish|bearish|neutral",
+    "smc_signals": ["liquidity sweep below equal lows", "bullish order block mitigation", "fair value gap created"],
+    "patterns_detected": [{"name": "pattern name", "reliability": "high|medium|low", "description": "brief description"}],
+    "chart_annotations": {
+        "bos_levels": ["price1", "price2"],
+        "liquidity_zones": ["price1"],
+        "order_blocks": [{"price": "price", "type": "bullish|bearish"}],
+        "fair_value_gaps": [{"start": "price1", "end": "price2"}]
+    },
     "support_levels": ["price1", "price2"],
     "resistance_levels": ["price1", "price2"],
     "suggested_entry": "price or null",
@@ -163,7 +246,7 @@ Be precise with price levels. Use null for fields not applicable. Return ONLY th
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": f"Analyze this trading chart. {symbol_context}. {timeframe_context}. Detect the symbol if visible, identify patterns, key levels, and suggest trade setup. Return JSON only."
+                                    "text": f"Analyze this trading chart using Smart Money Concepts. {symbol_context}. {timeframe_context}. Detect the symbol if visible, identify market structure, liquidity zones, order blocks, and suggest institutional trade setup. Return JSON only."
                                 },
                                 {
                                     "type": "image_url",
@@ -172,7 +255,7 @@ Be precise with price levels. Use null for fields not applicable. Return ONLY th
                             ]
                         }
                     ],
-                    "max_tokens": 1500,
+                    "max_tokens": 2000,
                     "temperature": 0.2
                 },
                 timeout=60.0
@@ -207,7 +290,10 @@ Be precise with price levels. Use null for fields not applicable. Return ONLY th
                 detected_symbol = extract_symbol_from_text(content) or symbol or "Unknown"
                 result = {
                     "symbol": detected_symbol,
+                    "market_structure": "neutral",
+                    "smc_signals": [],
                     "patterns_detected": [],
+                    "chart_annotations": {},
                     "support_levels": [],
                     "resistance_levels": [],
                     "suggested_entry": None,
@@ -219,34 +305,41 @@ Be precise with price levels. Use null for fields not applicable. Return ONLY th
                     "structure_quality": "neutral"
                 }
 
-            # Ensure symbol
-            if not result.get("symbol") or result["symbol"] == "Unknown":
-                result["symbol"] = extract_symbol_from_text(content) or symbol or "Unknown"
+            # Ensure symbol and normalize it
+            detected_symbol = result.get("symbol") or symbol or "Unknown"
+            result["symbol"] = normalize_symbol(detected_symbol)
 
             # Add chart image to result
             result["chart_image"] = f"data:{content_type};base64,{base64_image}"
 
-            # Build trade setup
-            if result.get("suggested_entry") and result.get("suggested_stop") and result.get("suggested_target"):
-                try:
-                    entry = float(str(result["suggested_entry"]).replace(",", ""))
-                    sl = float(str(result["suggested_stop"]).replace(",", ""))
-                    tp = float(str(result["suggested_target"]).replace(",", ""))
+            # Ensure chart_annotations exists
+            if "chart_annotations" not in result:
+                result["chart_annotations"] = {}
 
-                    risk = abs(entry - sl)
-                    reward = abs(tp - entry)
-                    rr = f"1:{reward/risk:.1f}" if risk > 0 else "N/A"
+            # Build trade setup if not present
+            if not result.get("trade_setup"):
+                if result.get("suggested_entry") and result.get("suggested_stop") and result.get("suggested_target"):
+                    try:
+                        entry = float(str(result["suggested_entry"]).replace(",", ""))
+                        sl = float(str(result["suggested_stop"]).replace(",", ""))
+                        tp = float(str(result["suggested_target"]).replace(",", ""))
 
-                    result["trade_setup"] = {
-                        "entry": str(entry),
-                        "stop_loss": str(sl),
-                        "take_profit": str(tp),
-                        "risk_reward": rr,
-                        "probability": result.get("confidence", 0.7),
-                        "direction": result.get("trading_bias", "neutral").upper(),
-                        "quality": result.get("structure_quality", "neutral")
-                    }
-                except:
+                        risk = abs(entry - sl)
+                        reward = abs(tp - entry)
+                        rr = f"1:{reward/risk:.1f}" if risk > 0 else "N/A"
+
+                        result["trade_setup"] = {
+                            "entry": str(entry),
+                            "stop_loss": str(sl),
+                            "take_profit": str(tp),
+                            "risk_reward": rr,
+                            "probability": result.get("confidence", 0.7),
+                            "direction": result.get("trading_bias", "neutral").upper(),
+                            "quality": result.get("structure_quality", "neutral")
+                        }
+                    except:
+                        result["trade_setup"] = None
+                else:
                     result["trade_setup"] = None
 
             result["mode"] = "ai"
@@ -264,7 +357,7 @@ Be precise with price levels. Use null for fields not applicable. Return ONLY th
 
 @router.get("/pattern-library")
 async def get_pattern_library():
-    """Educational pattern library - static data"""
+    """Educational pattern library with SMC concepts included"""
     return {
         "reversal": [
             {"name": "Head and Shoulders", "type": "reversal", "reliability": "high", "description": "Three peaks pattern signaling trend reversal", "success_rate": "65%"},
@@ -280,5 +373,10 @@ async def get_pattern_library():
             {"name": "Doji", "type": "candlestick", "reliability": "medium", "description": "Indecision in the market", "success_rate": "55%"},
             {"name": "Engulfing Pattern", "type": "candlestick", "reliability": "high", "description": "Strong reversal signal", "success_rate": "72%"},
             {"name": "Hammer", "type": "candlestick", "reliability": "medium", "description": "Potential bottom reversal", "success_rate": "60%"}
+        ],
+        "smc": [
+            {"name": "Order Block", "type": "smc", "reliability": "high", "description": "Last opposing candle before strong move", "success_rate": "70%"},
+            {"name": "Fair Value Gap", "type": "smc", "reliability": "medium", "description": "Imbalance zone between candles", "success_rate": "65%"},
+            {"name": "Liquidity Sweep", "type": "smc", "reliability": "high", "description": "Stop hunt above/below equal highs/lows", "success_rate": "75%"}
         ]
     }

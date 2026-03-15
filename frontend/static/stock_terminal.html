@@ -19,9 +19,6 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        .score-ring {
-            background: conic-gradient(var(--color) var(--percent), #374151 0);
-        }
         .loading-shimmer {
             background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
             background-size: 200% 100%;
@@ -35,13 +32,31 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Error toast */
+        #error-toast {
+            transition: all 0.3s ease;
+        }
     </style>
-<base target="_blank">
+    <base target="_blank">
 </head>
 <body class="text-gray-100 min-h-screen bg-gray-900">
 
+    <!-- Error Toast (replaces browser alert) -->
+    <div id="error-toast" class="hidden fixed top-4 right-4 z-50 max-w-md bg-red-900/90 border border-red-500/50 text-red-200 px-5 py-4 rounded-xl shadow-2xl backdrop-blur-md">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-exclamation-circle text-red-400 mt-0.5 flex-shrink-0"></i>
+            <div>
+                <div class="font-semibold text-red-300 text-sm mb-1">Error</div>
+                <div id="error-message" class="text-sm leading-relaxed"></div>
+            </div>
+            <button onclick="hideError()" class="ml-2 text-red-400 hover:text-red-200 flex-shrink-0">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Header -->
-    <header class="border-b border-gray-800 bg-gray-900/95 sticky top-0 z-50 backdrop-blur-md">
+    <header class="border-b border-gray-800 bg-gray-900/95 sticky top-0 z-40 backdrop-blur-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -54,13 +69,16 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button onclick="switchTab('analyzer')" id="tab-analyzer" class="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white transition-all">
+                    <button onclick="switchTab('analyzer')" id="tab-analyzer"
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white transition-all">
                         <i class="fas fa-search mr-2"></i>Analyze
                     </button>
-                    <button onclick="switchTab('portfolio')" id="tab-portfolio" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
+                    <button onclick="switchTab('portfolio')" id="tab-portfolio"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
                         <i class="fas fa-briefcase mr-2"></i>Portfolio
                     </button>
-                    <button onclick="switchTab('compare')" id="tab-compare" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
+                    <button onclick="switchTab('compare')" id="tab-compare"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
                         <i class="fas fa-code-compare mr-2"></i>Compare
                     </button>
                 </div>
@@ -78,11 +96,13 @@
                 <div class="flex gap-4">
                     <div class="flex-1 relative">
                         <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input type="text" id="stock-symbol" placeholder="Enter stock symbol (e.g., AAPL, MSFT, NVDA)" 
+                        <input type="text" id="stock-symbol"
+                            placeholder="Enter stock symbol (e.g., AAPL, MSFT, NVDA)"
                             class="w-full bg-gray-800 border border-gray-700 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all uppercase"
                             onkeypress="if(event.key==='Enter') analyzeStock()">
                     </div>
-                    <button onclick="analyzeStock()" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center gap-2">
+                    <button onclick="analyzeStock()" id="analyze-btn"
+                        class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 flex items-center gap-2">
                         <span>Analyze</span>
                         <i class="fas fa-arrow-right"></i>
                     </button>
@@ -95,6 +115,7 @@
                     <i class="fas fa-circle-notch fa-spin text-2xl"></i>
                     <span class="text-lg">AI is analyzing market data...</span>
                 </div>
+                <p class="text-gray-500 text-sm mt-2">Fetching live data + running AI scoring</p>
             </div>
 
             <!-- Results -->
@@ -107,7 +128,8 @@
                             <p id="res-name" class="text-gray-400">Apple Inc.</p>
                         </div>
                         <div class="flex items-center gap-4">
-                            <div id="res-rating-badge" class="px-6 py-3 rounded-xl bg-green-500/20 border border-green-500/50 text-green-400 font-bold text-xl">
+                            <div id="res-rating-badge"
+                                class="px-6 py-3 rounded-xl bg-green-500/20 border border-green-500/50 text-green-400 font-bold text-xl">
                                 STRONG BUY
                             </div>
                             <div class="text-right">
@@ -150,9 +172,7 @@
                         <h3 class="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
                             <i class="fas fa-robot"></i> AI Investment Summary
                         </h3>
-                        <p id="res-summary" class="text-gray-300 leading-relaxed">
-                            Loading analysis...
-                        </p>
+                        <p id="res-summary" class="text-gray-300 leading-relaxed">Loading analysis...</p>
                     </div>
                 </div>
 
@@ -160,9 +180,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="glass-panel rounded-2xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-4">AI Scores</h3>
-                        <div class="space-y-4" id="scores-container">
-                            <!-- Scores injected here -->
-                        </div>
+                        <div class="space-y-4" id="scores-container"></div>
                     </div>
 
                     <div class="glass-panel rounded-2xl p-6 md:col-span-2">
@@ -214,15 +232,13 @@
                         <h3 class="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
                             <i class="fas fa-exclamation-triangle"></i> Key Risks
                         </h3>
-                        <ul id="res-risks" class="space-y-2 text-gray-300 text-sm">
-                        </ul>
+                        <ul id="res-risks" class="space-y-2 text-gray-300 text-sm"></ul>
                     </div>
                     <div class="glass-panel rounded-2xl p-6 border-l-4 border-green-500/50">
                         <h3 class="text-lg font-semibold text-green-400 mb-3 flex items-center gap-2">
                             <i class="fas fa-lightbulb"></i> Opportunities
                         </h3>
-                        <ul id="res-opportunities" class="space-y-2 text-gray-300 text-sm">
-                        </ul>
+                        <ul id="res-opportunities" class="space-y-2 text-gray-300 text-sm"></ul>
                     </div>
                 </div>
             </div>
@@ -232,7 +248,6 @@
         <div id="view-portfolio" class="hidden space-y-6">
             <div class="glass-panel rounded-2xl p-6">
                 <h2 class="text-2xl font-bold text-white mb-6">AI Portfolio Builder</h2>
-                
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Investment Amount ($)</label>
@@ -241,7 +256,8 @@
                     </div>
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Risk Tolerance</label>
-                        <select id="portfolio-risk" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                        <select id="portfolio-risk"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
                             <option value="conservative">Conservative</option>
                             <option value="moderate" selected>Moderate</option>
                             <option value="aggressive">Aggressive</option>
@@ -249,15 +265,16 @@
                     </div>
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Time Horizon</label>
-                        <select id="portfolio-horizon" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                        <select id="portfolio-horizon"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
                             <option value="short">Short Term</option>
                             <option value="medium">Medium Term</option>
                             <option value="long" selected>Long Term</option>
                         </select>
                     </div>
                 </div>
-
-                <button onclick="buildPortfolio()" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 rounded-xl font-semibold transition-all">
+                <button onclick="buildPortfolio()" id="portfolio-btn"
+                    class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 rounded-xl font-semibold transition-all">
                     <i class="fas fa-magic mr-2"></i>Generate AI Portfolio
                 </button>
             </div>
@@ -274,11 +291,7 @@
                             <div class="text-sm text-gray-500">Expected Annual Return</div>
                         </div>
                     </div>
-
-                    <div id="portfolio-allocations" class="space-y-3">
-                        <!-- Allocations injected here -->
-                    </div>
-
+                    <div id="portfolio-allocations" class="space-y-3"></div>
                     <div class="mt-6 pt-6 border-t border-gray-800 grid grid-cols-3 gap-4 text-center">
                         <div>
                             <div id="portfolio-volatility" class="text-lg font-semibold text-white">Moderate</div>
@@ -302,10 +315,12 @@
             <div class="glass-panel rounded-2xl p-6">
                 <h2 class="text-2xl font-bold text-white mb-4">Compare Stocks</h2>
                 <div class="flex gap-2 mb-4">
-                    <input type="text" id="compare-input" placeholder="Enter symbols separated by commas (e.g., AAPL, MSFT, GOOGL)" 
+                    <input type="text" id="compare-input"
+                        placeholder="Enter symbols separated by commas (e.g., AAPL, MSFT, GOOGL)"
                         class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 uppercase"
                         onkeypress="if(event.key==='Enter') compareStocks()">
-                    <button onclick="compareStocks()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                    <button onclick="compareStocks()" id="compare-btn"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
                         Compare
                     </button>
                 </div>
@@ -314,9 +329,7 @@
             <div id="compare-results" class="hidden space-y-4 fade-in">
                 <div class="glass-panel rounded-2xl p-6">
                     <h3 class="text-lg font-semibold text-white mb-4">AI Comparison Results</h3>
-                    <div id="compare-stocks-container" class="space-y-4">
-                        <!-- Comparison results here -->
-                    </div>
+                    <div id="compare-stocks-container" class="space-y-4"></div>
                 </div>
             </div>
         </div>
@@ -326,20 +339,65 @@
     <script>
         const API_BASE = window.location.origin + '/api/stock';
 
+        // ── FIX 7: Replace browser alert() with a styled toast.
+        //    Also used to surface the correct error message extracted from the response.
+        function showError(msg) {
+            document.getElementById('error-message').textContent = msg;
+            document.getElementById('error-toast').classList.remove('hidden');
+            clearTimeout(window._errorTimer);
+            window._errorTimer = setTimeout(hideError, 8000);
+        }
+        function hideError() {
+            document.getElementById('error-toast').classList.add('hidden');
+        }
+
+        // ── FIX 8: Safe API helper — extracts meaningful error messages from
+        //    BOTH FastAPI HTTPException format {"detail":"..."} and our custom
+        //    {"error":"..."} format, AND from plain-text responses that would
+        //    otherwise crash JSON.parse() with "Unexpected token 'I'...".
+        async function apiFetch(url, options = {}) {
+            let response;
+            try {
+                response = await fetch(url, options);
+            } catch (networkErr) {
+                throw new Error('Network error — is the server running? ' + networkErr.message);
+            }
+
+            const contentType = response.headers.get('content-type') || '';
+
+            // ── FIX: Don't call .json() blindly — check content-type first.
+            //    A plain-text "Internal Server Error" causes .json() to throw
+            //    "Unexpected token 'I'..." which hides the real error.
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Server error (${response.status}): ${text.slice(0, 200)}`);
+            }
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                // FastAPI HTTPException → {"detail": "..."}
+                // Our OkResponse error path → {"error": "..."}
+                const msg = result.detail || result.error || `HTTP ${response.status}`;
+                throw new Error(msg);
+            }
+
+            // Our OkResponse always has ok:true on success.
+            // Belt-and-suspenders: catch any ok:false that slips through.
+            if (result.ok === false) {
+                throw new Error(result.detail || result.error || 'Unknown error');
+            }
+
+            return result;
+        }
+
         function switchTab(tab) {
-            // Hide all views
-            document.getElementById('view-analyzer').classList.add('hidden');
-            document.getElementById('view-portfolio').classList.add('hidden');
-            document.getElementById('view-compare').classList.add('hidden');
-            
-            // Reset tab styles
             ['analyzer', 'portfolio', 'compare'].forEach(t => {
+                document.getElementById('view-' + t).classList.add('hidden');
                 const btn = document.getElementById('tab-' + t);
                 btn.classList.remove('bg-purple-600', 'text-white');
                 btn.classList.add('text-gray-400');
             });
-            
-            // Show selected view
             document.getElementById('view-' + tab).classList.remove('hidden');
             const activeBtn = document.getElementById('tab-' + tab);
             activeBtn.classList.remove('text-gray-400');
@@ -347,64 +405,67 @@
         }
 
         async function analyzeStock() {
-            const symbol = document.getElementById('stock-symbol').value.trim();
+            const symbol = document.getElementById('stock-symbol').value.trim().toUpperCase();
             if (!symbol) return;
 
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = true;
             document.getElementById('loading-state').classList.remove('hidden');
             document.getElementById('analysis-results').classList.add('hidden');
+            hideError();
 
             try {
-                const response = await fetch(`${API_BASE}/analyze/${symbol}`);
-                const result = await response.json();
-                
-                if (!result.ok) throw new Error(result.error);
-
+                const result = await apiFetch(`${API_BASE}/analyze/${symbol}`);
                 displayAnalysis(result.data);
+                document.getElementById('analysis-results').classList.remove('hidden');
             } catch (error) {
-                alert('Error analyzing stock: ' + error.message);
+                showError(error.message);
             } finally {
                 document.getElementById('loading-state').classList.add('hidden');
+                btn.disabled = false;
             }
         }
 
         function displayAnalysis(data) {
-            const ai = data.ai_analysis;
+            const ai     = data.ai_analysis;
             const market = data.market_data;
 
             document.getElementById('res-symbol').textContent = data.symbol;
-            document.getElementById('res-name').textContent = market.name || data.symbol;
-            document.getElementById('res-price').textContent = '$' + (market.price || '0.00');
-            
-            const changeEl = document.getElementById('res-change');
-            const change = parseFloat(market.change);
-            changeEl.textContent = (change >= 0 ? '+' : '') + market.change + ' (' + market.change_pct + '%)';
-            changeEl.className = change >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium';
+            document.getElementById('res-name').textContent   = market.name || data.symbol;
+            document.getElementById('res-price').textContent  = market.price ? '$' + parseFloat(market.price).toFixed(2) : 'N/A';
+
+            const changeEl  = document.getElementById('res-change');
+            const change    = parseFloat(market.change) || 0;
+            const changePct = parseFloat(market.change_pct) || 0;
+            changeEl.textContent  = (change >= 0 ? '+' : '') + change.toFixed(2) + ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%)';
+            changeEl.className    = change >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium';
 
             document.getElementById('res-market-cap').textContent = market.market_cap || 'N/A';
-            document.getElementById('res-pe').textContent = market.pe_ratio || 'N/A';
-            document.getElementById('res-beta').textContent = market.beta || 'N/A';
-            document.getElementById('res-52w').textContent = (market['52_week_low'] || '0') + '-' + (market['52_week_high'] || '0');
-            document.getElementById('res-sector').textContent = market.sector || 'N/A';
-            document.getElementById('res-dividend').textContent = market.div_yield || '0%';
+            document.getElementById('res-pe').textContent         = market.pe_ratio   || 'N/A';
+            document.getElementById('res-beta').textContent       = market.beta       || 'N/A';
+            document.getElementById('res-52w').textContent        = (market['52_week_low'] || '?') + ' – ' + (market['52_week_high'] || '?');
+            document.getElementById('res-sector').textContent     = market.sector     || 'N/A';
+            document.getElementById('res-dividend').textContent   = market.div_yield  || 'N/A';
 
-            const ratingBadge = document.getElementById('res-rating-badge');
-            ratingBadge.textContent = ai.rating || 'HOLD';
+            const ratingBadge  = document.getElementById('res-rating-badge');
+            ratingBadge.textContent = (ai.rating || 'HOLD').replace('_', ' ');
             const ratingColors = {
                 'STRONG_BUY': 'bg-green-500/20 border-green-500/50 text-green-400',
-                'BUY': 'bg-green-500/20 border-green-500/50 text-green-400',
-                'HOLD': 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
-                'SELL': 'bg-red-500/20 border-red-500/50 text-red-400'
+                'BUY':        'bg-green-500/20 border-green-500/50 text-green-400',
+                'HOLD':       'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
+                'SELL':       'bg-red-500/20 border-red-500/50 text-red-400',
             };
-            ratingBadge.className = 'px-6 py-3 rounded-xl border font-bold text-xl ' + (ratingColors[ai.rating] || ratingColors['HOLD']);
+            ratingBadge.className = 'px-6 py-3 rounded-xl border font-bold text-xl ' +
+                (ratingColors[ai.rating] || ratingColors['HOLD']);
 
-            document.getElementById('res-summary').textContent = ai.summary || 'No summary available.';
-            document.getElementById('res-trend').textContent = ai.trend || 'Neutral';
-            document.getElementById('res-momentum').textContent = ai.momentum || 'Moderate';
-            document.getElementById('res-risk').textContent = ai.risk_level || 'Medium';
-            document.getElementById('res-hold').textContent = ai.hold_period || 'Long Term';
-            document.getElementById('res-revenue').textContent = ai.revenue_growth || 'Moderate';
-            document.getElementById('res-profit').textContent = ai.profit_margin_rating || 'Moderate';
-            document.getElementById('res-debt').textContent = ai.debt_level || 'Moderate';
+            document.getElementById('res-summary').textContent   = ai.summary           || 'No summary available.';
+            document.getElementById('res-trend').textContent     = ai.trend             || 'Neutral';
+            document.getElementById('res-momentum').textContent  = ai.momentum          || 'Moderate';
+            document.getElementById('res-risk').textContent      = ai.risk_level        || 'Medium';
+            document.getElementById('res-hold').textContent      = ai.hold_period       || 'Long Term';
+            document.getElementById('res-revenue').textContent   = ai.revenue_growth    || 'Moderate';
+            document.getElementById('res-profit').textContent    = ai.profit_margin_rating || 'Moderate';
+            document.getElementById('res-debt').textContent      = ai.debt_level        || 'Moderate';
             document.getElementById('res-consensus').textContent = ai.analyst_consensus || 'Hold';
 
             // Scores
@@ -422,8 +483,7 @@
                             <div class="w-full bg-gray-700 rounded-full h-2">
                                 <div class="${color} h-2 rounded-full" style="width: ${value}%"></div>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 });
             }
 
@@ -440,47 +500,48 @@
             (ai.opportunities || []).forEach(opp => {
                 oppContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-plus text-green-400 mt-1 text-xs"></i>${opp}</li>`;
             });
-
-            document.getElementById('analysis-results').classList.remove('hidden');
         }
 
         async function buildPortfolio() {
-            const amount = document.getElementById('portfolio-amount').value;
-            const risk = document.getElementById('portfolio-risk').value;
+            const amount  = document.getElementById('portfolio-amount').value;
+            const risk    = document.getElementById('portfolio-risk').value;
             const horizon = document.getElementById('portfolio-horizon').value;
+            const btn     = document.getElementById('portfolio-btn');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Building portfolio…';
+            hideError();
 
             try {
-                const response = await fetch(`${API_BASE}/portfolio`, {
-                    method: 'POST',
+                const result = await apiFetch(`${API_BASE}/portfolio`, {
+                    method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: parseFloat(amount), risk, horizon })
+                    body:    JSON.stringify({ amount: parseFloat(amount), risk, horizon }),
                 });
-                
-                const result = await response.json();
-                if (!result.ok) throw new Error(result.error);
-
                 displayPortfolio(result.data);
             } catch (error) {
-                alert('Error building portfolio: ' + error.message);
+                showError(error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Generate AI Portfolio';
             }
         }
 
         function displayPortfolio(data) {
-            document.getElementById('portfolio-summary').textContent = data.summary || 'AI-generated portfolio';
-            document.getElementById('portfolio-return').textContent = data.expected_annual_return || '8-12%';
-            document.getElementById('portfolio-volatility').textContent = data.expected_volatility || 'Moderate';
-            document.getElementById('portfolio-diversification').textContent = data.diversification_score || '80';
-            document.getElementById('portfolio-rebalance').textContent = data.rebalance_frequency || 'Quarterly';
+            document.getElementById('portfolio-summary').textContent         = data.summary                || 'AI-generated portfolio';
+            document.getElementById('portfolio-return').textContent          = data.expected_annual_return  || '8-12%';
+            document.getElementById('portfolio-volatility').textContent      = data.expected_volatility     || 'Moderate';
+            document.getElementById('portfolio-diversification').textContent = data.diversification_score   || '80';
+            document.getElementById('portfolio-rebalance').textContent       = data.rebalance_frequency     || 'Quarterly';
 
             const container = document.getElementById('portfolio-allocations');
             container.innerHTML = '';
-            
             (data.allocations || []).forEach(alloc => {
                 container.innerHTML += `
                     <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-4 border border-gray-700">
                         <div class="flex items-center gap-4">
                             <div class="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
-                                <span class="text-purple-400 font-bold">${alloc.symbol}</span>
+                                <span class="text-purple-400 font-bold text-xs">${alloc.symbol}</span>
                             </div>
                             <div>
                                 <div class="font-semibold text-white">${alloc.name}</div>
@@ -489,45 +550,44 @@
                         </div>
                         <div class="text-right">
                             <div class="text-xl font-bold text-white">${alloc.pct}%</div>
-                            <div class="text-sm text-gray-400">$${alloc.amount.toLocaleString()}</div>
+                            <div class="text-sm text-gray-400">$${(alloc.amount || 0).toLocaleString()}</div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
-
             document.getElementById('portfolio-results').classList.remove('hidden');
         }
 
         async function compareStocks() {
-            const input = document.getElementById('compare-input').value;
-            const symbols = input.split(',').map(s => s.trim()).filter(s => s);
-            
-            if (symbols.length < 2) {
-                alert('Please enter at least 2 symbols');
-                return;
-            }
+            const input   = document.getElementById('compare-input').value;
+            const symbols = input.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            const btn     = document.getElementById('compare-btn');
+
+            if (symbols.length < 2) { showError('Please enter at least 2 symbols separated by commas.'); return; }
+
+            btn.disabled = true;
+            btn.textContent = 'Comparing…';
+            hideError();
 
             try {
-                const response = await fetch(`${API_BASE}/compare`, {
-                    method: 'POST',
+                const result = await apiFetch(`${API_BASE}/compare`, {
+                    method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols })
+                    body:    JSON.stringify({ symbols }),
                 });
-                
-                const result = await response.json();
-                if (!result.ok) throw new Error(result.error);
-
                 displayComparison(result.data);
+                document.getElementById('compare-results').classList.remove('hidden');
             } catch (error) {
-                alert('Error comparing stocks: ' + error.message);
+                showError(error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Compare';
             }
         }
 
         function displayComparison(data) {
             const container = document.getElementById('compare-stocks-container');
             container.innerHTML = '';
-
-            (data.stocks || []).forEach(stock => {
+            (data.stocks || []).sort((a, b) => a.overall_rank - b.overall_rank).forEach(stock => {
                 const rankColor = stock.overall_rank === 1 ? 'text-green-400' : stock.overall_rank === 2 ? 'text-yellow-400' : 'text-gray-400';
                 container.innerHTML += `
                     <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 flex items-center justify-between">
@@ -539,24 +599,12 @@
                             </div>
                         </div>
                         <div class="flex gap-6 text-sm">
-                            <div class="text-center">
-                                <div class="text-gray-500">Growth</div>
-                                <div class="text-white font-semibold">${stock.growth_score}</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-gray-500">Value</div>
-                                <div class="text-white font-semibold">${stock.valuation_score}</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-gray-500">Risk</div>
-                                <div class="text-white font-semibold">${stock.risk_score}</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="${stock.rating === 'BUY' ? 'text-green-400' : 'text-yellow-400'} font-bold">${stock.rating}</div>
-                            </div>
+                            <div class="text-center"><div class="text-gray-500">Growth</div><div class="text-white font-semibold">${stock.growth_score}</div></div>
+                            <div class="text-center"><div class="text-gray-500">Value</div><div class="text-white font-semibold">${stock.valuation_score}</div></div>
+                            <div class="text-center"><div class="text-gray-500">Risk</div><div class="text-white font-semibold">${stock.risk_score}</div></div>
+                            <div class="text-center"><div class="${stock.rating === 'BUY' ? 'text-green-400' : 'text-yellow-400'} font-bold">${stock.rating}</div></div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
 
             if (data.winner) {
@@ -565,12 +613,9 @@
                         <div class="flex items-center gap-2 text-green-400 font-semibold">
                             <i class="fas fa-trophy"></i> Winner: ${data.winner}
                         </div>
-                        <div class="text-gray-400 text-sm mt-1">${data.winner_reason}</div>
-                    </div>
-                `;
+                        <div class="text-gray-400 text-sm mt-1">${data.winner_reason || ''}</div>
+                    </div>`;
             }
-
-            document.getElementById('compare-results').classList.remove('hidden');
         }
 
         // Initialize

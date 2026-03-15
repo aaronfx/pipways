@@ -692,6 +692,17 @@
 
 const API_BASE = window.location.origin;
 
+// FIX: chart_analysis.js expects a global `API` object with a `.request()` method.
+// DashboardController exposes `dashboard.apiRequest()` — this shim bridges them.
+// Declared here (before chart_analysis.js loads) so the script finds it immediately.
+const API = {
+    request(endpoint, opts = {}) {
+        // dashboard is defined below — safe to reference here because this method
+        // is only *called* after the class is instantiated, not at declaration time.
+        return dashboard.apiRequest(endpoint, opts);
+    }
+};
+
 class DashboardController {
     constructor() {
         this.user = null;
@@ -806,6 +817,16 @@ class DashboardController {
                 case 'courses': await this.loadCourses(); break;
                 case 'journal': this.setupJournalUpload(); break;
                 case 'mentor': await this.loadMentor(); break;
+                // FIX: was missing — caused chart analysis section to silently show
+                // a stub alert() instead of the real ChartAnalysisPage component.
+                case 'analysis':
+                    if (typeof ChartAnalysisPage !== 'undefined') {
+                        await ChartAnalysisPage.render('section-analysis');
+                    } else {
+                        console.error('[Dashboard] ChartAnalysisPage not loaded. ' +
+                            'Ensure /js/chart_analysis.js is included before this script.');
+                    }
+                    break;
             }
         } catch (err) {
             console.error(`Error loading ${section}:`, err);
@@ -1496,8 +1517,15 @@ class DashboardController {
         }
     }
 
+    // FIX: was a stub that just called alert(). Now properly delegates to
+    // ChartAnalysisPage which owns all chart analysis UI and API logic.
     analyzeChart() {
-        alert('Chart analysis feature - integrate with your chart analysis API');
+        if (typeof ChartAnalysisPage !== 'undefined') {
+            const file = ChartAnalysisPage.uploadedImage;
+            if (file) {
+                ChartAnalysisPage.analyzeChart(file);
+            }
+        }
     }
 
     logout() {
@@ -1510,5 +1538,8 @@ class DashboardController {
 const dashboard = new DashboardController();
 </script>
 
+    <!-- FIX: Load ChartAnalysisPage component. Must come AFTER the inline script
+         so that the `API` shim and `dashboard` instance are already declared. -->
+    <script src="/js/chart_analysis.js"></script>
 </body>
 </html>

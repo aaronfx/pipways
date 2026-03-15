@@ -3,1176 +3,1527 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways Trading Dashboard</title>
+    <title>Pipways Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .hidden { display: none !important; }
-        .fade-in { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .quality-score-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; }
-        .quality-high { background: #dcfce7; color: #166534; }
-        .quality-good { background: #dbeafe; color: #1e40af; }
-        .quality-warning { background: #fef9c3; color: #854d0e; }
-        .quality-danger { background: #fee2e2; color: #991b1b; }
-        .admin-bar { background: linear-gradient(to right, #581c87, #312e81); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .score-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; border: 4px solid; }
+        .score-excellent { border-color: #10b981; color: #10b981; }
+        .score-good { border-color: #3b82f6; color: #3b82f6; }
+        .score-warning { border-color: #f59e0b; color: #f59e0b; }
+        .score-danger { border-color: #ef4444; color: #ef4444; }
     </style>
 <base target="_blank">
+<base target="_blank">
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
-    <!-- Admin Menu -->
-    <div id="admin-menu-container" class="hidden admin-bar p-3 border-b border-purple-700">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <i class="fas fa-shield-alt text-purple-300"></i>
-                <span class="font-semibold text-purple-100">Admin Panel</span>
-            </div>
-            <div class="flex space-x-4">
-                <button onclick="app.navigate('user-management')" class="text-sm bg-purple-700 hover:bg-purple-600 px-3 py-1 rounded transition">
-                    <i class="fas fa-users mr-1"></i> Users
-                </button>
-                <button onclick="app.navigate('content-management')" class="text-sm bg-purple-700 hover:bg-purple-600 px-3 py-1 rounded transition">
-                    <i class="fas fa-edit mr-1"></i> Content
-                </button>
-                <button onclick="app.navigate('analytics')" class="text-sm bg-purple-700 hover:bg-purple-600 px-3 py-1 rounded transition">
-                    <i class="fas fa-chart-line mr-1"></i> Analytics
-                </button>
-            </div>
-        </div>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
+
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden fixed top-4 left-4 z-50">
+        <button id="mobile-menu-btn" class="bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-700 text-white">
+            <i class="fas fa-bars"></i>
+        </button>
     </div>
 
-    <!-- Navigation -->
-    <nav class="bg-gray-800 border-b border-gray-700 p-4">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-4">
-                <button id="menu-toggle" class="lg:hidden text-gray-300 hover:text-white">
-                    <i class="fas fa-bars text-xl"></i>
-                </button>
-                <h1 class="text-xl font-bold text-blue-400">Pipways</h1>
-            </div>
-            <div class="hidden lg:flex items-center space-x-6">
-                <button onclick="app.navigate('dashboard')" class="nav-btn text-gray-300 hover:text-white font-medium">Dashboard</button>
-                <button onclick="app.navigate('chart-analysis')" class="nav-btn text-gray-300 hover:text-white font-medium">Chart Analysis</button>
-                <button onclick="app.navigate('journal')" class="nav-btn text-gray-300 hover:text-white font-medium">Journal</button>
-                <button onclick="app.navigate('performance')" class="nav-btn text-gray-300 hover:text-white font-medium">Performance</button>
-                <button onclick="app.navigate('mentor')" class="nav-btn text-gray-300 hover:text-white font-medium">AI Mentor</button>
-            </div>
-            <div class="flex items-center space-x-4">
-                <div id="user-info" class="flex items-center space-x-2">
-                    <span class="text-sm text-gray-400">Loading...</span>
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <div class="p-6 border-b border-gray-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white text-lg"></i>
                 </div>
-                <button onclick="app.logout()" class="text-red-400 hover:text-red-300">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
+                <div>
+                    <h1 class="font-bold text-xl tracking-tight">Pipways</h1>
+                    <p class="text-xs text-gray-500">Trading Platform</p>
+                </div>
             </div>
         </div>
-    </nav>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto p-6">
-        <!-- Dashboard Overview -->
-        <section id="dashboard-section" class="fade-in">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold mb-2">Dashboard</h2>
-                <p class="text-gray-400">Welcome back, <span id="user-name">System Administrator</span></p>
+        <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Main</div>
+
+            <a href="#" data-section="dashboard" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white bg-purple-600 transition-all">
+                <i class="fas fa-home w-5"></i><span>Dashboard</span>
+            </a>
+            <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-satellite-dish w-5"></i><span>Trading Signals</span>
+            </a>
+            <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-book w-5"></i><span>Trading Journal</span>
+            </a>
+            <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-chart-line w-5"></i><span>Chart Analysis</span>
+            </a>
+            <a href="#" data-section="performance" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-chart-bar w-5"></i><span>Performance</span>
+            </a>
+            <a href="#" data-section="mentor" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-robot w-5"></i><span>AI Mentor</span>
+            </a>
+
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-2 px-2">Education</div>
+            <a href="#" data-section="courses" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-graduation-cap w-5"></i><span>Courses</span>
+            </a>
+            <a href="#" data-section="webinars" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-video w-5"></i><span>Webinars</span>
+            </a>
+            <a href="#" data-section="blog" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-newspaper w-5"></i><span>Blog</span>
+            </a>
+
+            <div id="admin-menu-container" class="hidden">
+                <div class="text-xs font-semibold text-red-500 uppercase tracking-wider mt-6 mb-2 px-2">Administration</div>
+                <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all border-l-2 border-red-500">
+                    <i class="fas fa-shield-alt w-5 text-red-400"></i><span>Admin Dashboard</span>
+                </a>
             </div>
+        </nav>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <div class="bg-gradient-to-br from-pink-600 to-purple-700 rounded-xl p-6 cursor-pointer hover:scale-105 transition" onclick="app.navigate('mentor')">
-                    <div class="flex items-center justify-between mb-4">
-                        <i class="fas fa-robot text-3xl text-white"></i>
-                        <span class="bg-white/20 px-2 py-1 rounded text-xs">AI Powered</span>
-                    </div>
-                    <h3 class="text-xl font-bold mb-1">AI Mentor</h3>
-                    <p class="text-pink-100 text-sm">24/7 coaching</p>
+        <div class="p-4 border-t border-gray-800">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <i class="fas fa-user text-sm"></i>
                 </div>
-
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="w-12 h-12 bg-blue-900/50 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-signal text-blue-400 text-xl"></i>
-                        </div>
-                        <span class="text-green-400 text-xs flex items-center"><i class="fas fa-circle text-xs mr-1"></i> Live</span>
-                    </div>
-                    <h3 class="text-gray-400 text-sm mb-1">Active Signals</h3>
-                    <p class="text-2xl font-bold" id="active-signals-count">0</p>
-                </div>
-
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="w-12 h-12 bg-indigo-900/50 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-graduation-cap text-indigo-400 text-xl"></i>
-                        </div>
-                    </div>
-                    <h3 class="text-gray-400 text-sm mb-1">Courses</h3>
-                    <p class="text-2xl font-bold">12</p>
+                <div class="flex-1 min-w-0">
+                    <p id="user-name" class="font-medium text-sm truncate">Loading...</p>
+                    <p id="user-email" class="text-xs text-gray-500 truncate">...</p>
                 </div>
             </div>
-        </section>
+            <button onclick="dashboard.logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-all text-sm">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </aside>
 
-        <!-- Chart Analysis Section -->
-        <section id="chart-analysis-section" class="hidden fade-in">
-            <h2 class="text-2xl font-bold mb-6">Chart Analysis</h2>
+    <main class="flex-1 overflow-y-auto h-screen">
+        <header class="bg-gray-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+            <div class="md:hidden w-8"></div>
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-white">Dashboard</h2>
+                <p class="text-sm text-gray-400">Welcome back, <span id="header-user-name">Trader</span></p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative p-2 text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-bell text-xl"></i>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+            </div>
+        </header>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Upload Area -->
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <h3 class="font-semibold mb-4">Upload Chart</h3>
-                    <div id="chart-drop-zone" class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-500 transition cursor-pointer">
-                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
-                        <p class="text-gray-400 mb-2">Drag & drop chart image or click to browse</p>
-                        <input type="file" id="chart-file-input" accept="image/*" class="hidden">
-                        <button onclick="document.getElementById('chart-file-input').click()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition">
-                            Select Image
-                        </button>
-                    </div>
-                    <div id="chart-preview-container" class="hidden mt-4">
-                        <img id="chart-preview" class="w-full rounded-lg border border-gray-600 max-h-64 object-contain bg-gray-900" alt="Chart preview">
-                        <div class="mt-4 flex space-x-2">
-                            <button id="analyze-chart-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition">
-                                <i class="fas fa-brain mr-2"></i>Analyze Chart
+        <div class="p-6 max-w-7xl mx-auto">
+
+            <!-- DASHBOARD -->
+            <section id="section-dashboard" class="section">
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-300">Featured</h3>
+                        <div class="flex gap-2">
+                            <button id="carousel-prev" class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors text-gray-400">
+                                <i class="fas fa-chevron-left text-sm"></i>
+                            </button>
+                            <button id="carousel-next" class="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors text-gray-400">
+                                <i class="fas fa-chevron-right text-sm"></i>
                             </button>
                         </div>
                     </div>
+                    <div id="feature-carousel" class="relative overflow-hidden rounded-2xl"></div>
                 </div>
 
-                <!-- Analysis Results -->
-                <div id="chart-analysis-results" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="font-semibold">AI Analysis</h3>
-                        <span id="analysis-confidence" class="bg-green-900 text-green-300 px-2 py-1 rounded text-xs font-bold">--% Confidence</span>
-                    </div>
-
-                    <div id="pattern-result" class="mb-4">
-                        <p class="text-gray-400 text-sm mb-1">Detected Pattern</p>
-                        <p id="detected-pattern" class="text-lg font-bold text-blue-400">--</p>
-                    </div>
-
-                    <div id="trade-setup-card" class="bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700">
-                        <h4 class="font-semibold mb-3 text-sm text-gray-300">Trade Setup</h4>
-                        <div class="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span class="text-gray-400 text-xs block">Symbol</span>
-                                <span id="setup-symbol" class="font-mono font-bold">--</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400 text-xs block">Entry</span>
-                                <span id="setup-entry" class="font-mono text-blue-400 font-bold">--</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400 text-xs block">Stop Loss</span>
-                                <span id="setup-sl" class="font-mono text-red-400 font-bold">--</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400 text-xs block">Take Profit</span>
-                                <span id="setup-tp" class="font-mono text-green-400 font-bold">--</span>
-                            </div>
-                            <div class="col-span-2 border-t border-gray-700 pt-2">
-                                <span class="text-gray-400 text-xs block">Risk:Reward</span>
-                                <span id="setup-rr" class="font-mono text-purple-400 font-bold text-lg">--</span>
-                            </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-purple-600/20 rounded-lg"><i class="fas fa-satellite-dish text-purple-400 text-xl"></i></div>
+                            <span class="text-xs text-green-400 flex items-center"><i class="fas fa-arrow-up mr-1"></i> Live</span>
                         </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Active Signals</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-signals">--</p>
                     </div>
-
-                    <div class="flex space-x-2 mb-4">
-                        <button id="save-signal-btn" class="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg transition text-sm">
-                            <i class="fas fa-save mr-1"></i> Save Signal
-                        </button>
-                        <button id="validate-trade-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition text-sm">
-                            <i class="fas fa-check-circle mr-1"></i> Validate Trade
-                        </button>
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-blue-600/20 rounded-lg"><i class="fas fa-graduation-cap text-blue-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Courses</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-courses">--</p>
                     </div>
-
-                    <!-- Debug Info (hidden by default, shown on error) -->
-                    <div id="validation-debug" class="hidden mt-4 p-3 bg-red-900/30 border border-red-700 rounded text-xs text-red-300">
-                        <p class="font-semibold mb-1">Debug Info:</p>
-                        <pre id="validation-debug-text" class="whitespace-pre-wrap break-all"></pre>
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-green-600/20 rounded-lg"><i class="fas fa-chart-line text-green-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Win Rate</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-winrate">--</p>
                     </div>
-
-                    <!-- Validation Results -->
-                    <div id="validation-results" class="hidden mt-4 p-4 bg-gray-900 rounded-lg border border-gray-700">
-                        <!-- Populated by JS -->
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-pink-600/20 rounded-lg"><i class="fas fa-robot text-pink-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">AI Insights</h4>
+                        <p class="text-2xl font-bold text-white">24</p>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Trading Journal Section -->
-        <section id="journal-section" class="hidden fade-in">
-            <h2 class="text-2xl font-bold mb-6">Trading Journal</h2>
-
-            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
-                <h3 class="font-semibold mb-4 flex items-center">
-                    <i class="fas fa-file-import mr-2 text-blue-400"></i>
-                    Import Trades - Multi Format
-                </h3>
-
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-                    <button onclick="app.selectJournalFormat('mt4')" class="journal-format-btn bg-gray-700 border-2 border-gray-600 hover:border-blue-500 p-4 rounded-lg transition text-center group" data-format="mt4">
-                        <i class="fas fa-file-code text-blue-400 text-2xl mb-2 block group-hover:scale-110 transition"></i>
-                        <span class="text-sm font-medium">MT4 Statement</span>
-                        <span class="text-xs text-gray-500 block">.htm, .html</span>
-                    </button>
-                    <button onclick="app.selectJournalFormat('mt5')" class="journal-format-btn bg-gray-700 border-2 border-gray-600 hover:border-blue-500 p-4 rounded-lg transition text-center group" data-format="mt5">
-                        <i class="fas fa-file-code text-indigo-400 text-2xl mb-2 block group-hover:scale-110 transition"></i>
-                        <span class="text-sm font-medium">MT5 Statement</span>
-                        <span class="text-xs text-gray-500 block">.htm, .html</span>
-                    </button>
-                    <button onclick="app.selectJournalFormat('csv')" class="journal-format-btn bg-gray-700 border-2 border-gray-600 hover:border-blue-500 p-4 rounded-lg transition text-center group" data-format="csv">
-                        <i class="fas fa-file-csv text-yellow-400 text-2xl mb-2 block group-hover:scale-110 transition"></i>
-                        <span class="text-sm font-medium">CSV File</span>
-                        <span class="text-xs text-gray-500 block">.csv</span>
-                    </button>
-                    <button onclick="app.selectJournalFormat('excel')" class="journal-format-btn bg-gray-700 border-2 border-gray-600 hover:border-blue-500 p-4 rounded-lg transition text-center group" data-format="excel">
-                        <i class="fas fa-file-excel text-green-400 text-2xl mb-2 block group-hover:scale-110 transition"></i>
-                        <span class="text-sm font-medium">Excel</span>
-                        <span class="text-xs text-gray-500 block">.xlsx, .xls</span>
-                    </button>
-                    <button onclick="app.selectJournalFormat('screenshot')" class="journal-format-btn bg-gray-700 border-2 border-gray-600 hover:border-blue-500 p-4 rounded-lg transition text-center group" data-format="screenshot">
-                        <i class="fas fa-camera text-pink-400 text-2xl mb-2 block group-hover:scale-110 transition"></i>
-                        <span class="text-sm font-medium">Screenshot OCR</span>
-                        <span class="text-xs text-gray-500 block">.png, .jpg</span>
-                    </button>
-                    <button onclick="app.selectJournalFormat('manual')" class="journal-format-btn bg-gray-700 border-2 border-gray-600 hover:border-blue-500 p-4 rounded-lg transition text-center group" data-format="manual">
-                        <i class="fas fa-keyboard text-purple-400 text-2xl mb-2 block group-hover:scale-110 transition"></i>
-                        <span class="text-sm font-medium">Manual Entry</span>
-                        <span class="text-xs text-gray-500 block">Form input</span>
-                    </button>
+            <!-- SIGNALS -->
+            <section id="section-signals" class="section hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-white">Trading Signals</h3>
+                    <select class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300">
+                        <option>All Pairs</option><option>Forex</option><option>Crypto</option><option>Indices</option>
+                    </select>
                 </div>
+                <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </section>
 
-                <!-- Upload Area -->
-                <div id="journal-upload-container" class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center transition-colors">
-                    <input type="file" id="journal-file-input" class="hidden" accept=".csv,.xlsx,.xls,.htm,.html,.png,.jpg,.jpeg,.pdf">
-                    <div id="journal-drop-content">
-                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
-                        <p class="text-gray-300 mb-2 font-medium">Drop your trading statement here</p>
-                        <p class="text-gray-500 text-sm mb-4">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images</p>
-                        <p id="selected-format-display" class="text-blue-400 text-sm font-semibold">Select a format above to enable upload</p>
-                    </div>
-                    <div id="journal-loading" class="hidden">
-                        <div class="loading-spinner mx-auto mb-3"></div>
-                        <p class="text-gray-300">AI is analyzing your trades...</p>
-                        <p class="text-gray-500 text-xs mt-1">This may take a few moments</p>
-                    </div>
-                    <div id="journal-error" class="hidden text-left">
-                        <div class="flex items-start space-x-3">
-                            <i class="fas fa-exclamation-triangle text-red-400 text-xl mt-1"></i>
-                            <div>
-                                <p class="text-red-400 font-semibold mb-1">No trades found</p>
-                                <p class="text-gray-400 text-sm mb-3">We couldn't detect any trades in your file. This could be due to:</p>
-                                <ul class="text-gray-500 text-xs space-y-1 mb-3 list-disc list-inside">
-                                    <li>Wrong file format selected</li>
-                                    <li>File is corrupted or password protected</li>
-                                    <li>Unsupported broker format</li>
-                                    <li>File contains no closed trades</li>
-                                </ul>
-                                <div class="bg-gray-900 p-2 rounded text-xs text-gray-500 mb-3">
-                                    <span class="font-semibold">Debug:</span> <span id="journal-error-details"></span>
-                                </div>
-                                <button onclick="app.resetJournalUpload()" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition">
-                                    <i class="fas fa-redo mr-1"></i> Try Again
+            <!-- JOURNAL -->
+            <section id="section-journal" class="section hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trades - Multi Format</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                                <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt4">
+                                    <i class="fas fa-file-code text-blue-400"></i> MT4 Statement
+                                </button>
+                                <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt5">
+                                    <i class="fas fa-file-code text-green-400"></i> MT5 Statement
+                                </button>
+                                <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="csv">
+                                    <i class="fas fa-file-csv text-yellow-400"></i> CSV File
+                                </button>
+                                <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="excel">
+                                    <i class="fas fa-file-excel text-green-500"></i> Excel
+                                </button>
+                                <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="screenshot">
+                                    <i class="fas fa-camera text-pink-400"></i> Screenshot OCR
+                                </button>
+                                <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-sm text-white">
+                                    <i class="fas fa-edit"></i> Manual Entry
                                 </button>
                             </div>
+
+                            <div id="journal-dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-12 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900">
+                                <input type="file" id="journal-file-input" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.html,.htm,.png,.jpg,.jpeg">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                                <p class="text-gray-300 mb-2">Drop your trading statement here</p>
+                                <p class="text-sm text-gray-500">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images</p>
+                                <p class="text-xs text-purple-400 mt-2" id="selected-format">Click a format above</p>
+                            </div>
+
+                            <div id="upload-status" class="mt-4 hidden"></div>
+                            <div id="journal-upload-loading" class="hidden mt-4 text-center">
+                                <div class="inline-flex items-center gap-2 text-blue-400">
+                                    <i class="fas fa-spinner fa-spin"></i><span>Analyzing with AI...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="journal-analysis" class="hidden"></div>
+                        <div id="recent-trades-container" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h4 class="font-bold text-white mb-4">Recent Trades</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs text-gray-500 uppercase bg-gray-900">
+                                        <tr><th class="px-4 py-3">Symbol</th><th class="px-4 py-3">Direction</th><th class="px-4 py-3">Entry</th><th class="px-4 py-3">Exit</th><th class="px-4 py-3">P&L</th></tr>
+                                    </thead>
+                                    <tbody id="trades-table-body" class="text-gray-300"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div id="journal-stats" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h4 class="font-bold text-white mb-4">Performance Overview</h4>
+                            <div class="space-y-4">
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-400">Total Trades</span>
+                                    <span class="text-white font-bold" id="stat-total-trades">--</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-400">Win Rate</span>
+                                    <span class="text-green-400 font-bold" id="stat-win-rate">--</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-400">Profit Factor</span>
+                                    <span class="text-blue-400 font-bold" id="stat-profit-factor">--</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
+                                    <span class="text-gray-400">Net P&L</span>
+                                    <span class="font-bold" id="stat-net-pnl">--</span>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-gray-700">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-gray-400 text-sm">Overall Grade</span>
+                                    <span class="px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm" id="stat-grade">--</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div id="stat-progress" class="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="manual-entry-form" class="bg-gray-800 rounded-xl p-6 border border-gray-700 hidden">
+                            <h4 class="font-bold text-white mb-4"><i class="fas fa-plus-circle text-green-400 mr-2"></i>Add Trade Manually</h4>
+                            <form class="space-y-4" onsubmit="event.preventDefault(); dashboard.addManualTrade();">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Symbol</label>
+                                    <input type="text" id="manual-symbol" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="EURUSD" required>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Direction</label>
+                                    <select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                                        <option value="BUY">Buy</option>
+                                        <option value="SELL">Sell</option>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
+                                        <input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-400 mb-1">Exit Price</label>
+                                        <input type="number" id="manual-exit" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">P&L ($)</label>
+                                    <input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
+                                </div>
+                                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors">
+                                    <i class="fas fa-plus mr-2"></i>Add Trade
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <!-- Results Area -->
-                <div id="journal-results" class="hidden mt-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h4 class="font-semibold text-lg">Analysis Results</h4>
-                        <span id="journal-trade-count" class="bg-blue-900 text-blue-300 px-3 py-1 rounded-full text-sm font-bold">0 trades found</span>
-                    </div>
-
-                    <div id="journal-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <!-- Populated by JS -->
-                    </div>
-
-                    <div class="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                        <h5 class="font-semibold mb-3 flex items-center">
-                            <i class="fas fa-lightbulb text-yellow-400 mr-2"></i>
-                            AI Insights
-                        </h5>
-                        <ul id="insights-list" class="space-y-2 text-sm text-gray-300">
-                            <!-- Populated by JS -->
-                        </ul>
-                    </div>
+            <!-- COURSES -->
+            <section id="section-courses" class="section hidden">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h3 class="text-xl font-bold text-white">Trading Courses</h3>
+                    <div id="course-filters" class="flex flex-wrap gap-2"></div>
                 </div>
-            </div>
+                <div id="courses-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
 
-            <!-- Manual Entry Form -->
-            <div id="manual-entry-form" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <h3 class="font-semibold mb-4">Manual Trade Entry</h3>
-                <form onsubmit="app.submitManualTrade(event)">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Symbol</label>
-                            <input type="text" name="symbol" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:border-blue-500 focus:outline-none">
+            <!-- WEBINARS -->
+            <section id="section-webinars" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Upcoming Webinars</h3>
+                <div id="webinars-container" class="space-y-4"></div>
+            </section>
+
+            <!-- BLOG -->
+            <section id="section-blog" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Trading Blog</h3>
+                <div id="blog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- ADMIN -->
+            <section id="section-admin" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Admin Dashboard</h3>
+                <div id="admin-container"></div>
+            </section>
+
+            <!-- MENTOR -->
+            <section id="section-mentor" class="section hidden"></section>
+
+            <!-- CHART ANALYSIS -->
+            <section id="section-analysis" class="section hidden">
+                <div class="max-w-6xl mx-auto">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h3 class="text-xl font-bold text-white mb-4"><i class="fas fa-chart-line mr-2 text-purple-400"></i>AI Chart Analysis</h3>
+                            <p class="text-gray-400 mb-6">Upload chart images for pattern recognition and trade setup validation.</p>
+
+                            <div id="chart-dropzone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900 mb-4">
+                                <input type="file" id="chart-file-input" class="hidden" accept="image/*">
+                                <img id="chart-preview" class="hidden max-h-48 mx-auto mb-4 rounded-lg">
+                                <div id="chart-upload-placeholder">
+                                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                                    <p class="text-gray-300 font-medium">Drop chart image here</p>
+                                    <p class="text-sm text-gray-500">PNG, JPG, WEBP (max 5MB)</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Symbol</label>
+                                    <input type="text" id="chart-symbol" placeholder="EURUSD" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-400 mb-1">Timeframe</label>
+                                    <select id="chart-timeframe" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                                        <option value="">Auto-detect</option>
+                                        <option value="5M">5M</option>
+                                        <option value="15M">15M</option>
+                                        <option value="1H">1H</option>
+                                        <option value="4H">4H</option>
+                                        <option value="1D">1D</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button id="analyze-chart-btn" onclick="dashboard.analyzeChart()" disabled class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors font-semibold">
+                                <i class="fas fa-brain mr-2"></i>Analyze Chart
+                            </button>
+
+                            <div id="chart-analysis-loading" class="hidden mt-4 text-center text-purple-400">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>AI analyzing patterns...
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Type</label>
-                            <select name="type" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:border-blue-500 focus:outline-none">
-                                <option value="BUY">Buy</option>
-                                <option value="SELL">Sell</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
-                            <input type="number" step="0.00001" name="entry" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Exit Price</label>
-                            <input type="number" step="0.00001" name="exit" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Size (Lots)</label>
-                            <input type="number" step="0.01" name="size" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Date</label>
-                            <input type="date" name="date" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:border-blue-500 focus:outline-none">
+
+                        <div id="chart-analysis-results" class="bg-gray-800 rounded-xl p-6 border border-gray-700 hidden">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-lg font-bold text-white">Analysis Results</h4>
+                                    <p class="text-sm text-gray-500"><span id="analysis-symbol">--</span> <span id="analysis-timeframe"></span></p>
+                                </div>
+                                <span id="analysis-confidence" class="px-3 py-1 rounded-full bg-blue-900 text-blue-300 text-sm font-bold">0%</span>
+                            </div>
+
+                            <div class="mb-4">
+                                <span class="text-sm text-gray-400">Trading Bias:</span>
+                                <span id="analysis-bias" class="text-2xl font-bold ml-2 uppercase">--</span>
+                            </div>
+
+                            <div class="mb-4">
+                                <span class="text-sm text-gray-400">Pattern:</span>
+                                <div id="analysis-pattern" class="mt-1 text-white font-medium">--</div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-lg p-4 mb-4">
+                                <h5 class="font-bold text-white mb-3"><i class="fas fa-crosshairs text-purple-400 mr-2"></i>Trade Setup</h5>
+                                <div class="grid grid-cols-2 gap-3 mb-3">
+                                    <div class="p-2 bg-gray-900 rounded"><span class="text-xs text-gray-500 block">Entry</span><span id="setup-entry" class="font-mono font-bold">--</span></div>
+                                    <div class="p-2 bg-gray-900 rounded"><span class="text-xs text-gray-500 block">Stop Loss</span><span id="setup-sl" class="font-mono font-bold text-red-400">--</span></div>
+                                    <div class="p-2 bg-gray-900 rounded"><span class="text-xs text-gray-500 block">Take Profit</span><span id="setup-tp" class="font-mono font-bold text-green-400">--</span></div>
+                                    <div class="p-2 bg-gray-900 rounded"><span class="text-xs text-gray-500 block">R:R</span><span id="setup-rr" class="font-mono font-bold text-purple-400">--</span></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="dashboard.showTradeValidator()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm">
+                                        <i class="fas fa-check-circle mr-1"></i>Validate
+                                    </button>
+                                    <button onclick="dashboard.saveCurrentSignal()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm">
+                                        <i class="fas fa-save mr-1"></i>Save Signal
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="key-levels-list" class="space-y-2 mb-4"></div>
+                            <ul id="analysis-insights" class="list-disc list-inside text-sm text-gray-400"></ul>
+
+                            <div class="mt-4 pt-4 border-t border-gray-700">
+                                <span class="text-sm text-gray-400">Analyzed Chart:</span>
+                                <img id="attached-chart-preview" class="mt-2 max-h-32 rounded-lg hidden">
+                            </div>
                         </div>
                     </div>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition">
-                        <i class="fas fa-plus mr-2"></i>Add Trade
-                    </button>
-                </form>
-            </div>
-        </section>
 
-        <!-- Performance Section -->
-        <section id="performance-section" class="hidden fade-in">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold">Performance Analytics</h2>
-                <select id="performance-period" onchange="app.loadPerformance()" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                    <option value="7">Last 7 Days</option>
-                    <option value="30" selected>Last 30 Days</option>
-                    <option value="90">Last 90 Days</option>
-                    <option value="365">Last Year</option>
-                </select>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <p class="text-gray-400 text-xs mb-1">Total Trades</p>
-                    <p id="stat-total-trades" class="text-2xl font-bold">--</p>
-                </div>
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <p class="text-gray-400 text-xs mb-1">Win Rate</p>
-                    <p id="stat-win-rate" class="text-2xl font-bold text-green-400">--%</p>
-                </div>
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <p class="text-gray-400 text-xs mb-1">Profit Factor</p>
-                    <p id="stat-profit-factor" class="text-2xl font-bold text-blue-400">--</p>
-                </div>
-                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                    <p class="text-gray-400 text-xs mb-1">Net P&L</p>
-                    <p id="stat-net-pnl" class="text-2xl font-bold text-purple-400">--</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <h3 class="font-semibold mb-4">Equity Curve</h3>
-                    <div class="h-64">
-                        <canvas id="equity-curve-chart"></canvas>
-                    </div>
-                </div>
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <h3 class="font-semibold mb-4">Trade Distribution</h3>
-                    <div class="h-64">
-                        <canvas id="trade-distribution-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <h3 class="font-semibold mb-4 flex items-center">
-                    <i class="fas fa-brain text-purple-400 mr-2"></i>
-                    AI Psychology Profile
-                </h3>
-                <div id="psychology-profile" class="space-y-4">
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-400 w-32">Discipline</span>
-                        <div class="flex-1 bg-gray-700 rounded-full h-2 mx-3">
-                            <div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
-                        </div>
-                        <span class="text-sm font-bold w-8">--%</span>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-400 w-32">Patience</span>
-                        <div class="flex-1 bg-gray-700 rounded-full h-2 mx-3">
-                            <div class="bg-green-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
-                        </div>
-                        <span class="text-sm font-bold w-8">--%</span>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-400 w-32">Consistency</span>
-                        <div class="flex-1 bg-gray-700 rounded-full h-2 mx-3">
-                            <div class="bg-purple-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
-                        </div>
-                        <span class="text-sm font-bold w-8">--%</span>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-400 w-32">Risk Management</span>
-                        <div class="flex-1 bg-gray-700 rounded-full h-2 mx-3">
-                            <div class="bg-yellow-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
-                        </div>
-                        <span class="text-sm font-bold w-8">--%</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- AI Mentor Section -->
-        <section id="mentor-section" class="hidden fade-in">
-            <h2 class="text-2xl font-bold mb-6">AI Mentor</h2>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700 flex flex-col h-[600px]">
-                    <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                                <i class="fas fa-robot text-white"></i>
+                    <div id="trade-validator-modal" class="hidden mt-6 bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-shield-alt mr-2 text-blue-400"></i>AI Trade Validator</h4>
+                        <div class="grid grid-cols-4 gap-4 mb-4">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Entry</label>
+                                <input type="number" id="validator-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
                             </div>
                             <div>
-                                <h3 class="font-semibold">Trading Mentor</h3>
-                                <p class="text-xs text-green-400 flex items-center">
-                                    <span class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span>
-                                    Online
-                                </p>
+                                <label class="block text-xs text-gray-400 mb-1">Stop Loss</label>
+                                <input type="number" id="validator-sl" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Take Profit</label>
+                                <input type="number" id="validator-tp" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Symbol</label>
+                                <input type="text" id="validator-symbol" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm">
                             </div>
                         </div>
-                        <select id="mentor-skill-level" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs focus:border-blue-500 focus:outline-none">
-                            <option value="beginner">Beginner</option>
-                            <option value="intermediate">Intermediate</option>
-                            <option value="advanced">Advanced</option>
-                        </select>
-                    </div>
+                        <button onclick="dashboard.validateTradeSetup()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg mb-4">Validate Setup</button>
 
-                    <div id="mentor-chat-container" class="flex-1 overflow-y-auto p-4 space-y-4">
-                        <div class="flex items-start space-x-3">
-                            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                                <i class="fas fa-robot text-white text-xs"></i>
+                        <div id="validation-result" class="hidden">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div id="validation-score" class="score-circle">0</div>
+                                <div>
+                                    <div class="text-sm text-gray-400">Quality Score</div>
+                                    <div id="validation-recommendation" class="text-lg font-bold text-white">--</div>
+                                </div>
                             </div>
-                            <div class="bg-gray-700 rounded-lg p-3 max-w-[80%]">
-                                <p class="text-sm">Hello! I'm your AI trading mentor. How can I help you improve your trading today?</p>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="p-3 bg-gray-900 rounded"><span class="text-xs text-gray-500">R:R Ratio</span><div id="validation-rr" class="text-xl font-bold">--</div></div>
+                                <div class="p-3 bg-gray-900 rounded"><span class="text-xs text-gray-500">Win Probability</span><div id="validation-probability" class="text-xl font-bold">--</div></div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="p-4 border-t border-gray-700">
-                        <div class="flex space-x-2 mb-2">
-                            <input type="text" id="mentor-input" placeholder="Ask about trading strategies, psychology, or analysis..." 
-                                class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500">
-                            <button id="mentor-send-btn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="app.askQuickQuestion('How do I control emotions while trading?')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full transition">Emotions</button>
-                            <button onclick="app.askQuickQuestion('What is a good risk management strategy?')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full transition">Risk Management</button>
-                            <button onclick="app.askQuickQuestion('How do I identify trend reversals?')" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full transition">Trend Analysis</button>
+                            <div id="validation-warnings" class="text-sm mb-2"></div>
+                            <div id="validation-suggestions" class="text-sm text-blue-400"></div>
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <div class="space-y-6">
+            <!-- PERFORMANCE -->
+            <section id="section-performance" class="section hidden">
+                <div class="max-w-6xl mx-auto space-y-6">
                     <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <h3 class="font-semibold mb-4">Quick Topics</h3>
-                        <div class="space-y-2">
-                            <button onclick="app.askQuickQuestion('Explain support and resistance')" class="w-full text-left text-sm bg-gray-700 hover:bg-gray-600 p-3 rounded-lg transition flex items-center">
-                                <i class="fas fa-chart-line text-blue-400 mr-2"></i> Support & Resistance
-                            </button>
-                            <button onclick="app.askQuickQuestion('What is position sizing?')" class="w-full text-left text-sm bg-gray-700 hover:bg-gray-600 p-3 rounded-lg transition flex items-center">
-                                <i class="fas fa-calculator text-green-400 mr-2"></i> Position Sizing
-                            </button>
-                            <button onclick="app.askQuickQuestion('How to read candlestick patterns?')" class="w-full text-left text-sm bg-gray-700 hover:bg-gray-600 p-3 rounded-lg transition flex items-center">
-                                <i class="fas fa-fire text-orange-400 mr-2"></i> Candlestick Patterns
-                            </button>
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-white"><i class="fas fa-chart-bar mr-2 text-purple-400"></i>Performance Analytics</h3>
+                                <p class="text-gray-400 text-sm">AI-powered trading analysis</p>
+                            </div>
+                            <select id="performance-period" onchange="dashboard.loadPerformanceStats()" class="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                                <option value="7">Last 7 Days</option>
+                                <option value="30" selected>Last 30 Days</option>
+                                <option value="90">Last 90 Days</option>
+                                <option value="365">Last Year</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="p-4 bg-gradient-to-br from-blue-900 to-blue-800 rounded-xl">
+                                <div class="text-3xl font-bold text-blue-300 mb-1" id="perf-total-trades">--</div>
+                                <div class="text-sm text-gray-400">Total Trades</div>
+                            </div>
+                            <div class="p-4 bg-gradient-to-br from-green-900 to-green-800 rounded-xl">
+                                <div class="text-3xl font-bold text-green-300 mb-1" id="perf-win-rate">--</div>
+                                <div class="text-sm text-gray-400">Win Rate</div>
+                            </div>
+                            <div class="p-4 bg-gradient-to-br from-purple-900 to-purple-800 rounded-xl">
+                                <div class="text-3xl font-bold text-purple-300 mb-1" id="perf-profit-factor">--</div>
+                                <div class="text-sm text-gray-400">Profit Factor</div>
+                            </div>
+                            <div class="p-4 bg-gradient-to-br from-orange-900 to-orange-800 rounded-xl">
+                                <div class="text-3xl font-bold text-orange-300 mb-1" id="perf-expectancy">--</div>
+                                <div class="text-sm text-gray-400">Expectancy</div>
+                            </div>
                         </div>
                     </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h4 class="font-bold text-white mb-4">Equity Curve</h4>
+                            <div class="h-64"><canvas id="equity-curve-chart"></canvas></div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <h4 class="font-bold text-white mb-4">Trade Distribution</h4>
+                            <div class="h-64 flex items-center justify-center"><canvas id="trade-distribution-chart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div id="performance-psychology" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h4 class="font-bold text-white mb-4"><i class="fas fa-brain mr-2 text-pink-400"></i>AI Psychology Profile</h4>
+                        <div id="psychology-traits" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h4 class="font-bold text-white mb-4">Upload Journal for Analysis</h4>
+                        <textarea id="performance-journal-input" rows="6" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-4 text-white font-mono text-sm" placeholder='[{"entry_date": "2024-01-01", "symbol": "EURUSD", "direction": "BUY", "entry_price": 1.0850, "exit_price": 1.0900, "pnl": 50.00}]'></textarea>
+                        <button onclick="dashboard.analyzePerformance()" class="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg">
+                            <i class="fas fa-brain mr-2"></i>Analyze Performance
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+
+        </div>
     </main>
 
     <script>
-        // API Configuration
-        const API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:8000' : window.location.origin;
+        // Complete Dashboard Controller - ALL METHODS INCLUDED
+        const API_BASE = window.location.origin;
 
         class DashboardController {
             constructor() {
-                this.currentUser = null;
-                this.currentSection = 'dashboard';
-                this.charts = {};
-                this.journalFormat = null;
+                this.user = null;
+                this.allCourses = [];
+                this.manualTrades = [];
+                this.currentChartFile = null;
+                this.currentChartBase64 = null;
                 this.currentAnalysis = null;
+                this.currentJournalFormat = null;
+                this.equityChart = null;
+                this.distributionChart = null;
                 this.init();
             }
 
             init() {
                 this.checkAuth();
-                this.setupEventListeners();
-                this.setupDropZones();
+                this.setupNavigation();
+                this.setupMobileMenu();
+                // renderAdminMenu will be called after user is loaded in checkAuth/updateUserDisplay
+                this.initFeatureCarousel();
+                this.loadDashboardStats();
+                this.navigate('dashboard');
             }
 
             checkAuth() {
-                const token = localStorage.getItem('access_token');
-                if (!token) {
-                    window.location.href = '/login.html';
+                const token = localStorage.getItem('pipways_token');
+                const userStr = localStorage.getItem('pipways_user');
+                if (!token || !userStr) {
+                    window.location.href = '/';
                     return;
                 }
-                this.loadUser();
-            }
-
-            async loadUser() {
                 try {
-                    const token = localStorage.getItem('access_token');
-                    const response = await fetch(`${API_BASE}/api/users/me`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    if (!response.ok) throw new Error('Failed to load user');
-
-                    this.currentUser = await response.json();
-                    console.log('[Auth] User loaded:', this.currentUser);
-
+                    this.user = JSON.parse(userStr);
+                    console.log('[Auth] User loaded:', this.user);
                     this.updateUserDisplay();
-                    this.renderAdminMenu();
-                    this.loadDashboardData();
-                } catch (error) {
-                    console.error('Auth error:', error);
-                    localStorage.removeItem('access_token');
-                    window.location.href = '/login.html';
+                    // Delay admin menu check to ensure DOM ready
+                    setTimeout(() => this.renderAdminMenu(), 200);
+                } catch (e) {
+                    console.error('Auth error:', e);
+                    window.location.href = '/';
                 }
             }
 
             updateUserDisplay() {
-                if (!this.currentUser) return;
-
-                const name = this.currentUser.full_name || this.currentUser.email || 'User';
-                document.getElementById('user-name').textContent = name;
-                document.getElementById('user-info').innerHTML = `
-                    <span class="text-sm text-gray-300">${name}</span>
-                    ${this.currentUser.is_admin || this.isAdminByEmail() ? '<i class="fas fa-shield-alt text-purple-400 ml-2" title="Admin"></i>' : ''}
-                `;
-            }
-
-            isAdminByEmail() {
-                if (!this.currentUser) return false;
-                const email = this.currentUser.email || '';
-                const name = this.currentUser.full_name || '';
-
-                const isAdminEmail = email.includes('admin') || email === 'admin@pipways.com';
-                const isAdminName = name.toLowerCase().includes('administrator') || name.toLowerCase().includes('admin');
-                const isSuperuser = this.currentUser.is_superuser || this.currentUser.is_staff;
-
-                return isAdminEmail || isAdminName || isSuperuser;
+                const user = this.user || {};
+                document.getElementById('user-name').textContent = user.full_name || user.email || 'User';
+                document.getElementById('user-email').textContent = user.email || '';
+                document.getElementById('header-user-name').textContent = user.full_name || user.email || 'Trader';
+                // Now that user data is loaded, render admin menu
+                this.renderAdminMenu();
             }
 
             renderAdminMenu() {
-                const adminContainer = document.getElementById('admin-menu-container');
-                const isAdmin = this.currentUser && (
-                    this.currentUser.is_admin === true || 
-                    this.currentUser.role === 'admin' ||
-                    this.isAdminByEmail()
+                // Check all possible admin indicators including email pattern
+                const email = this.user?.email || '';
+                const name = this.user?.full_name || '';
+
+                const isAdminEmail = email.includes('admin') || email === 'admin@pipways.com';
+                const isAdminName = name.toLowerCase().includes('administrator') || name.toLowerCase().includes('admin');
+
+                const isAdmin = this.user && (
+                    this.user.is_admin === true || 
+                    this.user.role === 'admin' ||
+                    this.user.is_superuser === true ||
+                    this.user.admin === true ||
+                    this.user.role === 'superuser' ||
+                    isAdminEmail ||
+                    isAdminName
                 );
 
-                console.log('[Admin Check] Email:', this.currentUser?.email);
-                console.log('[Admin Check] is_admin field:', this.currentUser?.is_admin);
-                console.log('[Admin Check] Is Admin:', isAdmin);
+                console.log('[Admin Check] Email:', email, 'Name:', name, 'Is Admin:', isAdmin, 'Role:', this.user?.role);
+                console.log('[Admin Check] Email pattern match:', isAdminEmail, 'Name pattern match:', isAdminName);
 
-                if (isAdmin) {
-                    adminContainer.classList.remove('hidden');
-                    console.log('[Admin] Menu SHOWN');
-                } else {
-                    adminContainer.classList.add('hidden');
-                    console.log('[Admin] Menu hidden');
+                const adminMenu = document.getElementById('admin-menu-container');
+                if (adminMenu) {
+                    if (isAdmin) {
+                        adminMenu.classList.remove('hidden');
+                        adminMenu.style.display = 'block';
+                        console.log('[Admin] Menu shown');
+                    } else {
+                        adminMenu.classList.add('hidden');
+                        adminMenu.style.display = 'none';
+                        console.log('[Admin] Menu hidden - User is not admin');
+                    }
                 }
             }
 
-            setupEventListeners() {
-                // Chart file input
-                document.getElementById('chart-file-input')?.addEventListener('change', (e) => this.handleChartSelect(e));
-                document.getElementById('analyze-chart-btn')?.addEventListener('click', () => this.analyzeChart());
-                document.getElementById('validate-trade-btn')?.addEventListener('click', () => this.validateTrade());
-                document.getElementById('save-signal-btn')?.addEventListener('click', () => this.saveSignal());
-
-                // Journal file input
-                document.getElementById('journal-file-input')?.addEventListener('change', (e) => this.handleJournalUpload(e));
-
-                // Mentor chat
-                document.getElementById('mentor-send-btn')?.addEventListener('click', () => this.sendMentorMessage());
-                document.getElementById('mentor-input')?.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') this.sendMentorMessage();
-                });
-
-                // Mobile menu
-                document.getElementById('menu-toggle')?.addEventListener('click', () => {
-                    document.querySelector('.lg\:flex')?.classList.toggle('hidden');
+            setupNavigation() {
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const section = e.currentTarget.dataset.section;
+                        if (section) this.navigate(section);
+                    });
                 });
             }
 
-            setupDropZones() {
-                // Chart drop zone
-                const chartDrop = document.getElementById('chart-drop-zone');
-                if (chartDrop) {
-                    chartDrop.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        chartDrop.classList.add('border-blue-500');
-                    });
-                    chartDrop.addEventListener('dragleave', () => chartDrop.classList.remove('border-blue-500'));
-                    chartDrop.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        chartDrop.classList.remove('border-blue-500');
-                        if (e.dataTransfer.files.length) this.handleChartFile(e.dataTransfer.files[0]);
-                    });
-                    chartDrop.addEventListener('click', () => document.getElementById('chart-file-input').click());
-                }
+            setupMobileMenu() {
+                const btn = document.getElementById('mobile-menu-btn');
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
 
-                // Journal drop zone
-                const journalDrop = document.getElementById('journal-upload-container');
-                if (journalDrop) {
-                    journalDrop.addEventListener('dragover', (e) => {
-                        e.preventDefault();
-                        if (this.journalFormat) journalDrop.classList.add('border-blue-500');
+                if (btn && sidebar) {
+                    btn.addEventListener('click', () => {
+                        sidebar.classList.toggle('-translate-x-full');
+                        overlay?.classList.toggle('hidden');
                     });
-                    journalDrop.addEventListener('dragleave', () => journalDrop.classList.remove('border-blue-500'));
-                    journalDrop.addEventListener('drop', (e) => {
-                        e.preventDefault();
-                        journalDrop.classList.remove('border-blue-500');
-                        if (e.dataTransfer.files.length && this.journalFormat) {
-                            this.handleJournalFile(e.dataTransfer.files[0]);
-                        } else if (!this.journalFormat) {
-                            alert('Please select a format first');
-                        }
-                    });
-                    journalDrop.addEventListener('click', (e) => {
-                        if (!this.journalFormat) return;
-                        if (e.target.closest('#journal-drop-content') || e.target === journalDrop) {
-                            document.getElementById('journal-file-input').click();
-                        }
+                }
+                if (overlay) {
+                    overlay.addEventListener('click', () => {
+                        sidebar.classList.add('-translate-x-full');
+                        overlay.classList.add('hidden');
                     });
                 }
             }
 
             navigate(section) {
-                document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
-                const target = document.getElementById(`${section}-section`);
+                document.querySelectorAll('.nav-link').forEach(el => {
+                    el.classList.remove('bg-purple-600', 'text-white');
+                    el.classList.add('text-gray-300');
+                });
+                const activeLink = document.querySelector(`[data-section="${section}"]`);
+                if (activeLink) {
+                    activeLink.classList.add('bg-purple-600', 'text-white');
+                    activeLink.classList.remove('text-gray-300');
+                }
+                document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+                const target = document.getElementById(`section-${section}`);
                 if (target) {
                     target.classList.remove('hidden');
-                    this.currentSection = section;
+                    this.loadSectionData(section);
+                }
+                const titles = {
+                    'dashboard': 'Dashboard', 'signals': 'Trading Signals', 'journal': 'Trading Journal',
+                    'courses': 'Trading Courses', 'webinars': 'Webinars', 'blog': 'Trading Blog',
+                    'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis',
+                    'performance': 'Performance Analytics', 'mentor': 'AI Mentor'
+                };
+                document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
+                document.getElementById('sidebar')?.classList.add('-translate-x-full');
+                document.getElementById('sidebar-overlay')?.classList.add('hidden');
+            }
 
-                    if (section === 'performance') this.loadPerformance();
-                    if (section === 'chart-analysis') this.loadChartAnalysis();
-                    if (section === 'mentor') this.loadMentor();
-                    if (section === 'journal') this.resetJournalUpload();
+            async loadSectionData(section) {
+                try {
+                    switch(section) {
+                        case 'dashboard': this.loadDashboardStats(); break;
+                        case 'signals': await this.loadSignals(); break;
+                        case 'courses': await this.loadCourses(); break;
+                        case 'webinars': await this.loadWebinars(); break;
+                        case 'blog': await this.loadBlog(); break;
+                        case 'journal': this.setupJournalUpload(); break;
+                        case 'admin': await this.loadAdminData(); break;
+                        case 'mentor': await this.loadMentor(); break;
+                        case 'analysis': await this.loadChartAnalysis(); break;
+                        case 'performance': await this.loadPerformance(); break;
+                    }
+                } catch (err) {
+                    console.error(`[Dashboard] Error loading ${section}:`, err);
                 }
             }
 
-            // Chart Analysis Methods
-            handleChartSelect(event) {
-                if (event.target.files.length) this.handleChartFile(event.target.files[0]);
+            // ===== DASHBOARD METHODS =====
+            async loadDashboardStats() {
+                try {
+                    const signals = await this.apiRequest('/signals/active');
+                    document.getElementById('stat-signals').textContent = Array.isArray(signals) ? signals.length : '--';
+                } catch (e) { document.getElementById('stat-signals').textContent = '--'; }
+                try {
+                    const courses = await this.apiRequest('/courses/list');
+                    const courseList = Array.isArray(courses) ? courses : (courses.courses || []);
+                    document.getElementById('stat-courses').textContent = courseList.length;
+                } catch (e) { document.getElementById('stat-courses').textContent = '--'; }
             }
 
-            handleChartFile(file) {
-                if (!file.type.startsWith('image/')) {
-                    alert('Please select an image file');
+            // ===== API HELPER =====
+            async apiRequest(endpoint, options = {}) {
+                const token = localStorage.getItem('pipways_token');
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` }),
+                    ...options.headers
+                };
+                if (options.body instanceof FormData) delete headers['Content-Type'];
+                const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }
+
+            // ===== SIGNALS METHODS =====
+            async loadSignals() {
+                const container = document.getElementById('signals-container');
+                if (!container) return;
+                this.showSkeleton(container, 3);
+                try {
+                    const data = await this.apiRequest('/signals/active');
+                    const signals = Array.isArray(data) ? data : (data.signals || []);
+                    this.renderSignals(signals);
+                } catch (error) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No active signals</div>';
+                }
+            }
+
+            renderSignals(signals) {
+                const container = document.getElementById('signals-container');
+                if (!signals || signals.length === 0) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No active signals available</div>';
                     return;
                 }
+                container.innerHTML = signals.map(s => `
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-white text-lg">${s.symbol}</h4>
+                            <span class="px-2 py-1 rounded text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${s.direction}</span>
+                        </div>
+                        <div class="text-sm text-gray-400 space-y-1">
+                            <div class="flex justify-between"><span>Entry:</span> <span class="text-white">${s.entry_price}</span></div>
+                            <div class="flex justify-between"><span>SL:</span> <span class="text-red-400">${s.stop_loss}</span></div>
+                            <div class="flex justify-between"><span>TP:</span> <span class="text-green-400">${s.take_profit}</span></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
 
+            // ===== COURSES METHODS =====
+            async loadCourses() {
+                const container = document.getElementById('courses-container');
+                if (!container) return;
+                this.showSkeleton(container, 4);
+                try {
+                    const data = await this.apiRequest('/courses/list');
+                    this.allCourses = Array.isArray(data) ? data : (data.courses || []);
+                    this.renderCourses(this.allCourses);
+                    this.setupCourseFilters();
+                } catch (error) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available</div>';
+                }
+            }
+
+            setupCourseFilters() {
+                const filterContainer = document.getElementById('course-filters');
+                if (!filterContainer) return;
+                const levels = ['All', 'Beginner', 'Intermediate', 'Advanced'];
+                filterContainer.innerHTML = levels.map(level => `
+                    <button onclick="dashboard.filterCourses('${level}')" class="filter-btn px-4 py-2 rounded-full text-sm transition-colors ${level === 'All' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}" data-level="${level}">${level}</button>
+                `).join('');
+            }
+
+            filterCourses(level) {
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    const isActive = btn.dataset.level === level;
+                    btn.className = `filter-btn px-4 py-2 rounded-full text-sm transition-colors ${isActive ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`;
+                });
+                if (level === 'All') this.renderCourses(this.allCourses);
+                else this.renderCourses(this.allCourses.filter(c => c.level?.toLowerCase() === level.toLowerCase()));
+            }
+
+            renderCourses(courses) {
+                const container = document.getElementById('courses-container');
+                if (!courses || courses.length === 0) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available</div>';
+                    return;
+                }
+                container.innerHTML = courses.map(c => `
+                    <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                        <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
+                            <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
+                        </div>
+                        <div class="p-4">
+                            <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
+                            <h4 class="font-bold text-white mb-2">${c.title}</h4>
+                            <p class="text-sm text-gray-400 mb-3 line-clamp-2">${c.description || ''}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // ===== WEBINARS METHODS =====
+            async loadWebinars() {
+                const container = document.getElementById('webinars-container');
+                if (!container) return;
+                this.showSkeleton(container, 2);
+                try {
+                    const data = await this.apiRequest('/webinars/upcoming?upcoming=true');
+                    const webinars = Array.isArray(data) ? data : (data.webinars || []);
+                    if (!webinars || webinars.length === 0) {
+                        container.innerHTML = '<div class="text-center py-8 text-gray-500">No upcoming webinars</div>';
+                        return;
+                    }
+                    container.innerHTML = webinars.map(w => {
+                        const date = new Date(w.scheduled_at);
+                        return `
+                            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div class="flex gap-4">
+                                    <div class="text-center min-w-[60px] bg-gray-700 rounded-lg p-2">
+                                        <div class="text-xl font-bold text-purple-400">${date.getDate()}</div>
+                                        <div class="text-xs text-gray-400 uppercase">${date.toLocaleString('default', {month: 'short'})}</div>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-white">${w.title}</h4>
+                                        <p class="text-sm text-gray-400">${w.description || ''}</p>
+                                    </div>
+                                </div>
+                                <button class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm">Register Now</button>
+                            </div>
+                        `;
+                    }).join('');
+                } catch (error) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500">Failed to load webinars</div>';
+                }
+            }
+
+            // ===== BLOG METHODS =====
+            async loadBlog() {
+                const container = document.getElementById('blog-container');
+                if (!container) return;
+                this.showSkeleton(container, 3);
+                try {
+                    const data = await this.apiRequest('/blog/posts');
+                    const posts = Array.isArray(data) ? data : (data.posts || []);
+                    if (!posts || posts.length === 0) {
+                        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No articles available</div>';
+                        return;
+                    }
+                    container.innerHTML = posts.map(p => `
+                        <article class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                            <div class="h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+                                <i class="fas fa-newspaper text-5xl text-white/20"></i>
+                            </div>
+                            <div class="p-4">
+                                <div class="text-xs text-purple-400 mb-2 uppercase">${p.category || 'General'}</div>
+                                <h4 class="font-bold text-white mb-2">${p.title}</h4>
+                                <p class="text-sm text-gray-400 line-clamp-3 mb-3">${p.excerpt || p.content?.substring(0, 120) + '...' || ''}</p>
+                            </div>
+                        </article>
+                    `).join('');
+                } catch (error) {
+                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load articles</div>';
+                }
+            }
+
+            // ===== ADMIN METHODS =====
+            async loadAdminData() {
+                const container = document.getElementById('admin-container');
+                if (!container) return;
+                try {
+                    const stats = await this.apiRequest('/admin/users');
+                    container.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <div class="text-3xl font-bold text-white mb-1">${stats.total_users || 0}</div>
+                                <div class="text-sm text-gray-400">Total Users</div>
+                            </div>
+                            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <div class="text-3xl font-bold text-white mb-1">${stats.active_signals || 0}</div>
+                                <div class="text-sm text-gray-400">Active Signals</div>
+                            </div>
+                            <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                                <div class="text-3xl font-bold text-white mb-1">${stats.new_today || 0}</div>
+                                <div class="text-sm text-gray-400">New Today</div>
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    container.innerHTML = '<div class="text-red-400 p-4 bg-red-900/20 rounded-lg">Error loading admin data</div>';
+                }
+            }
+
+            // ===== MENTOR METHODS =====
+            async loadMentor() {
+                const container = document.getElementById('section-mentor');
+                if (!container) return;
+                container.innerHTML = `
+                    <div class="max-w-6xl mx-auto h-[calc(100vh-200px)]">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                            <div class="lg:col-span-2 bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700">
+                                <div class="p-4 border-b border-gray-700">
+                                    <h3 class="font-bold text-white">AI Trading Mentor</h3>
+                                </div>
+                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900">
+                                    <div class="flex gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm">
+                                            <i class="fas fa-robot"></i>
+                                        </div>
+                                        <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%]">
+                                            <p class="text-gray-200">Welcome! I'm your AI Trading Mentor. Ask me anything about trading!</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-4 border-t border-gray-700 bg-gray-800">
+                                    <div class="flex gap-2">
+                                        <input type="text" id="mentor-input" placeholder="Ask your question..." class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white" onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
+                                        <button onclick="dashboard.sendMentorMessage()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async sendMentorMessage() {
+                const input = document.getElementById('mentor-input');
+                if (!input) return;
+                const message = input.value.trim();
+                if (!message) return;
+
+                const container = document.getElementById('mentor-messages');
+                container.innerHTML += `
+                    <div class="flex gap-3 flex-row-reverse">
+                        <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white text-sm"><i class="fas fa-user"></i></div>
+                        <div class="bg-purple-600 p-3 rounded-2xl rounded-tr-none max-w-[80%]"><p class="text-white">${message}</p></div>
+                    </div>
+                `;
+                input.value = '';
+                container.scrollTop = container.scrollHeight;
+
+                try {
+                    const response = await this.apiRequest('/ai/mentor/ask', {
+                        method: 'POST',
+                        body: JSON.stringify({ question: message, skill_level: 'intermediate' })
+                    });
+                    container.innerHTML += `
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm"><i class="fas fa-robot"></i></div>
+                            <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%]"><p class="text-gray-200">${response.response || response.answer}</p></div>
+                        </div>
+                    `;
+                    container.scrollTop = container.scrollHeight;
+                } catch (e) {
+                    container.innerHTML += `<div class="text-red-400">Error: Could not get response</div>`;
+                }
+            }
+
+            // ===== CHART ANALYSIS METHODS =====
+            async loadChartAnalysis() {
+                const dropZone = document.getElementById('chart-dropzone');
+                const fileInput = document.getElementById('chart-file-input');
+                if (!dropZone || !fileInput) return;
+
+                dropZone.addEventListener('click', () => fileInput.click());
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                    if (e.dataTransfer.files[0]) this.handleChartFileSelect(e.dataTransfer.files[0]);
+                });
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files[0]) this.handleChartFileSelect(e.target.files[0]);
+                });
+            }
+
+            handleChartFileSelect(file) {
+                if (!file || file.size > 5 * 1024 * 1024) {
+                    alert('File too large (max 5MB)');
+                    return;
+                }
+                // Store the file object for FormData upload
                 this.currentChartFile = file;
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    document.getElementById('chart-preview').src = e.target.result;
-                    document.getElementById('chart-preview-container').classList.remove('hidden');
+                    const preview = document.getElementById('chart-preview');
+                    const placeholder = document.getElementById('chart-upload-placeholder');
+                    const analyzeBtn = document.getElementById('analyze-chart-btn');
+                    if (preview) {
+                        preview.src = e.target.result;
+                        preview.classList.remove('hidden');
+                    }
+                    if (placeholder) placeholder.classList.add('hidden');
+                    if (analyzeBtn) analyzeBtn.disabled = false;
                 };
                 reader.readAsDataURL(file);
             }
 
             async analyzeChart() {
-                if (!this.currentChartFile) return;
-
-                const btn = document.getElementById('analyze-chart-btn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<div class="loading-spinner inline-block mr-2"></div> Analyzing...';
-                btn.disabled = true;
+                if (!this.currentChartFile) {
+                    alert('Please select a chart image');
+                    return;
+                }
+                document.getElementById('chart-analysis-loading').classList.remove('hidden');
+                document.getElementById('analyze-chart-btn').disabled = true;
 
                 try {
+                    const symbol = document.getElementById('chart-symbol')?.value || 'AUTO';
+                    const timeframe = document.getElementById('chart-timeframe')?.value || '';
+
+                    // Use FormData for file upload
                     const formData = new FormData();
                     formData.append('file', this.currentChartFile);
-                    formData.append('symbol', 'AUTO');
+                    formData.append('symbol', symbol);
+                    formData.append('timeframe', timeframe);
 
-                    const token = localStorage.getItem('access_token');
                     const response = await fetch(`${API_BASE}/ai/chart/analyze`, {
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` },
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
+                        },
                         body: formData
                     });
 
                     if (!response.ok) {
                         const errorText = await response.text();
-                        throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
 
-                    const result = await response.json();
-                    this.displayChartResults(result);
+                    const data = await response.json();
+
+                    const resultsEl = document.getElementById('chart-analysis-results');
+                    resultsEl.classList.remove('hidden');
+
+                    document.getElementById('analysis-symbol').textContent = data.symbol || symbol;
+                    document.getElementById('analysis-timeframe').textContent = data.timeframe || timeframe;
+
+                    const confidence = Math.round((data.confidence || 0) * 100);
+                    const confEl = document.getElementById('analysis-confidence');
+                    confEl.textContent = `${confidence}%`;
+                    confEl.className = `px-3 py-1 rounded-full text-sm font-bold ${confidence > 70 ? 'bg-green-900 text-green-300' : confidence > 40 ? 'bg-yellow-900 text-yellow-300' : 'bg-red-900 text-red-300'}`;
+
+                    const biasEl = document.getElementById('analysis-bias');
+                    biasEl.textContent = data.trading_bias || data.bias || 'Neutral';
+                    biasEl.className = `text-2xl font-bold ml-2 uppercase ${data.trading_bias === 'bullish' ? 'text-green-400' : data.trading_bias === 'bearish' ? 'text-red-400' : 'text-gray-400'}`;
+
+                    document.getElementById('analysis-pattern').textContent = data.pattern || 'No pattern detected';
+
+                    if (data.trade_setup) {
+                        const setup = data.trade_setup;
+                        document.getElementById('setup-entry').textContent = setup.entry_price || setup.entry || '--';
+                        document.getElementById('setup-sl').textContent = setup.stop_loss || setup.sl || '--';
+                        document.getElementById('setup-tp').textContent = setup.take_profit || setup.tp || '--';
+                        document.getElementById('setup-rr').textContent = setup.risk_reward || setup.rr || '--';
+                    }
+
+                    const levelsContainer = document.getElementById('key-levels-list');
+                    if (levelsContainer && data.key_levels) {
+                        levelsContainer.innerHTML = data.key_levels.map(level => `
+                            <div class="flex justify-between items-center p-2 bg-gray-900 rounded border-l-4 ${level.type === 'support' ? 'border-green-500' : 'border-red-500'}">
+                                <span class="text-gray-300 capitalize">${level.type}</span>
+                                <span class="font-mono font-bold">${level.price}</span>
+                            </div>
+                        `).join('');
+                    }
+
+                    const insightsEl = document.getElementById('analysis-insights');
+                    if (insightsEl && data.key_insights) {
+                        insightsEl.innerHTML = data.key_insights.map(i => `<li>${i}</li>`).join('');
+                    }
+
+                    const attachedChart = document.getElementById('attached-chart-preview');
+                    if (attachedChart) {
+                        attachedChart.src = this.currentChartBase64;
+                        attachedChart.classList.remove('hidden');
+                    }
+
+                    this.currentAnalysis = data;
                 } catch (error) {
-                    console.error('Chart analysis error:', error);
-                    alert('Failed to analyze chart: ' + error.message);
+                    console.error('[Chart Analysis] Error:', error);
+                    alert('Failed to analyze chart');
                 } finally {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
+                    document.getElementById('chart-analysis-loading').classList.add('hidden');
+                    document.getElementById('analyze-chart-btn').disabled = false;
                 }
             }
 
-            displayChartResults(result) {
-                this.currentAnalysis = result;
-
-                document.getElementById('chart-analysis-results').classList.remove('hidden');
-                document.getElementById('detected-pattern').textContent = result.pattern || 'Unknown Pattern';
-                document.getElementById('analysis-confidence').textContent = `${result.confidence || 0}% Confidence`;
-
-                if (result.setup) {
-                    document.getElementById('setup-symbol').textContent = result.setup.symbol || '--';
-                    document.getElementById('setup-entry').textContent = result.setup.entry || '--';
-                    document.getElementById('setup-sl').textContent = result.setup.stop_loss || '--';
-                    document.getElementById('setup-tp').textContent = result.setup.take_profit || '--';
-                    document.getElementById('setup-rr').textContent = result.setup.risk_reward || '--';
+            showTradeValidator() {
+                const modal = document.getElementById('trade-validator-modal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    if (this.currentAnalysis?.trade_setup) {
+                        const setup = this.currentAnalysis.trade_setup;
+                        document.getElementById('validator-entry').value = setup.entry_price || setup.entry || '';
+                        document.getElementById('validator-sl').value = setup.stop_loss || setup.sl || '';
+                        document.getElementById('validator-tp').value = setup.take_profit || setup.tp || '';
+                        document.getElementById('validator-symbol').value = this.currentAnalysis.symbol || '';
+                    }
                 }
             }
 
-            // FIXED: Better validation with detailed error handling
-            async validateTrade() {
-                if (!this.currentAnalysis || !this.currentAnalysis.setup) {
-                    alert('No trade setup to validate');
+            async validateTradeSetup() {
+                const entry = parseFloat(document.getElementById('validator-entry')?.value);
+                const sl = parseFloat(document.getElementById('validator-sl')?.value);
+                const tp = parseFloat(document.getElementById('validator-tp')?.value);
+                const symbol = document.getElementById('validator-symbol')?.value || 'EURUSD';
+
+                if (!entry || !sl || !tp) {
+                    alert('Please fill in all values');
                     return;
                 }
 
-                const btn = document.getElementById('validate-trade-btn');
-                const resultsDiv = document.getElementById('validation-results');
-                const debugDiv = document.getElementById('validation-debug');
-
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Validating...';
-                btn.disabled = true;
-                resultsDiv.classList.remove('hidden');
-                debugDiv.classList.add('hidden');
-                resultsDiv.innerHTML = '<div class="text-center py-4"><div class="loading-spinner mx-auto mb-2"></div><p class="text-sm text-gray-400">Validating trade setup...</p></div>';
+                // Show loading state
+                const resultEl = document.getElementById('validation-result');
+                if (resultEl) {
+                    resultEl.classList.remove('hidden');
+                    resultEl.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-blue-400 mr-2"></i>Validating...</div>';
+                }
 
                 try {
-                    const token = localStorage.getItem('access_token');
-                    const payload = {
-                        setup: this.currentAnalysis.setup,
-                        pattern: this.currentAnalysis.pattern,
-                        symbol: this.currentAnalysis.setup.symbol,
-                        entry: this.currentAnalysis.setup.entry,
-                        stop_loss: this.currentAnalysis.setup.stop_loss,
-                        take_profit: this.currentAnalysis.setup.take_profit,
-                        risk_reward: this.currentAnalysis.setup.risk_reward
+                    const payload = { 
+                        entry_price: entry, 
+                        stop_loss: sl, 
+                        take_profit: tp, 
+                        symbol, 
+                        setup_type: this.currentAnalysis?.pattern || 'manual',
+                        entry: entry,
+                        sl: sl,
+                        tp: tp
                     };
+                    console.log('[Validate] Sending:', payload);
 
-                    console.log('[Validate] Sending payload:', payload);
-
-                    const response = await fetch(`${API_BASE}/ai/trade/validate`, {
+                    const result = await this.apiRequest('/ai/trade/validate', {
                         method: 'POST',
-                        headers: { 
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
                         body: JSON.stringify(payload)
                     });
+                    console.log('[Validate] Success:', result);
 
-                    const responseText = await response.text();
-                    console.log('[Validate] Response:', response.status, responseText);
+                    const resultEl = document.getElementById('validation-result');
+                    resultEl.classList.remove('hidden');
 
-                    if (!response.ok) {
-                        // Show debug info
-                        debugDiv.classList.remove('hidden');
-                        document.getElementById('validation-debug-text').textContent = 
-                            `Status: ${response.status}\nResponse: ${responseText}\nSent: ${JSON.stringify(payload, null, 2)}`;
+                    const score = result.quality_score || 0;
+                    const scoreEl = document.getElementById('validation-score');
+                    scoreEl.textContent = score;
+                    scoreEl.className = `score-circle ${score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-warning' : 'score-danger'}`;
 
-                        let errorData;
-                        try {
-                            errorData = JSON.parse(responseText);
-                        } catch(e) {
-                            errorData = { detail: responseText };
-                        }
+                    document.getElementById('validation-recommendation').textContent = result.recommendation || (result.valid ? 'Valid Setup' : 'Review Setup');
+                    document.getElementById('validation-rr').textContent = result.risk_reward_ratio || result.rr || '--';
+                    document.getElementById('validation-probability').textContent = (result.probability || result.win_probability || 0) + '%';
 
-                        throw new Error(errorData.detail || `Validation failed: ${response.status}`);
+                    const warningsEl = document.getElementById('validation-warnings');
+                    if (result.warnings && result.warnings.length > 0) {
+                        warningsEl.innerHTML = result.warnings.map(w => `<div class="text-yellow-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i>${w}</div>`).join('');
+                    } else {
+                        warningsEl.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>No warnings!</div>';
                     }
 
-                    const result = JSON.parse(responseText);
-                    this.displayValidationResults(result);
+                    const suggestionsEl = document.getElementById('validation-suggestions');
+                    if (suggestionsEl && result.suggestions) {
+                        suggestionsEl.innerHTML = result.suggestions.map(s => `<div class="mb-1"><i class="fas fa-lightbulb mr-2"></i>${s}</div>`).join('');
+                    }
                 } catch (error) {
-                    console.error('Validation error:', error);
-                    resultsDiv.innerHTML = `
-                        <div class="text-center py-4">
-                            <i class="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
-                            <p class="text-sm text-red-400 mb-2">${error.message}</p>
-                            <button onclick="app.validateTrade()" class="mt-3 text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded">Retry Validation</button>
-                        </div>
-                    `;
-                } finally {
-                    btn.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Validate Trade';
-                    btn.disabled = false;
+                    console.error('[Validate] Error:', error);
+                    const resultEl = document.getElementById('validation-result');
+                    if (resultEl) {
+                        resultEl.innerHTML = `
+                            <div class="bg-red-900/30 border border-red-700 rounded-lg p-4">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <i class="fas fa-exclamation-triangle text-red-400"></i>
+                                    <span class="text-red-400 font-semibold">Validation Failed</span>
+                                </div>
+                                <p class="text-red-300 text-sm mb-2">${error.message}</p>
+                                <button onclick="dashboard.validateTradeSetup()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm mt-2">
+                                    <i class="fas fa-redo mr-1"></i>Retry
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        alert('Validation failed: ' + error.message);
+                    }
                 }
             }
 
-            displayValidationResults(result) {
-                const container = document.getElementById('validation-results');
-                const score = result.quality_score || result.quality || 0;
-
-                let scoreClass = 'quality-danger';
-                if (score >= 80) scoreClass = 'quality-high';
-                else if (score >= 60) scoreClass = 'quality-good';
-                else if (score >= 40) scoreClass = 'quality-warning';
-
-                container.innerHTML = `
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h4 class="font-semibold">Validation Score</h4>
-                            <p class="text-xs text-gray-400">Based on R:R ratio and setup quality</p>
-                        </div>
-                        <div class="${scoreClass} quality-score-circle">${score}</div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
-                        <div class="bg-gray-800 p-2 rounded">
-                            <span class="text-gray-400 text-xs block">Risk:Reward</span>
-                            <span class="font-mono font-bold">${result.risk_reward || result.risk_reward_ratio || '--'}</span>
-                        </div>
-                        <div class="bg-gray-800 p-2 rounded">
-                            <span class="text-gray-400 text-xs block">Win Probability</span>
-                            <span class="font-mono font-bold">${result.win_probability || result.probability || '--'}%</span>
-                        </div>
-                    </div>
-                    ${result.warnings && result.warnings.length > 0 ? `
-                        <div class="mb-3">
-                            <p class="text-xs text-red-400 font-semibold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i>Warnings:</p>
-                            <ul class="text-xs text-red-400 space-y-1">
-                                ${result.warnings.map(w => `<li>• ${w}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                    ${result.suggestions && result.suggestions.length > 0 ? `
-                        <div>
-                            <p class="text-xs text-green-400 font-semibold mb-1"><i class="fas fa-lightbulb mr-1"></i>Suggestions:</p>
-                            <ul class="text-xs text-green-400 space-y-1">
-                                ${result.suggestions.map(s => `<li>• ${s}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                `;
-            }
-
-            async saveSignal() {
-                if (!this.currentAnalysis) return;
-
-                const btn = document.getElementById('save-signal-btn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Saving...';
-                btn.disabled = true;
-
+            async saveCurrentSignal() {
+                if (!this.currentAnalysis) {
+                    alert('No analysis to save');
+                    return;
+                }
                 try {
-                    const token = localStorage.getItem('access_token');
-                    const response = await fetch(`${API_BASE}/ai/signal/save`, {
+                    await this.apiRequest('/ai/signal/save', {
                         method: 'POST',
-                        headers: { 
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
                         body: JSON.stringify({
+                            symbol: this.currentAnalysis.symbol,
                             pattern: this.currentAnalysis.pattern,
-                            setup: this.currentAnalysis.setup,
-                            image_data: document.getElementById('chart-preview').src
+                            bias: this.currentAnalysis.trading_bias || this.currentAnalysis.bias,
+                            entry_price: this.currentAnalysis.trade_setup?.entry_price || this.currentAnalysis.trade_setup?.entry,
+                            stop_loss: this.currentAnalysis.trade_setup?.stop_loss || this.currentAnalysis.trade_setup?.sl,
+                            take_profit: this.currentAnalysis.trade_setup?.take_profit || this.currentAnalysis.trade_setup?.tp,
+                            confidence: this.currentAnalysis.confidence
                         })
                     });
-
-                    if (!response.ok) throw new Error('Save failed');
-
-                    btn.innerHTML = '<i class="fas fa-check mr-1"></i> Saved!';
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }, 2000);
+                    alert('Signal saved successfully!');
                 } catch (error) {
-                    console.error('Save error:', error);
-                    btn.innerHTML = '<i class="fas fa-times mr-1"></i> Failed';
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }, 2000);
+                    console.error('[Save Signal] Error:', error);
+                    alert('Failed to save signal: ' + error.message);
                 }
             }
 
-            // FIXED: Journal Methods with better error handling
-            selectJournalFormat(format) {
-                this.journalFormat = format;
+            // ===== JOURNAL METHODS =====
+            setJournalFormat(format) {
+                this.currentJournalFormat = format;
+                console.log('[Journal] Format selected:', format);
 
-                // Update UI
-                document.querySelectorAll('.journal-format-btn').forEach(btn => {
-                    if (btn.dataset.format === format) {
-                        btn.classList.remove('bg-gray-700', 'border-gray-600');
-                        btn.classList.add('bg-blue-900/50', 'border-blue-500');
-                    } else {
-                        btn.classList.add('bg-gray-700', 'border-gray-600');
-                        btn.classList.remove('bg-blue-900/50', 'border-blue-500');
-                    }
+                document.querySelectorAll('.format-btn').forEach(btn => {
+                    btn.classList.remove('border-purple-500', 'bg-purple-600');
+                    btn.classList.add('border-gray-600', 'bg-gray-700');
                 });
+                const activeBtn = document.querySelector(`[data-format="${format}"]`);
+                if (activeBtn) {
+                    activeBtn.classList.remove('border-gray-600', 'bg-gray-700');
+                    activeBtn.classList.add('border-purple-500', 'bg-purple-600');
+                }
+                const fileInput = document.getElementById('journal-file-input');
+                const formatLabel = document.getElementById('selected-format');
+                const dropZone = document.getElementById('journal-dropzone');
 
-                // Show manual entry or file upload
-                if (format === 'manual') {
-                    document.getElementById('journal-upload-container').classList.add('hidden');
-                    document.getElementById('manual-entry-form').classList.remove('hidden');
-                    document.getElementById('journal-results')?.classList.add('hidden');
-                } else {
-                    document.getElementById('journal-upload-container').classList.remove('hidden');
-                    document.getElementById('manual-entry-form').classList.add('hidden');
-
-                    const formatNames = {
-                        'mt4': 'MT4 Statement (.htm, .html)',
-                        'mt5': 'MT5 Statement (.htm, .html)',
-                        'csv': 'CSV File (.csv)',
-                        'excel': 'Excel File (.xlsx, .xls)',
-                        'screenshot': 'Image File (.png, .jpg, .jpeg)'
-                    };
-                    document.getElementById('selected-format-display').textContent = 
-                        `Selected: ${formatNames[format]} - Click or drop file here`;
-                    document.getElementById('journal-upload-container').classList.add('border-blue-500', 'bg-blue-900/10');
+                const configs = {
+                    mt4: { accept: '.html,.htm', label: 'MT4 HTML selected - Click or drop file here' },
+                    mt5: { accept: '.html,.htm', label: 'MT5 HTML selected - Click or drop file here' },
+                    csv: { accept: '.csv', label: 'CSV selected - Click or drop file here' },
+                    excel: { accept: '.xlsx,.xls', label: 'Excel selected - Click or drop file here' },
+                    screenshot: { accept: '.png,.jpg,.jpeg', label: 'Screenshot for OCR selected - Click or drop file here' }
+                };
+                const config = configs[format];
+                if (config && fileInput) {
+                    fileInput.accept = config.accept;
+                    if (formatLabel) formatLabel.textContent = config.label;
+                    if (dropZone) {
+                        dropZone.classList.add('border-purple-500', 'bg-purple-900/10');
+                    }
+                    // Don't auto-click, let user click dropzone
                 }
             }
 
-            resetJournalUpload() {
-                document.getElementById('journal-drop-content')?.classList.remove('hidden');
-                document.getElementById('journal-loading')?.classList.add('hidden');
-                document.getElementById('journal-error')?.classList.add('hidden');
-                document.getElementById('journal-results')?.classList.add('hidden');
-                document.getElementById('journal-file-input').value = '';
-
-                if (this.journalFormat && this.journalFormat !== 'manual') {
-                    document.getElementById('selected-format-display').textContent = 
-                        `Selected format ready - Click or drop file here`;
+            showManualEntry() {
+                const form = document.getElementById('manual-entry-form');
+                if (form) {
+                    form.classList.remove('hidden');
+                    form.scrollIntoView({ behavior: 'smooth' });
                 }
             }
 
-            handleJournalUpload(event) {
-                if (event.target.files.length) this.handleJournalFile(event.target.files[0]);
+            setupJournalUpload() {
+                const dropZone = document.getElementById('journal-dropzone');
+                const fileInput = document.getElementById('journal-file-input');
+                if (!dropZone || !fileInput) return;
+                dropZone.addEventListener('click', () => fileInput.click());
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                });
+                dropZone.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+                    if (e.dataTransfer.files[0]) await this.handleJournalFile(e.dataTransfer.files[0]);
+                });
+                fileInput.addEventListener('change', async (e) => {
+                    if (e.target.files[0]) await this.handleJournalFile(e.target.files[0]);
+                });
             }
 
             async handleJournalFile(file) {
-                if (!this.journalFormat) {
-                    alert('Please select a format first');
+                const statusEl = document.getElementById('upload-status');
+                const loadingEl = document.getElementById('journal-upload-loading');
+
+                console.log('[Journal] Processing file:', file.name, 'Size:', file.size, 'Format:', this.currentJournalFormat);
+
+                if (!this.currentJournalFormat) {
+                    if (statusEl) {
+                        statusEl.classList.remove('hidden');
+                        statusEl.innerHTML = `<span class="text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i>Please select a format first</span>`;
+                    }
                     return;
                 }
 
-                console.log('[Journal] Processing file:', file.name, 'Format:', this.journalFormat, 'Size:', file.size);
-
-                document.getElementById('journal-drop-content').classList.add('hidden');
-                document.getElementById('journal-loading').classList.remove('hidden');
-                document.getElementById('journal-error').classList.add('hidden');
+                if (statusEl) {
+                    statusEl.classList.remove('hidden');
+                    statusEl.innerHTML = `<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Processing ${file.name}...</span>`;
+                }
+                if (loadingEl) loadingEl.classList.remove('hidden');
 
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
-                    formData.append('format', this.journalFormat);
+                    formData.append('format', this.currentJournalFormat);
                     formData.append('original_filename', file.name);
 
-                    const token = localStorage.getItem('access_token');
-                    console.log('[Journal] Sending request to /ai/performance/upload-journal');
+                    console.log('[Journal] Sending to /ai/performance/upload-journal');
 
                     const response = await fetch(`${API_BASE}/ai/performance/upload-journal`, {
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` },
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('pipways_token')}` },
                         body: formData
                     });
 
                     const responseText = await response.text();
                     console.log('[Journal] Response status:', response.status);
-                    console.log('[Journal] Response text:', responseText);
+                    console.log('[Journal] Response text:', responseText.substring(0, 500));
 
                     let result;
                     try {
                         result = JSON.parse(responseText);
                     } catch (e) {
-                        throw new Error('Invalid JSON response: ' + responseText.substring(0, 200));
+                        throw new Error('Invalid server response: ' + responseText.substring(0, 100));
                     }
 
                     if (!response.ok) {
                         throw new Error(result.detail || result.message || `Server error: ${response.status}`);
                     }
 
-                    if (!result.trades || result.trades.length === 0) {
-                        throw new Error('No trades detected in file');
+                    if (result.trades && result.trades.length > 0) {
+                        this.displayJournalAnalysis(result);
+                        if (statusEl) statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Imported ${result.trades_parsed || result.trades.length} trades successfully</span>`;
+                    } else if (result.statistics && result.statistics.total_trades > 0) {
+                        this.displayJournalAnalysis(result);
+                        if (statusEl) statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analysis complete</span>`;
+                    } else {
+                        console.log('[Journal] No trades in response:', result);
+                        throw new Error('No trades detected in file. Please check the file format and ensure it contains trade data.');
                     }
-
-                    this.displayJournalResults(result);
                 } catch (error) {
                     console.error('[Journal] Error:', error);
-                    document.getElementById('journal-loading').classList.add('hidden');
-                    document.getElementById('journal-error').classList.remove('hidden');
-                    document.getElementById('journal-error-details').textContent = error.message;
+                    if (statusEl) {
+                        statusEl.innerHTML = `
+                            <div class="bg-red-900/30 border border-red-700 rounded-lg p-3 mt-2">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-circle text-red-400 mt-1"></i>
+                                    <div>
+                                        <p class="text-red-400 font-semibold text-sm">Upload Failed</p>
+                                        <p class="text-red-300 text-xs mt-1">${error.message}</p>
+                                        <button onclick="document.getElementById('journal-file-input').click()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs mt-2">
+                                            Try Again
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } finally {
+                    if (loadingEl) loadingEl.classList.add('hidden');
                 }
             }
 
-            displayJournalResults(result) {
-                document.getElementById('journal-loading').classList.add('hidden');
-                document.getElementById('journal-error').classList.add('hidden');
-                document.getElementById('journal-results').classList.remove('hidden');
+            displayJournalAnalysis(result) {
+                const statsEl = document.getElementById('journal-stats');
+                const analysisEl = document.getElementById('journal-analysis');
+                const tradesContainer = document.getElementById('recent-trades-container');
 
-                const trades = result.trades || [];
-                const stats = result.stats || this.calculateStats(trades);
+                if (statsEl) {
+                    statsEl.classList.remove('hidden');
+                    document.getElementById('stat-total-trades').textContent = result.statistics?.total_trades || 0;
+                    document.getElementById('stat-win-rate').textContent = (result.statistics?.win_rate || 0) + '%';
+                    document.getElementById('stat-profit-factor').textContent = result.statistics?.profit_factor || 0;
+                    const pnl = result.statistics?.total_pnl || 0;
+                    const pnlEl = document.getElementById('stat-net-pnl');
+                    pnlEl.textContent = '$' + Math.abs(pnl).toFixed(2);
+                    pnlEl.className = 'font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
+                    document.getElementById('stat-grade').textContent = result.overall_grade || 'N/A';
+                    document.getElementById('stat-progress').style.width = (result.overall_score || 0) + '%';
+                }
 
-                document.getElementById('journal-trade-count').textContent = `${trades.length} trades found`;
+                if (analysisEl) {
+                    analysisEl.classList.remove('hidden');
+                    analysisEl.innerHTML = `
+                        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold text-white">Analysis Results</h3>
+                                <span class="px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold">${result.overall_grade}</span>
+                            </div>
+                            ${result.improvements?.length ? `
+                                <div class="space-y-2">
+                                    <h5 class="font-semibold text-gray-300 text-sm uppercase">AI Recommendations:</h5>
+                                    ${result.improvements.map(i => `
+                                        <div class="p-3 bg-blue-900/20 rounded-lg text-sm text-blue-200 border-l-4 border-blue-500">
+                                            <i class="fas fa-lightbulb text-blue-400 mr-2"></i>${i}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
 
-                document.getElementById('journal-stats').innerHTML = `
-                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700">
-                        <p class="text-xs text-gray-400">Total Trades</p>
-                        <p class="text-lg font-bold">${stats.total_trades || trades.length}</p>
-                    </div>
-                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700">
-                        <p class="text-xs text-gray-400">Win Rate</p>
-                        <p class="text-lg font-bold text-green-400">${stats.win_rate || 0}%</p>
-                    </div>
-                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700">
-                        <p class="text-xs text-gray-400">Total P&L</p>
-                        <p class="text-lg font-bold ${(stats.profit || 0) >= 0 ? 'text-green-400' : 'text-red-400'}">
-                            $${stats.profit || 0}
-                        </p>
-                    </div>
-                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700">
-                        <p class="text-xs text-gray-400">Avg Trade</p>
-                        <p class="text-lg font-bold text-blue-400">$${stats.avg_trade || 0}</p>
-                    </div>
-                `;
-
-                const insights = result.insights || [
-                    `Successfully imported ${trades.length} trades`,
-                    'Analyze your patterns in the Performance tab'
-                ];
-
-                document.getElementById('insights-list').innerHTML = insights.map(i => 
-                    `<li class="flex items-start"><i class="fas fa-check-circle text-green-400 mr-2 mt-1"></i>${i}</li>`
-                ).join('');
+                if (tradesContainer && result.trades) {
+                    tradesContainer.classList.remove('hidden');
+                    document.getElementById('trades-table-body').innerHTML = result.trades.slice(0, 10).map(trade => `
+                        <tr class="border-b border-gray-700">
+                            <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
+                            <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
+                            <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
+                            <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
+                            <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
+                        </tr>
+                    `).join('');
+                }
             }
 
-            calculateStats(trades) {
-                if (!trades || trades.length === 0) return {};
-
-                const winners = trades.filter(t => t.profit > 0).length;
-                const totalProfit = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
-
-                return {
-                    total_trades: trades.length,
-                    win_rate: Math.round((winners / trades.length) * 100),
-                    profit: totalProfit.toFixed(2),
-                    avg_trade: (totalProfit / trades.length).toFixed(2)
-                };
-            }
-
-            submitManualTrade(event) {
-                event.preventDefault();
-                const formData = new FormData(event.target);
+            addManualTrade() {
+                const symbol = document.getElementById('manual-symbol').value;
+                const direction = document.getElementById('manual-direction').value;
+                const entry = parseFloat(document.getElementById('manual-entry').value);
+                const pnl = parseFloat(document.getElementById('manual-pnl').value);
+                if (!symbol || isNaN(entry) || isNaN(pnl)) {
+                    alert('Please fill required fields');
+                    return;
+                }
                 const trade = {
-                    symbol: formData.get('symbol'),
-                    type: formData.get('type'),
-                    entry: parseFloat(formData.get('entry')),
-                    exit: parseFloat(formData.get('exit')),
-                    size: parseFloat(formData.get('size')),
-                    date: formData.get('date'),
-                    profit: (parseFloat(formData.get('exit')) - parseFloat(formData.get('entry'))) * 
-                            (formData.get('type') === 'BUY' ? 1 : -1) * parseFloat(formData.get('size')) * 100000
+                    entry_date: new Date().toISOString().split('T')[0],
+                    symbol: symbol.toUpperCase(),
+                    direction,
+                    entry_price: entry,
+                    exit_price: parseFloat(document.getElementById('manual-exit').value) || 0,
+                    stop_loss: parseFloat(document.getElementById('manual-sl').value) || 0,
+                    take_profit: parseFloat(document.getElementById('manual-tp').value) || 0,
+                    pnl,
+                    outcome: pnl > 0 ? 'win' : (pnl < 0 ? 'loss' : 'breakeven')
                 };
-
-                // Display single trade as result
-                this.displayJournalResults({
-                    trades: [trade],
-                    stats: {
-                        total_trades: 1,
-                        win_rate: trade.profit > 0 ? 100 : 0,
-                        profit: trade.profit.toFixed(2),
-                        avg_trade: trade.profit.toFixed(2)
-                    },
-                    insights: ['Manual trade entry recorded successfully']
-                });
-
-                event.target.reset();
+                this.manualTrades.push(trade);
+                this.apiRequest('/ai/performance/analyze-journal', {
+                    method: 'POST',
+                    body: JSON.stringify({ trades: this.manualTrades })
+                }).then(result => this.displayJournalAnalysis({...result, trades: this.manualTrades}));
             }
 
-            // Performance Methods
+            // ===== PERFORMANCE METHODS =====
             async loadPerformance() {
-                const period = document.getElementById('performance-period')?.value || 30;
+                await this.loadPerformanceStats();
+                await this.loadEquityCurve();
+                await this.loadTradeDistribution();
+            }
 
+            async loadPerformanceStats() {
+                const days = document.getElementById('performance-period')?.value || 30;
                 try {
-                    const token = localStorage.getItem('access_token');
-
-                    // Load stats
-                    const statsRes = await fetch(`${API_BASE}/ai/performance/dashboard?period=${period}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    if (statsRes.ok) {
-                        const stats = await statsRes.json();
-                        document.getElementById('stat-total-trades').textContent = stats.total_trades || 0;
-                        document.getElementById('stat-win-rate').textContent = (stats.win_rate || 0) + '%';
-                        document.getElementById('stat-profit-factor').textContent = stats.profit_factor || 0;
-                        document.getElementById('stat-net-pnl').textContent = '$' + (stats.net_pnl || 0);
+                    const data = await this.apiRequest(`/ai/performance/dashboard?days=${days}`);
+                    if (data.summary) {
+                        document.getElementById('perf-total-trades').textContent = data.summary.total_trades || 0;
+                        document.getElementById('perf-win-rate').textContent = (data.summary.win_rate || 0) + '%';
+                        document.getElementById('perf-profit-factor').textContent = data.summary.profit_factor || '0.0';
+                        document.getElementById('perf-expectancy').textContent = '$' + (data.summary.expectancy || 0);
                     }
-
-                    this.loadEquityCurve();
-                    this.loadTradeDistribution();
-                    this.loadPsychologyProfile();
+                    if (data.psychology_profile) {
+                        const psychContainer = document.getElementById('performance-psychology');
+                        const traitsContainer = document.getElementById('psychology-traits');
+                        if (psychContainer && traitsContainer) {
+                            psychContainer.classList.remove('hidden');
+                            const traits = data.psychology_profile.traits || {};
+                            traitsContainer.innerHTML = Object.entries(traits).map(([trait, score]) => `
+                                <div class="p-3 bg-gray-900 rounded-lg">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="text-gray-400 capitalize">${trait.replace('_', ' ')}</span>
+                                        <span class="text-white font-bold">${score}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full" style="width: ${score}%"></div>
+                                    </div>
+                                </div>
+                            `).join('');
+                        }
+                    }
                 } catch (error) {
-                    console.error('Performance load error:', error);
-                    // Show demo data if backend fails
-                    this.showDemoPerformance();
+                    console.error('[Performance Stats] Error:', error);
                 }
             }
 
-            showDemoPerformance() {
-                document.getElementById('stat-total-trades').textContent = '24';
-                document.getElementById('stat-win-rate').textContent = '62%';
-                document.getElementById('stat-profit-factor').textContent = '1.8';
-                document.getElementById('stat-net-pnl').textContent = '$1,240';
-
-                // Demo charts
-                this.loadEquityCurve(true);
-                this.loadTradeDistribution(true);
-                this.loadPsychologyProfile(true);
-            }
-
-            async loadEquityCurve(demo = false) {
+            async loadEquityCurve() {
                 try {
-                    const ctx = document.getElementById('equity-curve-chart').getContext('2d');
-
-                    let data;
-                    if (demo) {
-                        data = {
-                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-                            values: [10000, 10200, 10100, 10500, 11240]
-                        };
-                    } else {
-                        const token = localStorage.getItem('access_token');
-                        const response = await fetch(`${API_BASE}/ai/performance/equity-curve`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (!response.ok) return;
-                        data = await response.json();
-                    }
-
-                    if (this.charts.equity) this.charts.equity.destroy();
-
-                    this.charts.equity = new Chart(ctx, {
+                    const data = await this.apiRequest('/ai/performance/equity-curve?days=30');
+                    const ctx = document.getElementById('equity-curve-chart');
+                    if (!ctx) return;
+                    if (this.equityChart) this.equityChart.destroy();
+                    this.equityChart = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: data.labels || [],
+                            labels: data.dates || [],
                             datasets: [{
-                                label: 'Equity ($)',
-                                data: data.values || [],
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                label: 'Equity',
+                                data: data.equity || [],
+                                borderColor: 'rgb(124, 58, 237)',
+                                backgroundColor: 'rgba(124, 58, 237, 0.1)',
                                 fill: true,
                                 tension: 0.4
                             }]
@@ -1182,216 +1533,103 @@
                             maintainAspectRatio: false,
                             plugins: { legend: { display: false } },
                             scales: {
-                                y: { 
-                                    grid: { color: '#374151' }, 
-                                    ticks: { color: '#9ca3af', callback: (val) => '$' + val } 
-                                },
+                                y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af' } },
                                 x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
                             }
                         }
                     });
                 } catch (error) {
-                    console.error('Equity curve error:', error);
+                    console.error('[Equity Curve] Error:', error);
                 }
             }
 
-            async loadTradeDistribution(demo = false) {
+            async loadTradeDistribution() {
                 try {
-                    const ctx = document.getElementById('trade-distribution-chart').getContext('2d');
-
-                    let data;
-                    if (demo) {
-                        data = { winners: 15, losers: 8, break_even: 1 };
-                    } else {
-                        const token = localStorage.getItem('access_token');
-                        const response = await fetch(`${API_BASE}/ai/performance/trade-distribution`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (!response.ok) return;
-                        data = await response.json();
-                    }
-
-                    if (this.charts.distribution) this.charts.distribution.destroy();
-
-                    this.charts.distribution = new Chart(ctx, {
+                    const data = await this.apiRequest('/ai/performance/trade-distribution');
+                    const ctx = document.getElementById('trade-distribution-chart');
+                    if (!ctx) return;
+                    if (this.distributionChart) this.distributionChart.destroy();
+                    this.distributionChart = new Chart(ctx, {
                         type: 'doughnut',
                         data: {
                             labels: ['Winners', 'Losers', 'Break Even'],
                             datasets: [{
-                                data: [data.winners || 0, data.losers || 0, data.break_even || 0],
-                                backgroundColor: ['#22c55e', '#ef4444', '#6b7280'],
+                                data: [data.wins || 0, data.losses || 0, data.break_even || 0],
+                                backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(245, 158, 11, 0.8)'],
                                 borderWidth: 0
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: {
-                                legend: { position: 'bottom', labels: { color: '#9ca3af', padding: 20 } }
-                            }
+                            plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af' } } }
                         }
                     });
                 } catch (error) {
-                    console.error('Distribution error:', error);
+                    console.error('[Trade Distribution] Error:', error);
                 }
             }
 
-            loadPsychologyProfile(demo = false) {
-                const traits = demo ? [
-                    { name: 'Discipline', value: 85, color: 'bg-blue-500' },
-                    { name: 'Patience', value: 72, color: 'bg-green-500' },
-                    { name: 'Consistency', value: 90, color: 'bg-purple-500' },
-                    { name: 'Risk Management', value: 78, color: 'bg-yellow-500' }
-                ] : [
-                    { name: 'Discipline', value: 0, color: 'bg-blue-500' },
-                    { name: 'Patience', value: 0, color: 'bg-green-500' },
-                    { name: 'Consistency', value: 0, color: 'bg-purple-500' },
-                    { name: 'Risk Management', value: 0, color: 'bg-yellow-500' }
-                ];
+            async analyzePerformance() {
+                const input = document.getElementById('performance-journal-input');
+                if (!input || !input.value.trim()) {
+                    alert('Please enter trade data');
+                    return;
+                }
+                try {
+                    const trades = JSON.parse(input.value);
+                    const result = await this.apiRequest('/ai/performance/analyze-journal', {
+                        method: 'POST',
+                        body: JSON.stringify({ trades })
+                    });
+                    this.displayJournalAnalysis(result);
+                } catch (e) {
+                    alert('Invalid JSON: ' + e.message);
+                }
+            }
 
-                const container = document.getElementById('psychology-profile');
-                container.innerHTML = traits.map(t => `
-                    <div class="flex items-center">
-                        <span class="text-sm text-gray-400 w-32">${t.name}</span>
-                        <div class="flex-1 bg-gray-700 rounded-full h-2 mx-3">
-                            <div class="${t.color} h-2 rounded-full transition-all duration-1000" style="width: ${t.value}%"></div>
-                        </div>
-                        <span class="text-sm font-bold w-8">${t.value}%</span>
-                    </div>
+            // ===== UTILITY METHODS =====
+            showSkeleton(container, count = 3) {
+                container.innerHTML = Array(count).fill(0).map(() => `
+                    <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-32"></div>
                 `).join('');
             }
 
-            // Mentor Methods
-            loadMentor() {
-                const container = document.getElementById('mentor-chat-container');
-                if (container) container.scrollTop = container.scrollHeight;
-            }
-
-            async sendMentorMessage() {
-                const input = document.getElementById('mentor-input');
-                const message = input.value.trim();
-                if (!message) return;
-
-                this.addMentorMessage(message, 'user');
-                input.value = '';
-                const typingId = this.showTypingIndicator();
-
-                try {
-                    const token = localStorage.getItem('access_token');
-                    const response = await fetch(`${API_BASE}/ai/mentor/ask`, {
-                        method: 'POST',
-                        headers: { 
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            question: message,
-                            skill_level: document.getElementById('mentor-skill-level').value
-                        })
-                    });
-
-                    this.hideTypingIndicator(typingId);
-
-                    if (!response.ok) throw new Error('Failed to get response');
-
-                    const result = await response.json();
-                    this.addMentorMessage(result.answer || result.response || 'I apologize, I could not process that request.', 'mentor');
-                } catch (error) {
-                    this.hideTypingIndicator(typingId);
-                    this.addMentorMessage('I apologize, but I am having trouble connecting right now. Please try again in a moment.', 'mentor');
-                }
-            }
-
-            askQuickQuestion(question) {
-                document.getElementById('mentor-input').value = question;
-                this.sendMentorMessage();
-            }
-
-            addMentorMessage(text, sender) {
-                const container = document.getElementById('mentor-chat-container');
-                const isMentor = sender === 'mentor';
-
-                const div = document.createElement('div');
-                div.className = 'flex items-start space-x-3';
-                div.innerHTML = isMentor ? `
-                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-robot text-white text-xs"></i>
-                    </div>
-                    <div class="bg-gray-700 rounded-lg p-3 max-w-[80%]">
-                        <p class="text-sm">${text}</p>
-                    </div>
-                ` : `
-                    <div class="ml-auto bg-blue-600 rounded-lg p-3 max-w-[80%]">
-                        <p class="text-sm">${text}</p>
-                    </div>
-                `;
-
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
-            }
-
-            showTypingIndicator() {
-                const container = document.getElementById('mentor-chat-container');
-                const id = 'typing-' + Date.now();
-                const div = document.createElement('div');
-                div.id = id;
-                div.className = 'flex items-start space-x-3';
-                div.innerHTML = `
-                    <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-robot text-white text-xs"></i>
-                    </div>
-                    <div class="bg-gray-700 rounded-lg p-3">
-                        <div class="flex space-x-1">
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            initFeatureCarousel() {
+                const carousel = document.getElementById('feature-carousel');
+                if (!carousel) return;
+                const slides = [
+                    { icon: 'fa-satellite-dish', title: 'Trading Signals', desc: 'AI-powered signals', color: 'from-purple-600 to-blue-600', section: 'signals' },
+                    { icon: 'fa-book', title: 'Trading Journal', desc: 'Track your performance', color: 'from-green-600 to-teal-600', section: 'journal' },
+                    { icon: 'fa-chart-line', title: 'Chart Analysis', desc: 'AI Vision analysis', color: 'from-orange-600 to-red-600', section: 'analysis' },
+                    { icon: 'fa-robot', title: 'AI Mentor', desc: '24/7 coaching', color: 'from-pink-600 to-purple-600', section: 'mentor' },
+                    { icon: 'fa-graduation-cap', title: 'Courses', desc: 'Learn to trade', color: 'from-blue-600 to-cyan-600', section: 'courses' }
+                ];
+                let currentSlide = 0;
+                const renderSlides = () => {
+                    const slide = slides[currentSlide];
+                    carousel.innerHTML = `
+                        <div class="bg-gradient-to-r ${slide.color} rounded-xl p-6 md:p-8 text-white cursor-pointer hover:shadow-lg transition-all" onclick="dashboard.navigate('${slide.section}')">
+                            <i class="fas ${slide.icon} text-3xl mb-3 opacity-80"></i>
+                            <h3 class="text-xl font-bold mb-1">${slide.title}</h3>
+                            <p class="text-white/80 text-sm">${slide.desc}</p>
                         </div>
-                    </div>
-                `;
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
-                return id;
-            }
-
-            hideTypingIndicator(id) {
-                const el = document.getElementById(id);
-                if (el) el.remove();
-            }
-
-            // Dashboard Data
-            async loadDashboardData() {
-                try {
-                    const token = localStorage.getItem('access_token');
-                    const signalsRes = await fetch(`${API_BASE}/api/signals/active`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (signalsRes.ok) {
-                        const signals = await signalsRes.json();
-                        document.getElementById('active-signals-count').textContent = signals.length || 0;
-                    }
-                } catch (error) {
-                    console.error('Dashboard data error:', error);
-                }
-            }
-
-            loadChartAnalysis() {
-                document.getElementById('chart-analysis-results')?.classList.add('hidden');
-                document.getElementById('chart-preview-container')?.classList.add('hidden');
-                document.getElementById('validation-results')?.classList.add('hidden');
-                document.getElementById('validation-debug')?.classList.add('hidden');
-                this.currentChartFile = null;
-                this.currentAnalysis = null;
+                    `;
+                };
+                document.getElementById('carousel-next')?.addEventListener('click', () => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); });
+                document.getElementById('carousel-prev')?.addEventListener('click', () => { currentSlide = (currentSlide - 1 + slides.length) % slides.length; renderSlides(); });
+                setInterval(() => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); }, 5000);
+                renderSlides();
             }
 
             logout() {
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
-                window.location.href = '/login.html';
+                localStorage.removeItem('pipways_token');
+                localStorage.removeItem('pipways_user');
+                window.location.href = '/';
             }
         }
 
-        // Initialize App
-        const app = new DashboardController();
+        const dashboard = new DashboardController();
     </script>
 </body>
 </html>

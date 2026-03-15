@@ -88,20 +88,25 @@ async def cache_set(key: str, data: Any) -> None:
 #    FastAPI serialises as plain-text "Internal Server Error", causing the
 #    frontend's response.json() to fail with "Unexpected token 'I'...".
 def _require_clients() -> None:
+    global _anthropic, _http
+    # Lazy init — works even if main.py lifespan didn't set us up
     if _anthropic is None:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Anthropic client not initialised. "
-                "Ensure ANTHROPIC_API_KEY is set and the app lifespan has run."
-            ),
-        )
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            raise HTTPException(
+                status_code=503,
+                detail="ANTHROPIC_API_KEY environment variable is not set.",
+            )
+        _anthropic = AsyncAnthropic(api_key=api_key)
     if _http is None:
-        raise HTTPException(
-            status_code=503,
-            detail="HTTP client not initialised. App lifespan may not have run.",
-        )
+        _http = httpx.AsyncClient(timeout=10.0)
+```
 
+This way the module **initialises itself** on the first request using the env var directly — no dependency on `main.py`'s lifespan order.
+
+**Deploy that one change**, then hit:
+```
+https://pipwaysapp.onrender.com/api/stock/health
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
 

@@ -38,6 +38,11 @@ from . import ai_mentor
 # NEW: AI Stock Research Terminal
 from .stock_terminal_backend import router as stock_router
 
+# Import stock terminal globals for initialization
+import httpx
+from anthropic import AsyncAnthropic
+import stock_terminal_backend as stock_module
+
 # Keep old imports for backwards compatibility if needed
 # from . import ai_screening  # Can be removed if fully replaced by ai_services
 
@@ -58,12 +63,31 @@ async def lifespan(app: FastAPI):
                 print("[DB] Tables created/verified", flush=True)
         except Exception as e:
             print(f"[DB] Table creation skipped: {e}", flush=True)
+        
+        # Initialize Stock Terminal clients
+        try:
+            anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            if anthropic_key:
+                stock_module._anthropic = AsyncAnthropic(api_key=anthropic_key)
+                stock_module._http = httpx.AsyncClient(timeout=10.0)
+                print("[STOCK] Terminal clients initialized", flush=True)
+            else:
+                print("[STOCK] WARNING: ANTHROPIC_API_KEY not set", flush=True)
+        except Exception as e:
+            print(f"[STOCK] Client initialization error: {e}", flush=True)
+        
         print("[STARTUP] Database connected", flush=True)
     except Exception as e:
         print(f"[STARTUP ERROR] {e}", flush=True)
     yield
     try:
         await database.disconnect()
+    except:
+        pass
+    # Close stock terminal http client
+    try:
+        if stock_module._http:
+            await stock_module._http.aclose()
     except:
         pass
 

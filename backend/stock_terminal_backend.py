@@ -3,8 +3,18 @@ Pipways AI Stock Research Terminal - FastAPI Backend Module
 ===========================================================
 Mount the router into your existing FastAPI app:
 
-    from stock_terminal_backend import router as stock_router
-    app.include_router(stock_router, prefix="/api/stock", tags=["Stock Terminal"])
+    from . import stock_terminal_backend as stock_module
+    app.include_router(stock_module.router, prefix="/api/stock", tags=["Stock Terminal"])
+
+In your lifespan, initialise the shared clients:
+
+    stock_module._anthropic = AsyncAnthropic(api_key=anthropic_key)
+    stock_module._http      = httpx.AsyncClient(timeout=10.0)
+
+And close them on shutdown:
+
+    if stock_module._http:
+        await stock_module._http.aclose()
 
 Dependencies:
     pip install fastapi anthropic httpx python-dotenv uvicorn
@@ -15,8 +25,6 @@ Run standalone (dev):
 Environment variables required:
     ANTHROPIC_API_KEY   - your Anthropic key
     ALPHA_VANTAGE_KEY   - free key from alphavantage.co (25 req/day on free tier)
-
-Swap Alpha Vantage for Polygon.io or yfinance for production volume.
 """
 
 from __future__ import annotations
@@ -40,35 +48,29 @@ ALPHA_VANTAGE_KEY = os.environ.get("ALPHA_VANTAGE_KEY", "demo")
 ALPHA_BASE        = "https://www.alphavantage.co/query"
 CACHE_TTL         = 300  # seconds (5 min)
 
-# ── Shared async clients (created once at startup) ────────────────────────────
+# ── Shared async clients ──────────────────────────────────────────────────────
+# Initialised externally (via main.py lifespan) or by the standalone lifespan below.
 _anthropic: AsyncAnthropic | None    = None
 _http:      httpx.AsyncClient | None = None
 
-
-@asynccontextmanager
-async def lifespan(application: FastAPI):
-    """Initialise and cleanly close shared async clients."""
-    global _anthropic, _http
-    if not ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
-    _anthropic = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-    _http      = httpx.AsyncClient(timeout=10.0)
-    print("✓  Pipways Stock Terminal started")
-    print(f"   Anthropic    : SET")
-    print(f"   Alpha Vantage: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (limited)'}")
-    yield
-    await _http.aclose()
-    print("✓  Pipways Stock Terminal shut down")
+# ── FIX 1: asyncio.Lock created lazily, NOT at module-import time.
+#    Creating asyncio primitives at import time silently binds them to a
+#    stale/non-existent event loop, causing "Future attached to different loop"
+#    errors at runtime on some Python/uvicorn versions.
+_cache_lock: asyncio.Lock | None = None
+_cache:      dict[str, dict]     = {}
 
 
-# ── In-process async-safe cache ───────────────────────────────────────────────
-# Replace with Redis (aioredis) for multi-worker / production deployments.
-_cache:      dict[str, dict] = {}
-_cache_lock: asyncio.Lock    = asyncio.Lock()
+def _get_lock() -> asyncio.Lock:
+    """Return (creating on first call) the cache lock bound to the running loop."""
+    global _cache_lock
+    if _cache_lock is None:
+        _cache_lock = asyncio.Lock()
+    return _cache_lock
 
 
 async def cache_get(key: str) -> Any | None:
-    async with _cache_lock:
+    async with _get_lock():
         item = _cache.get(key)
         if item and (time.monotonic() - item["ts"]) < CACHE_TTL:
             return item["data"]
@@ -76,11 +78,32 @@ async def cache_get(key: str) -> Any | None:
 
 
 async def cache_set(key: str, data: Any) -> None:
-    async with _cache_lock:
+    async with _get_lock():
         _cache[key] = {"data": data, "ts": time.monotonic()}
 
 
-# ── Pydantic request / response models ───────────────────────────────────────
+# ── FIX 2: Guard helper raises a structured 503 JSON error if the clients
+#    were never initialised (e.g. ANTHROPIC_API_KEY missing).
+#    Without this, _anthropic.messages.create() throws AttributeError which
+#    FastAPI serialises as plain-text "Internal Server Error", causing the
+#    frontend's response.json() to fail with "Unexpected token 'I'...".
+def _require_clients() -> None:
+    if _anthropic is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Anthropic client not initialised. "
+                "Ensure ANTHROPIC_API_KEY is set and the app lifespan has run."
+            ),
+        )
+    if _http is None:
+        raise HTTPException(
+            status_code=503,
+            detail="HTTP client not initialised. App lifespan may not have run.",
+        )
+
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
 
 class OkResponse(BaseModel):
     ok:     bool = True
@@ -109,35 +132,80 @@ SYSTEM_PROMPT = (
 
 async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
     """Call Claude asynchronously and return parsed JSON."""
-    message = await _anthropic.messages.create(
-        model      = "claude-opus-4-5",
-        max_tokens = max_tokens,
-        system     = SYSTEM_PROMPT,
-        messages   = [{"role": "user", "content": prompt}],
-    )
-    raw   = "".join(b.text for b in message.content if hasattr(b, "text"))
-    clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    _require_clients()
+
+    # FIX 3: Wrap the Anthropic call so any API error becomes a 502 JSON response.
+    try:
+        message = await _anthropic.messages.create(
+            model      = "claude-opus-4-5",
+            max_tokens = max_tokens,
+            system     = SYSTEM_PROMPT,
+            messages   = [{"role": "user", "content": prompt}],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
+
+    raw = "".join(b.text for b in message.content if hasattr(b, "text"))
+
+    # FIX 4: More robust markdown fence stripping.
+    #    removeprefix("```json") misses "```json\n{...}\n```" because the
+    #    newline is part of the prefix.  Split on the first newline instead.
+    clean = raw.strip()
+    if clean.startswith("```"):
+        clean = clean.split("\n", 1)[-1]           # drop "```json" or "```" line
+    if clean.endswith("```"):
+        clean = clean.rsplit("```", 1)[0].strip()  # drop trailing fence
+
     try:
         return json.loads(clean)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail=f"Claude returned invalid JSON: {exc}") from exc
+        raise HTTPException(
+            status_code=502,
+            detail=f"Claude returned invalid JSON: {exc}. Raw (first 300 chars): {raw[:300]}",
+        ) from exc
 
 
 # ── Market data helpers ───────────────────────────────────────────────────────
 
+# FIX 5: Alpha Vantage returns informational/rate-limit JSON instead of data
+#    when the key is exhausted.  Detect these keys and raise a clear error.
+_AV_ERROR_KEYS = {"Note", "Information", "Error Message"}
+
+
+def _check_av_response(payload: dict, symbol: str) -> None:
+    for key in _AV_ERROR_KEYS:
+        if key in payload:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Alpha Vantage limit/error for '{symbol}': {payload[key][:200]}",
+            )
+    if not payload:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data returned for '{symbol}'. Verify the ticker symbol.",
+        )
+
+
 async def fetch_quote(symbol: str) -> dict:
     """Async real-time quote from Alpha Vantage."""
+    _require_clients()
     key = f"quote:{symbol}"
     if cached := await cache_get(key):
         return cached
 
-    resp = await _http.get(ALPHA_BASE, params={
-        "function": "GLOBAL_QUOTE",
-        "symbol":   symbol,
-        "apikey":   ALPHA_VANTAGE_KEY,
-    })
-    resp.raise_for_status()
-    raw = resp.json().get("Global Quote", {})
+    try:
+        resp = await _http.get(ALPHA_BASE, params={
+            "function": "GLOBAL_QUOTE",
+            "symbol":   symbol,
+            "apikey":   ALPHA_VANTAGE_KEY,
+        })
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Market data fetch error: {exc}") from exc
+
+    payload = resp.json()
+    _check_av_response(payload, symbol)
+    raw = payload.get("Global Quote", {})
 
     result = {
         "symbol":     symbol,
@@ -155,17 +223,23 @@ async def fetch_quote(symbol: str) -> dict:
 
 async def fetch_overview(symbol: str) -> dict:
     """Async company overview / fundamentals from Alpha Vantage."""
+    _require_clients()
     key = f"overview:{symbol}"
     if cached := await cache_get(key):
         return cached
 
-    resp = await _http.get(ALPHA_BASE, params={
-        "function": "OVERVIEW",
-        "symbol":   symbol,
-        "apikey":   ALPHA_VANTAGE_KEY,
-    })
-    resp.raise_for_status()
+    try:
+        resp = await _http.get(ALPHA_BASE, params={
+            "function": "OVERVIEW",
+            "symbol":   symbol,
+            "apikey":   ALPHA_VANTAGE_KEY,
+        })
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Market data fetch error: {exc}") from exc
+
     d = resp.json()
+    _check_av_response(d, symbol)
 
     result = {
         "name":              d.get("Name",                 symbol),
@@ -205,62 +279,58 @@ async def fetch_overview(symbol: str) -> dict:
 router = APIRouter()
 
 
-@router.get(
-    "/quote/{symbol}",
-    response_model = OkResponse,
-    summary        = "Live market quote",
-    description    = "Returns the latest price quote for the given ticker symbol.",
-)
+@router.get("/quote/{symbol}", response_model=OkResponse, summary="Live market quote")
 async def quote(symbol: str) -> OkResponse:
+    # FIX 6: All routes have a catch-all except so ANY unhandled exception
+    #    returns a structured JSON 500 rather than plain-text "Internal Server Error".
     try:
         data = await fetch_quote(symbol.upper())
         return OkResponse(data=data)
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Market data error: {exc}") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get(
-    "/overview/{symbol}",
-    response_model = OkResponse,
-    summary        = "Company overview & fundamentals",
-)
+@router.get("/overview/{symbol}", response_model=OkResponse, summary="Company overview")
 async def overview(symbol: str) -> OkResponse:
     try:
         data = await fetch_overview(symbol.upper())
         return OkResponse(data=data)
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"Market data error: {exc}") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get(
     "/analyze/{symbol}",
     response_model = OkResponse,
     summary        = "Full AI stock analysis",
-    description    = (
-        "Fetches live market data then runs a multi-dimension AI analysis "
-        "across 6 scoring categories. Results are cached for 5 minutes."
-    ),
+    description    = "Fetches live market data then runs AI analysis. Cached for 5 min.",
 )
 async def analyze(symbol: str) -> OkResponse:
-    sym       = symbol.upper()
-    cache_key = f"analysis:{sym}"
-
-    if cached := await cache_get(cache_key):
-        return OkResponse(data=cached, cached=True)
-
-    # Fetch quote + overview concurrently; degrade gracefully if either fails
-    quote_data: dict = {"price": "N/A", "change_pct": "N/A"}
-    ov:         dict = {"name": sym, "sector": "Unknown"}
-
     try:
-        quote_data, ov = await asyncio.gather(
-            fetch_quote(sym),
-            fetch_overview(sym),
-        )
-    except Exception:
-        pass  # Continue with partial / fallback data
+        sym       = symbol.upper()
+        cache_key = f"analysis:{sym}"
 
-    prompt = f"""
+        if cached := await cache_get(cache_key):
+            return OkResponse(data=cached, cached=True)
+
+        quote_data: dict = {"price": "N/A", "change_pct": "N/A"}
+        ov:         dict = {"name": sym, "sector": "Unknown"}
+
+        try:
+            quote_data, ov = await asyncio.gather(
+                fetch_quote(sym),
+                fetch_overview(sym),
+            )
+        except HTTPException as exc:
+            print(f"[STOCK] Market data degraded for {sym}: {exc.detail}", flush=True)
+        except Exception as exc:
+            print(f"[STOCK] Market data failed for {sym}: {exc}", flush=True)
+
+        prompt = f"""
 Analyze the stock {sym} using the following real market data:
 
 Company: {ov.get('name')}
@@ -312,24 +382,25 @@ Return exactly this JSON structure:
   "analyst_consensus": "Underperform" | "Hold" | "Buy" | "Strong Buy"
 }}
 """
-    ai_data = await claude_json(prompt)
-    result  = {
-        "symbol":      sym,
-        "market_data": {**quote_data, **ov},
-        "ai_analysis": ai_data,
-    }
-    await cache_set(cache_key, result)
-    return OkResponse(data=result)
+        ai_data = await claude_json(prompt)
+        result  = {
+            "symbol":      sym,
+            "market_data": {**quote_data, **ov},
+            "ai_analysis": ai_data,
+        }
+        await cache_set(cache_key, result)
+        return OkResponse(data=result)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post(
-    "/portfolio",
-    response_model = OkResponse,
-    summary        = "AI portfolio builder",
-    description    = "Builds a diversified stock portfolio tailored to amount, risk tolerance, and horizon.",
-)
+@router.post("/portfolio", response_model=OkResponse, summary="AI portfolio builder")
 async def portfolio(body: PortfolioRequest) -> OkResponse:
-    prompt = f"""
+    try:
+        prompt = f"""
 Build an optimal diversified stock portfolio for an investor with these parameters:
 - Investment amount: ${body.amount:,.2f}
 - Risk tolerance: {body.risk}
@@ -361,45 +432,42 @@ Rules:
 - Allocations must be whole numbers summing to exactly 100
 - Dollar amounts must reflect the percentage of ${body.amount:,.2f}
 """
-    data = await claude_json(prompt, max_tokens=1000)
+        data = await claude_json(prompt, max_tokens=1000)
+        for allocation in data.get("allocations", []):
+            allocation["amount"] = round(body.amount * int(allocation.get("pct", 0)) / 100, 2)
+        return OkResponse(data=data)
 
-    # Recalculate dollar amounts server-side to guarantee accuracy
-    for allocation in data.get("allocations", []):
-        allocation["amount"] = round(body.amount * int(allocation.get("pct", 0)) / 100, 2)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return OkResponse(data=data)
 
-
-@router.post(
-    "/compare",
-    response_model = OkResponse,
-    summary        = "Side-by-side stock comparison",
-    description    = "Compare 2–5 tickers and receive AI ranking with scores across key dimensions.",
-)
+@router.post("/compare", response_model=OkResponse, summary="Side-by-side stock comparison")
 async def compare(body: CompareRequest) -> OkResponse:
-    symbols = [s.strip().upper() for s in body.symbols if s.strip()][:5]
-    if len(symbols) < 2:
-        raise HTTPException(status_code=422, detail="Provide at least 2 valid symbols")
+    try:
+        symbols = [s.strip().upper() for s in body.symbols if s.strip()][:5]
+        if len(symbols) < 2:
+            raise HTTPException(status_code=422, detail="Provide at least 2 valid symbols")
 
-    # Fetch all overviews concurrently with per-symbol graceful fallback
-    async def safe_overview(sym: str) -> tuple[str, dict]:
-        try:
-            return sym, await fetch_overview(sym)
-        except Exception:
-            return sym, {"name": sym}
+        async def safe_overview(sym: str) -> tuple[str, dict]:
+            try:
+                return sym, await fetch_overview(sym)
+            except Exception:
+                return sym, {"name": sym}
 
-    pairs     = await asyncio.gather(*[safe_overview(s) for s in symbols])
-    overviews = dict(pairs)
+        pairs     = await asyncio.gather(*[safe_overview(s) for s in symbols])
+        overviews = dict(pairs)
 
-    stock_context = "\n".join(
-        f"- {sym}: {overviews[sym].get('name', '?')}, "
-        f"Sector: {overviews[sym].get('sector', '?')}, "
-        f"P/E: {overviews[sym].get('pe_ratio', '?')}, "
-        f"Beta: {overviews[sym].get('beta', '?')}"
-        for sym in symbols
-    )
+        stock_context = "\n".join(
+            f"- {sym}: {overviews[sym].get('name','?')}, "
+            f"Sector: {overviews[sym].get('sector','?')}, "
+            f"P/E: {overviews[sym].get('pe_ratio','?')}, "
+            f"Beta: {overviews[sym].get('beta','?')}"
+            for sym in symbols
+        )
 
-    prompt = f"""
+        prompt = f"""
 Compare these stocks for an investor and rank them objectively:
 
 {stock_context}
@@ -427,15 +495,20 @@ Return exactly this JSON:
 }}
 Provide exactly one object per symbol. Rank 1 = best overall pick.
 """
-    data = await claude_json(prompt, max_tokens=900)
-    return OkResponse(data=data)
+        data = await claude_json(prompt, max_tokens=900)
+        return OkResponse(data=data)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-# ── Cache management endpoints ────────────────────────────────────────────────
+# ── Utility endpoints ─────────────────────────────────────────────────────────
 
 @router.delete("/cache", summary="Flush the analysis cache")
 async def flush_cache() -> dict:
-    async with _cache_lock:
+    async with _get_lock():
         count = len(_cache)
         _cache.clear()
     return {"ok": True, "cleared": count}
@@ -443,7 +516,7 @@ async def flush_cache() -> dict:
 
 @router.get("/cache/stats", summary="Cache statistics")
 async def cache_stats() -> dict:
-    async with _cache_lock:
+    async with _get_lock():
         total   = len(_cache)
         now     = time.monotonic()
         live    = sum(1 for v in _cache.values() if (now - v["ts"]) < CACHE_TTL)
@@ -451,35 +524,35 @@ async def cache_stats() -> dict:
     return {"ok": True, "total": total, "live": live, "expired": expired, "ttl_seconds": CACHE_TTL}
 
 
-# ── Health check ──────────────────────────────────────────────────────────────
-
-@router.get("/health", summary="Health check", include_in_schema=False)
+@router.get("/health", include_in_schema=False)
 async def health() -> dict:
     return {
         "ok":              True,
         "service":         "Pipways Stock Terminal",
         "anthropic_ready": _anthropic is not None,
         "http_ready":      _http is not None,
+        "alpha_vantage":   "demo (25 req/day)" if ALPHA_VANTAGE_KEY == "demo" else "configured",
     }
 
 
-# ── Standalone app (dev / testing) ────────────────────────────────────────────
-app = FastAPI(
-    title       = "Pipways AI Stock Research Terminal",
-    description = "AI-powered stock analysis, portfolio building, and comparison engine.",
-    version     = "2.0.0",
-    lifespan    = lifespan,
-)
+# ── Standalone app (dev only — not used when imported by main.py) ─────────────
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    global _anthropic, _http
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
+    _anthropic = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    _http      = httpx.AsyncClient(timeout=10.0)
+    print("✓  Pipways Stock Terminal started (standalone)")
+    print(f"   Alpha Vantage: {'custom' if ALPHA_VANTAGE_KEY != 'demo' else 'demo (25 req/day limit)'}")
+    yield
+    await _http.aclose()
+    print("✓  Pipways Stock Terminal shut down")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins  = ["*"],   # Restrict to your domain(s) in production
-    allow_methods  = ["*"],
-    allow_headers  = ["*"],
-)
 
+app = FastAPI(title="Pipways AI Stock Research Terminal", version="2.1.0", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router, prefix="/api/stock", tags=["Stock Terminal"])
-
 
 if __name__ == "__main__":
     import uvicorn

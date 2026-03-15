@@ -1,6 +1,6 @@
 """
-Multi-Format Trade Journal Parser - FIXED VERSION
-Supports: MT4/MT5 HTML, CSV, Excel, PDF, Images (OCR)
+Multi-Format Trade Journal Parser
+Supports: MT4/MT5 HTML, CSV, Excel, PDF, Images/OCR
 """
 import json
 import re
@@ -62,7 +62,7 @@ class TradeJournalParser:
         """Main entry point - parse any supported file format"""
         filename_lower = filename.lower()
 
-        # Determine file type from extension if not provided or if 'auto'
+        # Determine file type from extension if not provided
         if not file_type or file_type == "auto":
             if filename_lower.endswith('.json'):
                 file_type = 'json'
@@ -82,9 +82,11 @@ class TradeJournalParser:
                 raise ValueError(f"Unsupported file format: {filename}")
 
         # FIX: Map format aliases to actual parser types
-        # MT4 and MT5 are both HTML formats
         if file_type in ['mt4', 'mt5']:
             file_type = 'html'
+        
+        if file_type in ['screenshot', 'ocr']:
+            file_type = 'image'
 
         # Route to appropriate parser
         parsers = {
@@ -112,7 +114,7 @@ class TradeJournalParser:
         try:
             text = content.decode('utf-8')
             data = json.loads(text)
-
+            
             if isinstance(data, list):
                 return [TradeJournalParser.normalize_trade(trade) for trade in data]
             elif isinstance(data, dict):
@@ -123,59 +125,59 @@ class TradeJournalParser:
                 else:
                     return [TradeJournalParser.normalize_trade(data)]
             else:
-                raise ValueError("JSON must contain an array of trades or a trade object")
+                raise ValueError("JSON must contain an array of trades")
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON format: {str(e)}")
 
     @staticmethod
     def parse_csv(content: bytes) -> List[Dict[str, Any]]:
-        """Parse CSV trade data with automatic delimiter detection"""
+        """Parse CSV trade data"""
         try:
             encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
             content_str = None
-
+            
             for encoding in encodings:
                 try:
                     content_str = content.decode(encoding)
                     break
                 except UnicodeDecodeError:
                     continue
-
+            
             if content_str is None:
-                raise ValueError("Could not decode file with supported encodings")
+                raise ValueError("Could not decode file")
 
             lines = content_str.strip().split('\n')
             if len(lines) < 2:
-                raise ValueError("CSV file appears to be empty or has no data rows")
+                raise ValueError("CSV file is empty")
 
             # Detect delimiter
             first_line = lines[0]
             delimiters = [',', ';', '\t', '|']
             delimiter_counts = {d: first_line.count(d) for d in delimiters}
             delimiter = max(delimiter_counts, key=delimiter_counts.get)
-
+            
             if delimiter_counts[delimiter] == 0:
-                raise ValueError("Could not detect CSV delimiter")
+                delimiter = ','
 
             reader = csv.DictReader(lines, delimiter=delimiter)
             trades = []
-
-            for row_num, row in enumerate(reader, start=2):
+            
+            for row in reader:
                 try:
                     trade = TradeJournalParser.normalize_trade(row)
                     if trade.get('symbol') or trade.get('pnl') != 0:
                         trades.append(trade)
                 except Exception:
                     continue
-
+                    
             return trades
-
+            
         except Exception as e:
             raise ValueError(f"CSV parsing error: {str(e)}")
 
     @staticmethod
     def parse_excel(content: bytes) -> List[Dict[str, Any]]:
-        """Parse Excel file (.xlsx, .xls)"""
+        """Parse Excel file"""
         if not PANDAS_AVAILABLE:
             raise ValueError("pandas library required for Excel parsing")
 
@@ -184,10 +186,10 @@ class TradeJournalParser:
                 df = pd.read_excel(io.BytesIO(content), engine='openpyxl')
             except:
                 df = pd.read_excel(io.BytesIO(content), engine='xlrd')
-
+            
             if df.empty:
-                raise ValueError("Excel file appears to be empty")
-
+                raise ValueError("Excel file is empty")
+            
             trades = []
             for idx, row in df.iterrows():
                 try:
@@ -200,15 +202,15 @@ class TradeJournalParser:
                             row_dict[col] = val.strftime('%Y-%m-%d %H:%M:%S')
                         else:
                             row_dict[col] = str(val)
-
+                    
                     trade = TradeJournalParser.normalize_trade(row_dict)
                     if trade.get('symbol') or trade.get('pnl') != 0:
                         trades.append(trade)
                 except Exception:
                     continue
-
+                    
             return trades
-
+            
         except Exception as e:
             raise ValueError(f"Excel parsing error: {str(e)}")
 
@@ -223,7 +225,7 @@ class TradeJournalParser:
             trades = []
 
             tables = soup.find_all('table')
-
+            
             if not tables:
                 raise ValueError("No tables found in HTML file")
 
@@ -270,10 +272,10 @@ class TradeJournalParser:
                         continue
 
             if not trades:
-                raise ValueError("No valid trade data found in HTML tables")
-
+                raise ValueError("No valid trade data found in HTML")
+                
             return trades
-
+            
         except Exception as e:
             raise ValueError(f"HTML parsing error: {str(e)}")
 
@@ -321,9 +323,9 @@ class TradeJournalParser:
 
             if not trades:
                 raise ValueError("No valid trade data found in PDF")
-
+                
             return trades
-
+            
         except Exception as e:
             raise ValueError(f"PDF parsing error: {str(e)}")
 
@@ -333,9 +335,6 @@ class TradeJournalParser:
         try:
             text = content.decode('utf-8', errors='ignore')
             lines = text.strip().split('\n')
-
-            if '\t' in text:
-                return TradeJournalParser.parse_csv(content.replace(b'\t', b','))
 
             trades = []
             for line in lines:
@@ -370,11 +369,12 @@ class TradeJournalParser:
     def parse_image_ocr(content: bytes) -> List[Dict[str, Any]]:
         """Parse image using OCR"""
         if not TESSERACT_AVAILABLE or not PIL_AVAILABLE:
-            raise ValueError("OCR unavailable. Install pytesseract and Pillow")
+            raise ValueError("OCR unavailable. Install pytesseract and Pillow, or upload CSV/Excel/HTML instead.")
 
         try:
-            image = Image.open(io.BytesIO(content))
-
+            from PIL import Image as PILImage
+            image = PILImage.open(io.BytesIO(content))
+            
             if image.mode != 'RGB':
                 image = image.convert('RGB')
 
@@ -386,24 +386,24 @@ class TradeJournalParser:
                 scale_factor = 2
                 gray_image = gray_image.resize(
                     (gray_image.width * scale_factor, gray_image.height * scale_factor),
-                    resample=Image.LANCZOS
+                    resample=PILImage.LANCZOS
                 )
 
             thresholded = gray_image.point(lambda x: 0 if x < 128 else 255, '1')
 
             custom_config = r'--oem 3 --psm 6'
             text = pytesseract.image_to_string(thresholded, config=custom_config)
-
+            
             if not text.strip():
                 raise ValueError("OCR could not extract any text from image")
 
             trades = TradeJournalParser._extract_trades_from_text(text)
-
+            
             if not trades:
-                raise ValueError("OCR extracted text but could not identify trade patterns")
-
+                raise ValueError("OCR extracted text but could not identify trade patterns. Try uploading CSV or Excel instead.")
+            
             return trades
-
+            
         except Exception as e:
             raise ValueError(f"OCR processing error: {str(e)}")
 
@@ -411,7 +411,7 @@ class TradeJournalParser:
     def _detect_columns(headers: List[str]) -> Dict[str, str]:
         """Detect column mapping from headers"""
         mapping = {}
-
+        
         clean_headers = []
         for h in headers:
             clean = re.sub(r'[^\w\s]', ' ', h.lower())
@@ -424,7 +424,7 @@ class TradeJournalParser:
                     idx = clean_headers.index(pattern)
                     mapping[std_col] = headers[idx]
                     break
-
+                
                 for i, clean_h in enumerate(clean_headers):
                     if pattern in clean_h or clean_h in pattern:
                         pattern_words = set(pattern.split())
@@ -432,7 +432,7 @@ class TradeJournalParser:
                         if len(pattern_words & header_words) >= min(len(pattern_words), 2):
                             mapping[std_col] = headers[i]
                             break
-
+                
                 if std_col in mapping:
                     break
 
@@ -528,7 +528,7 @@ class TradeJournalParser:
             if key in trade and trade[key]:
                 normalized['entry_date'] = clean_date(trade[key])
                 break
-
+                
         for key in TradeJournalParser.COLUMN_ALIASES["exit_date"]:
             if key in trade and trade[key]:
                 normalized['exit_date'] = clean_date(trade[key])

@@ -18,6 +18,12 @@ from .security import get_current_user
 
 router = APIRouter()
 
+# Module-level HTTP client — reused across all requests for connection pooling.
+# Initialized to None here; the FastAPI lifespan handler in main.py must set
+# chart_analysis._http_client = httpx.AsyncClient(timeout=60.0) on startup
+# and call await chart_analysis._http_client.aclose() on shutdown.
+_http_client: Optional[httpx.AsyncClient] = None
+
 # OpenRouter Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_VISION_MODEL") or os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
@@ -275,8 +281,10 @@ You MUST return analysis in this STRICT JSON format:
 
 Be precise with price levels to 4-5 decimal places for forex, whole numbers for indices. Return ONLY valid JSON. No markdown, no explanation."""
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
+        # Use module-level pooled client (initialized in lifespan). Fall back to a
+        # temporary client if the app is run without the lifespan (e.g. in tests).
+        http = _http_client or httpx.AsyncClient(timeout=60.0)
+        response = await http.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -304,11 +312,10 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
                     ],
                     "max_tokens": 2500,
                     "temperature": 0.1
-                },
-                timeout=60.0
+                }
             )
 
-            if response.status_code != 200:
+        if response.status_code != 200:
                 error_text = response.text
                 print(f"[CHART ANALYSIS ERROR] HTTP {response.status_code}: {error_text}", flush=True)
                 if response.status_code == 401:
@@ -318,110 +325,109 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
                 else:
                     raise HTTPException(503, f"AI service error: {response.status_code}")
 
-            data = response.json()
+        data = response.json()
 
-            if "choices" not in data or len(data["choices"]) == 0:
+        if "choices" not in data or len(data["choices"]) == 0:
                 raise HTTPException(503, "Invalid response from AI service")
 
-            content = data["choices"][0]["message"]["content"]
+        content = data["choices"][0]["message"]["content"]
 
-            # Parse JSON with markdown stripping
+        # Parse JSON with markdown stripping
+        try:
+            clean_content = clean_json_content(content)
+            json_match = re.search(r'\{.*\}', clean_content, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                result = json.loads(clean_content)
+        except json.JSONDecodeError:
+            print(f"[CHART ANALYSIS] JSON parse failed, content: {content[:300]}", flush=True)
+            detected_symbol = extract_symbol_from_text(content) or symbol or "Unknown"
+            result = {
+                "symbol": detected_symbol,
+                "market_structure": "neutral",
+                "smc_signals": [],
+                "patterns_detected": [],
+                "chart_annotations": {},
+                "support_levels": [],
+                "resistance_levels": [],
+                "suggested_entry": None,
+                "suggested_stop": None,
+                "suggested_target": None,
+                "trading_bias": "neutral",
+                "confidence": 0,
+                "key_insights": [content[:200]],
+                "structure_quality": "neutral"
+            }
+
+        # Ensure symbol and normalize it
+        detected_symbol = result.get("symbol") or symbol or "Unknown"
+        result["symbol"] = normalize_symbol(detected_symbol)
+
+        # Ensure chart_annotations exists
+        if "chart_annotations" not in result or not result["chart_annotations"]:
+            result["chart_annotations"] = {
+                "bos_levels": [],
+                "liquidity_zones": [],
+                "order_blocks": [],
+                "fair_value_gaps": [],
+                "premium_discount": {}
+            }
+
+        # Add chart image to result
+        result["chart_image"] = f"data:{content_type};base64,{base64_image}"
+
+        # Normalize confidence/probability.
+        # FIX: was `<= 0` which silently converted a genuine "no signal" (0.0)
+        # into a fabricated 60% confidence. Now only negative values are clamped.
+        confidence = result.get("confidence", 0.6)
+        if confidence < 0:
+            confidence = 0.0
+        if confidence > 1:
+            confidence = 1.0
+        result["confidence"] = confidence
+
+        # Build trade setup
+        trade_setup = None
+        if result.get("suggested_entry") and result.get("suggested_stop") and result.get("suggested_target"):
             try:
-                clean_content = clean_json_content(content)
+                entry = float(str(result["suggested_entry"]).replace(",", ""))
+                sl = float(str(result["suggested_stop"]).replace(",", ""))
+                tp = float(str(result["suggested_target"]).replace(",", ""))
 
-                json_match = re.search(r'\{.*\}', clean_content, re.DOTALL)
-                if json_match:
-                    result = json.loads(json_match.group())
+                risk = abs(entry - sl)
+                reward = abs(tp - entry)
+                rr = f"1:{reward/risk:.1f}" if risk > 0 else "N/A"
+
+                bias = result.get("trading_bias", "neutral").lower()
+                if bias == "bullish":
+                    direction = "BUY"
+                elif bias == "bearish":
+                    direction = "SELL"
                 else:
-                    result = json.loads(clean_content)
-            except json.JSONDecodeError:
-                print(f"[CHART ANALYSIS] JSON parse failed, content: {content[:300]}", flush=True)
-                detected_symbol = extract_symbol_from_text(content) or symbol or "Unknown"
-                result = {
-                    "symbol": detected_symbol,
-                    "market_structure": "neutral",
-                    "smc_signals": [],
-                    "patterns_detected": [],
-                    "chart_annotations": {},
-                    "support_levels": [],
-                    "resistance_levels": [],
-                    "suggested_entry": None,
-                    "suggested_stop": None,
-                    "suggested_target": None,
-                    "trading_bias": "neutral",
-                    "confidence": 0,
-                    "key_insights": [content[:200]],
-                    "structure_quality": "neutral"
+                    direction = "NEUTRAL"
+
+                trade_setup = {
+                    "entry": str(entry),
+                    "stop_loss": str(sl),
+                    "take_profit": str(tp),
+                    "risk_reward": rr,
+                    "probability": confidence,
+                    "direction": direction,
+                    "setup_type": "SMC Institutional"
                 }
+            except (ValueError, TypeError):
+                trade_setup = None
 
-            # Ensure symbol and normalize it
-            detected_symbol = result.get("symbol") or symbol or "Unknown"
-            result["symbol"] = normalize_symbol(detected_symbol)
+        result["trade_setup"] = trade_setup
 
-            # Ensure chart_annotations exists
-            if "chart_annotations" not in result or not result["chart_annotations"]:
-                result["chart_annotations"] = {
-                    "bos_levels": [],
-                    "liquidity_zones": [],
-                    "order_blocks": [],
-                    "fair_value_gaps": [],
-                    "premium_discount": {}
-                }
+        if not result.get("risk_reward_ratio") and trade_setup:
+            result["risk_reward_ratio"] = trade_setup.get("risk_reward", "N/A")
 
-            # Add chart image to result
-            result["chart_image"] = f"data:{content_type};base64,{base64_image}"
+        result["mode"] = "ai"
+        result["configured"] = True
 
-            # Normalize confidence/probability
-            confidence = result.get("confidence", 0.6)
-            if confidence <= 0:
-                confidence = 0.6
-            if confidence > 1:
-                confidence = 1
-            result["confidence"] = confidence
-
-            # Build trade setup
-            trade_setup = None
-            if result.get("suggested_entry") and result.get("suggested_stop") and result.get("suggested_target"):
-                try:
-                    entry = float(str(result["suggested_entry"]).replace(",", ""))
-                    sl = float(str(result["suggested_stop"]).replace(",", ""))
-                    tp = float(str(result["suggested_target"]).replace(",", ""))
-
-                    risk = abs(entry - sl)
-                    reward = abs(tp - entry)
-                    rr = f"1:{reward/risk:.1f}" if risk > 0 else "N/A"
-
-                    # Determine direction based on trading_bias
-                    bias = result.get("trading_bias", "neutral").lower()
-                    if bias == "bullish":
-                        direction = "BUY"
-                    elif bias == "bearish":
-                        direction = "SELL"
-                    else:
-                        direction = "NEUTRAL"
-
-                    trade_setup = {
-                        "entry": str(entry),
-                        "stop_loss": str(sl),
-                        "take_profit": str(tp),
-                        "risk_reward": rr,
-                        "probability": confidence,
-                        "direction": direction,
-                        "setup_type": "SMC Institutional"
-                    }
-                except (ValueError, TypeError):
-                    trade_setup = None
-
-            result["trade_setup"] = trade_setup
-
-            # Ensure risk_reward_ratio exists
-            if not result.get("risk_reward_ratio") and trade_setup:
-                result["risk_reward_ratio"] = trade_setup.get("risk_reward", "N/A")
-
-            result["mode"] = "ai"
-            result["configured"] = True
-
-            return result
+        return result
 
     except HTTPException:
         raise

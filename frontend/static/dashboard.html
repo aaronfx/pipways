@@ -59,6 +59,9 @@
                 <i class="fas fa-book w-5"></i><span>Trading Journal</span>
                 <span class="ml-auto bg-green-600 text-xs px-2 py-1 rounded-full">New</span>
             </a>
+            <a href="#" data-section="stocks" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-chart-pie w-5"></i><span>AI Stock Research</span>
+            </a>
             <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
                 <i class="fas fa-chart-line w-5"></i><span>Chart Analysis</span>
             </a>
@@ -408,6 +411,14 @@
                         </div>
                     </form>
                 </div>
+            </section>
+
+            <!-- AI STOCK RESEARCH -->
+            <section id="section-stocks" class="section hidden">
+                <iframe 
+                    src="/static/stock_terminal.html"
+                    class="w-full h-[900px] border-0 rounded-xl">
+                </iframe>
             </section>
 
             <!-- COURSES, WEBINARS, BLOG, ADMIN, MENTOR, ANALYSIS SECTIONS -->
@@ -778,8 +789,9 @@ class DashboardController {
         }
         const titles = {
             'dashboard': 'Dashboard', 'signals': 'Trading Signals', 'journal': 'Trading Journal',
-            'courses': 'Trading Courses', 'webinars': 'Webinars', 'blog': 'Trading Blog',
-            'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis', 'mentor': 'AI Mentor'
+            'stocks': 'AI Stock Research', 'courses': 'Trading Courses', 'webinars': 'Webinars', 
+            'blog': 'Trading Blog', 'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis', 
+            'mentor': 'AI Mentor'
         };
         document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
         document.getElementById('sidebar')?.classList.add('-translate-x-full');

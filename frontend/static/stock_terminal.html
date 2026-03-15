@@ -1,739 +1,648 @@
-"""
-Pipways AI Stock Research Terminal - FastAPI Backend Module
-===========================================================
-Mount the router into your existing FastAPI app:
-
-    from . import stock_terminal_backend as stock_module
-    app.include_router(stock_module.router, prefix="/api/stock", tags=["Stock Terminal"])
-
-Dependencies:
-    pip install fastapi anthropic httpx python-dotenv uvicorn
-
-Environment variables required:
-    ANTHROPIC_API_KEY   - your Anthropic key (console.anthropic.com)
-    EODHD_API_KEY       - your EODHD key (eodhd.com) — free tier: 20 req/day
-
-EODHD endpoints used:
-    /real-time/{symbol}.{exchange}    → live quote
-    /fundamentals/{symbol}.{exchange} → full fundamentals
-    Both require ?api_token=YOUR_KEY&fmt=json
-"""
-
-from __future__ import annotations
-
-import asyncio
-import json
-import math
-import os
-import time
-from contextlib import asynccontextmanager
-from typing import Any
-
-import httpx
-from anthropic import AsyncAnthropic
-from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-
-# ── Environment ───────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-EODHD_API_KEY     = os.environ.get("EODHD_API_KEY", "")
-EODHD_BASE        = "https://eodhd.com/api"
-CACHE_TTL         = 300  # 5 minutes
-
-# ── Shared clients ────────────────────────────────────────────────────────────
-_anthropic: AsyncAnthropic | None    = None
-_http:      httpx.AsyncClient | None = None
-
-# ── Async-safe cache ──────────────────────────────────────────────────────────
-_cache_lock: asyncio.Lock | None = None
-_cache:      dict[str, dict]     = {}
-
-
-def _get_lock() -> asyncio.Lock:
-    global _cache_lock
-    if _cache_lock is None:
-        _cache_lock = asyncio.Lock()
-    return _cache_lock
-
-
-async def cache_get(key: str) -> Any | None:
-    async with _get_lock():
-        item = _cache.get(key)
-        if item and (time.monotonic() - item["ts"]) < CACHE_TTL:
-            return item["data"]
-    return None
-
-
-async def cache_set(key: str, data: Any) -> None:
-    async with _get_lock():
-        _cache[key] = {"data": data, "ts": time.monotonic()}
-
-
-# ── Lazy self-initialisation ──────────────────────────────────────────────────
-def _require_clients() -> None:
-    global _anthropic, _http
-
-    if _anthropic is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise HTTPException(
-                status_code=503,
-                detail="ANTHROPIC_API_KEY is not set. Add it in Render → Environment.",
-            )
-        _anthropic = AsyncAnthropic(api_key=api_key)
-        print("[STOCK] Anthropic client lazy-initialised", flush=True)
-
-    if _http is None:
-        _http = httpx.AsyncClient(timeout=15.0)
-        print("[STOCK] HTTP client lazy-initialised", flush=True)
-
-
-# ── Pydantic models ───────────────────────────────────────────────────────────
-
-class OkResponse(BaseModel):
-    ok:     bool = True
-    cached: bool = False
-    data:   Any
-
-
-class PortfolioRequest(BaseModel):
-    amount:  float = Field(default=10_000, gt=0)
-    risk:    str   = Field(default="moderate", pattern="^(conservative|moderate|aggressive)$")
-    horizon: str   = Field(default="long",     pattern="^(short|medium|long)$")
-
-
-class CompareRequest(BaseModel):
-    symbols: list[str] = Field(min_length=2, max_length=5)
-
-
-# ── Claude AI helper ──────────────────────────────────────────────────────────
-
-SYSTEM_PROMPT = (
-    "You are an elite quantitative financial analyst and portfolio manager. "
-    "You provide data-driven, objective investment analysis. "
-    "Always respond with valid JSON only — no markdown, no preamble, no explanation."
-)
-
-
-async def claude_json(prompt: str, max_tokens: int = 1200) -> dict:
-    _require_clients()
-    try:
-        message = await _anthropic.messages.create(
-            model      = "claude-sonnet-4-6",
-            max_tokens = max_tokens,
-            system     = SYSTEM_PROMPT,
-            messages   = [{"role": "user", "content": prompt}],
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
-
-    raw   = "".join(b.text for b in message.content if hasattr(b, "text"))
-    clean = raw.strip()
-    if clean.startswith("```"):
-        clean = clean.split("\n", 1)[-1]
-    if clean.endswith("```"):
-        clean = clean.rsplit("```", 1)[0].strip()
-
-    try:
-        return json.loads(clean)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Claude returned invalid JSON: {exc}. Raw: {raw[:300]}",
-        ) from exc
-
-
-# ── EODHD helpers ─────────────────────────────────────────────────────────────
-
-def _safe(val: Any, fallback: str = "N/A") -> Any:
-    """Return value or fallback if None / NaN / empty."""
-    if val is None:
-        return fallback
-    try:
-        if isinstance(val, float) and math.isnan(val):
-            return fallback
-    except Exception:
-        pass
-    if str(val).strip().lower() in ("nan", "none", "", "null", "0"):
-        return fallback
-    return val
-
-
-def _fmt_large(val: Any) -> str:
-    """Format large numbers → $1.2T / $450B / $3.2M."""
-    try:
-        n = float(val)
-        if n == 0:
-            return "N/A"
-        if n >= 1e12: return f"${n/1e12:.2f}T"
-        if n >= 1e9:  return f"${n/1e9:.1f}B"
-        if n >= 1e6:  return f"${n/1e6:.1f}M"
-        return f"${n:,.0f}"
-    except Exception:
-        return "N/A"
-
-
-def _fmt_pct(val: Any) -> str:
-    """Format ratio → percentage string."""
-    try:
-        f = float(val)
-        if f == 0:
-            return "N/A"
-        # EODHD returns percentages as decimals (0.245 = 24.5%) OR already as %
-        if abs(f) < 1:
-            return f"{f * 100:.2f}%"
-        return f"{f:.2f}%"
-    except Exception:
-        return "N/A"
-
-
-def _resolve_ticker(symbol: str) -> tuple[str, str]:
-    """
-    Split 'AAPL' → ('AAPL', 'US')
-    Also handles explicit exchange: 'TSLA.US' → ('TSLA', 'US')
-    """
-    if "." in symbol:
-        parts = symbol.split(".", 1)
-        return parts[0].upper(), parts[1].upper()
-    return symbol.upper(), "US"
-
-
-async def _eodhd_get(path: str, params: dict | None = None) -> dict | list:
-    """Make an authenticated GET request to EODHD."""
-    _require_clients()
-    eodhd_key = os.environ.get("EODHD_API_KEY", "")
-    if not eodhd_key:
-        raise HTTPException(
-            status_code=503,
-            detail="EODHD_API_KEY is not set. Add it in Render → Environment.",
-        )
-    p = {"api_token": eodhd_key, "fmt": "json"}
-    if params:
-        p.update(params)
-    try:
-        resp = await _http.get(f"{EODHD_BASE}/{path}", params=p)
-        resp.raise_for_status()
-        return resp.json()
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(
-            status_code=exc.response.status_code,
-            detail=f"EODHD error: {exc.response.text[:200]}",
-        ) from exc
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"EODHD connection error: {exc}") from exc
-
-
-async def fetch_market_data(symbol: str) -> dict:
-    """
-    Fetch live quote + full fundamentals from EODHD.
-    Falls back gracefully if fundamentals are missing.
-    """
-    cache_key = f"eodhd:{symbol}"
-    if cached := await cache_get(cache_key):
-        return cached
-
-    ticker, exchange = _resolve_ticker(symbol)
-    full_sym = f"{ticker}.{exchange}"
-
-    # ── Fetch quote and fundamentals concurrently ─────────────────────────
-    try:
-        quote_data, fund_data = await asyncio.gather(
-            _eodhd_get(f"real-time/{full_sym}"),
-            _eodhd_get(f"fundamentals/{full_sym}"),
-        )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"EODHD fetch failed: {exc}") from exc
-
-    # ── Parse quote ───────────────────────────────────────────────────────
-    # quote_data is a dict for single symbols
-    if isinstance(quote_data, list):
-        quote_data = quote_data[0] if quote_data else {}
-
-    price      = float(quote_data.get("close") or quote_data.get("previousClose") or 0)
-    prev_close = float(quote_data.get("previousClose") or 0)
-    change     = round(float(quote_data.get("change") or 0), 4)
-    change_pct = round(float(str(quote_data.get("change_p") or "0").replace("%", "")), 4)
-    volume     = int(quote_data.get("volume") or 0)
-
-    # ── Parse fundamentals ────────────────────────────────────────────────
-    general    = fund_data.get("General", {})
-    highlights = fund_data.get("Highlights", {})
-    valuation  = fund_data.get("Valuation", {})
-    technicals = fund_data.get("Technicals", {})
-    shares     = fund_data.get("SharesStats", {})
-    earnings   = fund_data.get("Earnings", {})
-
-    # Analyst ratings
-    analyst    = fund_data.get("AnalystRatings", {})
-
-    result = {
-        # ── Identity ──────────────────────────────────────────────────
-        "symbol":        ticker,
-        "name":          _safe(general.get("Name"), ticker),
-        "sector":        _safe(general.get("Sector")),
-        "industry":      _safe(general.get("Industry")),
-        "exchange":      _safe(general.get("Exchange"), exchange),
-        "country":       _safe(general.get("CountryName"), "USA"),
-        "currency":      _safe(general.get("CurrencyCode"), "USD"),
-        "description":   _safe(general.get("Description"), ""),
-        "isin":          _safe(general.get("ISIN")),
-        "website":       _safe(general.get("WebURL")),
-
-        # ── Quote ─────────────────────────────────────────────────────
-        "price":         price,
-        "change":        change,
-        "change_pct":    str(change_pct),
-        "volume":        volume,
-        "prev_close":    prev_close,
-        "high":          float(quote_data.get("high") or 0),
-        "low":           float(quote_data.get("low") or 0),
-        "open":          float(quote_data.get("open") or 0),
-
-        # ── Valuation ─────────────────────────────────────────────────
-        "market_cap":    _fmt_large(highlights.get("MarketCapitalization")),
-        "pe_ratio":      _safe(highlights.get("PERatio")),
-        "forward_pe":    _safe(valuation.get("ForwardPE")),
-        "peg_ratio":     _safe(highlights.get("PEGRatio")),
-        "eps":           _safe(highlights.get("EarningsShare")),
-        "eps_growth_yoy":_safe(highlights.get("EPSEstimateNextYear")),
-        "book_value":    _safe(highlights.get("BookValue")),
-        "price_to_book": _safe(valuation.get("PriceBookMRQ")),
-        "price_to_sales":_safe(valuation.get("PriceSalesTTM")),
-        "ev_ebitda":     _safe(valuation.get("EnterpriseValueEbitda")),
-
-        # ── Range & Technicals ────────────────────────────────────────
-        "52_week_high":  _safe(technicals.get("52WeekHigh")),
-        "52_week_low":   _safe(technicals.get("52WeekLow")),
-        "50_day_avg":    _safe(technicals.get("50DayMA")),
-        "200_day_avg":   _safe(technicals.get("200DayMA")),
-        "beta":          _safe(technicals.get("Beta")),
-        "short_ratio":   _safe(technicals.get("ShortRatio")),
-
-        # ── Dividends ─────────────────────────────────────────────────
-        "div_yield":     _fmt_pct(highlights.get("DividendYield")),
-        "div_per_share": _safe(highlights.get("DividendShare")),
-
-        # ── Analyst ───────────────────────────────────────────────────
-        "analyst_target":     _safe(highlights.get("AnalystTargetPrice")),
-        "analyst_rating":     _safe(analyst.get("Rating")),
-        "analyst_buy":        _safe(analyst.get("StrongBuy", 0)),
-        "analyst_hold":       _safe(analyst.get("Hold", 0)),
-        "analyst_sell":       _safe(analyst.get("StrongSell", 0)),
-
-        # ── Financials ────────────────────────────────────────────────
-        "revenue_ttm":        _fmt_large(highlights.get("RevenueTTM")),
-        "revenue_per_share":  _safe(highlights.get("RevenuePerShareTTM")),
-        "gross_profit_ttm":   _fmt_large(highlights.get("GrossProfitTTM")),
-        "ebitda":             _fmt_large(highlights.get("EBITDA")),
-        "profit_margin":      _fmt_pct(highlights.get("ProfitMargin")),
-        "gross_margin":       _fmt_pct(highlights.get("GrossProfitTTM")),
-        "operating_margin":   _fmt_pct(highlights.get("OperatingMarginTTM")),
-        "return_on_equity":   _fmt_pct(highlights.get("ReturnOnEquityTTM")),
-        "return_on_assets":   _fmt_pct(highlights.get("ReturnOnAssetsTTM")),
-        "free_cashflow":      _fmt_large(highlights.get("FreeCashFlow") or
-                                         fund_data.get("CashFlow", {}).get("freeCashFlow")),
-        "debt_to_equity":     _safe(highlights.get("DebtEquityRatio") or
-                                    fund_data.get("Leverage", {}).get("debtEquityRatioTTM")),
-        "current_ratio":      _safe(fund_data.get("Leverage", {}).get("currentRatioTTM")),
-        "shares_outstanding": _fmt_large(shares.get("SharesOutstanding")),
-        "shares_float":       _fmt_large(shares.get("SharesFloat")),
-
-        # ── Meta ──────────────────────────────────────────────────────
-        "data_source": "eodhd_live",
-    }
-
-    await cache_set(cache_key, result)
-    return result
-
-
-# ── AI market data fallback (when EODHD key missing / rate-limited) ───────────
-
-async def enrich_with_claude(symbol: str) -> dict:
-    """Ask Claude to fill in realistic market data from training knowledge."""
-    prompt = f"""
-Provide realistic and accurate market data for the stock {symbol} based on your training knowledge.
-Use the most recent figures you know. Estimate conservatively if uncertain.
-
-Return ONLY this JSON (no markdown):
-{{
-  "name": "<Full company name>",
-  "sector": "<sector>",
-  "industry": "<industry>",
-  "exchange": "<e.g. NASDAQ>",
-  "country": "USA",
-  "currency": "USD",
-  "price": <number>,
-  "change": <number>,
-  "change_pct": "<e.g. 0.59>",
-  "market_cap": "<e.g. $3.2T>",
-  "pe_ratio": "<e.g. 33.2>",
-  "forward_pe": "<e.g. 29.5>",
-  "peg_ratio": "<e.g. 2.1>",
-  "eps": "<e.g. 6.43>",
-  "beta": "<e.g. 1.24>",
-  "div_yield": "<e.g. 0.52% or N/A>",
-  "52_week_high": "<e.g. 237.23>",
-  "52_week_low": "<e.g. 164.08>",
-  "50_day_avg": "<e.g. 220.5>",
-  "200_day_avg": "<e.g. 210.2>",
-  "analyst_target": "<e.g. 230.00>",
-  "profit_margin": "<e.g. 24.30%>",
-  "gross_margin": "<e.g. 45.60%>",
-  "operating_margin": "<e.g. 30.10%>",
-  "return_on_equity": "<e.g. 160.50%>",
-  "return_on_assets": "<e.g. 22.60%>",
-  "revenue_ttm": "<e.g. $383B>",
-  "ebitda": "<e.g. $130B>",
-  "free_cashflow": "<e.g. $90B>",
-  "debt_to_equity": "<e.g. 1.87>",
-  "current_ratio": "<e.g. 0.95>",
-  "price_to_book": "<e.g. 48.5>",
-  "book_value": "<e.g. 4.38>",
-  "data_source": "ai_estimate"
-}}
-"""
-    try:
-        data = await claude_json(prompt, max_tokens=700)
-        data["data_source"] = "ai_estimate"
-        # Ensure volume and prev_close exist
-        data.setdefault("volume",     0)
-        data.setdefault("prev_close", 0)
-        data.setdefault("high",       0)
-        data.setdefault("low",        0)
-        return data
-    except Exception as exc:
-        print(f"[STOCK] enrich_with_claude failed for {symbol}: {exc}", flush=True)
-        return {
-            "name": symbol, "sector": "N/A", "industry": "N/A",
-            "exchange": "N/A", "country": "USA", "currency": "USD",
-            "price": 0, "change": 0, "change_pct": "0",
-            "market_cap": "N/A", "pe_ratio": "N/A", "forward_pe": "N/A",
-            "peg_ratio": "N/A", "eps": "N/A", "beta": "N/A",
-            "div_yield": "N/A", "52_week_high": "N/A", "52_week_low": "N/A",
-            "50_day_avg": "N/A", "200_day_avg": "N/A", "analyst_target": "N/A",
-            "profit_margin": "N/A", "gross_margin": "N/A", "operating_margin": "N/A",
-            "return_on_equity": "N/A", "return_on_assets": "N/A",
-            "revenue_ttm": "N/A", "ebitda": "N/A", "free_cashflow": "N/A",
-            "debt_to_equity": "N/A", "current_ratio": "N/A",
-            "price_to_book": "N/A", "book_value": "N/A",
-            "volume": 0, "prev_close": 0, "high": 0, "low": 0,
-            "data_source": "ai_estimate",
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Stock Research Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        .glass-panel {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(75, 85, 99, 0.4);
+        }
+        .loading-shimmer {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+    <base target="_blank">
+</head>
+<body class="text-gray-100 min-h-screen bg-gray-900">
+
+    <!-- Error Toast -->
+    <div id="error-toast" class="hidden fixed top-4 right-4 z-50 max-w-md bg-red-900/90 border border-red-500/50 text-red-200 px-5 py-4 rounded-xl shadow-2xl backdrop-blur-md" style="transition:all 0.3s ease">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-exclamation-circle text-red-400 mt-0.5 flex-shrink-0"></i>
+            <div>
+                <div class="font-semibold text-red-300 text-sm mb-1">Error</div>
+                <div id="error-message" class="text-sm leading-relaxed"></div>
+            </div>
+            <button onclick="hideError()" class="ml-2 text-red-400 hover:text-red-200 flex-shrink-0"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- AI Estimate Banner -->
+    <div id="ai-estimate-banner" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-yellow-900/90 border border-yellow-600/50 text-yellow-200 px-5 py-3 rounded-xl shadow-2xl backdrop-blur-md text-sm flex items-center gap-2">
+        <i class="fas fa-robot text-yellow-400"></i>
+        <span>Live market data unavailable — showing AI estimates from training knowledge</span>
+        <button onclick="document.getElementById('ai-estimate-banner').classList.add('hidden')" class="ml-2 text-yellow-400 hover:text-yellow-200"><i class="fas fa-times"></i></button>
+    </div>
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-gray-900/95 sticky top-0 z-40 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-chart-pie text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">AI Stock Research</h1>
+                        <p class="text-xs text-gray-400">Powered by Claude AI</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="switchTab('analyzer')" id="tab-analyzer"
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white transition-all">
+                        <i class="fas fa-search mr-2"></i>Analyze
+                    </button>
+                    <button onclick="switchTab('portfolio')" id="tab-portfolio"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
+                        <i class="fas fa-briefcase mr-2"></i>Portfolio
+                    </button>
+                    <button onclick="switchTab('compare')" id="tab-compare"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
+                        <i class="fas fa-code-compare mr-2"></i>Compare
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Stock Analyzer Tab -->
+        <div id="view-analyzer" class="space-y-6">
+            <div class="glass-panel rounded-2xl p-6">
+                <div class="flex gap-4">
+                    <div class="flex-1 relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="stock-symbol"
+                            placeholder="Enter stock symbol (e.g., AAPL, MSFT, NVDA)"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all uppercase"
+                            onkeypress="if(event.key==='Enter') analyzeStock()">
+                    </div>
+                    <button onclick="analyzeStock()" id="analyze-btn"
+                        class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all flex items-center gap-2">
+                        <span>Analyze</span><i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-state" class="hidden glass-panel rounded-2xl p-12 text-center">
+                <div class="inline-flex items-center gap-3 text-purple-400">
+                    <i class="fas fa-circle-notch fa-spin text-2xl"></i>
+                    <span class="text-lg">AI is analyzing market data...</span>
+                </div>
+                <p class="text-gray-500 text-sm mt-2">Fetching live data + running AI scoring</p>
+            </div>
+
+            <!-- Results -->
+            <div id="analysis-results" class="hidden space-y-6 fade-in">
+                <!-- Top Summary Card -->
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                        <div>
+                            <h2 id="res-symbol" class="text-3xl font-bold text-white mb-1"></h2>
+                            <p id="res-name" class="text-gray-400"></p>
+                            <p id="res-datasource" class="hidden text-xs text-yellow-500 mt-1 flex items-center gap-1">
+                                <i class="fas fa-robot"></i> AI estimates (live data unavailable)
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <div id="res-rating-badge" class="px-6 py-3 rounded-xl border font-bold text-xl"></div>
+                            <div class="text-right">
+                                <div id="res-price" class="text-3xl font-bold text-white"></div>
+                                <div id="res-change" class="font-medium"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Market Cap</div>
+                            <div id="res-market-cap" class="text-sm font-semibold text-white"></div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">P/E Ratio</div>
+                            <div id="res-pe" class="text-sm font-semibold text-white"></div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Beta</div>
+                            <div id="res-beta" class="text-sm font-semibold text-white"></div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">52W Range</div>
+                            <div id="res-52w" class="text-sm font-semibold text-white"></div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Sector</div>
+                            <div id="res-sector" class="text-sm font-semibold text-white"></div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                            <div class="text-xs text-gray-500 mb-1">Dividend Yield</div>
+                            <div id="res-dividend" class="text-sm font-semibold text-white"></div>
+                        </div>
+                    </div>
+
+                    <!-- AI Summary -->
+                    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-5 border border-purple-700/30">
+                        <h3 class="text-sm font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                            <i class="fas fa-robot"></i> AI Investment Summary
+                        </h3>
+                        <p id="res-summary" class="text-gray-300 leading-relaxed"></p>
+                    </div>
+                </div>
+
+                <!-- AI Scores + Analysis Details -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-panel rounded-2xl p-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">AI Scores</h3>
+                        <div class="space-y-4" id="scores-container"></div>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-6 md:col-span-2">
+                        <h3 class="text-lg font-semibold text-white mb-4">Analysis Details</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Trend</span>
+                                    <span id="res-trend" class="font-medium"></span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Momentum</span>
+                                    <span id="res-momentum" class="font-medium"></span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Risk Level</span>
+                                    <span id="res-risk" class="font-medium"></span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Hold Period</span>
+                                    <span id="res-hold" class="text-white font-medium"></span>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Revenue Growth</span>
+                                    <span id="res-revenue" class="font-medium"></span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Profit Margin</span>
+                                    <span id="res-profit" class="font-medium"></span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Debt Level</span>
+                                    <span id="res-debt" class="font-medium"></span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b border-gray-800">
+                                    <span class="text-gray-400">Analyst Consensus</span>
+                                    <span id="res-consensus" class="font-medium"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Risks & Opportunities -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-panel rounded-2xl p-6 border-l-4 border-red-500/50">
+                        <h3 class="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle"></i> Key Risks
+                        </h3>
+                        <ul id="res-risks" class="space-y-2 text-gray-300 text-sm"></ul>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-6 border-l-4 border-green-500/50">
+                        <h3 class="text-lg font-semibold text-green-400 mb-3 flex items-center gap-2">
+                            <i class="fas fa-lightbulb"></i> Opportunities
+                        </h3>
+                        <ul id="res-opportunities" class="space-y-2 text-gray-300 text-sm"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Builder Tab -->
+        <div id="view-portfolio" class="hidden space-y-6">
+            <div class="glass-panel rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-6">AI Portfolio Builder</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Investment Amount ($)</label>
+                        <input type="number" id="portfolio-amount" value="10000" min="1000" step="1000"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Risk Tolerance</label>
+                        <select id="portfolio-risk" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                            <option value="conservative">Conservative</option>
+                            <option value="moderate" selected>Moderate</option>
+                            <option value="aggressive">Aggressive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Time Horizon</label>
+                        <select id="portfolio-horizon" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                            <option value="short">Short Term</option>
+                            <option value="medium">Medium Term</option>
+                            <option value="long" selected>Long Term</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="buildPortfolio()" id="portfolio-btn"
+                    class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 rounded-xl font-semibold transition-all">
+                    <i class="fas fa-magic mr-2"></i>Generate AI Portfolio
+                </button>
+            </div>
+            <div id="portfolio-results" class="hidden space-y-6 fade-in">
+                <div class="glass-panel rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Recommended Allocation</h3>
+                            <p id="portfolio-summary" class="text-gray-400 mt-1"></p>
+                        </div>
+                        <div class="text-right">
+                            <div id="portfolio-return" class="text-2xl font-bold text-green-400"></div>
+                            <div class="text-sm text-gray-500">Expected Annual Return</div>
+                        </div>
+                    </div>
+                    <div id="portfolio-allocations" class="space-y-3"></div>
+                    <div class="mt-6 pt-6 border-t border-gray-800 grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div id="portfolio-volatility" class="text-lg font-semibold text-white"></div>
+                            <div class="text-xs text-gray-500">Volatility</div>
+                        </div>
+                        <div>
+                            <div id="portfolio-diversification" class="text-lg font-semibold text-white"></div>
+                            <div class="text-xs text-gray-500">Diversification Score</div>
+                        </div>
+                        <div>
+                            <div id="portfolio-rebalance" class="text-lg font-semibold text-white"></div>
+                            <div class="text-xs text-gray-500">Rebalance Frequency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compare Tab -->
+        <div id="view-compare" class="hidden space-y-6">
+            <div class="glass-panel rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white mb-4">Compare Stocks</h2>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="compare-input"
+                        placeholder="Enter symbols separated by commas (e.g., AAPL, MSFT, GOOGL)"
+                        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 uppercase"
+                        onkeypress="if(event.key==='Enter') compareStocks()">
+                    <button onclick="compareStocks()" id="compare-btn"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                        Compare
+                    </button>
+                </div>
+            </div>
+            <div id="compare-results" class="hidden space-y-4 fade-in">
+                <div class="glass-panel rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">AI Comparison Results</h3>
+                    <div id="compare-stocks-container" class="space-y-4"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin + '/api/stock';
+
+        // ── Safe value formatter — never shows NaN, null, undefined, 0-as-price ──
+        function fmt(val, opts = {}) {
+            const { prefix = '', suffix = '', fallback = 'N/A', isPrice = false, decimals = 2 } = opts;
+            if (val === null || val === undefined || val === '' || val === 'N/A' || val === 'None') return fallback;
+            const num = parseFloat(val);
+            if (isPrice && (isNaN(num) || num === 0)) return fallback;
+            if (!isNaN(num) && (prefix === '$' || isPrice)) {
+                return prefix + num.toFixed(decimals) + suffix;
+            }
+            if (!isNaN(num) && decimals !== null) {
+                return prefix + num.toFixed(decimals) + suffix;
+            }
+            return prefix + String(val) + suffix;
         }
 
-
-# ── Router ────────────────────────────────────────────────────────────────────
-router = APIRouter()
-
-
-@router.get("/quote/{symbol}", response_model=OkResponse, summary="Live market quote")
-async def quote(symbol: str) -> OkResponse:
-    try:
-        data = await fetch_market_data(symbol.upper())
-        keys = ["symbol", "price", "change", "change_pct", "volume", "prev_close", "high", "low", "open"]
-        return OkResponse(data={k: data[k] for k in keys if k in data})
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.get("/overview/{symbol}", response_model=OkResponse, summary="Company overview")
-async def overview(symbol: str) -> OkResponse:
-    try:
-        data = await fetch_market_data(symbol.upper())
-        return OkResponse(data=data)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.get(
-    "/analyze/{symbol}",
-    response_model = OkResponse,
-    summary        = "Full AI stock analysis",
-    description    = "Fetches live data via EODHD then runs Claude AI analysis. Cached 5 min.",
-)
-async def analyze(symbol: str) -> OkResponse:
-    try:
-        sym       = symbol.upper()
-        cache_key = f"analysis:{sym}"
-
-        if cached := await cache_get(cache_key):
-            return OkResponse(data=cached, cached=True)
-
-        # ── Fetch live market data ────────────────────────────────────────
-        market:      dict = {}
-        data_source: str  = "eodhd_live"
-
-        try:
-            market = await fetch_market_data(sym)
-            print(f"[STOCK] EODHD data fetched for {sym}", flush=True)
-        except Exception as exc:
-            print(f"[STOCK] EODHD failed for {sym}: {exc} — falling back to AI estimates", flush=True)
-            data_source = "ai_estimate"
-            market = await enrich_with_claude(sym)
-
-        data_note = (
-            "NOTE: Live market data unavailable — figures are AI estimates from training knowledge."
-            if data_source == "ai_estimate" else
-            "Data source: EODHD live market data."
-        )
-
-        prompt = f"""
-Analyze the stock {sym} using the following live market data:
-{data_note}
-
-Company       : {market.get('name')}
-Sector        : {market.get('sector')} | Industry: {market.get('industry')}
-Exchange      : {market.get('exchange')} | Country: {market.get('country')}
-
-── Price ───────────────────────────────────────────────
-Current Price : ${market.get('price')}
-Change Today  : {market.get('change')} ({market.get('change_pct')}%)
-52w High      : {market.get('52_week_high')} | 52w Low: {market.get('52_week_low')}
-50d MA        : {market.get('50_day_avg')}  | 200d MA: {market.get('200_day_avg')}
-Beta          : {market.get('beta')}
-
-── Valuation ───────────────────────────────────────────
-Market Cap    : {market.get('market_cap')}
-P/E (TTM)     : {market.get('pe_ratio')} | Forward P/E: {market.get('forward_pe')}
-PEG Ratio     : {market.get('peg_ratio')} | Price/Book: {market.get('price_to_book')}
-EPS (TTM)     : {market.get('eps')} | Book Value: {market.get('book_value')}
-Analyst Target: {market.get('analyst_target')}
-Dividend Yield: {market.get('div_yield')}
-EV/EBITDA     : {market.get('ev_ebitda')}
-
-── Financials ──────────────────────────────────────────
-Revenue TTM   : {market.get('revenue_ttm')} | EBITDA: {market.get('ebitda')}
-Gross Margin  : {market.get('gross_margin')} | Operating Margin: {market.get('operating_margin')}
-Profit Margin : {market.get('profit_margin')} | Free Cash Flow: {market.get('free_cashflow')}
-ROE           : {market.get('return_on_equity')} | ROA: {market.get('return_on_assets')}
-Debt/Equity   : {market.get('debt_to_equity')} | Current Ratio: {market.get('current_ratio')}
-
-Return exactly this JSON structure:
-{{
-  "rating": "BUY" | "HOLD" | "SELL" | "STRONG_BUY",
-  "confidence": <integer 50-99>,
-  "hold_period": "<e.g. Long Term (2-5 years)>",
-  "scores": {{
-    "Financial Strength": <0-100>,
-    "Price Momentum": <0-100>,
-    "Market Sentiment": <0-100>,
-    "Sector Performance": <0-100>,
-    "Growth Potential": <0-100>,
-    "Risk Level": <0-100>
-  }},
-  "overall_score": <float 0.0-10.0, one decimal>,
-  "weighted_score": <float 0.0-100.0>,
-  "long_term_outlook": "<one clear sentence>",
-  "growth_window": "<e.g. 3-7 years>",
-  "risk_level": "Low" | "Medium" | "High",
-  "trend": "Bullish" | "Bearish" | "Neutral",
-  "momentum": "Strong" | "Moderate" | "Weak",
-  "key_support": <number>,
-  "key_resistance": <number>,
-  "risks": ["<risk 1>", "<risk 2>", "<risk 3>"],
-  "opportunities": ["<opportunity 1>", "<opportunity 2>"],
-  "summary": "<3-4 sentence human-style investment summary>",
-  "short_term": "Not recommended" | "Moderate opportunity" | "Strong opportunity",
-  "medium_term": "Not recommended" | "Moderate opportunity" | "Strong opportunity",
-  "long_term": "Not recommended" | "Moderate opportunity" | "Strong investment candidate",
-  "revenue_growth": "Weak" | "Moderate" | "Strong",
-  "profit_margin_rating": "Low" | "Moderate" | "High",
-  "debt_level": "Low" | "Moderate" | "High",
-  "cash_flow": "Negative" | "Moderate" | "Strong",
-  "competitive_moat": "Narrow" | "Wide" | "None",
-  "insider_sentiment": "Bearish" | "Neutral" | "Bullish",
-  "analyst_consensus": "Underperform" | "Hold" | "Buy" | "Strong Buy"
-}}
-"""
-        ai_data = await claude_json(prompt)
-        result  = {
-            "symbol":      sym,
-            "market_data": {**market, "data_source": data_source},
-            "ai_analysis": ai_data,
+        function colorClass(val, positive = 'text-green-400', neutral = 'text-yellow-400', negative = 'text-red-400') {
+            const map = {
+                'Bullish': positive, 'Strong': positive, 'High': positive,
+                'Low': positive,     'Positive': positive, 'Buy': positive, 'Strong Buy': positive,
+                'Bearish': negative, 'Weak': negative, 'Sell': negative, 'Negative': negative,
+                'Neutral': neutral,  'Hold': neutral, 'Medium': neutral, 'Moderate': neutral,
+            };
+            return map[val] || 'text-white';
         }
-        await cache_set(cache_key, result)
-        return OkResponse(data=result)
 
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        function showError(msg) {
+            document.getElementById('error-message').textContent = msg;
+            document.getElementById('error-toast').classList.remove('hidden');
+            clearTimeout(window._errorTimer);
+            window._errorTimer = setTimeout(hideError, 8000);
+        }
+        function hideError() { document.getElementById('error-toast').classList.add('hidden'); }
 
+        async function apiFetch(url, options = {}) {
+            let response;
+            try {
+                response = await fetch(url, options);
+            } catch (e) {
+                throw new Error('Network error — is the server running? ' + e.message);
+            }
+            const ct = response.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Server error (${response.status}): ${text.slice(0, 200)}`);
+            }
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || result.error || `HTTP ${response.status}`);
+            if (result.ok === false) throw new Error(result.detail || result.error || 'Unknown error');
+            return result;
+        }
 
-@router.post("/portfolio", response_model=OkResponse, summary="AI portfolio builder")
-async def portfolio(body: PortfolioRequest) -> OkResponse:
-    try:
-        prompt = f"""
-Build an optimal diversified stock portfolio for an investor with these parameters:
-- Investment amount: ${body.amount:,.2f}
-- Risk tolerance: {body.risk}
-- Investment horizon: {body.horizon} term
+        function switchTab(tab) {
+            ['analyzer', 'portfolio', 'compare'].forEach(t => {
+                document.getElementById('view-' + t).classList.add('hidden');
+                const btn = document.getElementById('tab-' + t);
+                btn.classList.remove('bg-purple-600', 'text-white');
+                btn.classList.add('text-gray-400');
+            });
+            document.getElementById('view-' + tab).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-' + tab);
+            activeBtn.classList.remove('text-gray-400');
+            activeBtn.classList.add('bg-purple-600', 'text-white');
+        }
 
-Return exactly this JSON:
-{{
-  "allocations": [
-    {{
-      "symbol": "<TICKER>",
-      "name": "<Company Name>",
-      "pct": <integer, all allocations must sum to exactly 100>,
-      "amount": <dollar amount>,
-      "rationale": "<one sentence why>",
-      "asset_type": "Stock" | "ETF" | "Bond ETF"
-    }}
-  ],
-  "expected_annual_return": "<e.g. 10-14%>",
-  "expected_volatility": "Low" | "Moderate" | "High",
-  "risk_profile": "<Conservative|Moderate|Aggressive>",
-  "diversification_score": <0-100>,
-  "summary": "<2 sentence portfolio thesis>",
-  "rebalance_frequency": "Quarterly" | "Semi-Annual" | "Annual"
-}}
+        async function analyzeStock() {
+            const symbol = document.getElementById('stock-symbol').value.trim().toUpperCase();
+            if (!symbol) return;
 
-Rules:
-- 4 to 7 positions total
-- Include at least 1 ETF for diversification
-- Allocations must be whole numbers summing to exactly 100
-- Dollar amounts must reflect the percentage of ${body.amount:,.2f}
-"""
-        data = await claude_json(prompt, max_tokens=1000)
-        for a in data.get("allocations", []):
-            a["amount"] = round(body.amount * int(a.get("pct", 0)) / 100, 2)
-        return OkResponse(data=data)
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = true;
+            document.getElementById('loading-state').classList.remove('hidden');
+            document.getElementById('analysis-results').classList.add('hidden');
+            document.getElementById('ai-estimate-banner').classList.add('hidden');
+            hideError();
 
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+            try {
+                const result = await apiFetch(`${API_BASE}/analyze/${symbol}`);
+                displayAnalysis(result.data);
+                document.getElementById('analysis-results').classList.remove('hidden');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loading-state').classList.add('hidden');
+                btn.disabled = false;
+            }
+        }
 
+        function displayAnalysis(data) {
+            const ai     = data.ai_analysis;
+            const market = data.market_data;
+            const isAiEstimate = market.data_source === 'ai_estimate';
 
-@router.post("/compare", response_model=OkResponse, summary="Side-by-side stock comparison")
-async def compare(body: CompareRequest) -> OkResponse:
-    try:
-        symbols = [s.strip().upper() for s in body.symbols if s.strip()][:5]
-        if len(symbols) < 2:
-            raise HTTPException(status_code=422, detail="Provide at least 2 valid symbols")
+            // ── Symbol + Name ──
+            document.getElementById('res-symbol').textContent = data.symbol;
+            document.getElementById('res-name').textContent   = market.name && market.name !== data.symbol ? market.name : '';
 
-        async def safe_fetch(sym: str) -> tuple[str, dict]:
-            try:
-                return sym, await fetch_market_data(sym)
-            except Exception:
-                return sym, await enrich_with_claude(sym)
+            // ── Data source banner ──
+            const dsEl = document.getElementById('res-datasource');
+            if (isAiEstimate) {
+                dsEl.classList.remove('hidden');
+                document.getElementById('ai-estimate-banner').classList.remove('hidden');
+            } else {
+                dsEl.classList.add('hidden');
+            }
 
-        pairs   = await asyncio.gather(*[safe_fetch(s) for s in symbols])
-        markets = dict(pairs)
+            // ── Price (never show $NaN or $0.00) ──
+            const price    = parseFloat(market.price);
+            const priceEl  = document.getElementById('res-price');
+            priceEl.textContent = (!isNaN(price) && price > 0) ? '$' + price.toFixed(2) : 'N/A';
 
-        stock_context = "\n".join(
-            f"- {sym}: {markets[sym].get('name', sym)}, "
-            f"Sector: {markets[sym].get('sector', '?')}, "
-            f"Price: ${markets[sym].get('price', '?')}, "
-            f"P/E: {markets[sym].get('pe_ratio', '?')}, "
-            f"Market Cap: {markets[sym].get('market_cap', '?')}, "
-            f"Beta: {markets[sym].get('beta', '?')}, "
-            f"Revenue: {markets[sym].get('revenue_ttm', '?')}"
-            for sym in symbols
-        )
+            // ── Change ──
+            const changeEl  = document.getElementById('res-change');
+            const change    = parseFloat(market.change)     || 0;
+            const changePct = parseFloat(market.change_pct) || 0;
+            if (!isNaN(price) && price > 0) {
+                changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) +
+                                       ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%)';
+                changeEl.className   = (change >= 0 ? 'text-green-400' : 'text-red-400') + ' font-medium';
+            } else {
+                changeEl.textContent = '';
+            }
 
-        prompt = f"""
-Compare these stocks for an investor and rank them objectively:
+            // ── Metrics ──
+            document.getElementById('res-market-cap').textContent = market.market_cap || 'N/A';
+            document.getElementById('res-pe').textContent         = market.pe_ratio   || 'N/A';
+            document.getElementById('res-beta').textContent       = market.beta       || 'N/A';
+            document.getElementById('res-sector').textContent     = market.sector     || 'N/A';
+            document.getElementById('res-dividend').textContent   = market.div_yield  || 'N/A';
 
-{stock_context}
+            // ── 52W Range (never show ? – ?) ──
+            const lo = market['52_week_low'];
+            const hi = market['52_week_high'];
+            const loOk = lo && lo !== 'N/A' && parseFloat(lo) > 0;
+            const hiOk = hi && hi !== 'N/A' && parseFloat(hi) > 0;
+            document.getElementById('res-52w').textContent =
+                (loOk && hiOk) ? `$${parseFloat(lo).toFixed(2)} – $${parseFloat(hi).toFixed(2)}` : 'N/A';
 
-Return exactly this JSON:
-{{
-  "stocks": [
-    {{
-      "symbol": "<TICKER>",
-      "rating": "BUY" | "HOLD" | "SELL",
-      "overall_rank": <1 to {len(symbols)}>,
-      "growth_score": <0-100>,
-      "valuation_score": <0-100>,
-      "risk_score": <0-100>,
-      "momentum_score": <0-100>,
-      "dividend_score": <0-100>,
-      "one_line_summary": "<concise analyst opinion>",
-      "best_for": "Growth investors" | "Income investors" | "Value investors" | "Traders"
-    }}
-  ],
-  "winner": "<symbol>",
-  "winner_reason": "<one sentence>",
-  "avoid": "<symbol or null>",
-  "avoid_reason": "<one sentence or null>"
-}}
-Provide exactly one object per symbol. Rank 1 = best overall pick.
-"""
-        data = await claude_json(prompt, max_tokens=900)
-        return OkResponse(data=data)
+            // ── Rating badge ──
+            const ratingBadge  = document.getElementById('res-rating-badge');
+            const rating       = (ai.rating || 'HOLD');
+            ratingBadge.textContent = rating.replace('_', ' ');
+            const ratingColors = {
+                'STRONG_BUY': 'bg-green-500/20 border-green-500/50 text-green-400',
+                'BUY':        'bg-green-500/20 border-green-500/50 text-green-400',
+                'HOLD':       'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
+                'SELL':       'bg-red-500/20 border-red-500/50 text-red-400',
+            };
+            ratingBadge.className = 'px-6 py-3 rounded-xl border font-bold text-xl ' +
+                (ratingColors[rating] || ratingColors['HOLD']);
 
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+            // ── AI Summary ──
+            document.getElementById('res-summary').textContent = ai.summary || 'No summary available.';
 
+            // ── Analysis details with colour coding ──
+            function setColored(id, val) {
+                const el = document.getElementById(id);
+                el.textContent  = val || 'N/A';
+                el.className    = 'font-medium ' + colorClass(val);
+            }
+            setColored('res-trend',    ai.trend);
+            setColored('res-momentum', ai.momentum);
+            setColored('res-risk',     ai.risk_level);
+            setColored('res-revenue',  ai.revenue_growth);
+            setColored('res-profit',   ai.profit_margin_rating);
+            setColored('res-debt',     ai.debt_level);
+            setColored('res-consensus',ai.analyst_consensus);
+            document.getElementById('res-hold').textContent = ai.hold_period || 'N/A';
 
-# ── Utility endpoints ─────────────────────────────────────────────────────────
+            // ── Score bars ──
+            const scoresContainer = document.getElementById('scores-container');
+            scoresContainer.innerHTML = '';
+            if (ai.scores) {
+                Object.entries(ai.scores).forEach(([key, value]) => {
+                    const color = value >= 70 ? 'bg-green-500' : value >= 40 ? 'bg-yellow-500' : 'bg-red-500';
+                    scoresContainer.innerHTML += `
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-400">${key}</span>
+                                <span class="text-white font-semibold">${value}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="${color} h-2 rounded-full" style="width:${value}%"></div>
+                            </div>
+                        </div>`;
+                });
+            }
 
-@router.delete("/cache", summary="Flush the analysis cache")
-async def flush_cache() -> dict:
-    async with _get_lock():
-        count = len(_cache)
-        _cache.clear()
-    return {"ok": True, "cleared": count}
+            // ── Risks ──
+            const risksContainer = document.getElementById('res-risks');
+            risksContainer.innerHTML = '';
+            (ai.risks || []).forEach(risk => {
+                risksContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-minus text-red-400 mt-1 text-xs flex-shrink-0"></i>${risk}</li>`;
+            });
 
+            // ── Opportunities ──
+            const oppContainer = document.getElementById('res-opportunities');
+            oppContainer.innerHTML = '';
+            (ai.opportunities || []).forEach(opp => {
+                oppContainer.innerHTML += `<li class="flex items-start gap-2"><i class="fas fa-plus text-green-400 mt-1 text-xs flex-shrink-0"></i>${opp}</li>`;
+            });
+        }
 
-@router.get("/cache/stats", summary="Cache statistics")
-async def cache_stats() -> dict:
-    async with _get_lock():
-        total   = len(_cache)
-        now     = time.monotonic()
-        live    = sum(1 for v in _cache.values() if (now - v["ts"]) < CACHE_TTL)
-        expired = total - live
-    return {"ok": True, "total": total, "live": live, "expired": expired, "ttl_seconds": CACHE_TTL}
+        async function buildPortfolio() {
+            const amount  = document.getElementById('portfolio-amount').value;
+            const risk    = document.getElementById('portfolio-risk').value;
+            const horizon = document.getElementById('portfolio-horizon').value;
+            const btn     = document.getElementById('portfolio-btn');
 
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Building portfolio…';
+            hideError();
 
-@router.get("/health", include_in_schema=False)
-async def health() -> dict:
-    try:
-        _require_clients()
-    except Exception:
-        pass
-    eodhd_key = os.environ.get("EODHD_API_KEY", "")
-    return {
-        "ok":              True,
-        "service":         "Pipways Stock Terminal",
-        "anthropic_ready": _anthropic is not None,
-        "http_ready":      _http is not None,
-        "eodhd_key_set":   bool(eodhd_key),
-        "data_source":     "EODHD live" if eodhd_key else "AI estimates (no EODHD key)",
-        "model":           "claude-sonnet-4-6",
-    }
+            try {
+                const result = await apiFetch(`${API_BASE}/portfolio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: parseFloat(amount), risk, horizon }),
+                });
+                displayPortfolio(result.data);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magic mr-2"></i>Generate AI Portfolio';
+            }
+        }
 
+        function displayPortfolio(data) {
+            document.getElementById('portfolio-summary').textContent         = data.summary                || '';
+            document.getElementById('portfolio-return').textContent          = data.expected_annual_return  || 'N/A';
+            document.getElementById('portfolio-volatility').textContent      = data.expected_volatility     || 'N/A';
+            document.getElementById('portfolio-diversification').textContent = data.diversification_score   || 'N/A';
+            document.getElementById('portfolio-rebalance').textContent       = data.rebalance_frequency     || 'N/A';
 
-# ── Standalone app ────────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(application: FastAPI):
-    global _anthropic, _http
-    if not ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
-    _anthropic = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-    _http      = httpx.AsyncClient(timeout=15.0)
-    print("✓  Pipways Stock Terminal started")
-    print(f"   Data source  : {'EODHD live' if EODHD_API_KEY else 'AI estimates (EODHD_API_KEY not set)'}")
-    print(f"   Model        : claude-sonnet-4-6")
-    yield
-    await _http.aclose()
-    print("✓  Pipways Stock Terminal shut down")
+            const container = document.getElementById('portfolio-allocations');
+            container.innerHTML = '';
+            (data.allocations || []).forEach(alloc => {
+                const amt = typeof alloc.amount === 'number' ? '$' + alloc.amount.toLocaleString() : 'N/A';
+                container.innerHTML += `
+                    <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
+                                <span class="text-purple-400 font-bold text-xs">${alloc.symbol}</span>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-white">${alloc.name}</div>
+                                <div class="text-sm text-gray-400">${alloc.asset_type || ''} • ${alloc.rationale || ''}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xl font-bold text-white">${alloc.pct}%</div>
+                            <div class="text-sm text-gray-400">${amt}</div>
+                        </div>
+                    </div>`;
+            });
+            document.getElementById('portfolio-results').classList.remove('hidden');
+        }
 
+        async function compareStocks() {
+            const input   = document.getElementById('compare-input').value;
+            const symbols = input.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            const btn     = document.getElementById('compare-btn');
 
-app = FastAPI(title="Pipways AI Stock Research Terminal", version="4.0.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-app.include_router(router, prefix="/api/stock", tags=["Stock Terminal"])
+            if (symbols.length < 2) { showError('Please enter at least 2 symbols separated by commas.'); return; }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("stock_terminal_backend:app", host="0.0.0.0", port=5050, reload=True)
+            btn.disabled = true;
+            btn.textContent = 'Comparing…';
+            hideError();
+
+            try {
+                const result = await apiFetch(`${API_BASE}/compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbols }),
+                });
+                displayComparison(result.data);
+                document.getElementById('compare-results').classList.remove('hidden');
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Compare';
+            }
+        }
+
+        function displayComparison(data) {
+            const container = document.getElementById('compare-stocks-container');
+            container.innerHTML = '';
+            (data.stocks || []).sort((a, b) => a.overall_rank - b.overall_rank).forEach(stock => {
+                const rankColor = stock.overall_rank === 1 ? 'text-green-400' : stock.overall_rank === 2 ? 'text-yellow-400' : 'text-gray-400';
+                const ratingColor = stock.rating === 'BUY' ? 'text-green-400' : stock.rating === 'SELL' ? 'text-red-400' : 'text-yellow-400';
+                container.innerHTML += `
+                    <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 flex items-center justify-between flex-wrap gap-4">
+                        <div class="flex items-center gap-4">
+                            <div class="text-2xl font-bold ${rankColor}">#${stock.overall_rank}</div>
+                            <div>
+                                <div class="font-bold text-white text-lg">${stock.symbol}</div>
+                                <div class="text-sm text-gray-400">${stock.one_line_summary || ''}</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-6 text-sm flex-wrap">
+                            <div class="text-center"><div class="text-gray-500">Growth</div><div class="text-white font-semibold">${stock.growth_score ?? 'N/A'}</div></div>
+                            <div class="text-center"><div class="text-gray-500">Value</div><div class="text-white font-semibold">${stock.valuation_score ?? 'N/A'}</div></div>
+                            <div class="text-center"><div class="text-gray-500">Risk</div><div class="text-white font-semibold">${stock.risk_score ?? 'N/A'}</div></div>
+                            <div class="text-center"><div class="${ratingColor} font-bold">${stock.rating || ''}</div></div>
+                        </div>
+                    </div>`;
+            });
+            if (data.winner) {
+                container.innerHTML += `
+                    <div class="mt-4 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+                        <div class="flex items-center gap-2 text-green-400 font-semibold">
+                            <i class="fas fa-trophy"></i> Winner: ${data.winner}
+                        </div>
+                        <div class="text-gray-400 text-sm mt-1">${data.winner_reason || ''}</div>
+                    </div>`;
+            }
+        }
+
+        switchTab('analyzer');
+    </script>
+</body>
+</html>

@@ -226,8 +226,8 @@ async def _eodhd_get(path: str, params: dict | None = None) -> dict | list:
 
 async def fetch_market_data(symbol: str) -> dict:
     """
-    Fetch live quote + full fundamentals from EODHD.
-    Falls back gracefully if fundamentals are missing.
+    Fetch live quote + fundamentals from EODHD.
+    Quote is required. Fundamentals are optional (free tier may not include them).
     """
     cache_key = f"eodhd:{symbol}"
     if cached := await cache_get(cache_key):
@@ -236,19 +236,21 @@ async def fetch_market_data(symbol: str) -> dict:
     ticker, exchange = _resolve_ticker(symbol)
     full_sym = f"{ticker}.{exchange}"
 
-    # ── Fetch quote and fundamentals concurrently ─────────────────────────
+    # ── Fetch quote (required) ────────────────────────────────────────────
     try:
-        quote_data, fund_data = await asyncio.gather(
-            _eodhd_get(f"real-time/{full_sym}"),
-            _eodhd_get(f"fundamentals/{full_sym}"),
-        )
-    except HTTPException:
-        raise
+        quote_data = await _eodhd_get(f"real-time/{full_sym}")
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"EODHD fetch failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"EODHD quote failed for {symbol}: {exc}") from exc
+
+    # ── Fetch fundamentals (optional — free tier may not include this) ────
+    fund_data = {}
+    try:
+        fund_data = await _eodhd_get(f"fundamentals/{full_sym}")
+        print(f"[STOCK] EODHD fundamentals OK for {symbol}", flush=True)
+    except Exception as exc:
+        print(f"[STOCK] EODHD fundamentals unavailable for {symbol}: {exc}", flush=True)
 
     # ── Parse quote ───────────────────────────────────────────────────────
-    # quote_data is a dict for single symbols
     if isinstance(quote_data, list):
         quote_data = quote_data[0] if quote_data else {}
 

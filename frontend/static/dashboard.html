@@ -349,7 +349,7 @@
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
                             <h3 class="text-xl font-bold text-white mb-4"><i class="fas fa-chart-line mr-2 text-purple-400"></i>AI Chart Analysis</h3>
-                            <p class="text-gray-400 mb-6">Upload chart images for pattern recognition and trade setup validation.</p>
+                            <p class="text-gray-400 mb-6">Smart Money Concepts institutional analysis</p>
 
                             <div id="chart-dropzone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900 mb-4">
                                 <input type="file" id="chart-file-input" class="hidden" accept="image/*">
@@ -400,6 +400,18 @@
                             <div class="mb-4">
                                 <span class="text-sm text-gray-400">Trading Bias:</span>
                                 <span id="analysis-bias" class="text-2xl font-bold ml-2 uppercase">--</span>
+                            </div>
+
+                            <!-- SMC Market Structure Display -->
+                            <div id="smc-market-structure" class="hidden mb-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
+                                <span class="text-xs text-gray-500 uppercase block mb-1">Market Structure</span>
+                                <span id="market-structure-value" class="text-lg font-bold text-purple-400">--</span>
+                            </div>
+
+                            <!-- SMC Signals Display -->
+                            <div id="smc-signals-container" class="hidden mb-4">
+                                <span class="text-sm text-gray-400 block mb-2"><i class="fas fa-university mr-2"></i>SMC Signals:</span>
+                                <ul id="smc-signals-list" class="list-disc list-inside text-sm text-gray-400 space-y-1 ml-2"></ul>
                             </div>
 
                             <div class="mb-4">
@@ -598,9 +610,13 @@
 
             updateUserDisplay() {
                 const user = this.user || {};
-                document.getElementById('user-name').textContent = user.full_name || user.email || 'User';
-                document.getElementById('user-email').textContent = user.email || '';
-                document.getElementById('header-user-name').textContent = user.full_name || user.email || 'Trader';
+                const userNameEl = document.getElementById('user-name');
+                const userEmailEl = document.getElementById('user-email');
+                const headerUserNameEl = document.getElementById('header-user-name');
+                
+                if (userNameEl) userNameEl.textContent = user.full_name || user.email || 'User';
+                if (userEmailEl) userEmailEl.textContent = user.email || '';
+                if (headerUserNameEl) headerUserNameEl.textContent = user.full_name || user.email || 'Trader';
                 // Now that user data is loaded, render admin menu
                 this.renderAdminMenu();
             }
@@ -691,9 +707,13 @@
                     'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis',
                     'performance': 'Performance Analytics', 'mentor': 'AI Mentor'
                 };
-                document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
-                document.getElementById('sidebar')?.classList.add('-translate-x-full');
-                document.getElementById('sidebar-overlay')?.classList.add('hidden');
+                const pageTitle = document.getElementById('page-title');
+                if (pageTitle) pageTitle.textContent = titles[section] || 'Dashboard';
+                
+                const sidebarEl = document.getElementById('sidebar');
+                const overlayEl = document.getElementById('sidebar-overlay');
+                if (sidebarEl) sidebarEl.classList.add('-translate-x-full');
+                if (overlayEl) overlayEl.classList.add('hidden');
             }
 
             async loadSectionData(section) {
@@ -719,13 +739,21 @@
             async loadDashboardStats() {
                 try {
                     const signals = await this.apiRequest('/signals/active');
-                    document.getElementById('stat-signals').textContent = Array.isArray(signals) ? signals.length : '--';
-                } catch (e) { document.getElementById('stat-signals').textContent = '--'; }
+                    const signalsEl = document.getElementById('stat-signals');
+                    if (signalsEl) signalsEl.textContent = Array.isArray(signals) ? signals.length : '--';
+                } catch (e) { 
+                    const signalsEl = document.getElementById('stat-signals');
+                    if (signalsEl) signalsEl.textContent = '--'; 
+                }
                 try {
                     const courses = await this.apiRequest('/courses/list');
+                    const coursesEl = document.getElementById('stat-courses');
                     const courseList = Array.isArray(courses) ? courses : (courses.courses || []);
-                    document.getElementById('stat-courses').textContent = courseList.length;
-                } catch (e) { document.getElementById('stat-courses').textContent = '--'; }
+                    if (coursesEl) coursesEl.textContent = courseList.length;
+                } catch (e) { 
+                    const coursesEl = document.getElementById('stat-courses');
+                    if (coursesEl) coursesEl.textContent = '--'; 
+                }
             }
 
             // ===== API HELPER =====
@@ -758,6 +786,7 @@
 
             renderSignals(signals) {
                 const container = document.getElementById('signals-container');
+                if (!container) return;
                 if (!signals || signals.length === 0) {
                     container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No active signals available</div>';
                     return;
@@ -812,6 +841,7 @@
 
             renderCourses(courses) {
                 const container = document.getElementById('courses-container');
+                if (!container) return;
                 if (!courses || courses.length === 0) {
                     container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No courses available</div>';
                     return;
@@ -1023,6 +1053,7 @@
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
+                    this.currentChartBase64 = e.target.result;
                     const preview = document.getElementById('chart-preview');
                     const placeholder = document.getElementById('chart-upload-placeholder');
                     const analyzeBtn = document.getElementById('analyze-chart-btn');
@@ -1041,8 +1072,11 @@
                     alert('Please select a chart image');
                     return;
                 }
-                document.getElementById('chart-analysis-loading').classList.remove('hidden');
-                document.getElementById('analyze-chart-btn').disabled = true;
+                const loadingEl = document.getElementById('chart-analysis-loading');
+                const analyzeBtn = document.getElementById('analyze-chart-btn');
+                
+                if (loadingEl) loadingEl.classList.remove('hidden');
+                if (analyzeBtn) analyzeBtn.disabled = true;
 
                 try {
                     const symbol = document.getElementById('chart-symbol')?.value || 'AUTO';
@@ -1068,36 +1102,80 @@
                     }
 
                     const data = await response.json();
-
-                    const resultsEl = document.getElementById('chart-analysis-results');
-                    resultsEl.classList.remove('hidden');
-
-                    document.getElementById('analysis-symbol').textContent = data.symbol || symbol;
-                    document.getElementById('analysis-timeframe').textContent = data.timeframe || timeframe;
-
-                    const confidence = Math.round((data.confidence || 0) * 100);
-                    const confEl = document.getElementById('analysis-confidence');
-                    confEl.textContent = `${confidence}%`;
-                    confEl.className = `px-3 py-1 rounded-full text-sm font-bold ${confidence > 70 ? 'bg-green-900 text-green-300' : confidence > 40 ? 'bg-yellow-900 text-yellow-300' : 'bg-red-900 text-red-300'}`;
-
-                    const biasEl = document.getElementById('analysis-bias');
-                    biasEl.textContent = data.trading_bias || data.bias || 'Neutral';
-                    biasEl.className = `text-2xl font-bold ml-2 uppercase ${data.trading_bias === 'bullish' ? 'text-green-400' : data.trading_bias === 'bearish' ? 'text-red-400' : 'text-gray-400'}`;
-
-                    // FIX BUG 3: Use patterns_detected array instead of pattern
-                    const patternEl = document.getElementById('analysis-pattern');
-                    if (data.patterns_detected && data.patterns_detected.length > 0) {
-                        patternEl.textContent = data.patterns_detected.map(p => p.name).join(', ');
-                    } else {
-                        patternEl.textContent = 'No pattern detected';
+                    // Store annotations for future use
+                    if (data.chart_annotations) {
+                        console.log('[Chart Analysis] Annotations received:', data.chart_annotations);
                     }
 
+                    const resultsEl = document.getElementById('chart-analysis-results');
+                    if (resultsEl) resultsEl.classList.remove('hidden');
+
+                    const symbolEl = document.getElementById('analysis-symbol');
+                    const timeframeEl = document.getElementById('analysis-timeframe');
+                    const confEl = document.getElementById('analysis-confidence');
+                    const biasEl = document.getElementById('analysis-bias');
+                    const patternEl = document.getElementById('analysis-pattern');
+                    
+                    if (symbolEl) symbolEl.textContent = data.symbol || symbol;
+                    if (timeframeEl) timeframeEl.textContent = data.timeframe || timeframe;
+
+                    const confidence = Math.round((data.confidence || 0) * 100);
+                    if (confEl) {
+                        confEl.textContent = `${confidence}%`;
+                        confEl.className = `px-3 py-1 rounded-full text-sm font-bold ${confidence > 70 ? 'bg-green-900 text-green-300' : confidence > 40 ? 'bg-yellow-900 text-yellow-300' : 'bg-red-900 text-red-300'}`;
+                    }
+
+                    if (biasEl) {
+                        biasEl.textContent = data.trading_bias || data.bias || 'Neutral';
+                        biasEl.className = `text-2xl font-bold ml-2 uppercase ${data.trading_bias === 'bullish' ? 'text-green-400' : data.trading_bias === 'bearish' ? 'text-red-400' : 'text-gray-400'}`;
+                    }
+
+                    // Display SMC Market Structure
+                    const msContainer = document.getElementById('smc-market-structure');
+                    const msValue = document.getElementById('market-structure-value');
+                    if (data.market_structure) {
+                        if (msContainer) msContainer.classList.remove('hidden');
+                        if (msValue) {
+                            msValue.textContent = data.market_structure.toUpperCase();
+                            msValue.className = `text-lg font-bold ${data.market_structure === 'bullish' ? 'text-green-400' : data.market_structure === 'bearish' ? 'text-red-400' : 'text-gray-400'}`;
+                        }
+                    } else {
+                        if (msContainer) msContainer.classList.add('hidden');
+                    }
+
+                    // Display SMC Signals
+                    const smcContainer = document.getElementById('smc-signals-container');
+                    const smcList = document.getElementById('smc-signals-list');
+                    if (data.smc_signals && data.smc_signals.length > 0) {
+                        if (smcContainer) smcContainer.classList.remove('hidden');
+                        if (smcList) {
+                            smcList.innerHTML = data.smc_signals.map(signal => `<li>${signal}</li>`).join('');
+                        }
+                    } else {
+                        if (smcContainer) smcContainer.classList.add('hidden');
+                    }
+
+                    // Fix: Use patterns_detected array
+                    if (patternEl) {
+                        if (data.patterns_detected && data.patterns_detected.length > 0) {
+                            patternEl.textContent = data.patterns_detected.map(p => p.name).join(', ');
+                        } else {
+                            patternEl.textContent = 'No pattern detected';
+                        }
+                    }
+
+                    // Trade setup
                     if (data.trade_setup) {
                         const setup = data.trade_setup;
-                        document.getElementById('setup-entry').textContent = setup.entry_price || setup.entry || '--';
-                        document.getElementById('setup-sl').textContent = setup.stop_loss || setup.sl || '--';
-                        document.getElementById('setup-tp').textContent = setup.take_profit || setup.tp || '--';
-                        document.getElementById('setup-rr').textContent = setup.risk_reward || setup.rr || '--';
+                        const entryEl = document.getElementById('setup-entry');
+                        const slEl = document.getElementById('setup-sl');
+                        const tpEl = document.getElementById('setup-tp');
+                        const rrEl = document.getElementById('setup-rr');
+                        
+                        if (entryEl) entryEl.textContent = setup.entry_price || setup.entry || '--';
+                        if (slEl) slEl.textContent = setup.stop_loss || setup.sl || '--';
+                        if (tpEl) tpEl.textContent = setup.take_profit || setup.tp || '--';
+                        if (rrEl) rrEl.textContent = setup.risk_reward || setup.rr || '--';
                     }
 
                     const levelsContainer = document.getElementById('key-levels-list');
@@ -1115,7 +1193,7 @@
                         insightsEl.innerHTML = data.key_insights.map(i => `<li>${i}</li>`).join('');
                     }
 
-                    // FIX BUG 2: Use data.chart_image from server response
+                    // Fix: Use data.chart_image from server response
                     const attachedChart = document.getElementById('attached-chart-preview');
                     if (attachedChart && data.chart_image) {
                         attachedChart.src = data.chart_image;
@@ -1127,8 +1205,10 @@
                     console.error('[Chart Analysis] Error:', error);
                     alert('Failed to analyze chart');
                 } finally {
-                    document.getElementById('chart-analysis-loading').classList.add('hidden');
-                    document.getElementById('analyze-chart-btn').disabled = false;
+                    const loadingEl = document.getElementById('chart-analysis-loading');
+                    const analyzeBtn = document.getElementById('analyze-chart-btn');
+                    if (loadingEl) loadingEl.classList.add('hidden');
+                    if (analyzeBtn) analyzeBtn.disabled = false;
                 }
             }
 
@@ -1138,25 +1218,34 @@
                     modal.classList.remove('hidden');
                     if (this.currentAnalysis?.trade_setup) {
                         const setup = this.currentAnalysis.trade_setup;
-                        document.getElementById('validator-entry').value = setup.entry_price || setup.entry || '';
-                        document.getElementById('validator-sl').value = setup.stop_loss || setup.sl || '';
-                        document.getElementById('validator-tp').value = setup.take_profit || setup.tp || '';
-                        document.getElementById('validator-symbol').value = this.currentAnalysis.symbol || '';
-                        // FIX BUG 1: Set direction from analysis bias if available
-                        const direction = this.currentAnalysis.trading_bias === 'bullish' ? 'BUY' : 
-                                         this.currentAnalysis.trading_bias === 'bearish' ? 'SELL' : 'BUY';
-                        document.getElementById('validator-direction').value = direction;
+                        const entryEl = document.getElementById('validator-entry');
+                        const slEl = document.getElementById('validator-sl');
+                        const tpEl = document.getElementById('validator-tp');
+                        const symbolEl = document.getElementById('validator-symbol');
+                        const dirEl = document.getElementById('validator-direction');
+                        
+                        if (entryEl) entryEl.value = setup.entry_price || setup.entry || '';
+                        if (slEl) slEl.value = setup.stop_loss || setup.sl || '';
+                        if (tpEl) tpEl.value = setup.take_profit || setup.tp || '';
+                        if (symbolEl) symbolEl.value = this.currentAnalysis.symbol || '';
+                        if (dirEl) dirEl.value = (this.currentAnalysis.trading_bias === 'bullish' || setup.direction === 'BUY' || setup.direction === 'BULLISH') ? 'BUY' : 'SELL';
                     }
                 }
             }
 
             async validateTradeSetup() {
-                const entry = parseFloat(document.getElementById('validator-entry')?.value);
-                const sl = parseFloat(document.getElementById('validator-sl')?.value);
-                const tp = parseFloat(document.getElementById('validator-tp')?.value);
-                const symbol = document.getElementById('validator-symbol')?.value || 'EURUSD';
-                // FIX BUG 1: Get direction from the select input
-                const direction = document.getElementById('validator-direction')?.value || 'BUY';
+                const entryEl = document.getElementById('validator-entry');
+                const slEl = document.getElementById('validator-sl');
+                const tpEl = document.getElementById('validator-tp');
+                const symbolEl = document.getElementById('validator-symbol');
+                const dirEl = document.getElementById('validator-direction');
+                
+                // Safe parsing with null checks
+                const entry = entryEl ? parseFloat(entryEl.value) : 0;
+                const sl = slEl ? parseFloat(slEl.value) : 0;
+                const tp = tpEl ? parseFloat(tpEl.value) : 0;
+                const symbol = symbolEl ? (symbolEl.value || 'EURUSD') : 'EURUSD';
+                const direction = dirEl ? (dirEl.value || 'BUY') : 'BUY';
 
                 if (!entry || !sl || !tp) {
                     alert('Please fill in all values');
@@ -1171,13 +1260,13 @@
                 }
 
                 try {
-                    // FIX BUG 1: Send correct payload with direction and proper field names
+                    // Fix: Send correct payload with entry_price, stop_loss, take_profit, direction, symbol
                     const payload = { 
                         entry_price: entry, 
                         stop_loss: sl, 
                         take_profit: tp, 
-                        direction: direction,
-                        symbol: symbol
+                        symbol: symbol,
+                        direction: direction
                     };
                     console.log('[Validate] Sending:', payload);
 
@@ -1188,27 +1277,34 @@
                     console.log('[Validate] Success:', result);
 
                     const resultEl = document.getElementById('validation-result');
-                    resultEl.classList.remove('hidden');
+                    if (resultEl) resultEl.classList.remove('hidden');
 
                     const score = result.quality_score || 0;
                     const scoreEl = document.getElementById('validation-score');
-                    scoreEl.textContent = score;
-                    scoreEl.className = `score-circle ${score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-warning' : 'score-danger'}`;
-
-                    document.getElementById('validation-recommendation').textContent = result.recommendation || (result.valid ? 'Valid Setup' : 'Review Setup');
-                    document.getElementById('validation-rr').textContent = result.risk_reward_ratio || result.rr || '--';
-                    document.getElementById('validation-probability').textContent = (result.probability || result.win_probability || 0) + '%';
-
-                    const warningsEl = document.getElementById('validation-warnings');
-                    if (result.warnings && result.warnings.length > 0) {
-                        warningsEl.innerHTML = result.warnings.map(w => `<div class="text-yellow-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i>${w}</div>`).join('');
-                    } else {
-                        warningsEl.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>No warnings!</div>';
+                    const recEl = document.getElementById('validation-recommendation');
+                    const rrEl = document.getElementById('validation-rr');
+                    const probEl = document.getElementById('validation-probability');
+                    const warnEl = document.getElementById('validation-warnings');
+                    const suggEl = document.getElementById('validation-suggestions');
+                    
+                    if (scoreEl) {
+                        scoreEl.textContent = score;
+                        scoreEl.className = `score-circle ${score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-warning' : 'score-danger'}`;
                     }
+                    if (recEl) recEl.textContent = result.recommendation || (result.valid ? 'Valid Setup' : 'Review Setup');
+                    if (rrEl) rrEl.textContent = result.risk_reward_ratio || result.rr || '--';
+                    if (probEl) probEl.textContent = (result.probability || result.win_probability || 0) + '%';
 
-                    const suggestionsEl = document.getElementById('validation-suggestions');
-                    if (suggestionsEl && result.suggestions) {
-                        suggestionsEl.innerHTML = result.suggestions.map(s => `<div class="mb-1"><i class="fas fa-lightbulb mr-2"></i>${s}</div>`).join('');
+                    if (warnEl) {
+                        if (result.warnings && result.warnings.length > 0) {
+                            warnEl.innerHTML = result.warnings.map(w => `<div class="text-yellow-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i>${w}</div>`).join('');
+                        } else {
+                            warnEl.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>No warnings!</div>';
+                        }
+                    }
+                    
+                    if (suggEl && result.suggestions) {
+                        suggEl.innerHTML = result.suggestions.map(s => `<div class="mb-1"><i class="fas fa-lightbulb mr-2"></i>${s}</div>`).join('');
                     }
                 } catch (error) {
                     console.error('[Validate] Error:', error);
@@ -1242,8 +1338,7 @@
                         method: 'POST',
                         body: JSON.stringify({
                             symbol: this.currentAnalysis.symbol,
-                            pattern: this.currentAnalysis.pattern,
-                            bias: this.currentAnalysis.trading_bias || this.currentAnalysis.bias,
+                            direction: this.currentAnalysis.trading_bias || this.currentAnalysis.bias,
                             entry_price: this.currentAnalysis.trade_setup?.entry_price || this.currentAnalysis.trade_setup?.entry,
                             stop_loss: this.currentAnalysis.trade_setup?.stop_loss || this.currentAnalysis.trade_setup?.sl,
                             take_profit: this.currentAnalysis.trade_setup?.take_profit || this.currentAnalysis.trade_setup?.tp,
@@ -1289,7 +1384,6 @@
                     if (dropZone) {
                         dropZone.classList.add('border-purple-500', 'bg-purple-900/10');
                     }
-                    // Don't auto-click, let user click dropzone
                 }
             }
 
@@ -1412,15 +1506,24 @@
 
                 if (statsEl) {
                     statsEl.classList.remove('hidden');
-                    document.getElementById('stat-total-trades').textContent = result.statistics?.total_trades || 0;
-                    document.getElementById('stat-win-rate').textContent = (result.statistics?.win_rate || 0) + '%';
-                    document.getElementById('stat-profit-factor').textContent = result.statistics?.profit_factor || 0;
-                    const pnl = result.statistics?.total_pnl || 0;
+                    const totalEl = document.getElementById('stat-total-trades');
+                    const winRateEl = document.getElementById('stat-win-rate');
+                    const pfEl = document.getElementById('stat-profit-factor');
                     const pnlEl = document.getElementById('stat-net-pnl');
-                    pnlEl.textContent = '$' + Math.abs(pnl).toFixed(2);
-                    pnlEl.className = 'font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
-                    document.getElementById('stat-grade').textContent = result.overall_grade || 'N/A';
-                    document.getElementById('stat-progress').style.width = (result.overall_score || 0) + '%';
+                    const gradeEl = document.getElementById('stat-grade');
+                    const progEl = document.getElementById('stat-progress');
+                    
+                    if (totalEl) totalEl.textContent = result.statistics?.total_trades || 0;
+                    if (winRateEl) winRateEl.textContent = (result.statistics?.win_rate || 0) + '%';
+                    if (pfEl) pfEl.textContent = result.statistics?.profit_factor || 0;
+                    
+                    const pnl = result.statistics?.total_pnl || 0;
+                    if (pnlEl) {
+                        pnlEl.textContent = '$' + Math.abs(pnl).toFixed(2);
+                        pnlEl.className = 'font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
+                    }
+                    if (gradeEl) gradeEl.textContent = result.overall_grade || 'N/A';
+                    if (progEl) progEl.style.width = (result.overall_score || 0) + '%';
                 }
 
                 if (analysisEl) {
@@ -1447,23 +1550,33 @@
 
                 if (tradesContainer && result.trades) {
                     tradesContainer.classList.remove('hidden');
-                    document.getElementById('trades-table-body').innerHTML = result.trades.slice(0, 10).map(trade => `
-                        <tr class="border-b border-gray-700">
-                            <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
-                            <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
-                            <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
-                            <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
-                            <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
-                        </tr>
-                    `).join('');
+                    const tbody = document.getElementById('trades-table-body');
+                    if (tbody) {
+                        tbody.innerHTML = result.trades.slice(0, 10).map(trade => `
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
+                                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
+                                <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
+                                <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
+                                <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
+                            </tr>
+                        `).join('');
+                    }
                 }
             }
 
             addManualTrade() {
-                const symbol = document.getElementById('manual-symbol').value;
-                const direction = document.getElementById('manual-direction').value;
-                const entry = parseFloat(document.getElementById('manual-entry').value);
-                const pnl = parseFloat(document.getElementById('manual-pnl').value);
+                const symbolEl = document.getElementById('manual-symbol');
+                const dirEl = document.getElementById('manual-direction');
+                const entryEl = document.getElementById('manual-entry');
+                const pnlEl = document.getElementById('manual-pnl');
+                const exitEl = document.getElementById('manual-exit');
+                
+                const symbol = symbolEl ? symbolEl.value : '';
+                const direction = dirEl ? dirEl.value : 'BUY';
+                const entry = entryEl ? parseFloat(entryEl.value) : 0;
+                const pnl = pnlEl ? parseFloat(pnlEl.value) : 0;
+                
                 if (!symbol || isNaN(entry) || isNaN(pnl)) {
                     alert('Please fill required fields');
                     return;
@@ -1473,9 +1586,7 @@
                     symbol: symbol.toUpperCase(),
                     direction,
                     entry_price: entry,
-                    exit_price: parseFloat(document.getElementById('manual-exit').value) || 0,
-                    stop_loss: parseFloat(document.getElementById('manual-sl').value) || 0,
-                    take_profit: parseFloat(document.getElementById('manual-tp').value) || 0,
+                    exit_price: exitEl ? (parseFloat(exitEl.value) || 0) : 0,
                     pnl,
                     outcome: pnl > 0 ? 'win' : (pnl < 0 ? 'loss' : 'breakeven')
                 };
@@ -1494,15 +1605,23 @@
             }
 
             async loadPerformanceStats() {
-                const days = document.getElementById('performance-period')?.value || 30;
+                const daysEl = document.getElementById('performance-period');
+                const days = daysEl ? daysEl.value : 30;
+                
                 try {
                     const data = await this.apiRequest(`/ai/performance/dashboard?days=${days}`);
+                    const totalEl = document.getElementById('perf-total-trades');
+                    const winEl = document.getElementById('perf-win-rate');
+                    const pfEl = document.getElementById('perf-profit-factor');
+                    const expEl = document.getElementById('perf-expectancy');
+                    
                     if (data.summary) {
-                        document.getElementById('perf-total-trades').textContent = data.summary.total_trades || 0;
-                        document.getElementById('perf-win-rate').textContent = (data.summary.win_rate || 0) + '%';
-                        document.getElementById('perf-profit-factor').textContent = data.summary.profit_factor || '0.0';
-                        document.getElementById('perf-expectancy').textContent = '$' + (data.summary.expectancy || 0);
+                        if (totalEl) totalEl.textContent = data.summary.total_trades || 0;
+                        if (winEl) winEl.textContent = (data.summary.win_rate || 0) + '%';
+                        if (pfEl) pfEl.textContent = data.summary.profit_factor || '0.0';
+                        if (expEl) expEl.textContent = '$' + (data.summary.expectancy || 0);
                     }
+                    
                     if (data.psychology_profile) {
                         const psychContainer = document.getElementById('performance-psychology');
                         const traitsContainer = document.getElementById('psychology-traits');
@@ -1608,6 +1727,7 @@
 
             // ===== UTILITY METHODS =====
             showSkeleton(container, count = 3) {
+                if (!container) return;
                 container.innerHTML = Array(count).fill(0).map(() => `
                     <div class="animate-pulse bg-gray-800 rounded-lg p-4 border border-gray-700 h-32"></div>
                 `).join('');
@@ -1634,8 +1754,12 @@
                         </div>
                     `;
                 };
-                document.getElementById('carousel-next')?.addEventListener('click', () => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); });
-                document.getElementById('carousel-prev')?.addEventListener('click', () => { currentSlide = (currentSlide - 1 + slides.length) % slides.length; renderSlides(); });
+                const nextBtn = document.getElementById('carousel-next');
+                const prevBtn = document.getElementById('carousel-prev');
+                
+                if (nextBtn) nextBtn.addEventListener('click', () => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); });
+                if (prevBtn) prevBtn.addEventListener('click', () => { currentSlide = (currentSlide - 1 + slides.length) % slides.length; renderSlides(); });
+                
                 setInterval(() => { currentSlide = (currentSlide + 1) % slides.length; renderSlides(); }, 5000);
                 renderSlides();
             }

@@ -8,756 +8,1012 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .gradient-bg { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
-        .card-glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .metric-card { transition: all 0.3s ease; }
-        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
-        .format-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
-        .format-btn:disabled { opacity: 0.5; cursor: not-allowed; background: #374151; border-color: #374151; }
-        .coming-soon-badge { 
-            position: absolute; 
-            top: -8px; 
-            right: -8px; 
-            background: #ef4444; 
-            color: white; 
-            font-size: 0.6rem; 
-            padding: 2px 6px; 
-            border-radius: 10px;
-            white-space: nowrap;
-        }
-        .upload-area { border: 2px dashed #4b5563; transition: all 0.3s ease; }
-        .upload-area:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
-        .chart-container { position: relative; height: 300px; }
-        .trade-win { color: #10b981; }
-        .trade-loss { color: #ef4444; }
-        .trade-breakeven { color: #6b7280; }
-        .progress-bar { transition: width 0.5s ease; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.3); }
     </style>
 </head>
-<body class="gradient-bg text-white min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-slate-900 border-b border-slate-800 px-6 py-4">
-        <div class="flex items-center justify-between max-w-7xl mx-auto">
-            <div class="flex items-center space-x-2">
-                <i class="fas fa-chart-line text-blue-500 text-2xl"></i>
-                <span class="text-xl font-bold">Pipways</span>
-            </div>
-            <div class="flex items-center space-x-6">
-                <button onclick="showSection('journal')" class="nav-btn text-blue-400 hover:text-blue-300 font-medium">Trading Journal</button>
-                <button onclick="showSection('ai-mentor')" class="nav-btn text-gray-400 hover:text-white">AI Mentor</button>
-                <button onclick="showSection('risk')" class="nav-btn text-gray-400 hover:text-white">Risk Calculator</button>
-                <button onclick="logout()" class="text-gray-400 hover:text-red-400"><i class="fas fa-sign-out-alt"></i></button>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
+
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden fixed top-4 left-4 z-50">
+        <button id="mobile-menu-btn" class="bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-700 text-white">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <div class="p-6 border-b border-gray-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-chart-line text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-xl tracking-tight">Pipways</h1>
+                    <p class="text-xs text-gray-500">Trading Analytics</p>
+                </div>
             </div>
         </div>
-    </nav>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto p-6 space-y-6">
-        
-        <!-- Trading Journal Section -->
-        <section id="section-journal" class="space-y-6">
-            
-            <!-- Import Card -->
-            <div class="card-glass rounded-xl p-6">
-                <h2 class="text-2xl font-bold mb-4 flex items-center">
-                    <i class="fas fa-file-import mr-3 text-blue-500"></i>
-                    Import Trades
-                </h2>
-                
-                <!-- Format Selection -->
+        <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Main</div>
+            <a href="#" data-section="dashboard" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white bg-purple-600 transition-all">
+                <i class="fas fa-home w-5"></i><span>Dashboard</span>
+            </a>
+            <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-satellite-dish w-5"></i><span>Trading Signals</span>
+            </a>
+            <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-book w-5"></i><span>Trading Journal</span>
+                <span class="ml-auto bg-green-600 text-xs px-2 py-1 rounded-full">New</span>
+            </a>
+            <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-chart-line w-5"></i><span>Chart Analysis</span>
+            </a>
+            <a href="#" data-section="mentor" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-robot w-5"></i><span>AI Mentor</span>
+            </a>
+
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-2 px-2">Education</div>
+            <a href="#" data-section="courses" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-graduation-cap w-5"></i><span>Courses</span>
+            </a>
+            <a href="#" data-section="webinars" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-video w-5"></i><span>Webinars</span>
+            </a>
+            <a href="#" data-section="blog" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
+                <i class="fas fa-newspaper w-5"></i><span>Blog</span>
+            </a>
+
+            <div id="admin-menu-container" class="hidden">
+                <div class="text-xs font-semibold text-red-500 uppercase tracking-wider mt-6 mb-2 px-2">Admin</div>
+                <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all border-l-2 border-red-500">
+                    <i class="fas fa-shield-alt w-5 text-red-400"></i><span>Admin</span>
+                </a>
+            </div>
+        </nav>
+
+        <div class="p-4 border-t border-gray-800">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <i class="fas fa-user text-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p id="user-name" class="font-medium text-sm truncate">Loading...</p>
+                    <p id="user-email" class="text-xs text-gray-500 truncate">...</p>
+                </div>
+            </div>
+            <button onclick="dashboard.logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-all text-sm">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto h-screen">
+        <header class="bg-gray-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+            <div class="md:hidden w-8"></div>
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-white">Dashboard</h2>
+                <p class="text-sm text-gray-400">Welcome back, <span id="header-user-name">Trader</span></p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="relative p-2 text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-bell text-xl"></i>
+                    <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+            </div>
+        </header>
+
+        <div class="p-6 max-w-7xl mx-auto">
+
+            <!-- DASHBOARD -->
+            <section id="section-dashboard" class="section">
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-300">Featured</h3>
+                    </div>
+                    <div class="bg-gradient-to-r from-purple-900 to-blue-900 rounded-2xl p-6 md:p-8">
+                        <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Trading Journal Upgrade</h2>
+                        <p class="text-gray-300 mb-4">New AI-powered analytics: Equity curves, drawdown analysis, and trading coach</p>
+                        <button onclick="dashboard.navigate('journal')" class="bg-white text-purple-900 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                            Try It Now
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-purple-600/20 rounded-lg"><i class="fas fa-satellite-dish text-purple-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Active Signals</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-signals">--</p>
+                    </div>
+                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-blue-600/20 rounded-lg"><i class="fas fa-graduation-cap text-blue-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Courses</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-courses">--</p>
+                    </div>
+                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-green-600/20 rounded-lg"><i class="fas fa-chart-line text-green-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">Win Rate</h4>
+                        <p class="text-2xl font-bold text-white" id="stat-winrate">--</p>
+                    </div>
+                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-3 bg-pink-600/20 rounded-lg"><i class="fas fa-robot text-pink-400 text-xl"></i></div>
+                        </div>
+                        <h4 class="text-gray-400 text-sm mb-1">AI Insights</h4>
+                        <p class="text-2xl font-bold text-white">24</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SIGNALS -->
+            <section id="section-signals" class="section hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-white">Trading Signals</h3>
+                </div>
+                <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </section>
+
+            <!-- TRADING JOURNAL - UPGRADED -->
+            <section id="section-journal" class="section hidden">
                 <div class="mb-6">
-                    <label class="block text-sm text-gray-400 mb-3">Select Format</label>
-                    <div class="flex flex-wrap gap-3">
-                        <button onclick="selectFormat('mt4')" id="btn-mt4" class="format-btn active px-4 py-2 rounded-lg border border-slate-600 hover:border-blue-500 transition flex items-center gap-2">
-                            <i class="fas fa-file-code"></i> MT4
+                    <h3 class="text-2xl font-bold text-white mb-2">Trading Journal</h3>
+                    <p class="text-gray-400">AI-powered analytics and trading performance insights</p>
+                </div>
+
+                <!-- Import Section -->
+                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trades</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                        <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt4">
+                            <i class="fas fa-file-code text-blue-400"></i> MT4
                         </button>
-                        <button onclick="selectFormat('mt5')" id="btn-mt5" class="format-btn px-4 py-2 rounded-lg border border-slate-600 hover:border-blue-500 transition flex items-center gap-2">
-                            <i class="fas fa-file-code"></i> MT5
+                        <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt5">
+                            <i class="fas fa-file-code text-green-400"></i> MT5
                         </button>
-                        <button onclick="selectFormat('csv')" id="btn-csv" class="format-btn px-4 py-2 rounded-lg border border-slate-600 hover:border-blue-500 transition flex items-center gap-2">
-                            <i class="fas fa-file-csv"></i> CSV
+                        <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="csv">
+                            <i class="fas fa-file-csv text-yellow-400"></i> CSV
                         </button>
-                        <button onclick="selectFormat('excel')" id="btn-excel" class="format-btn px-4 py-2 rounded-lg border border-slate-600 hover:border-blue-500 transition flex items-center gap-2">
-                            <i class="fas fa-file-excel"></i> Excel
+                        <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="excel">
+                            <i class="fas fa-file-excel text-green-500"></i> Excel
                         </button>
-                        <button onclick="selectFormat('pdf')" id="btn-pdf" class="format-btn px-4 py-2 rounded-lg border border-slate-600 hover:border-blue-500 transition flex items-center gap-2">
-                            <i class="fas fa-file-pdf"></i> PDF
+                        <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="screenshot">
+                            <i class="fas fa-camera text-pink-400"></i> OCR
                         </button>
-                        
-                        <!-- OCR Button - Hidden until tesseract is installed -->
-                        <!-- TO RE-ENABLE OCR: Remove 'hidden' class and enable the onclick handler -->
-                        <button id="btn-ocr" class="format-btn px-4 py-2 rounded-lg border border-slate-600 relative hidden" disabled title="OCR temporarily unavailable - Install tesseract to enable">
-                            <i class="fas fa-camera"></i> Screenshot
-                            <span class="coming-soon-badge">Setup Required</span>
+                        <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-sm text-white">
+                            <i class="fas fa-edit"></i> Manual
                         </button>
-                        
-                        <!-- OCR Coming Soon Notice (Optional - remove this div when enabling OCR) -->
-                        <div id="ocr-notice" class="w-full mt-2 text-xs text-amber-400 flex items-center gap-2">
-                            <i class="fas fa-info-circle"></i>
-                            <span>OCR/Screenshot upload temporarily unavailable. Please use MT4, CSV, Excel, or PDF formats.</span>
+                    </div>
+
+                    <div id="journal-dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900">
+                        <input type="file" id="journal-file-input" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.html,.htm,.png,.jpg,.jpeg">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                        <p class="text-gray-300 mb-2">Drop your trading statement here</p>
+                        <p class="text-sm text-gray-500">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images</p>
+                        <p class="text-xs text-purple-400 mt-2" id="selected-format">Select a format above</p>
+                    </div>
+
+                    <div id="upload-status" class="mt-4 hidden"></div>
+                    <div id="journal-upload-loading" class="hidden mt-4 text-center">
+                        <div class="inline-flex items-center gap-2 text-blue-400">
+                            <i class="fas fa-spinner fa-spin"></i><span>Analyzing with AI...</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Upload Area -->
-                <div id="upload-container" class="upload-area rounded-xl p-8 text-center cursor-pointer" onclick="document.getElementById('file-input').click()">
-                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
-                    <p class="text-lg mb-2">Drop your file here or click to browse</p>
-                    <p class="text-sm text-gray-400" id="file-types">Supported: .htm, .html (MT4/MT5 statements)</p>
-                    <input type="file" id="file-input" class="hidden" onchange="handleFileUpload(this.files[0])">
-                </div>
-
-                <!-- Upload Progress -->
-                <div id="upload-progress" class="hidden mt-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm text-gray-400">Uploading...</span>
-                        <span class="text-sm text-blue-400" id="progress-text">0%</span>
+                <!-- Performance Overview -->
+                <div id="performance-overview" class="hidden mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-bold text-white">Performance Overview</h4>
+                        <span id="overall-grade-badge" class="px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold">--</span>
                     </div>
-                    <div class="w-full bg-slate-700 rounded-full h-2">
-                        <div id="progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-white" id="stat-total-trades">--</div>
+                            <div class="text-xs text-gray-400">Trades</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-green-400" id="stat-win-rate">--</div>
+                            <div class="text-xs text-gray-400">Win Rate</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-blue-400" id="stat-profit-factor">--</div>
+                            <div class="text-xs text-gray-400">Profit Factor</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-purple-400" id="stat-expectancy">--</div>
+                            <div class="text-xs text-gray-400">Expectancy</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-orange-400" id="stat-max-drawdown">--</div>
+                            <div class="text-xs text-gray-400">Max DD</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-green-400" id="stat-winning-streak">--</div>
+                            <div class="text-xs text-gray-400">Win Streak</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-red-400" id="stat-losing-streak">--</div>
+                            <div class="text-xs text-gray-400">Loss Streak</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                            <div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div>
+                            <div class="text-xs text-gray-400">Net P&L</div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Status Message -->
-                <div id="upload-status" class="hidden mt-4 p-4 rounded-lg"></div>
-            </div>
-
-            <!-- Performance Overview -->
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4" id="metrics-container" style="display: none;">
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Total Trades</div>
-                    <div class="text-2xl font-bold" id="metric-total-trades">0</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Win Rate</div>
-                    <div class="text-2xl font-bold text-blue-400" id="metric-win-rate">0%</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Profit Factor</div>
-                    <div class="text-2xl font-bold text-green-400" id="metric-profit-factor">0.00</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Expectancy</div>
-                    <div class="text-2xl font-bold" id="metric-expectancy">$0.00</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Net P&L</div>
-                    <div class="text-2xl font-bold" id="metric-net-pnl">$0.00</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Max Drawdown</div>
-                    <div class="text-2xl font-bold text-red-400" id="metric-drawdown">$0.00</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Win Streak</div>
-                    <div class="text-2xl font-bold text-green-400" id="metric-win-streak">0</div>
-                </div>
-                <div class="card-glass rounded-lg p-4 metric-card">
-                    <div class="text-sm text-gray-400 mb-1">Loss Streak</div>
-                    <div class="text-2xl font-bold text-red-400" id="metric-loss-streak">0</div>
-                </div>
-            </div>
-
-            <!-- Charts Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="charts-container" style="display: none;">
-                <!-- Equity Curve -->
-                <div class="card-glass rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">Equity Curve</h3>
-                    <div class="chart-container">
-                        <canvas id="equityChart"></canvas>
-                    </div>
-                </div>
-                
-                <!-- Trade Distribution -->
-                <div class="card-glass rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">Trade Distribution</h3>
-                    <div class="chart-container">
-                        <canvas id="distributionChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- AI Trading Coach -->
-            <div class="card-glass rounded-xl p-6" id="ai-coach-container" style="display: none;">
-                <h3 class="text-lg font-semibold mb-4 flex items-center">
-                    <i class="fas fa-robot mr-2 text-purple-400"></i>
-                    AI Trading Coach
-                </h3>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-slate-800 rounded-lg p-4">
-                        <div class="text-sm text-gray-400 mb-2">Discipline Score</div>
-                        <div class="flex items-center gap-3">
-                            <div class="text-2xl font-bold" id="score-discipline">0</div>
-                            <div class="flex-1 bg-slate-700 rounded-full h-2">
-                                <div id="bar-discipline" class="bg-purple-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                    <!-- Strategy Detection -->
+                    <div id="strategy-detection" class="hidden bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-4 border border-blue-700/50 mb-6">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <span class="text-sm text-gray-400">Detected Strategy</span>
+                                <h5 class="text-xl font-bold text-blue-400" id="detected-strategy">--</h5>
                             </div>
-                        </div>
-                    </div>
-                    <div class="bg-slate-800 rounded-lg p-4">
-                        <div class="text-sm text-gray-400 mb-2">Risk Management</div>
-                        <div class="flex items-center gap-3">
-                            <div class="text-2xl font-bold" id="score-risk">0</div>
-                            <div class="flex-1 bg-slate-700 rounded-full h-2">
-                                <div id="bar-risk" class="bg-blue-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-slate-800 rounded-lg p-4">
-                        <div class="text-sm text-gray-400 mb-2">Strategy Consistency</div>
-                        <div class="flex items-center gap-3">
-                            <div class="text-2xl font-bold" id="score-consistency">0</div>
-                            <div class="flex-1 bg-slate-700 rounded-full h-2">
-                                <div id="bar-consistency" class="bg-green-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                            <div class="text-left md:text-right">
+                                <span class="text-sm text-gray-400">Risk Consistency</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-32 bg-gray-700 rounded-full h-2">
+                                        <div id="risk-consistency-bar" class="bg-green-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                    </div>
+                                    <span class="text-lg font-bold text-green-400" id="risk-consistency-score">--%</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="ai-insights" class="space-y-2">
-                    <!-- Dynamic insights will be inserted here -->
-                </div>
-            </div>
-
-            <!-- Strategy Detection -->
-            <div class="card-glass rounded-xl p-6" id="strategy-container" style="display: none;">
-                <h3 class="text-lg font-semibold mb-4">Detected Strategy Profile</h3>
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <span class="text-gray-400">Primary Style:</span>
-                        <span class="ml-2 text-xl font-bold text-blue-400" id="detected-strategy">Unknown</span>
+                <!-- Charts Grid -->
+                <div id="analytics-charts" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Equity Curve -->
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-line text-blue-400 mr-2"></i>Equity Curve</h4>
+                        <div class="chart-container">
+                            <canvas id="equity-curve-chart"></canvas>
+                        </div>
                     </div>
-                    <div class="text-right">
-                        <span class="text-gray-400">Risk Consistency:</span>
-                        <span class="ml-2 text-xl font-bold" id="risk-consistency">0%</span>
+
+                    <!-- Trade Distribution -->
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                        <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-pie text-green-400 mr-2"></i>Trade Distribution</h4>
+                        <div class="chart-container">
+                            <canvas id="trade-distribution-chart"></canvas>
+                        </div>
                     </div>
-                </div>
-                <div class="w-full bg-slate-800 rounded-full h-3">
-                    <div id="risk-bar" class="bg-gradient-to-r from-red-500 to-green-500 h-3 rounded-full transition-all duration-1000" style="width: 0%"></div>
-                </div>
-            </div>
 
-            <!-- Trade History Table -->
-            <div class="card-glass rounded-xl p-6" id="trades-container" style="display: none;">
-                <h3 class="text-lg font-semibold mb-4">Recent Trades</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead class="border-b border-slate-700">
-                            <tr>
-                                <th class="pb-3 text-gray-400 font-medium">Date</th>
-                                <th class="pb-3 text-gray-400 font-medium">Symbol</th>
-                                <th class="pb-3 text-gray-400 font-medium">Direction</th>
-                                <th class="pb-3 text-gray-400 font-medium">Entry</th>
-                                <th class="pb-3 text-gray-400 font-medium">Exit</th>
-                                <th class="pb-3 text-gray-400 font-medium">Volume</th>
-                                <th class="pb-3 text-gray-400 font-medium">P&L</th>
-                                <th class="pb-3 text-gray-400 font-medium">Outcome</th>
-                            </tr>
-                        </thead>
-                        <tbody id="trades-tbody" class="text-sm">
-                            <!-- Trades inserted here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- AI Mentor Section -->
-        <section id="section-ai-mentor" class="hidden space-y-6">
-            <div class="card-glass rounded-xl p-6">
-                <h2 class="text-2xl font-bold mb-4">AI Trading Mentor</h2>
-                <div id="chat-container" class="bg-slate-900 rounded-lg p-4 h-96 overflow-y-auto mb-4 space-y-4">
-                    <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">AI</div>
-                        <div class="bg-slate-800 rounded-lg p-3 max-w-[80%]">
-                            <p>Hello! I'm your AI trading coach. Ask me anything about your trading performance, risk management, or strategy analysis.</p>
+                    <!-- Monthly Performance -->
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 lg:col-span-2">
+                        <h4 class="font-bold text-white mb-4"><i class="fas fa-calendar-alt text-purple-400 mr-2"></i>Monthly Performance</h4>
+                        <div class="chart-container">
+                            <canvas id="monthly-performance-chart"></canvas>
                         </div>
                     </div>
                 </div>
-                <div class="flex gap-2">
-                    <input type="text" id="mentor-input" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="Ask about your trading...">
-                    <button onclick="askMentor()" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-medium transition">Send</button>
-                </div>
-            </div>
-        </section>
 
-        <!-- Risk Calculator Section -->
-        <section id="section-risk" class="hidden space-y-6">
-            <div class="card-glass rounded-xl p-6 max-w-2xl">
-                <h2 class="text-2xl font-bold mb-4">Position Size Calculator</h2>
-                <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
+                <!-- AI Trading Coach -->
+                <div id="ai-coach-section" class="hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border border-purple-700/50 mb-6">
+                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-purple-400 mr-2"></i>AI Trading Coach</h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
+                            <div class="text-3xl font-bold text-blue-400 mb-1" id="ai-discipline-score">--</div>
+                            <div class="text-sm text-gray-400">Discipline Score</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
+                            <div class="text-3xl font-bold text-green-400 mb-1" id="ai-risk-score">--</div>
+                            <div class="text-sm text-gray-400">Risk Management</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
+                            <div class="text-3xl font-bold text-purple-400 mb-1" id="ai-consistency-score">--</div>
+                            <div class="text-sm text-gray-400">Strategy Consistency</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-4">
+                        <h5 class="font-bold text-red-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Main Issue Detected</h5>
+                        <p id="ai-main-mistake" class="text-gray-300">--</p>
+                    </div>
+
+                    <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mb-4">
+                        <h5 class="font-bold text-blue-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>AI Recommendation</h5>
+                        <p id="ai-recommendation" class="text-gray-300">--</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm text-gray-400 mb-2">Account Balance ($)</label>
-                            <input type="number" id="risk-balance" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" value="10000">
+                            <h5 class="font-bold text-green-400 mb-2"><i class="fas fa-check-circle mr-2"></i>Strengths</h5>
+                            <ul id="ai-strengths" class="space-y-1 text-sm text-gray-300"></ul>
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-400 mb-2">Risk Per Trade (%)</label>
-                            <input type="number" id="risk-percent" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" value="1" step="0.1">
+                            <h5 class="font-bold text-yellow-400 mb-2"><i class="fas fa-arrow-up mr-2"></i>Improvements</h5>
+                            <ul id="ai-improvements" class="space-y-1 text-sm text-gray-300"></ul>
                         </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-2">Entry Price</label>
-                            <input type="number" id="risk-entry" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" step="0.00001">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-2">Stop Loss</label>
-                            <input type="number" id="risk-sl" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white" step="0.00001">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-2">Instrument</label>
-                        <select id="risk-instrument" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
-                            <option value="forex">Forex (Standard Lot = 100,000)</option>
-                            <option value="crypto">Crypto</option>
-                            <option value="indices">Indices</option>
-                        </select>
-                    </div>
-                    <button onclick="calculateRisk()" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-medium transition">Calculate Position Size</button>
-                    
-                    <div id="risk-result" class="hidden bg-slate-800 rounded-lg p-4 space-y-2">
-                        <!-- Results inserted here -->
                     </div>
                 </div>
-            </div>
-        </section>
+
+                <!-- Trade History -->
+                <div id="trade-history" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h4 class="font-bold text-white mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Trade History</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-500 uppercase bg-gray-900">
+                                <tr>
+                                    <th class="px-4 py-3">Date</th>
+                                    <th class="px-4 py-3">Symbol</th>
+                                    <th class="px-4 py-3">Direction</th>
+                                    <th class="px-4 py-3">Entry</th>
+                                    <th class="px-4 py-3">Exit</th>
+                                    <th class="px-4 py-3">P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trades-table-body" class="text-gray-300"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Manual Entry Form -->
+                <div id="manual-entry-form" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700 mt-6">
+                    <h4 class="font-bold text-white mb-4"><i class="fas fa-plus-circle text-green-400 mr-2"></i>Add Trade Manually</h4>
+                    <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" onsubmit="event.preventDefault(); dashboard.addManualTrade();">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Symbol</label>
+                            <input type="text" id="manual-symbol" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="EURUSD" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Direction</label>
+                            <select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                                <option value="BUY">Buy</option>
+                                <option value="SELL">Sell</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
+                            <input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Exit Price</label>
+                            <input type="number" id="manual-exit" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">P&L ($)</label>
+                            <input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Volume</label>
+                            <input type="number" id="manual-volume" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="0.10">
+                        </div>
+                        <div class="md:col-span-2 lg:col-span-2 flex items-end">
+                            <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors">
+                                <i class="fas fa-plus mr-2"></i>Add Trade
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- COURSES, WEBINARS, BLOG, ADMIN, MENTOR, ANALYSIS SECTIONS -->
+            <!-- (Keep existing sections, just removing PERFORMANCE section) -->
+
+            <!-- COURSES -->
+            <section id="section-courses" class="section hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-white">Trading Courses</h3>
+                </div>
+                <div id="courses-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- WEBINARS -->
+            <section id="section-webinars" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Upcoming Webinars</h3>
+                <div id="webinars-container" class="space-y-4"></div>
+            </section>
+
+            <!-- BLOG -->
+            <section id="section-blog" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Trading Blog</h3>
+                <div id="blog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- ADMIN -->
+            <section id="section-admin" class="section hidden">
+                <h3 class="text-xl font-bold text-white mb-6">Admin Dashboard</h3>
+                <div id="admin-container"></div>
+            </section>
+
+            <!-- MENTOR -->
+            <section id="section-mentor" class="section hidden"></section>
+
+            <!-- CHART ANALYSIS -->
+            <section id="section-analysis" class="section hidden">
+                <div class="max-w-6xl mx-auto">
+                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                        <h3 class="text-xl font-bold text-white mb-4"><i class="fas fa-chart-line mr-2 text-purple-400"></i>AI Chart Analysis</h3>
+                        <div id="chart-dropzone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900 mb-4">
+                            <input type="file" id="chart-file-input" class="hidden" accept="image/*">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
+                            <p class="text-gray-300 font-medium">Drop chart image here</p>
+                            <p class="text-sm text-gray-500">PNG, JPG, WEBP (max 5MB)</p>
+                        </div>
+                        <button id="analyze-chart-btn" onclick="dashboard.analyzeChart()" disabled class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors font-semibold">
+                            <i class="fas fa-brain mr-2"></i>Analyze Chart
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </div>
     </main>
 
     <script>
-        // Global State
-        let currentFormat = 'mt4';
-        let equityChart = null;
-        let distributionChart = null;
-        let monthlyChart = null;
 
-        // Format Configuration
-        const formatConfig = {
-            mt4: { accept: '.htm,.html', desc: 'MT4 Statement (.htm, .html)' },
-            mt5: { accept: '.htm,.html', desc: 'MT5 Statement (.htm, .html)' },
-            csv: { accept: '.csv', desc: 'CSV File (.csv)' },
-            excel: { accept: '.xlsx,.xls', desc: 'Excel File (.xlsx, .xls)' },
-            pdf: { accept: '.pdf', desc: 'PDF Statement (.pdf)' },
-            ocr: { accept: '.png,.jpg,.jpeg', desc: 'Screenshot (.png, .jpg)' }
+const API_BASE = window.location.origin;
+
+class DashboardController {
+    constructor() {
+        this.user = null;
+        this.currentJournalFormat = null;
+        this.manualTrades = [];
+        this.charts = {};
+        this.lastAnalysisResults = null;
+        this.init();
+    }
+
+    init() {
+        this.checkAuth();
+        this.setupNavigation();
+        this.setupMobileMenu();
+        this.loadDashboardStats();
+        this.navigate('dashboard');
+    }
+
+    checkAuth() {
+        const token = localStorage.getItem('pipways_token');
+        const userStr = localStorage.getItem('pipways_user');
+        if (!token || !userStr) {
+            window.location.href = '/';
+            return;
+        }
+        try {
+            this.user = JSON.parse(userStr);
+            this.updateUserDisplay();
+            setTimeout(() => this.renderAdminMenu(), 200);
+        } catch (e) {
+            window.location.href = '/';
+        }
+    }
+
+    updateUserDisplay() {
+        const user = this.user || {};
+        document.getElementById('user-name').textContent = user.full_name || user.email || 'User';
+        document.getElementById('user-email').textContent = user.email || '';
+        document.getElementById('header-user-name').textContent = user.full_name || user.email || 'Trader';
+    }
+
+    renderAdminMenu() {
+        const email = this.user?.email || '';
+        const isAdmin = email.includes('admin') || email === 'admin@pipways.com';
+        const adminMenu = document.getElementById('admin-menu-container');
+        if (adminMenu) {
+            adminMenu.style.display = isAdmin ? 'block' : 'none';
+        }
+    }
+
+    setupNavigation() {
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = e.currentTarget.dataset.section;
+                if (section) this.navigate(section);
+            });
+        });
+    }
+
+    setupMobileMenu() {
+        const btn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        if (btn && sidebar) {
+            btn.addEventListener('click', () => {
+                sidebar.classList.toggle('-translate-x-full');
+                overlay?.classList.toggle('hidden');
+            });
+        }
+        if (overlay) {
+            overlay.addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            });
+        }
+    }
+
+    navigate(section) {
+        document.querySelectorAll('.nav-link').forEach(el => {
+            el.classList.remove('bg-purple-600', 'text-white');
+            el.classList.add('text-gray-300');
+        });
+        const activeLink = document.querySelector(`[data-section="${section}"]`);
+        if (activeLink) {
+            activeLink.classList.add('bg-purple-600', 'text-white');
+            activeLink.classList.remove('text-gray-300');
+        }
+        document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+        const target = document.getElementById(`section-${section}`);
+        if (target) {
+            target.classList.remove('hidden');
+            this.loadSectionData(section);
+        }
+        const titles = {
+            'dashboard': 'Dashboard', 'signals': 'Trading Signals', 'journal': 'Trading Journal',
+            'courses': 'Trading Courses', 'webinars': 'Webinars', 'blog': 'Trading Blog',
+            'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis', 'mentor': 'AI Mentor'
+        };
+        document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
+        document.getElementById('sidebar')?.classList.add('-translate-x-full');
+        document.getElementById('sidebar-overlay')?.classList.add('hidden');
+    }
+
+    async loadSectionData(section) {
+        try {
+            switch(section) {
+                case 'dashboard': this.loadDashboardStats(); break;
+                case 'signals': await this.loadSignals(); break;
+                case 'courses': await this.loadCourses(); break;
+                case 'journal': this.setupJournalUpload(); break;
+                case 'mentor': await this.loadMentor(); break;
+            }
+        } catch (err) {
+            console.error(`Error loading ${section}:`, err);
+        }
+    }
+
+    async loadDashboardStats() {
+        try {
+            const signals = await this.apiRequest('/signals/active');
+            document.getElementById('stat-signals').textContent = Array.isArray(signals) ? signals.length : '--';
+        } catch (e) { document.getElementById('stat-signals').textContent = '--'; }
+        try {
+            const courses = await this.apiRequest('/courses/list');
+            const courseList = Array.isArray(courses) ? courses : (courses.courses || []);
+            document.getElementById('stat-courses').textContent = courseList.length;
+        } catch (e) { document.getElementById('stat-courses').textContent = '--'; }
+    }
+
+    async apiRequest(endpoint, options = {}) {
+        const token = localStorage.getItem('pipways_token');
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
+            ...options.headers
+        };
+        if (options.body instanceof FormData) delete headers['Content-Type'];
+        const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    }
+
+    // ==================== TRADING JOURNAL - UPGRADED ====================
+
+    setJournalFormat(format) {
+        this.currentJournalFormat = format;
+        document.querySelectorAll('.format-btn').forEach(btn => {
+            btn.classList.remove('border-purple-500', 'bg-purple-600');
+            btn.classList.add('border-gray-600', 'bg-gray-700');
+        });
+        const activeBtn = document.querySelector(`[data-format="${format}"]`);
+        if (activeBtn) {
+            activeBtn.classList.remove('border-gray-600', 'bg-gray-700');
+            activeBtn.classList.add('border-purple-500', 'bg-purple-600');
+        }
+        const configs = {
+            mt4: { accept: '.html,.htm', label: 'MT4 Statement selected' },
+            mt5: { accept: '.html,.htm', label: 'MT5 Statement selected' },
+            csv: { accept: '.csv', label: 'CSV File selected' },
+            excel: { accept: '.xlsx,.xls', label: 'Excel File selected' },
+            screenshot: { accept: '.png,.jpg,.jpeg', label: 'Screenshot for OCR selected' }
+        };
+        const config = configs[format];
+        if (config) {
+            document.getElementById('journal-file-input').accept = config.accept;
+            document.getElementById('selected-format').textContent = config.label;
+        }
+    }
+
+    setupJournalUpload() {
+        const dropZone = document.getElementById('journal-dropzone');
+        const fileInput = document.getElementById('journal-file-input');
+        if (!dropZone || !fileInput) return;
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+        });
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
+            if (e.dataTransfer.files[0]) await this.handleJournalFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files[0]) await this.handleJournalFile(e.target.files[0]);
+        });
+    }
+
+    async handleJournalFile(file) {
+        const statusEl = document.getElementById('upload-status');
+        const loadingEl = document.getElementById('journal-upload-loading');
+
+        if (!this.currentJournalFormat) {
+            statusEl.classList.remove('hidden');
+            statusEl.innerHTML = '<span class="text-yellow-400">Please select a format first</span>';
+            return;
+        }
+
+        statusEl.classList.remove('hidden');
+        statusEl.innerHTML = '<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Uploading...</span>';
+        loadingEl.classList.remove('hidden');
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('format', this.currentJournalFormat);
+
+            const token = localStorage.getItem('pipways_token');
+            const response = await fetch(`${API_BASE}/ai/performance/upload-journal`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) throw new Error(result.detail || 'Upload failed');
+
+            if (result.trades && result.trades.length > 0) {
+                this.lastAnalysisResults = result;
+                this.displayJournalAnalysis(result);
+                statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analyzed ${result.trades_parsed} trades</span>`;
+            } else {
+                throw new Error('No trades detected');
+            }
+        } catch (error) {
+            statusEl.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
+        } finally {
+            loadingEl.classList.add('hidden');
+        }
+    }
+
+    displayJournalAnalysis(result) {
+        // Show all sections
+        document.getElementById('performance-overview').classList.remove('hidden');
+        document.getElementById('analytics-charts').classList.remove('hidden');
+        document.getElementById('ai-coach-section').classList.remove('hidden');
+        document.getElementById('trade-history').classList.remove('hidden');
+        document.getElementById('strategy-detection').classList.remove('hidden');
+
+        const stats = result.statistics || {};
+
+        // Update Performance Overview
+        document.getElementById('stat-total-trades').textContent = stats.total_trades || 0;
+        document.getElementById('stat-win-rate').textContent = (stats.win_rate || 0) + '%';
+        document.getElementById('stat-profit-factor').textContent = stats.profit_factor || 0;
+        document.getElementById('stat-expectancy').textContent = '$' + (stats.expectancy || 0);
+        document.getElementById('stat-max-drawdown').textContent = '$' + (stats.max_drawdown || 0);
+        document.getElementById('stat-winning-streak').textContent = stats.winning_streak || 0;
+        document.getElementById('stat-losing-streak').textContent = stats.losing_streak || 0;
+        document.getElementById('stat-net-pnl').textContent = '$' + Math.abs(stats.net_pnl || 0).toFixed(2);
+        document.getElementById('stat-net-pnl').className = 'text-2xl font-bold ' + ((stats.net_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400');
+
+        // Grade
+        document.getElementById('overall-grade-badge').textContent = result.overall_grade || 'N/A';
+
+        // Strategy Detection
+        document.getElementById('detected-strategy').textContent = result.detected_strategy || 'Unknown';
+        document.getElementById('risk-consistency-score').textContent = (result.risk_consistency_score || 0) + '%';
+        document.getElementById('risk-consistency-bar').style.width = (result.risk_consistency_score || 0) + '%';
+
+        // AI Coach
+        const aiCoach = result.ai_coach || {};
+        document.getElementById('ai-discipline-score').textContent = aiCoach.discipline_score || '--';
+        document.getElementById('ai-risk-score').textContent = aiCoach.risk_management_score || '--';
+        document.getElementById('ai-consistency-score').textContent = aiCoach.strategy_consistency || '--';
+        document.getElementById('ai-main-mistake').textContent = aiCoach.main_mistake || 'None detected';
+        document.getElementById('ai-recommendation').textContent = aiCoach.recommendation || 'Keep maintaining your trading journal';
+
+        // Strengths & Improvements
+        const strengthsList = document.getElementById('ai-strengths');
+        strengthsList.innerHTML = (aiCoach.strengths || ['Consistent trading']).map(s => `<li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-1"></i>${s}</li>`).join('');
+
+        const improvementsList = document.getElementById('ai-improvements');
+        improvementsList.innerHTML = (aiCoach.improvements || ['Continue current approach']).map(i => `<li class="flex items-start gap-2"><i class="fas fa-arrow-up text-yellow-400 mt-1"></i>${i}</li>`).join('');
+
+        // Render Charts
+        this.renderEquityCurve(result.equity_curve || []);
+        this.renderTradeDistribution(result.trade_distribution || {});
+        this.renderMonthlyPerformance(result.monthly_performance || []);
+
+        // Trade History
+        const tbody = document.getElementById('trades-table-body');
+        tbody.innerHTML = (result.trades || []).slice(0, 20).map(trade => `
+            <tr class="border-b border-gray-700 hover:bg-gray-800/50">
+                <td class="px-4 py-3">${trade.entry_date || '--'}</td>
+                <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
+                <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
+                <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
+                <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
+                <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
+            </tr>
+        `).join('');
+    }
+
+    renderEquityCurve(equityData) {
+        const ctx = document.getElementById('equity-curve-chart');
+        if (!ctx) return;
+
+        if (this.charts.equity) this.charts.equity.destroy();
+
+        const labels = equityData.map(d => d.trade_number);
+        const data = equityData.map(d => d.equity);
+
+        this.charts.equity = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Equity',
+                    data: data,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af' } },
+                    x: { display: false }
+                }
+            }
+        });
+    }
+
+    renderTradeDistribution(distribution) {
+        const ctx = document.getElementById('trade-distribution-chart');
+        if (!ctx) return;
+
+        if (this.charts.distribution) this.charts.distribution.destroy();
+
+        this.charts.distribution = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Wins', 'Losses', 'Breakeven'],
+                datasets: [{
+                    data: [distribution.wins || 0, distribution.losses || 0, distribution.breakeven || 0],
+                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#9ca3af', padding: 20 } }
+                }
+            }
+        });
+    }
+
+    renderMonthlyPerformance(monthlyData) {
+        const ctx = document.getElementById('monthly-performance-chart');
+        if (!ctx) return;
+
+        if (this.charts.monthly) this.charts.monthly.destroy();
+
+        const labels = monthlyData.map(d => d.month);
+        const data = monthlyData.map(d => d.pnl);
+        const colors = data.map(v => v >= 0 ? '#10b981' : '#ef4444');
+
+        this.charts.monthly = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'P&L',
+                    data: data,
+                    backgroundColor: colors,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { 
+                        grid: { color: 'rgba(75, 85, 99, 0.3)' }, 
+                        ticks: { color: '#9ca3af', callback: v => '$' + v }
+                    },
+                    x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    showManualEntry() {
+        document.getElementById('manual-entry-form').classList.remove('hidden');
+    }
+
+    addManualTrade() {
+        const trade = {
+            entry_date: new Date().toISOString().split('T')[0],
+            symbol: document.getElementById('manual-symbol').value.toUpperCase(),
+            direction: document.getElementById('manual-direction').value,
+            entry_price: parseFloat(document.getElementById('manual-entry').value),
+            exit_price: parseFloat(document.getElementById('manual-exit').value) || 0,
+            pnl: parseFloat(document.getElementById('manual-pnl').value),
+            volume: parseFloat(document.getElementById('manual-volume').value) || 0.1
         };
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            selectFormat('mt4');
+        this.manualTrades.push(trade);
+
+        this.apiRequest('/ai/performance/analyze-journal', {
+            method: 'POST',
+            body: JSON.stringify({ trades: this.manualTrades })
+        }).then(result => {
+            this.lastAnalysisResults = result;
+            this.displayJournalAnalysis(result);
+        }).catch(err => {
+            alert('Analysis failed: ' + err.message);
         });
+    }
 
-        // Navigation
-        function showSection(section) {
-            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
-            document.getElementById('section-' + section).classList.remove('hidden');
-            
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('text-blue-400');
-                btn.classList.add('text-gray-400');
-            });
-            event.target.classList.remove('text-gray-400');
-            event.target.classList.add('text-blue-400');
-        }
+    // ==================== OTHER SECTIONS ====================
 
-        // Format Selection
-        function selectFormat(format) {
-            currentFormat = format;
-            
-            // Update buttons
-            document.querySelectorAll('.format-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.getElementById('btn-' + format).classList.add('active');
-            
-            // Update file input accept attribute
-            const config = formatConfig[format];
-            document.getElementById('file-input').accept = config.accept;
-            document.getElementById('file-types').textContent = 'Supported: ' + config.desc;
-            
-            // Reset upload area
-            document.getElementById('upload-status').classList.add('hidden');
-        }
-
-        // File Upload Handler
-        async function handleFileUpload(file) {
-            if (!file) return;
-            
-            const statusDiv = document.getElementById('upload-status');
-            const progressDiv = document.getElementById('upload-progress');
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
-            
-            // Validate file type
-            const config = formatConfig[currentFormat];
-            const acceptedExts = config.accept.split(',');
-            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
-            
-            if (!acceptedExts.includes(fileExt)) {
-                showStatus('error', 'Invalid file type. Expected: ' + config.desc);
-                return;
-            }
-            
-            // Show progress
-            progressDiv.classList.remove('hidden');
-            statusDiv.classList.add('hidden');
-            
-            // Simulate progress (actual upload happens at end)
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 10;
-                if (progress > 90) progress = 90;
-                progressBar.style.width = progress + '%';
-                progressText.textContent = progress + '%';
-            }, 100);
-            
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('format', currentFormat);
-                
-                const response = await fetch('/ai/performance/upload-journal', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                clearInterval(progressInterval);
-                progressBar.style.width = '100%';
-                progressText.textContent = '100%';
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showStatus('success', `Successfully imported ${data.trades_count || 'trades'}!`);
-                    updateDashboard(data);
-                } else {
-                    showStatus('error', data.detail || 'Upload failed. Please check file format.');
-                }
-                
-            } catch (error) {
-                clearInterval(progressInterval);
-                showStatus('error', 'Network error. Please try again.');
-                console.error('Upload error:', error);
-            } finally {
-                setTimeout(() => {
-                    progressDiv.classList.add('hidden');
-                    progressBar.style.width = '0%';
-                }, 1000);
-            }
-        }
-
-        // Show Status Message
-        function showStatus(type, message) {
-            const statusDiv = document.getElementById('upload-status');
-            statusDiv.classList.remove('hidden', 'bg-green-900/50', 'bg-red-900/50', 'text-green-400', 'text-red-400', 'border', 'border-green-700', 'border-red-700');
-            
-            if (type === 'success') {
-                statusDiv.classList.add('bg-green-900/50', 'text-green-400', 'border', 'border-green-700');
-                statusDiv.innerHTML = '<i class="fas fa-check-circle mr-2"></i>' + message;
-            } else {
-                statusDiv.classList.add('bg-red-900/50', 'text-red-400', 'border', 'border-red-700');
-                statusDiv.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>' + message;
-            }
-        }
-
-        // Update Dashboard with Data
-        function updateDashboard(data) {
-            const metrics = data.metrics || data;
-            
-            // Show containers
-            document.getElementById('metrics-container').style.display = 'grid';
-            document.getElementById('charts-container').style.display = 'grid';
-            document.getElementById('ai-coach-container').style.display = 'block';
-            document.getElementById('strategy-container').style.display = 'block';
-            document.getElementById('trades-container').style.display = 'block';
-            
-            // Update Metrics
-            document.getElementById('metric-total-trades').textContent = metrics.total_trades || 0;
-            document.getElementById('metric-win-rate').textContent = (metrics.win_rate || 0).toFixed(1) + '%';
-            document.getElementById('metric-profit-factor').textContent = (metrics.profit_factor || 0).toFixed(2);
-            document.getElementById('metric-expectancy').textContent = '$' + (metrics.expectancy || 0).toFixed(2);
-            document.getElementById('metric-net-pnl').textContent = '$' + (metrics.net_profit || 0).toFixed(2);
-            document.getElementById('metric-drawdown').textContent = '$' + (metrics.max_drawdown || 0).toFixed(2);
-            document.getElementById('metric-win-streak').textContent = metrics.winning_streak || 0;
-            document.getElementById('metric-loss-streak').textContent = metrics.losing_streak || 0;
-            
-            // Color code Net P&L
-            const netPnl = metrics.net_profit || 0;
-            const pnlElement = document.getElementById('metric-net-pnl');
-            pnlElement.className = 'text-2xl font-bold ' + (netPnl >= 0 ? 'text-green-400' : 'text-red-400');
-            
-            // Update Charts
-            updateCharts(metrics);
-            
-            // Update AI Coach
-            updateAICoach(metrics.psychology || {});
-            
-            // Update Strategy
-            updateStrategy(metrics);
-            
-            // Update Trades Table
-            updateTradesTable(data.trades || []);
-        }
-
-        // Update Charts
-        function updateCharts(metrics) {
-            // Equity Curve
-            const equityCtx = document.getElementById('equityChart').getContext('2d');
-            if (equityChart) equityChart.destroy();
-            
-            const equityData = metrics.equity_curve || [0];
-            const labels = equityData.map((_, i) => 'Trade ' + (i + 1));
-            
-            equityChart = new Chart(equityCtx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Account Equity',
-                        data: equityData,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#9ca3af' } },
-                        x: { grid: { display: false }, ticks: { display: false } }
-                    }
-                }
-            });
-            
-            // Trade Distribution
-            const distCtx = document.getElementById('distributionChart').getContext('2d');
-            if (distributionChart) distributionChart.destroy();
-            
-            const wins = metrics.winning_trades || 0;
-            const losses = metrics.losing_trades || 0;
-            const breakeven = metrics.breakeven_trades || 0;
-            
-            distributionChart = new Chart(distCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Wins', 'Losses', 'Breakeven'],
-                    datasets: [{
-                        data: [wins, losses, breakeven],
-                        backgroundColor: ['#10b981', '#ef4444', '#6b7280'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { color: '#9ca3af' } }
-                    }
-                }
-            });
-        }
-
-        // Update AI Coach
-        function updateAICoach(psychology) {
-            const discipline = psychology.discipline_score || 0;
-            const risk = psychology.risk_score || 0;
-            const consistency = psychology.consistency_score || 0;
-            
-            // Update scores
-            document.getElementById('score-discipline').textContent = discipline;
-            document.getElementById('score-risk').textContent = risk;
-            document.getElementById('score-consistency').textContent = consistency;
-            
-            // Update bars
-            document.getElementById('bar-discipline').style.width = discipline + '%';
-            document.getElementById('bar-risk').style.width = risk + '%';
-            document.getElementById('bar-consistency').style.width = consistency + '%';
-            
-            // Update insights
-            const insightsDiv = document.getElementById('ai-insights');
-            insightsDiv.innerHTML = '';
-            
-            if (psychology.insights && psychology.insights.length > 0) {
-                psychology.insights.forEach(insight => {
-                    const div = document.createElement('div');
-                    div.className = 'flex items-start gap-2 text-sm text-gray-300';
-                    div.innerHTML = '<i class="fas fa-lightbulb text-yellow-500 mt-1"></i><span>' + insight + '</span>';
-                    insightsDiv.appendChild(div);
-                });
-            } else {
-                insightsDiv.innerHTML = '<div class="text-sm text-gray-400">Upload trade data to receive AI insights.</div>';
-            }
-        }
-
-        // Update Strategy Detection
-        function updateStrategy(metrics) {
-            const strategy = metrics.detected_strategy || 'Mixed';
-            const consistency = metrics.risk_consistency || 0;
-            
-            document.getElementById('detected-strategy').textContent = strategy;
-            document.getElementById('risk-consistency').textContent = consistency + '%';
-            document.getElementById('risk-bar').style.width = consistency + '%';
-        }
-
-        // Update Trades Table
-        function updateTradesTable(trades) {
-            const tbody = document.getElementById('trades-tbody');
-            tbody.innerHTML = '';
-            
-            trades.slice(0, 50).forEach(trade => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-slate-800 hover:bg-slate-800/50';
-                
-                const pnl = parseFloat(trade.pnl) || 0;
-                const outcomeClass = pnl > 0 ? 'trade-win' : (pnl < 0 ? 'trade-loss' : 'trade-breakeven');
-                const outcomeText = pnl > 0 ? 'Win' : (pnl < 0 ? 'Loss' : 'BE');
-                
-                row.innerHTML = `
-                    <td class="py-3">${trade.entry_date || '-'}</td>
-                    <td class="py-3 font-medium">${trade.symbol || '-'}</td>
-                    <td class="py-3"><span class="${trade.direction === 'BUY' ? 'text-green-400' : 'text-red-400'}">${trade.direction || '-'}</span></td>
-                    <td class="py-3">${trade.entry_price || '-'}</td>
-                    <td class="py-3">${trade.exit_price || '-'}</td>
-                    <td class="py-3">${trade.volume || '-'}</td>
-                    <td class="py-3 ${outcomeClass}">$${pnl.toFixed(2)}</td>
-                    <td class="py-3"><span class="px-2 py-1 rounded text-xs ${outcomeClass} bg-opacity-20">${outcomeText}</span></td>
-                `;
-                
-                tbody.appendChild(row);
-            });
-        }
-
-        // AI Mentor Chat
-        async function askMentor() {
-            const input = document.getElementById('mentor-input');
-            const message = input.value.trim();
-            if (!message) return;
-            
-            // Add user message
-            addChatMessage('user', message);
-            input.value = '';
-            
-            try {
-                const response = await fetch('/ai/mentor/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
-                });
-                
-                const data = await response.json();
-                addChatMessage('ai', data.response || 'I apologize, but I cannot process that request right now.');
-                
-            } catch (error) {
-                addChatMessage('ai', 'Sorry, I am having trouble connecting right now.');
-            }
-        }
-
-        function addChatMessage(sender, text) {
-            const container = document.getElementById('chat-container');
-            const div = document.createElement('div');
-            div.className = 'flex items-start gap-3 ' + (sender === 'user' ? 'flex-row-reverse' : '');
-            
-            const avatar = sender === 'ai' ? 
-                '<div class="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">AI</div>' :
-                '<div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold">You</div>';
-            
-            const bubble = sender === 'ai' ?
-                '<div class="bg-slate-800 rounded-lg p-3 max-w-[80%] text-gray-200">' + text + '</div>' :
-                '<div class="bg-blue-600 rounded-lg p-3 max-w-[80%] text-white">' + text + '</div>';
-            
-            div.innerHTML = avatar + bubble;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        // Risk Calculator
-        function calculateRisk() {
-            const balance = parseFloat(document.getElementById('risk-balance').value) || 0;
-            const riskPercent = parseFloat(document.getElementById('risk-percent').value) || 0;
-            const entry = parseFloat(document.getElementById('risk-entry').value) || 0;
-            const stop = parseFloat(document.getElementById('risk-sl').value) || 0;
-            const instrument = document.getElementById('risk-instrument').value;
-            
-            if (!balance || !riskPercent || !entry || !stop) {
-                alert('Please fill in all fields');
-                return;
-            }
-            
-            const riskAmount = balance * (riskPercent / 100);
-            const stopPips = Math.abs(entry - stop);
-            
-            if (stopPips === 0) {
-                alert('Entry and Stop Loss cannot be the same');
-                return;
-            }
-            
-            let lotSize = 0;
-            let units = 0;
-            
-            if (instrument === 'forex') {
-                const pipValue = 10; // $10 per pip for standard lot
-                lotSize = riskAmount / (stopPips * 10000 * pipValue);
-                units = lotSize * 100000;
-            } else {
-                units = riskAmount / stopPips;
-            }
-            
-            const resultDiv = document.getElementById('risk-result');
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `
-                <div class="flex justify-between items-center border-b border-slate-700 pb-2">
-                    <span class="text-gray-400">Risk Amount:</span>
-                    <span class="font-bold text-red-400">$${riskAmount.toFixed(2)}</span>
+    async loadSignals() {
+        const container = document.getElementById('signals-container');
+        if (!container) return;
+        try {
+            const data = await this.apiRequest('/signals/active');
+            const signals = Array.isArray(data) ? data : (data.signals || []);
+            container.innerHTML = signals.map(s => `
+                <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-bold text-white text-lg">${s.symbol}</h4>
+                        <span class="px-2 py-1 rounded text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${s.direction}</span>
+                    </div>
+                    <div class="text-sm text-gray-400 space-y-1">
+                        <div class="flex justify-between"><span>Entry:</span><span class="text-white">${s.entry_price}</span></div>
+                        <div class="flex justify-between"><span>SL:</span><span class="text-red-400">${s.stop_loss}</span></div>
+                        <div class="flex justify-between"><span>TP:</span><span class="text-green-400">${s.take_profit}</span></div>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center border-b border-slate-700 py-2">
-                    <span class="text-gray-400">Position Size:</span>
-                    <span class="font-bold text-blue-400">${lotSize.toFixed(2)} lots</span>
+            `).join('');
+        } catch (error) {
+            container.innerHTML = '<div class="text-gray-500">No active signals</div>';
+        }
+    }
+
+    async loadCourses() {
+        const container = document.getElementById('courses-container');
+        if (!container) return;
+        try {
+            const data = await this.apiRequest('/courses/list');
+            const courses = Array.isArray(data) ? data : (data.courses || []);
+            container.innerHTML = courses.map(c => `
+                <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                    <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
+                        <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
+                    </div>
+                    <div class="p-4">
+                        <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
+                        <h4 class="font-bold text-white mb-2">${c.title}</h4>
+                        <p class="text-sm text-gray-400 line-clamp-2">${c.description || ''}</p>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center border-b border-slate-700 py-2">
-                    <span class="text-gray-400">Units:</span>
-                    <span class="font-bold">${Math.floor(units).toLocaleString()}</span>
+            `).join('');
+        } catch (error) {
+            container.innerHTML = '<div class="text-gray-500">No courses available</div>';
+        }
+    }
+
+    async loadMentor() {
+        const container = document.getElementById('section-mentor');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="max-w-4xl mx-auto h-[calc(100vh-200px)]">
+                <div class="bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700">
+                    <div class="p-4 border-b border-gray-700"><h3 class="font-bold text-white">AI Trading Mentor</h3></div>
+                    <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900">
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"><i class="fas fa-robot text-xs"></i></div>
+                            <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%]">
+                                <p class="text-gray-200">Hello! I'm your AI Trading Mentor. Ask me anything about trading, risk management, or strategy!</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-700 bg-gray-800">
+                        <div class="flex gap-2">
+                            <input type="text" id="mentor-input" placeholder="Ask your question..." class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white" onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
+                            <button onclick="dashboard.sendMentorMessage()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center pt-2">
-                    <span class="text-gray-400">Max Loss:</span>
-                    <span class="font-bold text-red-400">$${riskAmount.toFixed(2)}</span>
+            </div>
+        `;
+    }
+
+    async sendMentorMessage() {
+        const input = document.getElementById('mentor-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        const container = document.getElementById('mentor-messages');
+        container.innerHTML += `
+            <div class="flex gap-3 flex-row-reverse">
+                <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center"><i class="fas fa-user text-xs"></i></div>
+                <div class="bg-purple-600 p-3 rounded-2xl rounded-tr-none max-w-[80%]"><p class="text-white">${message}</p></div>
+            </div>
+        `;
+        input.value = '';
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            const response = await this.apiRequest('/ai/mentor/ask', {
+                method: 'POST',
+                body: JSON.stringify({ question: message, skill_level: 'intermediate' })
+            });
+            container.innerHTML += `
+                <div class="flex gap-3">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"><i class="fas fa-robot text-xs"></i></div>
+                    <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%]"><p class="text-gray-200">${response.response || response.answer}</p></div>
                 </div>
             `;
+            container.scrollTop = container.scrollHeight;
+        } catch (e) {
+            container.innerHTML += '<div class="text-red-400 text-sm">Error: Could not get response</div>';
         }
+    }
 
-        // Allow Enter key in mentor chat
-        document.getElementById('mentor-input')?.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') askMentor();
-        });
+    analyzeChart() {
+        alert('Chart analysis feature - integrate with your chart analysis API');
+    }
 
-        // Logout
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                window.location.href = '/logout';
-            }
-        }
+    logout() {
+        localStorage.removeItem('pipways_token');
+        localStorage.removeItem('pipways_user');
+        window.location.href = '/';
+    }
+}
 
-        // Drag and drop support
-        const uploadArea = document.getElementById('upload-container');
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('border-blue-500', 'bg-blue-500/5');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('border-blue-500', 'bg-blue-500/5');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('border-blue-500', 'bg-blue-500/5');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileUpload(files[0]);
-            }
-        });
-    </script>
+const dashboard = new DashboardController();
+</script>
+
 </body>
 </html>

@@ -180,6 +180,9 @@
                 <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all border-l-2 border-red-600">
                     <i class="fas fa-shield-alt w-4 text-sm text-red-400"></i><span class="text-sm">Admin Panel</span>
                 </a>
+                <a href="#" data-section="cms" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all border-l-2 border-purple-600">
+                    <i class="fas fa-layer-group w-4 text-sm text-purple-400"></i><span class="text-sm">CMS</span>
+                </a>
             </div>
         </nav>
 
@@ -680,6 +683,11 @@
                 <div id="admin-container"></div>
             </section>
 
+            <!-- CMS -->
+            <section id="section-cms" class="section hidden">
+                <div id="cms-container"></div>
+            </section>
+
             <!-- MENTOR -->
             <section id="section-mentor" class="section hidden">
                 <div class="max-w-7xl mx-auto h-[calc(100vh-140px)]">
@@ -1053,7 +1061,7 @@ const DashboardController = class {
             'dashboard': 'Dashboard', 'signals': 'Trading Signals', 'journal': 'Trading Journal',
             'stocks': 'AI Stock Research', 'courses': 'Trading Courses', 'webinars': 'Webinars',
             'blog': 'Trading Blog', 'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis',
-            'mentor': 'AI Mentor'
+            'mentor': 'AI Mentor', 'cms': 'Content Management'
         };
         document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
         document.getElementById('sidebar')?.classList.add('-translate-x-full');
@@ -1079,6 +1087,22 @@ const DashboardController = class {
                             <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-6 text-center">
                                 <i class="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
                                 <p class="text-red-200">Admin module failed to load.</p>
+                                <p class="text-red-400 text-sm">Please refresh the page.</p>
+                            </div>`;
+                    }
+                    break;
+                }
+
+                case 'cms': {
+                    const container = document.getElementById('cms-container');
+                    if (!container) break;
+                    if (typeof CMSPage !== 'undefined') {
+                        await CMSPage.render(container);
+                    } else {
+                        container.innerHTML = `
+                            <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-6 text-center">
+                                <i class="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
+                                <p class="text-red-200">CMS module failed to load.</p>
                                 <p class="text-red-400 text-sm">Please refresh the page.</p>
                             </div>`;
                     }
@@ -1938,6 +1962,7 @@ window.API = API;
     -->
     <script src="/js/modules/chart_analysis.js"></script>
     <script src="/js/modules/admin.js"></script>
+    <script src="/js/modules/cms.js"></script>
 
 </body>
 </html>

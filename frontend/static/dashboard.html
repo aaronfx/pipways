@@ -238,173 +238,234 @@
             ═══════════════════════════════════════════════════════════ -->
             <section id="section-dashboard" class="section animate-fade-in">
 
-                <!-- ── Greeting + Quick Actions ── -->
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <style>
+                    /* ── Feature Carousel ───────────────────────────────────── */
+                    .fc-track { display:flex; gap:1rem; transition:transform .45s cubic-bezier(.4,0,.2,1); will-change:transform; }
+                    .fc-slide  { flex:0 0 calc(33.333% - .67rem); min-width:0; border-radius:.875rem; overflow:hidden;
+                                 position:relative; cursor:pointer; transition:transform .2s,box-shadow .2s; }
+                    @media(max-width:900px){ .fc-slide{ flex:0 0 calc(50% - .5rem); } }
+                    @media(max-width:600px){ .fc-slide{ flex:0 0 90%; } }
+                    .fc-slide:hover{ transform:translateY(-4px); box-shadow:0 16px 40px -8px rgba(0,0,0,.6); }
+                    .fc-slide-inner{ height:220px; display:flex; flex-direction:column; justify-content:flex-end;
+                                     padding:1.25rem; position:relative; overflow:hidden; }
+                    .fc-slide-inner::before{ content:''; position:absolute; inset:0;
+                                             background:linear-gradient(180deg,transparent 20%,rgba(0,0,0,.75) 100%); z-index:1; }
+                    .fc-art{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+                    .fc-content{ position:relative; z-index:2; }
+                    .fc-tag{ display:inline-block; padding:.2rem .65rem; border-radius:9999px; font-size:.7rem;
+                              font-weight:700; margin-bottom:.5rem; backdrop-filter:blur(4px); }
+                    .fc-title{ font-size:1.1rem; font-weight:800; color:white; line-height:1.2; margin-bottom:.3rem; }
+                    .fc-desc{ font-size:.78rem; color:rgba(255,255,255,.72); line-height:1.4; margin-bottom:.75rem; }
+                    .fc-btn{ display:inline-flex; align-items:center; gap:.4rem; padding:.4rem 1rem;
+                              border-radius:.5rem; font-size:.78rem; font-weight:700; border:none; cursor:pointer;
+                              background:rgba(255,255,255,.15); color:white; backdrop-filter:blur(6px);
+                              transition:background .15s; border:1px solid rgba(255,255,255,.2); }
+                    .fc-btn:hover{ background:rgba(255,255,255,.25); }
+                    .fc-dot{ width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.3);
+                              cursor:pointer; transition:all .2s; flex-shrink:0; }
+                    .fc-dot.act{ background:white; transform:scale(1.3); }
+                    /* ── Platform Feature Cards ─────────────────────────────── */
+                    .pf-card{ border-radius:.75rem; padding:1.1rem; cursor:pointer; position:relative;
+                               overflow:hidden; border:1px solid; transition:transform .2s,box-shadow .2s; }
+                    .pf-card:hover{ transform:translateY(-3px); box-shadow:0 12px 28px -6px rgba(0,0,0,.5); }
+                    .pf-card::after{ content:'→'; position:absolute; bottom:.85rem; right:.9rem;
+                                     font-size:.75rem; opacity:.4; transition:opacity .2s,transform .2s; }
+                    .pf-card:hover::after{ opacity:.9; transform:translateX(3px); }
+                    /* ── Mini stat strip ────────────────────────────────────── */
+                    .ms-card{ background:#1f2937; border:1px solid #374151; border-radius:.75rem;
+                               padding:.9rem 1rem; cursor:pointer; transition:transform .2s; overflow:hidden; position:relative; }
+                    .ms-card:hover{ transform:translateY(-2px); }
+                    .ms-card::before{ content:''; position:absolute; bottom:0; left:0; right:0; height:2px; }
+                </style>
+
+                <!-- ── Greeting ─────────────────────────────────────────────── -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
                     <div>
-                        <h3 id="greeting-text" class="text-xl font-bold text-white">Good morning 👋</h3>
-                        <p class="text-sm text-gray-500 mt-0.5">Here's what's happening in your trading world today.</p>
+                        <h3 id="greeting-text" class="text-2xl font-bold text-white">Good morning 👋</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">Your complete trading education &amp; analysis platform.</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button onclick="dashboard.navigate('analysis')" class="qa-btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border-color:#7c3aed;">
-                            <i class="fas fa-chart-bar text-xs"></i> Analyze Chart
-                        </button>
-                        <button onclick="dashboard.navigate('journal')" class="qa-btn" style="background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.3);">
-                            <i class="fas fa-plus text-xs"></i> Add Trade
-                        </button>
-                        <button onclick="dashboard.navigate('mentor')" class="qa-btn" style="background:rgba(59,130,246,.12);color:#60a5fa;border-color:rgba(59,130,246,.3);">
-                            <i class="fas fa-robot text-xs"></i> Ask Mentor
-                        </button>
-                        <button onclick="dashboard.navigate('signals')" class="qa-btn" style="background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.3);">
-                            <i class="fas fa-satellite-dish text-xs"></i> Signals
-                        </button>
+                        <button onclick="dashboard.navigate('analysis')" class="qa-btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border-color:#7c3aed;"><i class="fas fa-chart-bar text-xs"></i> Analyze Chart</button>
+                        <button onclick="dashboard.navigate('courses')"  class="qa-btn" style="background:rgba(59,130,246,.12);color:#60a5fa;border-color:rgba(59,130,246,.3);"><i class="fas fa-graduation-cap text-xs"></i> Courses</button>
+                        <button onclick="dashboard.navigate('mentor')"   class="qa-btn" style="background:rgba(236,72,153,.12);color:#f472b6;border-color:rgba(236,72,153,.3);"><i class="fas fa-robot text-xs"></i> AI Mentor</button>
+                        <button onclick="dashboard.navigate('webinars')" class="qa-btn" style="background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.3);"><i class="fas fa-video text-xs"></i> Webinars</button>
                     </div>
                 </div>
 
-                <!-- ── Stat Cards ── -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-
-                    <!-- Active Signals -->
-                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('signals')">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(124,58,237,.18);">
-                                <i class="fas fa-satellite-dish text-purple-400 text-sm"></i>
-                            </div>
-                            <svg class="sparkline" width="64" height="28" id="spark-signals"></svg>
+                <!-- ── Feature Carousel ─────────────────────────────────────── -->
+                <div class="mb-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Platform Features</h4>
+                        <div class="flex items-center gap-2">
+                            <div id="fc-dots" class="flex gap-1.5"></div>
+                            <button id="fc-prev" onclick="dashboard._fcMove(-1)" style="background:#1f2937;border:1px solid #374151;color:#9ca3af;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.7rem;transition:all .15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#9ca3af'"><i class="fas fa-chevron-left"></i></button>
+                            <button id="fc-next" onclick="dashboard._fcMove(1)"  style="background:#1f2937;border:1px solid #374151;color:#9ca3af;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.7rem;transition:all .15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#9ca3af'"><i class="fas fa-chevron-right"></i></button>
                         </div>
-                        <p class="text-xs text-gray-500 mb-1">Active Signals</p>
-                        <div class="flex items-end gap-2">
-                            <p class="text-2xl font-bold text-white leading-none" id="stat-signals">--</p>
-                            <span class="text-xs text-purple-400 mb-0.5" id="stat-signals-sub">live</span>
-                        </div>
-                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#7c3aed,transparent);"></div>
                     </div>
-
-                    <!-- Courses -->
-                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('courses')">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(59,130,246,.18);">
-                                <i class="fas fa-graduation-cap text-blue-400 text-sm"></i>
-                            </div>
-                            <svg class="sparkline" width="64" height="28" id="spark-courses"></svg>
-                        </div>
-                        <p class="text-xs text-gray-500 mb-1">Courses</p>
-                        <div class="flex items-end gap-2">
-                            <p class="text-2xl font-bold text-white leading-none" id="stat-courses">--</p>
-                            <span class="text-xs text-blue-400 mb-0.5">available</span>
-                        </div>
-                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#3b82f6,transparent);"></div>
+                    <div style="overflow:hidden;border-radius:.875rem;">
+                        <div id="fc-track" class="fc-track"></div>
                     </div>
-
-                    <!-- Win Rate -->
-                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('journal')">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(16,185,129,.18);">
-                                <i class="fas fa-chart-line text-green-400 text-sm"></i>
-                            </div>
-                            <svg class="sparkline" width="64" height="28" id="spark-winrate"></svg>
-                        </div>
-                        <p class="text-xs text-gray-500 mb-1">Win Rate</p>
-                        <div class="flex items-end gap-2">
-                            <p class="text-2xl font-bold text-white leading-none" id="stat-winrate">--</p>
-                            <span class="text-xs text-green-400 mb-0.5">all time</span>
-                        </div>
-                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#10b981,transparent);"></div>
-                    </div>
-
-                    <!-- AI Insights -->
-                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('mentor')" style="animation:glowPulse 3s ease-in-out infinite;">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(236,72,153,.18);">
-                                <i class="fas fa-robot text-pink-400 text-sm"></i>
-                            </div>
-                            <svg class="sparkline" width="64" height="28" id="spark-ai"></svg>
-                        </div>
-                        <p class="text-xs text-gray-500 mb-1">AI Insights</p>
-                        <div class="flex items-end gap-2">
-                            <p class="text-2xl font-bold text-white leading-none">24</p>
-                            <span class="text-xs text-pink-400 mb-0.5">this week</span>
-                        </div>
-                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#ec4899,transparent);"></div>
-                    </div>
-
                 </div>
 
-                <!-- ── Main Content Grid ── -->
+                <!-- ── Mini Stats Strip ─────────────────────────────────────── -->
+                <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-5" id="dash-stats-strip">
+                    <div class="ms-card" style="--accent:#a78bfa;" onclick="dashboard.navigate('courses')" >
+                        <div class="ms-card::before" style="background:#a78bfa;"></div>
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(167,139,250,.15);"><i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i></div>
+                        <p class="text-xl font-bold text-white leading-none" id="stat-courses">--</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Courses</p>
+                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#a78bfa,transparent);"></div>
+                    </div>
+                    <div class="ms-card" onclick="dashboard.navigate('webinars')">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(251,191,36,.15);"><i class="fas fa-video text-xs" style="color:#fbbf24;"></i></div>
+                        <p class="text-xl font-bold text-white leading-none" id="stat-webinars">--</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Webinars</p>
+                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#fbbf24,transparent);"></div>
+                    </div>
+                    <div class="ms-card" onclick="dashboard.navigate('blog')">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(96,165,250,.15);"><i class="fas fa-newspaper text-xs" style="color:#60a5fa;"></i></div>
+                        <p class="text-xl font-bold text-white leading-none" id="stat-blog">--</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Articles</p>
+                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#60a5fa,transparent);"></div>
+                    </div>
+                    <div class="ms-card" onclick="dashboard.navigate('journal')">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(52,211,153,.15);"><i class="fas fa-chart-line text-xs" style="color:#34d399;"></i></div>
+                        <p class="text-xl font-bold text-white leading-none" id="stat-winrate">--</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Win Rate</p>
+                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#34d399,transparent);"></div>
+                    </div>
+                    <div class="ms-card" onclick="dashboard.navigate('analysis')">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(124,58,237,.15);"><i class="fas fa-chart-bar text-xs" style="color:#8b5cf6;"></i></div>
+                        <p class="text-xl font-bold text-white leading-none" id="stat-analyses">--</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Analyses</p>
+                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#8b5cf6,transparent);"></div>
+                    </div>
+                    <div class="ms-card" onclick="dashboard.navigate('mentor')" style="animation:glowPulse 3s ease-in-out infinite;">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(244,114,182,.15);"><i class="fas fa-robot text-xs" style="color:#f472b6;"></i></div>
+                        <p class="text-xl font-bold text-white leading-none" id="stat-signals">--</p>
+                        <p class="text-xs text-gray-500 mt-0.5">AI Sessions</p>
+                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#f472b6,transparent);"></div>
+                    </div>
+                </div>
+
+                <!-- ── Main Grid ────────────────────────────────────────────── -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
-                    <!-- Recent Signals (2/3 width) -->
-                    <div class="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden">
-                        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700/80">
-                            <div class="flex items-center gap-2">
-                                <div class="w-2 h-2 rounded-full bg-purple-400" style="animation:pulse-dot 2s infinite;"></div>
-                                <h4 class="font-semibold text-white text-sm">Recent Signals</h4>
+                    <!-- Platform Feature Showcase (2/3) -->
+                    <div class="lg:col-span-2">
+                        <h4 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Everything You Need</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="pf-grid">
+
+                            <!-- Chart Analysis -->
+                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(124,58,237,.18),rgba(109,40,217,.08));border-color:rgba(124,58,237,.3);" onclick="dashboard.navigate('analysis')">
+                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#7c3aed,#5b21b6);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(124,58,237,.4);">
+                                    <i class="fas fa-chart-bar text-white text-lg"></i>
+                                </div>
+                                <div class="font-bold text-white text-sm mb-1">AI Chart Analysis</div>
+                                <div class="text-gray-400 text-xs leading-relaxed">SMC · institutional order flow · pattern detection</div>
+                                <div class="mt-2 text-xs font-semibold" style="color:#a78bfa;">Analyze now</div>
                             </div>
-                            <button onclick="dashboard.navigate('signals')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">View all →</button>
-                        </div>
-                        <div id="dashboard-signals-table" class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr style="background:#111827;">
-                                        <th class="px-5 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Symbol</th>
-                                        <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dir</th>
-                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Entry</th>
-                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
-                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">TP</th>
-                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Conf.</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="dashboard-signals-body">
-                                    <tr><td colspan="6" class="px-5 py-8 text-center text-gray-500 text-sm">Loading signals…</td></tr>
-                                </tbody>
-                            </table>
+
+                            <!-- Trading Journal -->
+                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.08));border-color:rgba(16,185,129,.3);" onclick="dashboard.navigate('journal')">
+                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#059669,#047857);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(16,185,129,.35);">
+                                    <i class="fas fa-book-open text-white text-lg"></i>
+                                </div>
+                                <div class="font-bold text-white text-sm mb-1">Trading Journal</div>
+                                <div class="text-gray-400 text-xs leading-relaxed">Import MT4/MT5 · equity curves · psychology insights</div>
+                                <div class="mt-2 text-xs font-semibold" style="color:#34d399;">Log trades</div>
+                            </div>
+
+                            <!-- AI Mentor -->
+                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(236,72,153,.18),rgba(219,39,119,.08));border-color:rgba(236,72,153,.3);" onclick="dashboard.navigate('mentor')">
+                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#db2777,#9d174d);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(236,72,153,.35);">
+                                    <i class="fas fa-robot text-white text-lg"></i>
+                                </div>
+                                <div class="font-bold text-white text-sm mb-1">AI Mentor</div>
+                                <div class="text-gray-400 text-xs leading-relaxed">24/7 trading coach · strategy review · Q&amp;A</div>
+                                <div class="mt-2 text-xs font-semibold" style="color:#f472b6;">Ask anything</div>
+                            </div>
+
+                            <!-- Courses -->
+                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(59,130,246,.18),rgba(37,99,235,.08));border-color:rgba(59,130,246,.3);" onclick="dashboard.navigate('courses')">
+                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(59,130,246,.35);">
+                                    <i class="fas fa-graduation-cap text-white text-lg"></i>
+                                </div>
+                                <div class="font-bold text-white text-sm mb-1">Trading Academy</div>
+                                <div class="text-gray-400 text-xs leading-relaxed">Structured courses · video lessons · quizzes &amp; certificates</div>
+                                <div class="mt-2 text-xs font-semibold" style="color:#60a5fa;">Start learning</div>
+                            </div>
+
+                            <!-- Webinars -->
+                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(217,119,6,.08));border-color:rgba(245,158,11,.3);" onclick="dashboard.navigate('webinars')">
+                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#d97706,#b45309);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(245,158,11,.35);">
+                                    <i class="fas fa-video text-white text-lg"></i>
+                                </div>
+                                <div class="font-bold text-white text-sm mb-1">Live Webinars</div>
+                                <div class="text-gray-400 text-xs leading-relaxed">Expert-led sessions · market walkthroughs · live Q&amp;A</div>
+                                <div class="mt-2 text-xs font-semibold" style="color:#fbbf24;">Join session</div>
+                            </div>
+
+                            <!-- Blog -->
+                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(20,184,166,.18),rgba(15,118,110,.08));border-color:rgba(20,184,166,.3);" onclick="dashboard.navigate('blog')">
+                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#0f766e,#115e59);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(20,184,166,.35);">
+                                    <i class="fas fa-newspaper text-white text-lg"></i>
+                                </div>
+                                <div class="font-bold text-white text-sm mb-1">Market Blog</div>
+                                <div class="text-gray-400 text-xs leading-relaxed">Daily analysis · strategy breakdowns · market outlook</div>
+                                <div class="mt-2 text-xs font-semibold" style="color:#2dd4bf;">Read articles</div>
+                            </div>
+
                         </div>
                     </div>
 
-                    <!-- Market Overview (1/3 width) -->
-                    <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden">
-                        <div class="flex items-center gap-2 px-5 py-4 border-b border-gray-700/80">
-                            <i class="fas fa-globe-americas text-blue-400 text-xs"></i>
-                            <h4 class="font-semibold text-white text-sm">Market Snapshot</h4>
+                    <!-- Right Column: Market + Activity -->
+                    <div class="flex flex-col gap-4">
+                        <!-- Market Snapshot -->
+                        <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden flex-1">
+                            <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-700/80">
+                                <i class="fas fa-globe-americas text-blue-400 text-xs"></i>
+                                <h4 class="font-semibold text-white text-sm">Market Snapshot</h4>
+                            </div>
+                            <div class="px-4 py-2" id="market-overview-list"></div>
                         </div>
-                        <div class="px-5 py-3" id="market-overview-list">
-                            <!-- populated by JS -->
+                        <!-- Activity -->
+                        <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden flex-1">
+                            <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-700/80">
+                                <i class="fas fa-bolt text-yellow-400 text-xs"></i>
+                                <h4 class="font-semibold text-white text-sm">Recent Activity</h4>
+                            </div>
+                            <div class="px-4 py-2" id="activity-feed"></div>
                         </div>
                     </div>
 
                 </div>
 
-                <!-- ── Bottom Grid ── -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-                    <!-- Featured Banner (2/3) -->
-                    <div class="lg:col-span-2 rounded-xl p-6 relative overflow-hidden" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#1e3a5f 100%);border:1px solid rgba(124,58,237,.3);">
-                        <div class="absolute inset-0 opacity-10" style="background:radial-gradient(ellipse at 80% 50%,#7c3aed,transparent 65%);"></div>
-                        <div class="relative z-10">
-                            <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold mb-3" style="background:rgba(124,58,237,.3);color:#c4b5fd;border:1px solid rgba(124,58,237,.4);">✨ NEW</span>
-                            <h2 class="text-xl font-bold text-white mb-1">Trading Journal Upgrade</h2>
-                            <p class="text-sm text-indigo-200 mb-4">AI-powered analytics: Equity curves, drawdown tracking &amp; personal trading coach.</p>
-                            <div class="flex gap-3">
-                                <button onclick="dashboard.navigate('journal')" class="px-5 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105" style="background:white;color:#4c1d95;">
-                                    Try It Now
-                                </button>
-                                <button onclick="dashboard.navigate('analysis')" class="px-5 py-2 rounded-lg font-semibold text-sm border transition-all hover:bg-white/10" style="border-color:rgba(255,255,255,.25);color:white;">
-                                    Analyze Chart
-                                </button>
+                <!-- ── Upcoming Webinars Banner ──────────────────────────────── -->
+                <div id="dash-webinar-banner" class="rounded-xl p-5 relative overflow-hidden mb-1" style="background:linear-gradient(135deg,#1a1035 0%,#2d1b5e 50%,#1a2a4a 100%);border:1px solid rgba(124,58,237,.25);">
+                    <div class="absolute inset-0" style="background:radial-gradient(ellipse at 85% 50%,rgba(124,58,237,.2),transparent 65%);"></div>
+                    <!-- Decorative SVG art -->
+                    <svg class="absolute right-4 top-1/2 -translate-y-1/2 opacity-10" width="180" height="100" viewBox="0 0 180 100">
+                        <circle cx="90" cy="50" r="48" fill="none" stroke="#a78bfa" stroke-width="1.5"/>
+                        <circle cx="90" cy="50" r="32" fill="none" stroke="#7c3aed" stroke-width="1"/>
+                        <circle cx="90" cy="50" r="16" fill="rgba(124,58,237,.3)"/>
+                        <line x1="20" y1="50" x2="160" y2="50" stroke="#a78bfa" stroke-width=".75" stroke-dasharray="4,3"/>
+                        <line x1="90" y1="5"  x2="90"  y2="95" stroke="#a78bfa" stroke-width=".75" stroke-dasharray="4,3"/>
+                    </svg>
+                    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="inline-block w-2 h-2 rounded-full bg-green-400" style="animation:pulse-dot 2s infinite;"></span>
+                                <span class="text-xs font-bold text-green-400 uppercase tracking-wider">Platform Overview</span>
                             </div>
+                            <h2 class="text-lg font-bold text-white mb-1">More than signals — a complete trading ecosystem</h2>
+                            <p class="text-sm text-indigo-200">AI-powered analysis · Structured education · Live mentoring · Trading psychology · Market research</p>
+                        </div>
+                        <div class="flex gap-2 flex-shrink-0 flex-wrap">
+                            <button onclick="dashboard.navigate('courses')"  class="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105 whitespace-nowrap" style="background:white;color:#4c1d95;">Explore Courses</button>
+                            <button onclick="dashboard.navigate('webinars')" class="px-4 py-2 rounded-lg font-semibold text-sm border transition-all hover:bg-white/10 whitespace-nowrap" style="border-color:rgba(255,255,255,.25);color:white;">View Webinars</button>
                         </div>
                     </div>
-
-                    <!-- Activity Feed (1/3) -->
-                    <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden">
-                        <div class="flex items-center gap-2 px-5 py-4 border-b border-gray-700/80">
-                            <i class="fas fa-bolt text-yellow-400 text-xs"></i>
-                            <h4 class="font-semibold text-white text-sm">Activity</h4>
-                        </div>
-                        <div class="px-5 py-3" id="activity-feed">
-                            <!-- populated by JS -->
-                        </div>
-                    </div>
-
                 </div>
 
             </section>
@@ -1134,32 +1195,60 @@ const DashboardController = class {
         this._initTicker();
         this._renderMarketOverview();
         this._renderActivityFeed();
-        this._renderSparklines();
         this._setGreeting();
-
-        // Active signals
-        try {
-            const signals = await this.apiRequest('/signals/active');
-            const list = Array.isArray(signals) ? signals : (signals.signals || []);
-            const el = document.getElementById('stat-signals');
-            if (el) { el.textContent = list.length; el.classList.add('count-animate'); }
-            this._renderSignalsTable(list);
-        } catch (e) {
-            const el = document.getElementById('stat-signals');
-            if (el) el.textContent = '0';
-            this._renderSignalsTable([]);
-        }
+        this._initFeatureCarousel();
 
         // Courses
         try {
-            const courses = await this.apiRequest('/courses/list');
-            const list = Array.isArray(courses) ? courses : (courses.courses || []);
+            const data = await this.apiRequest('/courses/list');
+            const list = Array.isArray(data) ? data : (data.courses || []);
             const el = document.getElementById('stat-courses');
-            if (el) { el.textContent = list.length; el.classList.add('count-animate'); }
-        } catch (e) {
+            if (el) el.textContent = list.length;
+        } catch (_) {
             const el = document.getElementById('stat-courses');
             if (el) el.textContent = '0';
         }
+
+        // Webinars
+        try {
+            const data = await this.apiRequest('/webinars/upcoming?upcoming=true');
+            const list = Array.isArray(data) ? data : (data.webinars || []);
+            const el = document.getElementById('stat-webinars');
+            if (el) el.textContent = list.length;
+        } catch (_) {
+            const el = document.getElementById('stat-webinars');
+            if (el) el.textContent = '0';
+        }
+
+        // Blog
+        try {
+            const data = await this.apiRequest('/blog/posts');
+            const list = Array.isArray(data) ? data : (data.posts || []);
+            const el = document.getElementById('stat-blog');
+            if (el) el.textContent = list.length;
+        } catch (_) {
+            const el = document.getElementById('stat-blog');
+            if (el) el.textContent = '0';
+        }
+
+        // AI sessions / signals — used as "platform usage" metric
+        try {
+            const data = await this.apiRequest('/signals/active');
+            const list = Array.isArray(data) ? data : (data.signals || []);
+            const el = document.getElementById('stat-signals');
+            if (el) el.textContent = list.length;
+        } catch (_) {
+            const el = document.getElementById('stat-signals');
+            if (el) el.textContent = '0';
+        }
+
+        // Analyses stat (placeholder)
+        const aEl = document.getElementById('stat-analyses');
+        if (aEl) aEl.textContent = '--';
+
+        // Win rate
+        const wEl = document.getElementById('stat-winrate');
+        if (wEl) wEl.textContent = '--%';
     }
 
     _setGreeting() {
@@ -1169,6 +1258,193 @@ const DashboardController = class {
         const el = document.getElementById('greeting-text');
         const name = this.user?.full_name?.split(' ')[0] || 'Trader';
         if (el) el.textContent = `${greet}, ${name} ${emojis}`;
+    }
+
+    _initFeatureCarousel() {
+        const slides = [
+            {
+                section: 'analysis',
+                tag: '🤖 AI-Powered', tagBg: 'rgba(124,58,237,.5)', tagColor: '#e9d5ff',
+                title: 'AI Chart Analysis',
+                desc: 'Upload any chart. Get SMC analysis, order blocks, fair value gaps & a trade setup in seconds.',
+                btn: 'Analyse a chart',
+                bg: 'linear-gradient(135deg,#1e1035 0%,#3b0764 50%,#1e1b4b 100%)',
+                art: `<svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    <defs><linearGradient id="cg1" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".3"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></linearGradient></defs>
+                    <polyline points="0,180 40,160 80,170 120,130 160,140 200,100 240,115 280,80 320,90 360,55 400,65" fill="none" stroke="#a78bfa" stroke-width="2.5" opacity=".8"/>
+                    <polygon points="0,180 40,160 80,170 120,130 160,140 200,100 240,115 280,80 320,90 360,55 400,65 400,220 0,220" fill="url(#cg1)"/>
+                    <circle cx="200" cy="100" r="6" fill="#a78bfa" opacity=".9"/>
+                    <circle cx="280" cy="80" r="4" fill="#7c3aed" opacity=".7"/>
+                    <rect x="155" y="60" width="90" height="32" rx="4" fill="rgba(124,58,237,.35)" stroke="rgba(167,139,250,.4)" stroke-width="1"/>
+                    <text x="200" y="80" text-anchor="middle" fill="#e9d5ff" font-size="10" font-family="monospace">SMC BULLISH</text>
+                    <line x1="50" y1="0" x2="50" y2="220" stroke="rgba(167,139,250,.1)" stroke-width="1" stroke-dasharray="4,4"/>
+                    <line x1="200" y1="0" x2="200" y2="220" stroke="rgba(167,139,250,.1)" stroke-width="1" stroke-dasharray="4,4"/>
+                    <line x1="350" y1="0" x2="350" y2="220" stroke="rgba(167,139,250,.1)" stroke-width="1" stroke-dasharray="4,4"/>
+                </svg>`,
+            },
+            {
+                section: 'courses',
+                tag: '📚 Academy', tagBg: 'rgba(37,99,235,.5)', tagColor: '#bfdbfe',
+                title: 'Trading Academy',
+                desc: 'From beginner to advanced. Structured courses, video lessons, quizzes & certificates.',
+                btn: 'Browse courses',
+                bg: 'linear-gradient(135deg,#0c1a3a 0%,#1e3a8a 50%,#0c2461 100%)',
+                art: `<svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    ${[0,1,2,3,4].map((i)=>`
+                    <rect x="${30+i*70}" y="${60+i*18}" width="55" height="${120-i*18}" rx="4"
+                          fill="rgba(59,130,246,${0.15+i*.08})" stroke="rgba(96,165,250,.3)" stroke-width="1"/>
+                    <rect x="${30+i*70}" y="${60+i*18}" width="55" height="${(120-i*18)*0.7}" rx="4"
+                          fill="rgba(37,99,235,${0.25+i*.06})"/>
+                    `).join('')}
+                    <text x="200" y="210" text-anchor="middle" fill="rgba(96,165,250,.5)" font-size="9" font-family="sans-serif">BEGINNER → ADVANCED</text>
+                    <circle cx="57" cy="50" r="18" fill="rgba(37,99,235,.3)" stroke="rgba(96,165,250,.4)" stroke-width="1.5"/>
+                    <text x="57" y="55" text-anchor="middle" fill="#bfdbfe" font-size="14">🎓</text>
+                </svg>`,
+            },
+            {
+                section: 'mentor',
+                tag: '🧠 AI Mentor', tagBg: 'rgba(219,39,119,.5)', tagColor: '#fbcfe8',
+                title: 'Personal AI Trading Coach',
+                desc: 'Ask any trading question. Get real strategy reviews, psychology insights & risk guidance 24/7.',
+                btn: 'Ask the mentor',
+                bg: 'linear-gradient(135deg,#1a0a2e 0%,#831843 60%,#1a0a2e 100%)',
+                art: `<svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    <circle cx="200" cy="110" r="70" fill="rgba(219,39,119,.1)" stroke="rgba(244,114,182,.2)" stroke-width="1.5"/>
+                    <circle cx="200" cy="110" r="45" fill="rgba(219,39,119,.15)" stroke="rgba(244,114,182,.3)" stroke-width="1"/>
+                    <circle cx="200" cy="110" r="22" fill="rgba(219,39,119,.35)"/>
+                    <text x="200" y="118" text-anchor="middle" fill="white" font-size="20">🤖</text>
+                    ${[[130,55,'Risk?'],[270,60,'Entry?'],[110,150,'Strategy'],[285,145,'SMC?'],[200,185,'When?']].map(([x,y,t])=>`
+                    <rect x="${x-22}" y="${y-10}" width="44" height="18" rx="9" fill="rgba(244,114,182,.15)" stroke="rgba(244,114,182,.25)" stroke-width=".8"/>
+                    <text x="${x}" y="${y+4}" text-anchor="middle" fill="rgba(244,114,182,.85)" font-size="8">${t}</text>`).join('')}
+                </svg>`,
+            },
+            {
+                section: 'webinars',
+                tag: '🎥 Live', tagBg: 'rgba(217,119,6,.5)', tagColor: '#fde68a',
+                title: 'Live Webinars & Sessions',
+                desc: 'Expert-led live trading sessions, market walkthroughs and real-time Q&A with professional traders.',
+                btn: 'View schedule',
+                bg: 'linear-gradient(135deg,#1c0f00 0%,#78350f 50%,#1c1000 100%)',
+                art: `<svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    <rect x="60" y="40" width="280" height="150" rx="10" fill="rgba(245,158,11,.08)" stroke="rgba(251,191,36,.2)" stroke-width="1.5"/>
+                    <rect x="75" y="55" width="250" height="110" rx="6" fill="rgba(245,158,11,.06)"/>
+                    <circle cx="200" cy="110" r="30" fill="rgba(245,158,11,.2)" stroke="rgba(251,191,36,.4)" stroke-width="1.5"/>
+                    <polygon points="193,98 193,122 218,110" fill="rgba(251,191,36,.8)"/>
+                    <circle cx="105" cy="45" r="6" fill="#ef4444"/>
+                    <circle cx="122" cy="45" r="6" fill="#f59e0b"/>
+                    <circle cx="139" cy="45" r="6" fill="#10b981"/>
+                    <rect x="75" y="170" width="250" height="5" rx="2.5" fill="rgba(245,158,11,.15)"/>
+                    <rect x="75" y="170" width="150" height="5" rx="2.5" fill="rgba(251,191,36,.4)"/>
+                    <circle cx="95" cy="200" r="8" fill="rgba(245,158,11,.3)"/>
+                    <circle cx="120" cy="200" r="8" fill="rgba(245,158,11,.2)"/>
+                    <circle cx="145" cy="200" r="8" fill="rgba(245,158,11,.15)"/>
+                    <text x="168" y="205" fill="rgba(251,191,36,.5)" font-size="9">+47 attending</text>
+                </svg>`,
+            },
+            {
+                section: 'journal',
+                tag: '📔 Journal', tagBg: 'rgba(5,150,105,.5)', tagColor: '#a7f3d0',
+                title: 'Trading Journal & Analytics',
+                desc: 'Import MT4/MT5/CSV trades. Track equity curves, drawdowns, win rate & psychology patterns.',
+                btn: 'Open journal',
+                bg: 'linear-gradient(135deg,#022c22 0%,#065f46 50%,#022c22 100%)',
+                art: `<svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    <defs><linearGradient id="jg" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#059669" stop-opacity=".4"/><stop offset="100%" stop-color="#059669" stop-opacity="0"/></linearGradient></defs>
+                    <polyline points="20,180 50,165 80,170 110,145 140,150 170,120 200,125 230,100 260,105 290,78 320,82 350,60 380,65" fill="none" stroke="#34d399" stroke-width="2" opacity=".9"/>
+                    <polygon points="20,180 50,165 80,170 110,145 140,150 170,120 200,125 230,100 260,105 290,78 320,82 350,60 380,65 380,220 20,220" fill="url(#jg)"/>
+                    ${[50,110,170,230,290,350].map(x=>`<line x1="${x}" y1="50" x2="${x}" y2="200" stroke="rgba(52,211,153,.07)" stroke-width="1"/>`).join('')}
+                    ${[80,120,160,200].map(y=>`<line x1="20" y1="${y}" x2="380" y2="${y}" stroke="rgba(52,211,153,.07)" stroke-width="1"/>`).join('')}
+                    <rect x="20" y="50" width="65" height="22" rx="4" fill="rgba(5,150,105,.4)" stroke="rgba(52,211,153,.3)"/>
+                    <text x="52" y="65" text-anchor="middle" fill="#a7f3d0" font-size="9">Win Rate: 68%</text>
+                </svg>`,
+            },
+            {
+                section: 'blog',
+                tag: '📰 Research', tagBg: 'rgba(15,118,110,.5)', tagColor: '#99f6e4',
+                title: 'Market Research & Blog',
+                desc: 'Daily market analysis, strategy breakdowns, SMC insights and economic event coverage.',
+                btn: 'Read latest',
+                bg: 'linear-gradient(135deg,#032420 0%,#134e4a 50%,#032420 100%)',
+                art: `<svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none">
+                    ${[0,1,2].map(i=>`
+                    <rect x="30" y="${30+i*58}" width="160" height="48" rx="6" fill="rgba(20,184,166,.08)" stroke="rgba(45,212,191,.15)" stroke-width="1"/>
+                    <rect x="42" y="${42+i*58}" width="60" height="8" rx="4" fill="rgba(45,212,191,.3)"/>
+                    <rect x="42" y="${55+i*58}" width="136" height="5" rx="2.5" fill="rgba(45,212,191,.12)"/>
+                    <rect x="42" y="${63+i*58}" width="100" height="5" rx="2.5" fill="rgba(45,212,191,.08)"/>
+                    `).join('')}
+                    <rect x="210" y="30" width="160" height="160" rx="8" fill="rgba(20,184,166,.1)" stroke="rgba(45,212,191,.2)" stroke-width="1"/>
+                    <text x="290" y="90" text-anchor="middle" fill="rgba(45,212,191,.4)" font-size="48">📈</text>
+                    <rect x="222" y="155" width="136" height="8" rx="4" fill="rgba(45,212,191,.2)"/>
+                    <rect x="222" y="168" width="90" height="8" rx="4" fill="rgba(45,212,191,.12)"/>
+                </svg>`,
+            },
+        ];
+
+        const track = document.getElementById('fc-track');
+        const dotsEl = document.getElementById('fc-dots');
+        if (!track || !dotsEl) return;
+
+        track.innerHTML = slides.map((s, i) => `
+            <div class="fc-slide" onclick="dashboard.navigate('${s.section}')">
+                <div class="fc-slide-inner" style="background:${s.bg};">
+                    <div class="fc-art">${s.art}</div>
+                    <div class="fc-content">
+                        <div class="fc-tag" style="background:${s.tagBg};color:${s.tagColor};">${s.tag}</div>
+                        <div class="fc-title">${s.title}</div>
+                        <div class="fc-desc">${s.desc}</div>
+                        <button class="fc-btn"><i class="fas fa-arrow-right" style="font-size:.65rem;"></i> ${s.btn}</button>
+                    </div>
+                </div>
+            </div>`).join('');
+
+        dotsEl.innerHTML = slides.map((_, i) => `<div class="fc-dot${i === 0 ? ' act' : ''}" onclick="dashboard._fcGoTo(${i})"></div>`).join('');
+
+        this._fcIndex  = 0;
+        this._fcTotal  = slides.length;
+        this._fcSlides = slides;
+        this._fcUpdateTrack();
+
+        // Auto-advance every 4s
+        if (this._fcTimer) clearInterval(this._fcTimer);
+        this._fcTimer = setInterval(() => this._fcMove(1), 4500);
+
+        // Pause on hover
+        track.addEventListener('mouseenter', () => clearInterval(this._fcTimer));
+        track.addEventListener('mouseleave', () => {
+            if (this._fcTimer) clearInterval(this._fcTimer);
+            this._fcTimer = setInterval(() => this._fcMove(1), 4500);
+        });
+    }
+
+    _fcVisibleCount() {
+        const w = window.innerWidth;
+        return w < 600 ? 1 : w < 900 ? 2 : 3;
+    }
+
+    _fcMove(dir) {
+        const total = this._fcTotal || 0;
+        if (!total) return;
+        const vis = this._fcVisibleCount();
+        const maxIdx = Math.max(0, total - vis);
+        this._fcIndex = Math.min(Math.max(0, this._fcIndex + dir), maxIdx);
+        if (dir > 0 && this._fcIndex >= maxIdx) this._fcIndex = 0;  // wrap
+        this._fcUpdateTrack();
+    }
+
+    _fcGoTo(i) {
+        this._fcIndex = i;
+        this._fcUpdateTrack();
+    }
+
+    _fcUpdateTrack() {
+        const track = document.getElementById('fc-track');
+        if (!track) return;
+        const slideW = track.children[0]?.offsetWidth || 0;
+        const gap    = 16;
+        track.style.transform = `translateX(-${this._fcIndex * (slideW + gap)}px)`;
+        document.querySelectorAll('.fc-dot').forEach((d, i) => {
+            d.classList.toggle('act', i === this._fcIndex);
+        });
     }
 
     _initClock() {

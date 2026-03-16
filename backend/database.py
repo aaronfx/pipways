@@ -221,3 +221,226 @@ async def init_database():
     except Exception as e:
         print(f"[DB FATAL] Could not connect: {e}", flush=True)
         raise
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DATABASE MIGRATIONS  ─  added for CMS v2
+# Safe to call every startup: every statement is fully idempotent.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# (table, column, pg_type, default_clause)
+# Each row becomes:  ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <col> <type> <default>
+_COLUMN_MIGRATIONS = [
+    # ── blog_posts ────────────────────────────────────────────────────────────
+    # The live table was created with status/featured only; CMS v2 needs these:
+    ("blog_posts", "is_published",    "BOOLEAN",      "DEFAULT FALSE"),
+    ("blog_posts", "tags",            "TEXT",         "DEFAULT '[]'"),
+    ("blog_posts", "featured_image",  "VARCHAR(500)", "DEFAULT ''"),
+    ("blog_posts", "views",           "INTEGER",      "DEFAULT 0"),
+    ("blog_posts", "focus_keyword",   "VARCHAR(255)", "DEFAULT ''"),
+    ("blog_posts", "seo_title",       "VARCHAR(255)", "DEFAULT ''"),
+    ("blog_posts", "seo_description", "TEXT",         "DEFAULT ''"),   # may already exist
+    ("blog_posts", "seo_keywords",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
+    ("blog_posts", "og_image_url",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
+
+    # ── signals ───────────────────────────────────────────────────────────────
+    # Production signals table may have been created with a minimal schema
+    # (id, title, status …) before the trading-specific columns were added.
+    ("signals", "symbol",        "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "direction",     "VARCHAR(10)",  "DEFAULT 'BUY'"),
+    ("signals", "entry_price",   "FLOAT",        "DEFAULT 0"),
+    ("signals", "stop_loss",     "FLOAT",        "DEFAULT 0"),
+    ("signals", "take_profit",   "FLOAT",        "DEFAULT 0"),
+    ("signals", "timeframe",     "VARCHAR(10)",  "DEFAULT '1H'"),
+    ("signals", "analysis",      "TEXT",         "DEFAULT ''"),
+    ("signals", "outcome",       "VARCHAR(20)",  ""),
+    ("signals", "created_by",    "INTEGER",      ""),
+    ("signals", "result_pips",   "FLOAT",        ""),
+    # ai_confidence / status / closed_at already exist per the ORM definition
+
+    # ── webinars ──────────────────────────────────────────────────────────────
+    # presenter + recording_url are in the ORM but missing from some live DBs
+    ("webinars", "presenter",        "VARCHAR(255)", "DEFAULT ''"),
+    ("webinars", "meeting_link",     "VARCHAR(500)", "DEFAULT ''"),
+    ("webinars", "recording_url",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
+    ("webinars", "thumbnail",        "VARCHAR(500)", "DEFAULT ''"),
+    ("webinars", "max_attendees",    "INTEGER",      "DEFAULT 100"),
+    ("webinars", "is_published",     "BOOLEAN",      "DEFAULT FALSE"),
+
+    # ── courses ───────────────────────────────────────────────────────────────
+    ("courses", "price",               "FLOAT",        "DEFAULT 0"),
+    ("courses", "thumbnail",           "VARCHAR(500)", "DEFAULT ''"),
+    ("courses", "preview_video",       "VARCHAR(500)", "DEFAULT ''"),
+    ("courses", "is_published",        "BOOLEAN",      "DEFAULT FALSE"),
+    ("courses", "certificate_enabled", "BOOLEAN",      "DEFAULT FALSE"),
+    ("courses", "pass_percentage",     "INTEGER",      "DEFAULT 70"),
+
+    # ── users ─────────────────────────────────────────────────────────────────
+    ("users", "last_login",        "TIMESTAMP",   ""),
+    # role / subscription_tier already exist in the ORM, guard anyway
+    ("users", "role",              "VARCHAR(50)", "DEFAULT 'user'"),
+]
+
+# New tables required by CMS v2 — all CREATE … IF NOT EXISTS so safe to re-run.
+_TABLE_MIGRATIONS = [
+    """CREATE TABLE IF NOT EXISTS course_modules (
+        id          SERIAL PRIMARY KEY,
+        course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title       VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT '',
+        order_index INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS lessons (
+        id               SERIAL PRIMARY KEY,
+        course_id        INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        module_id        INTEGER,
+        title            VARCHAR(255) NOT NULL,
+        content          TEXT DEFAULT '',
+        video_url        VARCHAR(500) DEFAULT '',
+        attachment_url   VARCHAR(500) DEFAULT '',
+        duration_minutes INTEGER DEFAULT 0,
+        order_index      INTEGER DEFAULT 0,
+        is_free_preview  BOOLEAN DEFAULT FALSE,
+        is_active        BOOLEAN DEFAULT TRUE,
+        created_at       TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS quizzes (
+        id              SERIAL PRIMARY KEY,
+        module_id       INTEGER NOT NULL REFERENCES course_modules(id) ON DELETE CASCADE,
+        title           VARCHAR(255) NOT NULL,
+        pass_percentage INTEGER DEFAULT 70,
+        max_attempts    INTEGER DEFAULT 3,
+        created_at      TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS quiz_questions (
+        id             SERIAL PRIMARY KEY,
+        quiz_id        INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+        question       TEXT NOT NULL,
+        option_a       TEXT NOT NULL,
+        option_b       TEXT NOT NULL,
+        option_c       TEXT DEFAULT '',
+        option_d       TEXT DEFAULT '',
+        correct_option VARCHAR(1) NOT NULL,
+        explanation    TEXT DEFAULT '',
+        order_index    INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS media_library (
+        id            SERIAL PRIMARY KEY,
+        filename      VARCHAR(500) NOT NULL,
+        original_name VARCHAR(255) DEFAULT '',
+        url           VARCHAR(500) NOT NULL,
+        mime_type     VARCHAR(100) DEFAULT '',
+        size_bytes    BIGINT DEFAULT 0,
+        folder        VARCHAR(100) DEFAULT 'general',
+        created_at    TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS site_settings (
+        key        VARCHAR(120) PRIMARY KEY,
+        value      TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS announcements (
+        id         SERIAL PRIMARY KEY,
+        message    TEXT NOT NULL,
+        type       VARCHAR(20) DEFAULT 'info',
+        is_active  BOOLEAN DEFAULT TRUE,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS coupons (
+        id             SERIAL PRIMARY KEY,
+        code           VARCHAR(50) UNIQUE NOT NULL,
+        discount_type  VARCHAR(20) DEFAULT 'percent',
+        discount_value FLOAT NOT NULL,
+        max_uses       INTEGER DEFAULT 100,
+        uses           INTEGER DEFAULT 0,
+        expires_at     TIMESTAMP,
+        is_active      BOOLEAN DEFAULT TRUE,
+        created_at     TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS login_logs (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS ai_mentor_logs (
+        id             SERIAL PRIMARY KEY,
+        user_id        INTEGER,
+        question_topic VARCHAR(255) DEFAULT '',
+        created_at     TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS chart_analysis_logs (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER,
+        symbol     VARCHAR(20) DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS journal_uploads (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+]
+
+
+async def run_migrations():
+    """
+    Idempotent migration runner — call once from main.py lifespan startup.
+
+    Phase 1: CREATE new tables (IF NOT EXISTS).
+    Phase 2: ADD missing columns (IF NOT EXISTS).
+    Phase 3: Back-fill is_published from legacy status/is_active columns.
+    """
+    print("[DB MIGRATION] Starting schema migration…", flush=True)
+    ok = warn = 0
+
+    # ── Phase 1: new tables ──────────────────────────────────────────────────
+    for sql in _TABLE_MIGRATIONS:
+        try:
+            await database.execute(sql.strip())
+            ok += 1
+        except Exception as e:
+            print(f"[DB MIGRATION] table warn: {e}", flush=True)
+            warn += 1
+
+    # ── Phase 2: missing columns ─────────────────────────────────────────────
+    for table, col, col_type, default_clause in _COLUMN_MIGRATIONS:
+        try:
+            ddl = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}"
+            if default_clause:
+                ddl += f" {default_clause}"
+            await database.execute(ddl)
+            ok += 1
+        except Exception as e:
+            print(f"[DB MIGRATION] col {table}.{col} warn: {e}", flush=True)
+            warn += 1
+
+    # ── Phase 3: back-fill is_published ──────────────────────────────────────
+    # blog_posts: if status = 'published', set is_published = TRUE
+    try:
+        await database.execute(
+            "UPDATE blog_posts SET is_published = TRUE "
+            "WHERE is_published = FALSE AND status = 'published'"
+        )
+    except Exception:
+        pass
+
+    # webinars: if status != 'cancelled' / 'draft', treat as published
+    try:
+        await database.execute(
+            "UPDATE webinars SET is_published = TRUE "
+            "WHERE is_published = FALSE AND status NOT IN ('cancelled', 'draft')"
+        )
+    except Exception:
+        pass
+
+    # courses: if is_active = TRUE, treat as published
+    try:
+        await database.execute(
+            "UPDATE courses SET is_published = TRUE "
+            "WHERE is_published = FALSE AND is_active = TRUE"
+        )
+    except Exception:
+        pass
+
+    print(f"[DB MIGRATION] Complete — {ok} statements ok, {warn} warnings", flush=True)

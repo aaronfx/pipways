@@ -858,98 +858,105 @@ function renderBlog() {
     `;
 }
 
-function renderAdmin() {
+async function renderAdmin() {
     const content = document.getElementById('content');
     if (!content) return;
-    
+
     const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
-    
+
     if (!user.is_admin) {
         content.innerHTML = `
             <div class="glass-card rounded-xl p-8 text-center border-red-200 bg-red-50 max-w-md mx-auto">
                 <i class="fas fa-lock text-4xl text-red-500 mb-4"></i>
                 <h3 class="text-xl font-bold text-red-800 mb-2">Access Denied</h3>
                 <p class="text-red-600">Admin privileges required.</p>
-            </div>
-        `;
+            </div>`;
         return;
     }
-    
+
+    // Render skeleton while loading
     content.innerHTML = `
         <div class="max-w-6xl mx-auto space-y-6">
             <div class="glass-card rounded-xl p-6 sm:p-8 bg-gradient-to-r from-gray-800 to-gray-900 text-white">
-                <h3 class="text-2xl font-bold mb-2">Admin Dashboard</h3>
-                <p class="text-gray-300">Platform management and user administration</p>
+                <h3 class="text-2xl font-bold mb-1">Admin Dashboard</h3>
+                <p class="text-gray-400 text-sm">Platform management and user analytics</p>
             </div>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="glass-card rounded-xl p-6 border-l-4 border-blue-500">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-gray-600 text-sm">Total Users</p>
-                            <p class="text-3xl font-bold text-gray-800 mt-1">1,247</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                            <i class="fas fa-users"></i>
-                        </div>
-                    </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                ${['Total Users','Active Signals','Courses','Blog Posts'].map((label, i) => `
+                <div class="glass-card rounded-xl p-5 border-l-4 ${['border-blue-500','border-green-500','border-purple-500','border-yellow-500'][i]}">
+                    <p class="text-gray-500 text-xs uppercase tracking-wide">${label}</p>
+                    <p class="text-3xl font-bold text-gray-800 mt-1 animate-pulse" id="stat-${['users','signals','courses','blog'][i]}">—</p>
+                </div>`).join('')}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="glass-card rounded-xl p-5 border-l-4 border-pink-400">
+                    <p class="text-gray-500 text-xs uppercase tracking-wide">AI Mentor (today)</p>
+                    <p class="text-3xl font-bold text-gray-800 mt-1 animate-pulse" id="stat-mentor">—</p>
                 </div>
-                
-                <div class="glass-card rounded-xl p-6 border-l-4 border-green-500">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-gray-600 text-sm">Active Signals</p>
-                            <p class="text-3xl font-bold text-gray-800 mt-1">42</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
-                            <i class="fas fa-signal"></i>
-                        </div>
-                    </div>
+                <div class="glass-card rounded-xl p-5 border-l-4 border-teal-400">
+                    <p class="text-gray-500 text-xs uppercase tracking-wide">Charts Analysed (today)</p>
+                    <p class="text-3xl font-bold text-gray-800 mt-1 animate-pulse" id="stat-charts">—</p>
                 </div>
-                
-                <div class="glass-card rounded-xl p-6 border-l-4 border-purple-500">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-gray-600 text-sm">System Status</p>
-                            <p class="text-3xl font-bold text-green-600 mt-1">Online</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
-                            <i class="fas fa-server"></i>
-                        </div>
-                    </div>
+                <div class="glass-card rounded-xl p-5 border-l-4 border-orange-400">
+                    <p class="text-gray-500 text-xs uppercase tracking-wide">New Users (today)</p>
+                    <p class="text-3xl font-bold text-gray-800 mt-1 animate-pulse" id="stat-new">—</p>
                 </div>
             </div>
-            
+
             <div class="glass-card rounded-xl p-6">
-                <h4 class="font-bold text-gray-800 mb-4">Recent Activity</h4>
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                                <i class="fas fa-user-plus text-sm"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-800">New user registered</p>
-                                <p class="text-xs text-gray-500">john@example.com</p>
-                            </div>
-                        </div>
-                        <span class="text-xs text-gray-500">2 min ago</span>
-                    </div>
-                    
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                                <i class="fas fa-signal text-sm"></i>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-800">New signal created</p>
-                                <p class="text-xs text-gray-500">EURUSD BUY @ 1.0850</p>
-                            </div>
-                        </div>
-                        <span class="text-xs text-gray-500">15 min ago</span>
-                    </div>
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-bold text-gray-800">Recent Users</h4>
+                    <span class="text-xs text-gray-400">Last 10 registrations</span>
+                </div>
+                <div id="recent-users-list" class="space-y-2">
+                    <p class="text-gray-400 text-sm animate-pulse">Loading…</p>
                 </div>
             </div>
-        </div>
-    `;
+        </div>`;
+
+    // Load real data
+    try {
+        const stats = await API.getAdminStats();
+
+        const set = (id, val) => { const el = document.getElementById(id); if (el) { el.textContent = val; el.classList.remove('animate-pulse'); } };
+        set('stat-users',   stats.total_users   ?? '—');
+        set('stat-signals', stats.active_signals ?? '—');
+        set('stat-courses', stats.total_courses  ?? '—');
+        set('stat-blog',    stats.total_blog_posts ?? '—');
+        set('stat-mentor',  stats.ai_mentor_requests_today ?? '—');
+        set('stat-charts',  stats.charts_analyzed_today    ?? '—');
+        set('stat-new',     stats.new_today ?? '—');
+
+        // Recent users table
+        const listEl = document.getElementById('recent-users-list');
+        if (listEl && stats.recent_users?.length) {
+            listEl.innerHTML = stats.recent_users.map(u => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                            ${(u.username || u.email || '?')[0].toUpperCase()}
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-800">${u.username || '—'}</p>
+                            <p class="text-xs text-gray-500">${u.email}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs px-2 py-0.5 rounded-full ${u.subscription_tier === 'pro' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'}">
+                            ${u.subscription_tier || 'free'}
+                        </span>
+                        <span class="text-xs text-gray-400">${u.created_at ? new Date(u.created_at).toLocaleDateString() : ''}</span>
+                    </div>
+                </div>`).join('');
+        } else if (listEl) {
+            listEl.innerHTML = '<p class="text-gray-400 text-sm">No users yet.</p>';
+        }
+
+    } catch (e) {
+        console.error('[Admin] Failed to load stats:', e);
+        const els = ['stat-users','stat-signals','stat-courses','stat-blog','stat-mentor','stat-charts','stat-new'];
+        els.forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = 'Error'; el.classList.remove('animate-pulse'); el.classList.add('text-red-500'); }});
+    }
 }

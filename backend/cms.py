@@ -466,31 +466,57 @@ async def cms_list_courses(_=Depends(get_admin_user)):
 
 @router.post("/courses", status_code=201)
 async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
-    cid = await _exec(
-        "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
-        "is_published,is_active,certificate_enabled,pass_percentage,created_at) "
-        "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:active,:cert,:pass,:now)",
-        {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-         "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-         "pub":data.is_published,"active":data.is_published,  # sync is_active with is_published
-         "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
-         "now":datetime.utcnow()}
-    )
+    try:
+        # Full INSERT including is_active (works after migration runs)
+        cid = await _exec(
+            "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
+            "is_published,is_active,certificate_enabled,pass_percentage,created_at) "
+            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:active,:cert,:pass,:now)",
+            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
+             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
+             "pub":data.is_published,"active":data.is_published,
+             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
+             "now":datetime.utcnow()}
+        )
+    except Exception:
+        # Fallback: is_active column not yet added — insert without it
+        cid = await _exec(
+            "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
+            "is_published,certificate_enabled,pass_percentage,created_at) "
+            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)",
+            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
+             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
+             "pub":data.is_published,
+             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
+             "now":datetime.utcnow()}
+        )
     return {"id": cid, "message": "Course created"}
 
 @router.put("/courses/{cid}")
 async def cms_update_course(cid: int, data: CourseIn, _=Depends(get_admin_user)):
     if not await _row("SELECT id FROM courses WHERE id=:id", {"id": cid}):
         raise HTTPException(404, "Course not found")
-    await _exec(
-        "UPDATE courses SET title=:title,description=:desc,level=:level,price=:price,"
-        "thumbnail=:thumb,preview_video=:preview,is_published=:pub,is_active=:active,"
-        "certificate_enabled=:cert,pass_percentage=:pass WHERE id=:id",
-        {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-         "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-         "pub":data.is_published,"active":data.is_published,  # sync is_active
-         "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
-    )
+    try:
+        await _exec(
+            "UPDATE courses SET title=:title,description=:desc,level=:level,price=:price,"
+            "thumbnail=:thumb,preview_video=:preview,is_published=:pub,is_active=:active,"
+            "certificate_enabled=:cert,pass_percentage=:pass WHERE id=:id",
+            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
+             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
+             "pub":data.is_published,"active":data.is_published,
+             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
+        )
+    except Exception:
+        # Fallback: is_active column not yet added
+        await _exec(
+            "UPDATE courses SET title=:title,description=:desc,level=:level,price=:price,"
+            "thumbnail=:thumb,preview_video=:preview,is_published=:pub,"
+            "certificate_enabled=:cert,pass_percentage=:pass WHERE id=:id",
+            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
+             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
+             "pub":data.is_published,
+             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
+        )
     return {"message": "Course updated"}
 
 @router.delete("/courses/{cid}")
@@ -508,8 +534,12 @@ async def cms_toggle_course(cid: int, _=Depends(get_admin_user)):
     if not r: raise HTTPException(404, "Course not found")
     ns = not bool(r["is_published"])
     # Sync both is_published and is_active so public /courses/list sees it
-    await _exec("UPDATE courses SET is_published=:pub,is_active=:pub WHERE id=:id",
-                {"pub": ns, "id": cid})
+    try:
+        await _exec("UPDATE courses SET is_published=:pub,is_active=:pub WHERE id=:id",
+                    {"pub": ns, "id": cid})
+    except Exception:
+        await _exec("UPDATE courses SET is_published=:pub WHERE id=:id",
+                    {"pub": ns, "id": cid})
     return {"is_published": ns, "message": "Published" if ns else "Unpublished"}
 
 # ── Modules ──────────────────────────────────────────────────────────────────

@@ -123,7 +123,13 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-    # No httpx client to close for stock terminal — yfinance handles its own connections
+    # Close stock terminal HTTP client if it was lazy-initialized
+    try:
+        if stock_module._http is not None:
+            await stock_module._http.aclose()
+            print("[STOCK] HTTP client closed", flush=True)
+    except Exception:
+        pass
 
 
 app = FastAPI(

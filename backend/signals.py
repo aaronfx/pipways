@@ -7,7 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from .database import database, users
-from .security import get_current_user
+from .security import get_current_user, is_admin_user
 
 router = APIRouter()
 
@@ -67,21 +67,10 @@ async def create_signal(
 ):
     """Create new trading signal (admin only)"""
     try:
-        # Verify admin
-        # FIXED: SQLAlchemy Row objects don't support dict() directly
-        # Use _mapping for Row objects, fallback to dict for plain dicts
-        if hasattr(current_user, '_mapping'):
-            is_admin = bool(current_user._mapping.get('is_admin', False)) or \
-                       current_user._mapping.get('role') == 'admin'
-        elif isinstance(current_user, dict):
-            is_admin = bool(current_user.get('is_admin', False)) or \
-                       current_user.get('role') == 'admin'
-        else:
-            is_admin = bool(getattr(current_user, 'is_admin', False)) or \
-                       getattr(current_user, 'role', None) == 'admin'
-        
-        if not is_admin:
+        # Use shared helper — handles SQLAlchemy Row, dict, and ORM models
+        if not is_admin_user(current_user):
             raise HTTPException(403, "Admin access required")
+
         
         # Insert into database
         query = """

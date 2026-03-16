@@ -51,6 +51,10 @@ print("[IMPORT] All modules loaded successfully", flush=True)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 
+# Single source of truth for the application version.
+# Update this constant only; all references below use it automatically.
+APP_VERSION = "2.3.0"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -92,8 +96,10 @@ async def lifespan(app: FastAPI):
     # ── Cleanup ────────────────────────────────────────────────────────────
     try:
         await database.disconnect()
-    except Exception:
-        pass
+    except Exception as e:
+        # FIX: was bare `except: pass` — errors are now logged so they are not
+        # silently swallowed during shutdown, aiding post-mortem debugging.
+        print(f"[SHUTDOWN] database.disconnect() error: {e}", flush=True)
 
     # Close chart analysis HTTP client
     try:
@@ -108,7 +114,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pipways Trading Platform",
-    version="2.3.0",  # Bumped for chart analysis connection pooling
+    version=APP_VERSION,
     lifespan=lifespan
 )
 
@@ -126,7 +132,7 @@ app.add_middleware(
 async def health_check():
     return {
         "status": "healthy",
-        "version": "2.3.0",
+        "version": APP_VERSION,
         "stock_terminal": {
             "anthropic_ready": stock_module._anthropic is not None,
             "data_source":     "yfinance (free)",
@@ -200,7 +206,7 @@ async def serve_index():
     ]:
         if path and os.path.exists(path):
             return FileResponse(path)
-    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.3.0", "docs": "/docs"})
+    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": APP_VERSION, "docs": "/docs"})
 
 
 @app.get("/dashboard.html")
@@ -234,4 +240,4 @@ async def serve_spa(full_path: str):
     if os.path.exists(index_path):
         return FileResponse(index_path)
 
-    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": "2.3.0", "path": full_path})
+    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": APP_VERSION, "path": full_path})

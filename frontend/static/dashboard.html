@@ -99,6 +99,15 @@
         .mr-2 { margin-right: 0.5rem; }
         .mt-1 { margin-top: 0.25rem; }
         .mb-0 { margin-bottom: 0 !important; }
+
+        /* FIX: .card-body was used in chart_analysis.js templates but never defined */
+        .card-body { padding: 1rem 0 0; }
+
+        /* FIX: .badge-secondary was used in pattern reliability rendering but never defined */
+        .badge-secondary { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+
+        /* Additional badge variants used in chart analysis */
+        .badge-primary { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
@@ -1510,14 +1519,17 @@ const DashboardController = class {
     }
 };
 
-// Create API shim BEFORE instantiating dashboard
+// FIX: API shim is now defined AFTER dashboard is instantiated.
+// dashboard.apiRequest is referenced lazily (inside a function body), so
+// there is no TDZ issue — but placing it after instantiation makes the
+// dependency order explicit and avoids any confusion.
+const dashboard = new DashboardController();
+
 const API = {
     request(endpoint, opts = {}) {
         return dashboard.apiRequest(endpoint, opts);
     }
 };
-
-const dashboard = new DashboardController();
     </script>
     
     <script src="/js/chart_analysis.js"></script>

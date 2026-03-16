@@ -80,42 +80,38 @@ async def get_posts(
             params = {"limit": limit, "offset": offset}
         rows = await database.fetch_all(query, params)
 
-        posts = []
-        for row in rows:
-            # Parse tags from JSON string or return empty list
-            tags_raw = row.get("tags") or "[]"
-            try:
-                import json
-                tags = json.loads(tags_raw) if isinstance(tags_raw, str) else (tags_raw or [])
-            except Exception:
-                tags = []
+    posts = []
+    for row in rows:
+        # Parse tags from JSON string or return empty list
+        tags_raw = row.get("tags") or "[]"
+        try:
+            import json
+            tags = json.loads(tags_raw) if isinstance(tags_raw, str) else (tags_raw or [])
+        except Exception:
+            tags = []
 
-            posts.append({
-                "id": row["id"],
-                "title": row["title"],
-                "slug": row["slug"],
-                "excerpt": row.get("excerpt") or (row["content"][:150] + "..." if row.get("content") else ""),
-                "content": row["content"],
-                "category": row["category"],
-                "featured_image": row.get("featured_image", ""),
-                "views": row.get("views", 0),
-                "tags": tags,
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "featured": row.get("featured", False),
-                "read_time": row.get("read_time", "5 min"),
-                "is_published": bool(row.get("is_published", False)),
-            })
+        posts.append({
+            "id": row["id"],
+            "title": row["title"],
+            "slug": row["slug"],
+            "excerpt": row.get("excerpt") or (row["content"][:150] + "..." if row.get("content") else ""),
+            "content": row["content"],
+            "category": row["category"],
+            "featured_image": row.get("featured_image", ""),
+            "views": row.get("views", 0),
+            "tags": tags,
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "featured": row.get("featured", False),
+            "read_time": row.get("read_time", "5 min"),
+            "is_published": bool(row.get("is_published", False)),
+        })
 
-        return posts
-        
-    except Exception as e:
-        print(f"[ERROR] Failed to fetch blog posts: {e}", flush=True)
-        raise HTTPException(500, "Failed to load blog posts")
+    return posts
+
 
 @router.get("/posts/{slug}")
 async def get_post(slug: str, current_user = Depends(get_current_user)):
     """Get single post by slug"""
-    try:
     try:
         query = "SELECT * FROM blog_posts WHERE slug = :slug AND (status = 'published' OR COALESCE(is_published, false) = TRUE)"
         post = await database.fetch_one(query, {"slug": slug})
@@ -123,26 +119,22 @@ async def get_post(slug: str, current_user = Depends(get_current_user)):
         query = "SELECT * FROM blog_posts WHERE slug = :slug AND status = 'published'"
         post = await database.fetch_one(query, {"slug": slug})
 
-        if not post:
-            raise HTTPException(404, "Post not found")
+    if not post:
+        raise HTTPException(404, "Post not found")
 
-        result = dict(post)
-        # Normalise tags to a list
-        import json
-        tags_raw = result.get("tags", "[]") or "[]"
-        try:
-            result["tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else (tags_raw or [])
-        except Exception:
-            result["tags"] = []
-        # Serialise datetime fields
-        if result.get("created_at"):
-            result["created_at"] = result["created_at"].isoformat()
-        if result.get("updated_at"):
-            result["updated_at"] = result["updated_at"].isoformat()
+    result = dict(post)
+    # Normalise tags to a list
+    import json
+    tags_raw = result.get("tags", "[]") or "[]"
+    try:
+        result["tags"] = json.loads(tags_raw) if isinstance(tags_raw, str) else (tags_raw or [])
+    except Exception:
+        result["tags"] = []
+    
+    # Serialise datetime fields
+    if result.get("created_at"):
+        result["created_at"] = result["created_at"].isoformat()
+    if result.get("updated_at"):
+        result["updated_at"] = result["updated_at"].isoformat()
 
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Database error: {str(e)}")
+    return result

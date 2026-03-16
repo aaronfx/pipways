@@ -1656,6 +1656,10 @@ const DashboardController = class {
     async loadCourses() {
         const container = document.getElementById('courses-container');
         if (!container) return;
+        if (typeof CoursesPage !== 'undefined') {
+            await CoursesPage.render('courses-container');
+            return;
+        }
         container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>';
         try {
             const data = await this.apiRequest('/courses/list');
@@ -1668,18 +1672,16 @@ const DashboardController = class {
                 return;
             }
             container.innerHTML = courses.map(c => `
-                <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors">
-                    ${c.thumbnail_url
-                        ? `<img src="${c.thumbnail_url}" class="w-full h-40 object-cover" onerror="this.parentElement.innerHTML='<div class=\\'h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center\\'><i class=\\'fas fa-graduation-cap text-5xl text-white/20\\'></i></div>'"+this.outerHTML">`
-                        : `<div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center"><i class="fas fa-graduation-cap text-5xl text-white/20"></i></div>`}
+                <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors cursor-pointer"
+                     onclick="CoursesPage ? CoursesPage.openCourse(${c.id}) : null">
+                    <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
+                        <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
+                    </div>
                     <div class="p-4">
-                        <span class="text-xs text-purple-400 font-semibold uppercase tracking-wide">${c.level || 'Beginner'}</span>
+                        <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
                         <h4 class="font-bold text-white mt-1 mb-2">${c.title}</h4>
-                        <p class="text-sm text-gray-400 line-clamp-2 mb-3">${c.description || ''}</p>
-                        <div class="flex justify-between items-center text-xs text-gray-500">
-                            <span><i class="fas fa-book-open mr-1"></i>${c.lesson_count || 0} lessons</span>
-                            ${c.progress > 0 ? `<span class="text-green-400">${c.progress}% complete</span>` : '<span class="text-purple-400 cursor-pointer hover:text-purple-300">Start Learning →</span>'}
-                        </div>
+                        <p class="text-sm text-gray-400 line-clamp-2 mb-2">${c.description || ''}</p>
+                        <div class="text-xs text-gray-500">${c.lesson_count || 0} lessons</div>
                     </div>
                 </div>
             `).join('');
@@ -1688,7 +1690,7 @@ const DashboardController = class {
         }
     }
 
-    async loadWebinars() {
+    async loadWebinars    async loadWebinars() {
         const container = document.getElementById('webinars-container');
         if (!container) return;
         container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading webinars…</div>';
@@ -2071,6 +2073,8 @@ window.API = API;
     <script src="/js/modules/chart_analysis.js"></script>
     <script src="/js/modules/admin.js"></script>
     <script src="/js/modules/cms.js"></script>
+    <script src="/js/modules/courses.js"></script>
+    <script src="/js/modules/quiz.js"></script>
 
 </body>
 </html>

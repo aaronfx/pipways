@@ -1,578 +1,460 @@
 /**
- * courses.js v2 — Complete LMS Module
- * Features: Course Listing, Course Detail, Lesson Viewer, Quiz System
+ * Pipways LMS — courses.js
+ * Renders: course grid → curriculum accordion → lesson modal
+ *
+ * Depends on: window.API (or window.dashboard.apiRequest)
+ * Exposed as: window.CoursesPage
  */
-
 const CoursesPage = {
-    currentCourse: null,
-    currentLesson: null,
-    
-    async render(containerId = 'app') {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        
-        // Default view: Course Listing
-        await this.renderCourseList(container);
-    },
-    
-    async renderCourseList(container) {
-        container.innerHTML = `
-            <div class="max-w-7xl mx-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-white">📚 Trading Academy</h2>
-                        <p class="text-gray-400 text-sm mt-1">Master the markets with structured courses</p>
-                    </div>
-                </div>
-                <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="col-span-full text-center py-12">
-                        <i class="fas fa-spinner fa-spin text-3xl text-purple-400 mb-3"></i>
-                        <p class="text-gray-400">Loading courses...</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
+
+    // ── State ────────────────────────────────────────────────────────────────
+    _currentCourse:    null,
+    _currentLesson:    null,
+    _allLessons:       [],   // flat list for prev/next nav
+    _courseId:         null,
+
+    // ── Entry point ───────────────────────────────────────────────────────────
+    async render(containerId = 'courses-container') {
+        const root = typeof containerId === 'string'
+            ? (document.getElementById(containerId) || document.getElementById('section-courses') || document.body)
+            : containerId;
+
+        root.innerHTML = this._skeleton();
+
         try {
-            const courses = await dashboard.apiRequest('/courses/list');
-            const grid = document.getElementById('courses-grid');
-            
-            if (!courses || courses.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full text-center py-12">
-                        <i class="fas fa-graduation-cap text-4xl text-gray-600 mb-3 block"></i>
-                        <p class="text-gray-400">No courses available yet</p>
-                    </div>
-                `;
+            const data  = await this._req('/courses/list');
+            const courses = Array.isArray(data) ? data : (data.courses || []);
+            if (!courses.length) {
+                root.innerHTML = this._empty('No courses published yet', 'fa-graduation-cap');
                 return;
             }
-            
-            grid.innerHTML = courses.map(course => this.createCourseCard(course)).join('');
-            
-        } catch (error) {
-            console.error('[Courses] Error loading courses:', error);
-            container.innerHTML = `
-                <div class="text-center py-12">
-                    <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-3"></i>
-                    <p class="text-gray-400">Failed to load courses</p>
-                    <button onclick="CoursesPage.render()" class="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg">
-                        Retry
-                    </button>
+            root.innerHTML = `
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-white">Trading Academy</h3>
+                    <div id="lms-progress-badge" class="text-xs text-gray-400"></div>
                 </div>
-            `;
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="lms-course-grid">
+                    ${courses.map(c => this._courseCard(c)).join('')}
+                </div>`;
+            this._loadProgressBadge();
+        } catch (e) {
+            root.innerHTML = this._error('Failed to load courses', e.message);
         }
     },
-    
-    createCourseCard(course) {
-        const progress = course.progress || 0;
-        const hasProgress = progress > 0;
-        const isCompleted = progress === 100;
-        
+
+    // ── Course Card ───────────────────────────────────────────────────────────
+    _courseCard(c) {
+        const thumb = c.thumbnail_url
+            ? `<img src="${c.thumbnail_url}" class="w-full h-44 object-cover"
+                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : '';
+        const fallback = `<div class="w-full h-44 bg-gradient-to-br from-purple-900 to-blue-900
+                               flex items-center justify-center ${c.thumbnail_url ? 'hidden' : ''}">
+                               <i class="fas fa-graduation-cap text-5xl text-white/20"></i></div>`;
+        const pct    = c.progress || 0;
+        const btn    = pct > 0
+            ? `<button class="w-full mt-3 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
+                       style="background:#7c3aed;" onclick="CoursesPage.openCourse(${c.id})">
+                   Continue (${pct}%) →
+               </button>`
+            : `<button class="w-full mt-3 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
+                       style="background:#7c3aed;" onclick="CoursesPage.openCourse(${c.id})">
+                   Start Learning →
+               </button>`;
         return `
-            <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-purple-500/50 transition-all hover:transform hover:-translate-y-1 group cursor-pointer"
-                 onclick="CoursesPage.viewCourse(${course.id})">
-                <div class="relative h-48 overflow-hidden">
-                    ${course.thumbnail_url 
-                        ? `<img src="${course.thumbnail_url}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.src='/static/default-course.jpg'">`
-                        : `<div class="w-full h-full bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-                             <i class="fas fa-graduation-cap text-6xl text-white/20"></i>
-                           </div>`
-                    }
-                    ${isCompleted 
-                        ? `<div class="absolute top-3 right-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                             <i class="fas fa-check mr-1"></i>Completed
-                           </div>`
-                        : hasProgress 
-                            ? `<div class="absolute top-3 right-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                 ${progress}%
-                               </div>`
-                            : ''
-                    }
-                    ${course.price > 0 
-                        ? `<div class="absolute top-3 left-3 bg-yellow-500 text-black px-2 py-1 rounded-full text-xs font-bold">
-                             $${course.price}
-                           </div>`
-                        : `<div class="absolute top-3 left-3 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">FREE</div>`
-                    }
+        <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700
+                    hover:border-purple-600/50 transition-colors cursor-pointer group"
+             onclick="CoursesPage.openCourse(${c.id})">
+            ${thumb}${fallback}
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs text-purple-400 font-semibold uppercase tracking-wide">
+                        ${this._e(c.level || 'Beginner')}
+                    </span>
+                    ${c.instructor ? `<span class="text-xs text-gray-500">${this._e(c.instructor)}</span>` : ''}
                 </div>
-                <div class="p-5">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gray-700 text-gray-300">${course.level || 'Beginner'}</span>
-                        <span class="text-xs text-gray-500">${course.module_count || 0} modules • ${course.lesson_count || 0} lessons</span>
-                    </div>
-                    <h3 class="text-lg font-bold text-white mb-2 line-clamp-1">${course.title}</h3>
-                    <p class="text-sm text-gray-400 line-clamp-2 mb-4 h-10">${course.description || 'No description available'}</p>
-                    
-                    ${hasProgress ? `
-                        <div class="mb-3">
-                            <div class="flex justify-between text-xs text-gray-400 mb-1">
-                                <span>Progress</span>
-                                <span>${progress}%</span>
-                            </div>
-                            <div class="w-full bg-gray-700 rounded-full h-2">
-                                <div class="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all" style="width: ${progress}%"></div>
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <button class="w-full py-2.5 rounded-lg font-semibold text-sm transition-colors ${
-                        isCompleted 
-                            ? 'bg-green-600/20 text-green-400 border border-green-600/50 hover:bg-green-600/30'
-                            : hasProgress
-                                ? 'bg-purple-600 text-white hover:bg-purple-700'
-                                : 'bg-gray-700 text-white hover:bg-gray-600'
-                    }">
-                        ${isCompleted ? 'Review Course' : hasProgress ? 'Continue Learning →' : 'Start Learning →'}
-                    </button>
+                <h4 class="font-bold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                    ${this._e(c.title)}
+                </h4>
+                <p class="text-sm text-gray-400 line-clamp-2 mb-3">
+                    ${this._e(c.description || '')}
+                </p>
+                <div class="flex items-center justify-between text-xs text-gray-500 mb-2">
+                    <span><i class="fas fa-book-open mr-1"></i>${c.lesson_count || 0} lessons</span>
+                    ${pct > 0 ? `<span class="text-green-400">${pct}% done</span>` : ''}
                 </div>
+                ${pct > 0 ? `<div class="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div class="h-full bg-purple-500 rounded-full transition-all"
+                         style="width:${pct}%"></div>
+                </div>` : ''}
+                ${btn}
             </div>
-        `;
+        </div>`;
     },
-    
-    async viewCourse(courseId) {
-        const container = document.getElementById('app') || document.getElementById('section-courses');
-        if (!container) return;
-        
-        container.innerHTML = `
-            <div class="max-w-5xl mx-auto">
-                <div class="mb-6">
-                    <button onclick="CoursesPage.render()" class="text-gray-400 hover:text-white text-sm mb-4 flex items-center gap-2">
-                        <i class="fas fa-arrow-left"></i> Back to Courses
-                    </button>
-                    <div id="course-header" class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <div class="flex items-center justify-center h-32">
-                            <i class="fas fa-spinner fa-spin text-3xl text-purple-400"></i>
-                        </div>
-                    </div>
-                </div>
-                <div id="curriculum-container" class="space-y-4">
-                    <div class="bg-gray-800 rounded-xl p-8 border border-gray-700 text-center">
-                        <i class="fas fa-spinner fa-spin text-2xl text-purple-400 mb-2"></i>
-                        <p class="text-gray-400">Loading curriculum...</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
+
+    // ── Open Course (curriculum view) ─────────────────────────────────────────
+    async openCourse(courseId) {
+        this._courseId = courseId;
+        const root = document.getElementById('courses-container')
+                  || document.getElementById('section-courses')
+                  || document.body;
+        root.innerHTML = `<div class="text-center py-12 text-gray-500">
+            <i class="fas fa-spinner fa-spin text-2xl"></i>
+            <p class="mt-2">Loading curriculum…</p></div>`;
+
         try {
-            const data = await dashboard.apiRequest(`/courses/${courseId}/curriculum`);
-            this.currentCourse = data.course;
-            
-            // Render header
-            const header = document.getElementById('course-header');
-            header.innerHTML = `
-                <div class="flex flex-col md:flex-row gap-6">
-                    ${data.course.thumbnail 
-                        ? `<img src="${data.course.thumbnail}" class="w-full md:w-48 h-32 object-cover rounded-lg">`
-                        : `<div class="w-full md:w-48 h-32 bg-gradient-to-br from-purple-900 to-blue-900 rounded-lg flex items-center justify-center">
-                             <i class="fas fa-graduation-cap text-4xl text-white/30"></i>
-                           </div>`
-                    }
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-gray-700 text-gray-300">${data.course.level || 'Beginner'}</span>
-                        </div>
-                        <h1 class="text-2xl font-bold text-white mb-2">${data.course.title}</h1>
-                        <p class="text-gray-400 text-sm mb-4">${data.course.description || ''}</p>
-                        <div class="flex items-center gap-4 text-sm text-gray-500">
-                            <span><i class="fas fa-layer-group mr-1"></i> ${data.modules.length} modules</span>
-                            <span><i class="fas fa-book mr-1"></i> ${data.modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0)} lessons</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Render curriculum (Modules → Lessons → Quiz)
-            const container = document.getElementById('curriculum-container');
-            if (data.modules.length === 0) {
-                container.innerHTML = `
-                    <div class="bg-gray-800 rounded-xl p-8 border border-gray-700 text-center">
-                        <i class="fas fa-folder-open text-4xl text-gray-600 mb-3"></i>
-                        <p class="text-gray-400">No content available for this course yet</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            container.innerHTML = data.modules.map((module, idx) => `
-                <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                    <div class="p-4 bg-gray-700/50 border-b border-gray-700 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                                ${idx + 1}
-                            </div>
-                            <div>
-                                <h3 class="font-semibold text-white">${module.title}</h3>
-                                <p class="text-xs text-gray-400">${module.lessons?.length || 0} lessons ${module.quiz ? '• 1 quiz' : ''}</p>
-                            </div>
-                        </div>
-                        <i class="fas fa-chevron-down text-gray-500"></i>
-                    </div>
-                    <div class="divide-y divide-gray-700">
-                        ${(module.lessons || []).map((lesson, lidx) => `
-                            <div onclick="CoursesPage.viewLesson(${courseId}, ${lesson.id}, ${module.id})" 
-                                 class="p-4 hover:bg-gray-700/30 cursor-pointer flex items-center justify-between group">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-6 h-6 rounded-full ${lesson.completed ? 'bg-green-500' : 'bg-gray-600'} flex items-center justify-center">
-                                        ${lesson.completed 
-                                            ? '<i class="fas fa-check text-white text-xs"></i>'
-                                            : `<span class="text-white text-xs">${lidx + 1}</span>`
-                                        }
-                                    </div>
-                                    <div>
-                                        <p class="text-sm font-medium text-white group-hover:text-purple-400 transition-colors">${lesson.title}</p>
-                                        <p class="text-xs text-gray-500">
-                                            ${lesson.duration_minutes > 0 ? `<i class="fas fa-clock mr-1"></i>${lesson.duration_minutes}m` : ''}
-                                            ${lesson.is_free_preview ? '<span class="text-green-400 ml-2">Free Preview</span>' : ''}
-                                        </p>
-                                    </div>
-                                </div>
-                                <i class="fas fa-play-circle text-gray-600 group-hover:text-purple-400"></i>
-                            </div>
-                        `).join('')}
-                        
-                        ${module.quiz ? `
-                            <div onclick="CoursesPage.startQuiz(${courseId}, ${module.quiz.id})" 
-                                 class="p-4 hover:bg-gray-700/30 cursor-pointer flex items-center justify-between group bg-yellow-900/10">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-6 h-6 rounded-full bg-yellow-600 flex items-center justify-center">
-                                        <i class="fas fa-question text-white text-xs"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-sm font-medium text-yellow-400">Module Quiz: ${module.quiz.title}</p>
-                                        <p class="text-xs text-gray-500">Passing score: ${module.quiz.pass_percentage}%</p>
-                                    </div>
-                                </div>
-                                <i class="fas fa-chevron-right text-yellow-600"></i>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
-            
-        } catch (error) {
-            console.error('[Courses] Error loading course:', error);
-            container.innerHTML = `
-                <div class="bg-gray-800 rounded-xl p-8 border border-gray-700 text-center">
-                    <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-3"></i>
-                    <p class="text-gray-400">Failed to load course content</p>
-                    <button onclick="CoursesPage.viewCourse(${courseId})" class="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg">
-                        Retry
-                    </button>
-                </div>
-            `;
+            const data = await this._req(`/courses/${courseId}/curriculum`);
+            this._currentCourse = data;
+
+            // Flatten all lessons for prev/next nav
+            this._allLessons = [];
+            (data.modules || []).forEach(m => this._allLessons.push(...(m.lessons || [])));
+            this._allLessons.push(...(data.loose_lessons || []));
+
+            root.innerHTML = this._curriculumHTML(data);
+        } catch (e) {
+            root.innerHTML = this._error('Failed to load curriculum', e.message);
         }
     },
-    
-    async viewLesson(courseId, lessonId, moduleId) {
-        // Create modal overlay
+
+    _curriculumHTML(data) {
+        const c       = data.course || {};
+        const modules = data.modules || [];
+        const loose   = data.loose_lessons || [];
+
+        const modulesHTML = modules.map((mod, mi) => `
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-3 overflow-hidden">
+            <button class="w-full flex items-center justify-between px-5 py-4 text-left
+                           hover:bg-gray-700/50 transition-colors"
+                    onclick="CoursesPage._toggleModule('mod-${mod.id}')">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-purple-900/60 flex items-center justify-center
+                                 text-xs font-bold text-purple-300">${mi + 1}</span>
+                    <span class="font-semibold text-white">${this._e(mod.title)}</span>
+                    <span class="text-xs text-gray-500">${mod.lessons.length} lessons
+                        ${mod.quiz ? '+ quiz' : ''}</span>
+                </div>
+                <i class="fas fa-chevron-down text-gray-500 text-xs transition-transform"
+                   id="arr-mod-${mod.id}"></i>
+            </button>
+            <div id="mod-${mod.id}" class="hidden border-t border-gray-700">
+                ${mod.lessons.map(l => this._lessonRow(l)).join('')}
+                ${mod.quiz ? this._quizRow(mod.quiz, this._courseId) : ''}
+            </div>
+        </div>`).join('');
+
+        const looseHTML = loose.length ? `
+        <div class="bg-gray-800 rounded-xl border border-gray-700 mb-3 overflow-hidden">
+            <div class="px-5 py-3 border-b border-gray-700">
+                <span class="font-semibold text-white text-sm">Lessons</span>
+            </div>
+            ${loose.map(l => this._lessonRow(l)).join('')}
+        </div>` : '';
+
+        return `
+        <div class="max-w-3xl mx-auto">
+            <button onclick="CoursesPage.render()" class="flex items-center gap-2 text-gray-400
+                    hover:text-white text-sm mb-5 transition-colors">
+                <i class="fas fa-arrow-left"></i> Back to Courses
+            </button>
+            <div class="bg-gray-800 rounded-xl p-6 mb-6 border border-gray-700">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <span class="text-xs text-purple-400 font-semibold uppercase tracking-wide">
+                            ${this._e(c.level || 'Beginner')}
+                        </span>
+                        <h2 class="text-2xl font-bold text-white mt-1">${this._e(c.title || '')}</h2>
+                        ${c.instructor ? `<p class="text-sm text-gray-400 mt-1">By ${this._e(c.instructor)}</p>` : ''}
+                        <p class="text-gray-400 text-sm mt-2">${this._e(c.description || '')}</p>
+                    </div>
+                    ${c.thumbnail_url
+                        ? `<img src="${c.thumbnail_url}" class="w-28 h-20 object-cover rounded-lg flex-shrink-0">`
+                        : ''}
+                </div>
+            </div>
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Curriculum</h3>
+            ${modulesHTML}${looseHTML}
+        </div>`;
+    },
+
+    _lessonRow(l) {
+        const icon = l.video_url
+            ? 'fa-play-circle text-purple-400'
+            : 'fa-file-alt text-gray-500';
+        const done = l.completed
+            ? '<i class="fas fa-check-circle text-green-400 text-sm"></i>'
+            : '';
+        return `
+        <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-700/40 cursor-pointer
+                    border-b border-gray-700/50 last:border-0 transition-colors"
+             onclick="CoursesPage.openLesson(${l.id})">
+            <i class="fas ${icon} w-4 flex-shrink-0"></i>
+            <span class="flex-1 text-sm text-gray-300 hover:text-white transition-colors">
+                ${this._e(l.title)}
+            </span>
+            ${l.duration_minutes ? `<span class="text-xs text-gray-600">${l.duration_minutes}m</span>` : ''}
+            ${l.is_free_preview ? '<span class="text-xs text-green-500 font-semibold">Free</span>' : ''}
+            ${done}
+        </div>`;
+    },
+
+    _quizRow(quiz, courseId) {
+        return `
+        <div class="flex items-center gap-3 px-5 py-3 hover:bg-yellow-900/20 cursor-pointer
+                    border-b border-gray-700/50 last:border-0 transition-colors"
+             onclick="QuizPage ? QuizPage.open(${courseId}, ${quiz.id}) : alert('Quiz module loading…')">
+            <i class="fas fa-question-circle text-yellow-400 w-4 flex-shrink-0"></i>
+            <span class="flex-1 text-sm text-yellow-300">${this._e(quiz.title)}</span>
+            <span class="text-xs text-yellow-600">${quiz.question_count || 0} questions</span>
+        </div>`;
+    },
+
+    _toggleModule(id) {
+        const el  = document.getElementById(id);
+        const arr = document.getElementById('arr-' + id);
+        if (!el) return;
+        const open = el.classList.toggle('hidden');
+        if (arr) arr.style.transform = open ? '' : 'rotate(180deg)';
+    },
+
+    // ── Lesson Viewer (Modal) ─────────────────────────────────────────────────
+    async openLesson(lessonId) {
+        // Find lesson in flat list
+        const lesson = this._allLessons.find(l => l.id === lessonId);
+        if (!lesson) return;
+        this._currentLesson = lesson;
+        this._showLessonModal(lesson);
+    },
+
+    _showLessonModal(lesson) {
+        const idx  = this._allLessons.findIndex(l => l.id === lesson.id);
+        const prev = idx > 0 ? this._allLessons[idx - 1] : null;
+        const next = idx < this._allLessons.length - 1 ? this._allLessons[idx + 1] : null;
+
+        const videoHTML = lesson.video_url
+            ? this._videoPlayer(lesson.video_url)
+            : '';
+
         const modal = document.createElement('div');
         modal.id = 'lesson-modal';
-        modal.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;';
         modal.innerHTML = `
-            <div class="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-                    <div>
-                        <h3 class="font-bold text-white" id="lesson-title">Loading...</h3>
-                        <p class="text-xs text-gray-400" id="lesson-module">Module ${moduleId}</p>
-                    </div>
-                    <button onclick="document.getElementById('lesson-modal').remove()" class="text-gray-400 hover:text-white">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-                <div class="flex-1 overflow-y-auto p-4" id="lesson-content">
-                    <div class="flex items-center justify-center h-64">
-                        <i class="fas fa-spinner fa-spin text-3xl text-purple-400"></i>
-                    </div>
-                </div>
-                <div class="p-4 border-t border-gray-700 flex items-center justify-between bg-gray-700/30">
-                    <button onclick="CoursesPage.prevLesson()" class="px-4 py-2 text-gray-400 hover:text-white disabled:opacity-50" id="btn-prev" disabled>
-                        <i class="fas fa-arrow-left mr-2"></i>Previous
-                    </button>
-                    <button onclick="CoursesPage.markComplete(${courseId}, ${lessonId})" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold" id="btn-complete">
-                        <i class="fas fa-check mr-2"></i>Mark Complete
-                    </button>
-                    <button onclick="CoursesPage.nextLesson()" class="px-4 py-2 text-gray-400 hover:text-white disabled:opacity-50" id="btn-next" disabled>
-                        Next<i class="fas fa-arrow-right ml-2"></i>
-                    </button>
-                </div>
+        <div style="background:#111827;border-radius:1rem;width:100%;max-width:800px;
+                    max-height:90vh;overflow-y:auto;border:1px solid #374151;">
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:1rem 1.25rem;border-bottom:1px solid #374151;">
+                <h3 style="font-weight:700;color:white;font-size:1rem;">${this._e(lesson.title)}</h3>
+                <button onclick="CoursesPage.closeLesson()"
+                        style="background:none;border:none;color:#9ca3af;font-size:1.5rem;cursor:pointer;">×</button>
             </div>
-        `;
+
+            ${videoHTML}
+
+            <div style="padding:1.25rem;color:#d1d5db;font-size:.9rem;line-height:1.7;">
+                ${lesson.content || '<p class="text-gray-500">No additional content for this lesson.</p>'}
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:1rem 1.25rem;border-top:1px solid #374151;gap:1rem;flex-wrap:wrap;">
+                <div style="display:flex;gap:.75rem;">
+                    ${prev ? `<button onclick="CoursesPage.openLesson(${prev.id})"
+                        style="padding:.5rem 1rem;border-radius:.5rem;font-size:.8rem;
+                               background:#1f2937;color:#9ca3af;border:1px solid #374151;cursor:pointer;">
+                        ← Previous
+                    </button>` : '<span></span>'}
+                    ${next ? `<button onclick="CoursesPage.openLesson(${next.id})"
+                        style="padding:.5rem 1rem;border-radius:.5rem;font-size:.8rem;
+                               background:#1f2937;color:#9ca3af;border:1px solid #374151;cursor:pointer;">
+                        Next →
+                    </button>` : ''}
+                </div>
+
+                ${lesson.completed
+                    ? `<span style="color:#34d399;font-size:.85rem;font-weight:600;">
+                           <i class="fas fa-check-circle mr-1"></i>Completed
+                       </span>`
+                    : `<button onclick="CoursesPage.markComplete(${lesson.id})"
+                           id="btn-complete-${lesson.id}"
+                           style="padding:.6rem 1.5rem;border-radius:.5rem;font-size:.85rem;
+                                  font-weight:700;background:#7c3aed;color:white;border:none;cursor:pointer;">
+                           ✓ Mark Complete
+                       </button>`}
+            </div>
+        </div>`;
+
+        document.getElementById('lesson-modal')?.remove();
         document.body.appendChild(modal);
-        
+        modal.addEventListener('click', e => { if (e.target === modal) this.closeLesson(); });
+    },
+
+    _videoPlayer(url) {
+        // YouTube
+        const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+        if (ytMatch) {
+            return `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">
+                <iframe src="https://www.youtube.com/embed/${ytMatch[1]}" frameborder="0" allowfullscreen
+                    style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe>
+            </div>`;
+        }
+        // Vimeo
+        const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+        if (vmMatch) {
+            return `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">
+                <iframe src="https://player.vimeo.com/video/${vmMatch[1]}" frameborder="0" allowfullscreen
+                    style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe>
+            </div>`;
+        }
+        // Direct MP4 / other
+        return `<video controls style="width:100%;max-height:400px;background:#000;">
+            <source src="${url}">
+            Your browser does not support video.
+        </video>`;
+    },
+
+    closeLesson() {
+        document.getElementById('lesson-modal')?.remove();
+    },
+
+    async markComplete(lessonId) {
+        const btn = document.getElementById(`btn-complete-${lessonId}`);
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
         try {
-            // Fetch lesson details from curriculum data we already have
-            const curriculum = await dashboard.apiRequest(`/courses/${courseId}/curriculum`);
-            let lesson = null;
-            let module = null;
-            
-            for (const m of curriculum.modules) {
-                const l = m.lessons.find(l => l.id === lessonId);
-                if (l) {
-                    lesson = l;
-                    module = m;
-                    break;
-                }
+            const result = await this._req(
+                `/courses/${this._courseId}/lessons/${lessonId}/complete`,
+                { method: 'POST', body: JSON.stringify({}) }
+            );
+
+            // Update local lesson state
+            const lesson = this._allLessons.find(l => l.id === lessonId);
+            if (lesson) lesson.completed = true;
+
+            // Update progress badge
+            this._loadProgressBadge();
+
+            if (result.course_complete) {
+                this.closeLesson();
+                this._showCertModal(result);
+                return;
             }
-            
-            if (!lesson) throw new Error('Lesson not found');
-            
-            document.getElementById('lesson-title').textContent = lesson.title;
-            document.getElementById('lesson-module').textContent = module.title;
-            
-            const contentDiv = document.getElementById('lesson-content');
-            
-            // Video player
-            let videoHtml = '';
-            if (lesson.video_url) {
-                if (lesson.video_url.includes('youtube.com') || lesson.video_url.includes('youtu.be')) {
-                    const videoId = lesson.video_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
-                    if (videoId) {
-                        videoHtml = `<iframe class="w-full aspect-video rounded-lg mb-4" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
-                    }
-                } else if (lesson.video_url.includes('vimeo.com')) {
-                    const videoId = lesson.video_url.match(/vimeo\.com\/(\d+)/)?.[1];
-                    if (videoId) {
-                        videoHtml = `<iframe class="w-full aspect-video rounded-lg mb-4" src="https://player.vimeo.com/video/${videoId}" frameborder="0" allowfullscreen></iframe>`;
-                    }
-                } else {
-                    videoHtml = `<video class="w-full rounded-lg mb-4" controls><source src="${lesson.video_url}" type="video/mp4"></video>`;
-                }
+
+            if (btn) {
+                btn.outerHTML = `<span style="color:#34d399;font-size:.85rem;font-weight:600;">
+                    <i class="fas fa-check-circle mr-1"></i>Completed
+                </span>`;
             }
-            
-            contentDiv.innerHTML = `
-                ${videoHtml}
-                <div class="prose prose-invert max-w-none">
-                    <h4 class="text-lg font-semibold text-white mb-2">Lesson Content</h4>
-                    <p class="text-gray-300 leading-relaxed">${lesson.content || 'No content available for this lesson.'}</p>
-                </div>
-                ${lesson.attachment_url ? `
-                    <div class="mt-4 p-4 bg-gray-700/30 rounded-lg flex items-center gap-3">
-                        <i class="fas fa-paperclip text-purple-400 text-xl"></i>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-white">Attachment</p>
-                            <a href="${lesson.attachment_url}" target="_blank" class="text-sm text-purple-400 hover:underline">Download Resource</a>
-                        </div>
-                    </div>
-                ` : ''}
-            `;
-            
-            // Update navigation buttons
-            const allLessons = curriculum.modules.flatMap(m => m.lessons);
-            const currentIndex = allLessons.findIndex(l => l.id === lessonId);
-            
-            document.getElementById('btn-prev').disabled = currentIndex === 0;
-            document.getElementById('btn-next').disabled = currentIndex === allLessons.length - 1;
-            
-            // Store for navigation
-            this.currentLesson = {
-                courseId,
-                lessonId,
-                allLessons,
-                currentIndex
-            };
-            
-            // Update complete button if already completed
-            if (lesson.completed) {
-                const btn = document.getElementById('btn-complete');
-                btn.innerHTML = '<i class="fas fa-check-double mr-2"></i>Completed';
-                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                btn.classList.add('bg-gray-600', 'cursor-default');
-                btn.disabled = true;
+
+            // Auto-advance to next lesson after short delay
+            const idx  = this._allLessons.findIndex(l => l.id === lessonId);
+            const next = this._allLessons[idx + 1];
+            if (next) {
+                setTimeout(() => this.openLesson(next.id), 800);
             }
-            
-        } catch (error) {
-            console.error('[Courses] Error loading lesson:', error);
-            document.getElementById('lesson-content').innerHTML = `
-                <div class="text-center py-8">
-                    <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-2"></i>
-                    <p class="text-gray-400">Failed to load lesson</p>
-                </div>
-            `;
+        } catch (e) {
+            if (btn) { btn.disabled = false; btn.textContent = '✓ Mark Complete'; }
+            alert('Could not save progress: ' + e.message);
         }
     },
-    
-    async markComplete(courseId, lessonId) {
-        const btn = document.getElementById('btn-complete');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
-        
-        try {
-            const result = await dashboard.apiRequest(`/courses/${courseId}/lessons/${lessonId}/complete`, {
-                method: 'POST'
-            });
-            
-            btn.innerHTML = '<i class="fas fa-check-double mr-2"></i>Completed';
-            btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-            btn.classList.add('bg-gray-600', 'cursor-default');
-            
-            // Show success notification
-            dashboard._toast?.('Lesson completed!', 'success');
-            
-            // If course completed, show certificate notification
-            if (result.course_completed) {
-                setTimeout(() => {
-                    alert(`🎉 Congratulations! You've completed the course!\nCertificate ID: ${result.certificate_id || 'N/A'}`);
-                }, 500);
-            }
-            
-        } catch (error) {
-            console.error('[Courses] Error marking complete:', error);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-check mr-2"></i>Mark Complete';
-            alert('Failed to save progress. Please try again.');
-        }
-    },
-    
-    prevLesson() {
-        if (!this.currentLesson || this.currentLesson.currentIndex <= 0) return;
-        const prev = this.currentLesson.allLessons[this.currentLesson.currentIndex - 1];
-        this.viewLesson(this.currentLesson.courseId, prev.id, prev.module_id);
-    },
-    
-    nextLesson() {
-        if (!this.currentLesson || this.currentLesson.currentIndex >= this.currentLesson.allLessons.length - 1) return;
-        const next = this.currentLesson.allLessons[this.currentLesson.currentIndex + 1];
-        this.viewLesson(this.currentLesson.courseId, next.id, next.module_id);
-    },
-    
-    async startQuiz(courseId, quizId) {
+
+    _showCertModal(result) {
         const modal = document.createElement('div');
-        modal.id = 'quiz-modal';
-        modal.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem;';
         modal.innerHTML = `
-            <div class="bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-                    <h3 class="font-bold text-white">Quiz</h3>
-                    <button onclick="document.getElementById('quiz-modal').remove()" class="text-gray-400 hover:text-white">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="flex-1 overflow-y-auto p-6" id="quiz-content">
-                    <div class="flex items-center justify-center h-32">
-                        <i class="fas fa-spinner fa-spin text-2xl text-purple-400"></i>
-                    </div>
-                </div>
-            </div>
-        `;
+        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:1rem;
+                    padding:2.5rem;max-width:480px;width:100%;text-align:center;
+                    border:1px solid rgba(124,58,237,.4);">
+            <div style="font-size:3rem;margin-bottom:1rem;">🎓</div>
+            <h2 style="font-size:1.5rem;font-weight:800;color:white;margin-bottom:.5rem;">
+                Course Complete!
+            </h2>
+            <p style="color:#c4b5fd;margin-bottom:1.5rem;">
+                Congratulations! You've completed this course.
+            </p>
+            ${result.certificate_number ? `
+            <div style="background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);
+                        border-radius:.75rem;padding:1rem;margin-bottom:1.5rem;">
+                <p style="color:#a78bfa;font-size:.8rem;font-weight:600;">CERTIFICATE NUMBER</p>
+                <p style="color:white;font-family:monospace;font-size:.9rem;margin-top:.25rem;">
+                    ${result.certificate_number}
+                </p>
+            </div>` : ''}
+            <button onclick="this.closest('div[style]').remove();CoursesPage.render()"
+                    style="padding:.75rem 2rem;border-radius:.5rem;font-weight:700;
+                           background:#7c3aed;color:white;border:none;cursor:pointer;font-size:.9rem;">
+                Back to Courses
+            </button>
+        </div>`;
         document.body.appendChild(modal);
-        
-        try {
-            const quiz = await dashboard.apiRequest(`/courses/${courseId}/quizzes/${quizId}`);
-            
-            const content = document.getElementById('quiz-content');
-            content.innerHTML = `
-                <h2 class="text-xl font-bold text-white mb-2">${quiz.title}</h2>
-                <p class="text-sm text-gray-400 mb-6">Passing score: ${quiz.pass_percentage}% • ${quiz.questions.length} questions</p>
-                
-                <form id="quiz-form" class="space-y-6">
-                    ${quiz.questions.map((q, idx) => `
-                        <div class="bg-gray-700/30 rounded-lg p-4">
-                            <p class="font-medium text-white mb-3"><span class="text-purple-400 mr-2">${idx + 1}.</span>${q.question}</p>
-                            <div class="space-y-2">
-                                ${['a', 'b', 'c', 'd'].filter(opt => q[`option_${opt}`]).map(opt => `
-                                    <label class="flex items-center gap-3 p-3 rounded-lg bg-gray-700/50 hover:bg-gray-700 cursor-pointer transition-colors">
-                                        <input type="radio" name="q${q.id}" value="${opt}" class="w-4 h-4 text-purple-500" required>
-                                        <span class="text-gray-300">${q[`option_${opt}`]}</span>
-                                    </label>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `).join('')}
-                    
-                    <button type="submit" class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold">
-                        Submit Quiz
-                    </button>
-                </form>
-            `;
-            
-            document.getElementById('quiz-form').onsubmit = async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const answers = {};
-                formData.forEach((val, key) => {
-                    answers[key.replace('q', '')] = val;
-                });
-                
-                // Submit
-                const btn = e.target.querySelector('button[type="submit"]');
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
-                
-                try {
-                    const result = await dashboard.apiRequest(`/courses/${courseId}/quizzes/${quizId}/submit`, {
-                        method: 'POST',
-                        body: JSON.stringify(answers)
-                    });
-                    
-                    this.showQuizResults(result, quiz);
-                } catch (err) {
-                    alert('Failed to submit quiz: ' + err.message);
-                    btn.disabled = false;
-                    btn.innerHTML = 'Submit Quiz';
-                }
-            };
-            
-        } catch (error) {
-            console.error('[Courses] Error loading quiz:', error);
-            document.getElementById('quiz-content').innerHTML = `
-                <div class="text-center py-8">
-                    <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-2"></i>
-                    <p class="text-gray-400">Failed to load quiz</p>
-                </div>
-            `;
-        }
     },
-    
-    showQuizResults(result, quiz) {
-        const content = document.getElementById('quiz-content');
-        const passed = result.passed;
-        
-        content.innerHTML = `
-            <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full ${passed ? 'bg-green-500/20' : 'bg-red-500/20'} mb-4">
-                    <span class="text-3xl ${passed ? 'text-green-400' : 'text-red-400'} font-bold">${result.score}%</span>
+
+    // ── Progress badge ────────────────────────────────────────────────────────
+    async _loadProgressBadge() {
+        try {
+            const data = await this._req('/courses/enhanced/progress');
+            const el = document.getElementById('lms-progress-badge');
+            if (el) {
+                el.textContent = `${data.completed_count || 0} completed · ${data.overall_progress || 0}% overall`;
+            }
+        } catch (_) {}
+    },
+
+    // ── Utility ───────────────────────────────────────────────────────────────
+    async _req(endpoint, options = {}) {
+        const token = localStorage.getItem('pipways_token');
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...options.headers,
+        };
+        if (options.body instanceof FormData) delete headers['Content-Type'];
+
+        const res = await fetch(window.location.origin + endpoint, { ...options, headers });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+            throw new Error(err.detail || `Request failed ${res.status}`);
+        }
+        return res.json();
+    },
+
+    _e(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    },
+
+    _skeleton() {
+        return `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            ${Array(3).fill(`<div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 animate-pulse">
+                <div class="h-44 bg-gray-700"></div>
+                <div class="p-4 space-y-2">
+                    <div class="h-3 bg-gray-700 rounded w-1/3"></div>
+                    <div class="h-4 bg-gray-700 rounded w-3/4"></div>
+                    <div class="h-3 bg-gray-700 rounded w-full"></div>
+                    <div class="h-8 bg-gray-700 rounded mt-3"></div>
                 </div>
-                <h3 class="text-xl font-bold ${passed ? 'text-green-400' : 'text-red-400'} mb-1">
-                    ${passed ? '🎉 Congratulations! You Passed!' : '❌ Quiz Failed'}
-                </h3>
-                <p class="text-gray-400 text-sm">You got ${result.correct_count} out of ${result.total_questions} correct</p>
-            </div>
-            
-            <div class="space-y-3 mb-6">
-                ${result.results.map((r, idx) => `
-                    <div class="flex items-start gap-3 p-3 rounded-lg ${r.is_correct ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}">
-                        <div class="mt-0.5">
-                            ${r.is_correct 
-                                ? '<i class="fas fa-check-circle text-green-400"></i>'
-                                : '<i class="fas fa-times-circle text-red-400"></i>'
-                            }
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-white">Question ${idx + 1}</p>
-                            <p class="text-xs text-gray-400">Your answer: ${r.user_answer.toUpperCase()} ${!r.is_correct ? `• Correct: ${r.correct_answer.toUpperCase()}` : ''}</p>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <div class="flex gap-3">
-                ${!passed ? `
-                    <button onclick="CoursesPage.startQuiz(${this.currentCourse?.id || 0}, ${quiz.id})" class="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold">
-                        Retry Quiz
-                    </button>
-                ` : `
-                    <button onclick="document.getElementById('quiz-modal').remove()" class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">
-                        Continue Learning
-                    </button>
-                `}
-                <button onclick="document.getElementById('quiz-modal').remove()" class="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg">
-                    Close
-                </button>
-            </div>
-        `;
-    }
+            </div>`).join('')}
+        </div>`;
+    },
+
+    _empty(msg, icon = 'fa-inbox') {
+        return `<div class="text-center py-16 text-gray-500">
+            <i class="fas ${icon} text-5xl mb-4 block opacity-30"></i>
+            <p class="font-medium">${msg}</p>
+        </div>`;
+    },
+
+    _error(title, detail = '') {
+        return `<div class="text-center py-12 text-gray-500">
+            <i class="fas fa-exclamation-triangle text-3xl mb-3 block text-red-500/50"></i>
+            <p class="font-medium text-red-400">${title}</p>
+            ${detail ? `<p class="text-xs mt-1 text-gray-600">${detail}</p>` : ''}
+            <button onclick="CoursesPage.render()" class="mt-4 px-4 py-2 rounded-lg text-sm
+                    bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors">
+                Try Again
+            </button>
+        </div>`;
+    },
 };
 
-// Make available globally
 window.CoursesPage = CoursesPage;

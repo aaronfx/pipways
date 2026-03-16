@@ -28,10 +28,13 @@ OPENROUTER_CONFIGURED = OPENROUTER_API_KEY is not None and OPENROUTER_API_KEY !=
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Shared default for confidence when the AI omits the field.
+_DEFAULT_CONFIDENCE = 0.65
+
 # Common symbols for detection
 COMMON_SYMBOLS = [
     "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
-    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "XAUUSD", "XAGUSD", 
+    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "XAUUSD", "XAGUSD",
     "BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "US30", "US100", "DE30", "DXY"
 ]
 
@@ -48,7 +51,7 @@ def normalize_symbol(symbol: str) -> str:
     # Normalization mappings for common assets
     mappings = {
         "GOLD": "XAUUSD",
-        "XAU": "XAUUSD", 
+        "XAU": "XAUUSD",
         "SILVER": "XAGUSD",
         "XAG": "XAGUSD",
         "BITCOIN": "BTCUSD",
@@ -104,15 +107,40 @@ def clean_json_content(content: str) -> str:
     """Strip markdown and clean JSON content for parsing"""
     clean_content = content.strip()
 
-    # Remove markdown code blocks
-    if clean_content.startswith("`"):
-        clean_content = clean_content.split("`")[1]
+    # Remove markdown code blocks (triple-backtick variants)
     if "```json" in clean_content:
         clean_content = clean_content.split("```json")[1].split("```")[0].strip()
     elif "```" in clean_content:
         clean_content = clean_content.split("```")[1].split("```")[0].strip()
+    elif clean_content.startswith("`") and clean_content.endswith("`"):
+        # Single-backtick wrapping
+        clean_content = clean_content[1:-1].strip()
 
     return clean_content
+
+def _normalize_confidence(raw: Any) -> float:
+    """
+    Normalize a raw confidence value to the [0.0, 1.0] range.
+
+    AI models sometimes return values on a 0-100 scale (e.g. 82 meaning 82 %).
+    This function handles both conventions:
+      - Values already in [0, 1] are returned as-is.
+      - Values in (1, 100] are divided by 100.
+      - Values outside both ranges are clamped to 0.0 or 1.0.
+    """
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_CONFIDENCE
+
+    if value < 0:
+        return 0.0
+    if value <= 1.0:
+        return value
+    if value <= 100.0:
+        return value / 100.0
+    # Anything above 100 is nonsensical — cap at 1.0
+    return 1.0
 
 @router.post("/analyze")
 async def analyze_chart_image(
@@ -126,27 +154,27 @@ async def analyze_chart_image(
     Returns institutional-grade analysis with SMC signals and annotations.
     """
     print(f"[CHART ANALYSIS] Upload started: {file.filename}, Content-Type: {file.content_type}", flush=True)
-    
+
     # Enhanced content type validation
     if not file.content_type or not file.content_type.startswith('image/'):
         print(f"[CHART ANALYSIS ERROR] Invalid content type: {file.content_type}", flush=True)
         raise HTTPException(400, "File must be an image (PNG, JPG, JPEG, WEBP)")
-    
+
     # Validate file extension as secondary check
     allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif']
     file_ext = os.path.splitext(file.filename.lower())[1]
     if file_ext not in allowed_extensions:
         print(f"[CHART ANALYSIS ERROR] Invalid file extension: {file_ext}", flush=True)
         raise HTTPException(400, f"File extension {file_ext} not allowed. Use: PNG, JPG, JPEG, WEBP")
-    
+
     try:
         contents = await file.read()
         print(f"[CHART ANALYSIS] File read: {len(contents)} bytes", flush=True)
-        
+
         if len(contents) > 10 * 1024 * 1024:
             print(f"[CHART ANALYSIS ERROR] File too large: {len(contents)} bytes", flush=True)
             raise HTTPException(400, "Image too large (max 10MB)")
-        
+
         if len(contents) == 0:
             print(f"[CHART ANALYSIS ERROR] Empty file", flush=True)
             raise HTTPException(400, "Empty file uploaded")
@@ -154,7 +182,7 @@ async def analyze_chart_image(
         # Store image for response
         base64_image = base64.b64encode(contents).decode('utf-8')
         content_type = file.content_type or "image/jpeg"
-        
+
         print(f"[CHART ANALYSIS] Image processed, base64 length: {len(base64_image)}", flush=True)
 
         if not OPENROUTER_CONFIGURED:
@@ -231,7 +259,7 @@ Detect and identify:
 
 MARKET STRUCTURE
 • Higher Highs / Higher Lows (HH/HL) for bullish structure
-• Lower Highs / Lower Lows (LH/LL) for bearish structure  
+• Lower Highs / Lower Lows (LH/LL) for bearish structure
 • Break of Structure (BOS) - price breaking previous high/low confirming trend
 • Change of Character (CHOCH) - structure shift from bullish to bearish or vice versa
 
@@ -297,8 +325,14 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
 
         # Use module-level pooled client (initialized in lifespan). Fall back to a
         # temporary client if the app is run without the lifespan (e.g. in tests).
-        http = _http_client or httpx.AsyncClient(timeout=60.0)
-        response = await http.post(
+        # FIX: ensure the temporary client is always closed to prevent resource leaks.
+        _temp_client: Optional[httpx.AsyncClient] = None
+        if _http_client is None:
+            _temp_client = httpx.AsyncClient(timeout=60.0)
+        http = _http_client or _temp_client
+
+        try:
+            response = await http.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -328,21 +362,25 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
                     "temperature": 0.1
                 }
             )
+        finally:
+            # Close the temporary client if one was created for this request.
+            if _temp_client is not None:
+                await _temp_client.aclose()
 
         if response.status_code != 200:
-                error_text = response.text
-                print(f"[CHART ANALYSIS ERROR] HTTP {response.status_code}: {error_text}", flush=True)
-                if response.status_code == 401:
-                    raise HTTPException(503, "AI authentication failed. Check API key.")
-                elif response.status_code == 429:
-                    raise HTTPException(503, "AI service rate limited. Please try again.")
-                else:
-                    raise HTTPException(503, f"AI service error: {response.status_code}")
+            error_text = response.text
+            print(f"[CHART ANALYSIS ERROR] HTTP {response.status_code}: {error_text}", flush=True)
+            if response.status_code == 401:
+                raise HTTPException(503, "AI authentication failed. Check API key.")
+            elif response.status_code == 429:
+                raise HTTPException(503, "AI service rate limited. Please try again.")
+            else:
+                raise HTTPException(503, f"AI service error: {response.status_code}")
 
         data = response.json()
 
         if "choices" not in data or len(data["choices"]) == 0:
-                raise HTTPException(503, "Invalid response from AI service")
+            raise HTTPException(503, "Invalid response from AI service")
 
         content = data["choices"][0]["message"]["content"]
 
@@ -369,7 +407,7 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
                 "suggested_stop": None,
                 "suggested_target": None,
                 "trading_bias": "neutral",
-                "confidence": 0,
+                "confidence": _DEFAULT_CONFIDENCE,
                 "key_insights": [content[:200]],
                 "structure_quality": "neutral"
             }
@@ -391,13 +429,11 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
         # Add chart image to result
         result["chart_image"] = f"data:{content_type};base64,{base64_image}"
 
-        # Normalize confidence/probability.
-        confidence = result.get("confidence", 0.6)
-        if confidence < 0:
-            confidence = 0.0
-        if confidence > 1:
-            confidence = 1.0
-        result["confidence"] = confidence
+        # FIX: Normalize confidence correctly.
+        # AI models sometimes return 0-100 scale (e.g. 82 meaning 82 %).
+        # _normalize_confidence handles both 0-1 and 0-100 inputs; it never
+        # incorrectly clamps a percentage like 82 → 1.0.
+        result["confidence"] = _normalize_confidence(result.get("confidence", _DEFAULT_CONFIDENCE))
 
         # Build trade setup
         trade_setup = None
@@ -419,12 +455,8 @@ Be precise with price levels to 4-5 decimal places for forex, whole numbers for 
                 else:
                     direction = "NEUTRAL"
 
-                # FIX: Ensure probability is properly calculated and passed
-                setup_probability = result.get("confidence", 0.7)
-                if setup_probability < 0:
-                    setup_probability = 0.0
-                if setup_probability > 1:
-                    setup_probability = setup_probability / 100 if setup_probability > 1 else 1.0
+                # Use the already-normalized confidence value directly.
+                setup_probability = result["confidence"]
 
                 trade_setup = {
                     "entry": str(entry),

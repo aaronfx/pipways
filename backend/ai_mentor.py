@@ -10,9 +10,9 @@ import os
 import httpx
 import asyncio
 import json
-from collections import defaultdict
 
-from .security import get_current_user
+from .security import get_current_user, get_user_id as _user_id
+from .database import database  # needed for persistent history
 
 router = APIRouter()
 
@@ -22,21 +22,54 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_CONFIGURED = OPENROUTER_API_KEY is not None and OPENROUTER_API_KEY != ""
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# In-memory conversation storage (use Redis in production)
-conversation_history = defaultdict(list)  # user_id -> list of messages
-def _user_id(current_user) -> str:
-    """Safely extract user id from SQLAlchemy Row or dict."""
-    if hasattr(current_user, '_mapping'):
-        return str(current_user._mapping.get('id', 'anonymous'))
-    if isinstance(current_user, dict):
-        return str(current_user.get('id', 'anonymous'))
-    try:
-        return str(current_user.id)
-    except Exception:
-        return 'anonymous'
-
+# ── Persistent conversation history helpers ───────────────────────────────────
+# Replaces the in-memory defaultdict(list) which reset on every deploy.
+# History is stored in ai_mentor_logs (role + message columns added by migration).
 
 MAX_HISTORY = 10
+
+
+async def _db_load_history(user_id: str) -> list:
+    """Load last MAX_HISTORY*2 messages for a user from the database."""
+    try:
+        rows = await database.fetch_all(
+            "SELECT role, message FROM ai_mentor_logs "
+            "WHERE user_id = :uid AND message != '' "
+            "ORDER BY created_at DESC LIMIT :limit",
+            {"uid": int(user_id) if user_id.isdigit() else 0,
+             "limit": MAX_HISTORY * 2}
+        )
+        # Reverse so oldest first (DESC gives us newest first)
+        return [{"role": r["role"], "content": r["message"]}
+                for r in reversed(rows)]
+    except Exception as e:
+        print(f"[MENTOR] History load error: {e}", flush=True)
+        return []
+
+
+async def _db_save_message(user_id: str, role: str, content: str, topic: str = "") -> None:
+    """Persist a single message to ai_mentor_logs."""
+    try:
+        uid = int(user_id) if user_id.isdigit() else None
+        await database.execute(
+            "INSERT INTO ai_mentor_logs (user_id, role, message, question_topic, created_at) "
+            "VALUES (:uid, :role, :msg, :topic, NOW())",
+            {"uid": uid, "role": role, "msg": content, "topic": topic}
+        )
+    except Exception as e:
+        print(f"[MENTOR] History save error: {e}", flush=True)
+
+
+async def _db_clear_history(user_id: str) -> None:
+    """Delete all stored messages for a user."""
+    try:
+        uid = int(user_id) if user_id.isdigit() else None
+        await database.execute(
+            "DELETE FROM ai_mentor_logs WHERE user_id = :uid AND message != ''",
+            {"uid": uid}
+        )
+    except Exception as e:
+        print(f"[MENTOR] History clear error: {e}", flush=True)
 
 # ==========================================
 # MODELS
@@ -562,8 +595,8 @@ Or ask me anything about trading!"""
                 confidence=0.6
             )
 
-        # Get conversation history
-        history = conversation_history.get(user_id, [])
+        # Load conversation history from database (survives deploys)
+        history = await _db_load_history(user_id)
 
         # Build messages for AI
         messages = [{"role": "system", "content": build_system_prompt(context_data, query.skill_level)}]
@@ -623,13 +656,10 @@ Or ask me anything about trading!"""
     # Generate recommendations based on AI response and context
     recommendations = generate_recommendations(query.question, context_data, ai_response)
 
-    # Update conversation history
-    conversation_history[user_id].append({"role": "user", "content": query.question, "timestamp": datetime.utcnow()})
-    conversation_history[user_id].append({"role": "assistant", "content": ai_response, "timestamp": datetime.utcnow()})
-
-    # Trim history
-    if len(conversation_history[user_id]) > MAX_HISTORY * 2:
-        conversation_history[user_id] = conversation_history[user_id][-MAX_HISTORY * 2:]
+    # Persist conversation to database (survives server restarts & deploys)
+    topic = query.question[:100] if query.question else ""
+    await _db_save_message(user_id, "user",      query.question, topic)
+    await _db_save_message(user_id, "assistant", ai_response,    "")
 
     return MentorResponse(
         response=ai_response,
@@ -737,18 +767,18 @@ async def get_coach_insights(
 async def get_conversation_history(
     current_user = Depends(get_current_user)
 ):
-    """Retrieve last 10 conversation messages for the user"""
-    user_id = _user_id(current_user)
-    history = conversation_history.get(user_id, [])
-    return {"messages": history[-MAX_HISTORY*2:], "count": len(history)}
+    """Retrieve last 10 conversation messages for the user from the database."""
+    user_id = str(_user_id(current_user))
+    history = await _db_load_history(user_id)
+    return {"messages": history, "count": len(history)}
 
 @router.post("/clear-history")
 async def clear_history(
     current_user = Depends(get_current_user)
 ):
-    """Clear conversation history"""
-    user_id = _user_id(current_user)
-    conversation_history[user_id] = []
+    """Clear conversation history from the database."""
+    user_id = str(_user_id(current_user))
+    await _db_clear_history(user_id)
     return {"status": "cleared"}
 
 def generate_fallback_response(question: str, context: UserContext, skill_level: str) -> str:

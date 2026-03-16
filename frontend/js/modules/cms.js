@@ -476,39 +476,50 @@ const CMSPage = {
 
     _renderLMSTree(courses){
         const el=document.getElementById('cms-lms-tree'); if(!el) return;
-        if(!courses.length){ el.innerHTML=`<div class="text-center py-10 text-gray-500 text-sm"><i class="fas fa-graduation-cap text-2xl block mb-2 opacity-30"></i>No courses yet</div>`; return; }
+        if(!courses.length){
+            el.innerHTML=`<div class="text-center py-10 text-gray-500 text-sm">
+                <i class="fas fa-graduation-cap text-2xl block mb-2 opacity-30"></i>No courses yet — create one above.</div>`;
+            return;
+        }
         el.innerHTML=courses.map(c=>`
         <div class="lms-module">
             <div class="lms-module-header" onclick="CMSPage._lmsToggleCourse(${c.id})">
-                <i class="fas fa-chevron-right text-gray-600 text-xs transition-transform" id="lms-arr-${c.id}"></i>
+                <i class="fas fa-chevron-right text-gray-600 text-xs" id="lms-arr-${c.id}" style="transition:transform .2s;"></i>
                 <div style="flex:1;">
                     <div class="text-white font-semibold text-sm">${this._e(c.title)}</div>
-                    <div class="text-gray-500 text-xs">${c.level||'Beginner'} · ${c.module_count||0} modules · ${c.lesson_count||0} lessons · ${c.price>0?'$'+Number(c.price).toFixed(2):'Free'}</div>
+                    <div class="text-gray-500 text-xs">${this._e(c.level||'Beginner')} · ${c.module_count||0} modules · ${c.lesson_count||0} lessons · ${c.price>0?'$'+Number(c.price).toFixed(2):'Free'}</div>
                 </div>
                 ${this._pub(c.is_published)}
                 <div style="display:flex;gap:.3rem;" onclick="event.stopPropagation()">
-                    <button class="cb cb-g cb-sm" onclick="CMSPage._lmsCourseForm(${JSON.stringify(c).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
-                    <button class="cb ${c.is_published?'cb-g':'cb-gr'} cb-sm" onclick="CMSPage._toggleCourse(${c.id})">${c.is_published?'Unpublish':'Publish'}</button>
-                    <button class="cb cb-r cb-sm" onclick="CMSPage._deleteCourse(${c.id})"><i class="fas fa-trash"></i></button>
+                    <button class="cb cb-g" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._lmsCourseForm(${c.id})"><i class="fas fa-edit"></i></button>
+                    <button class="cb ${c.is_published?'cb-g':'cb-gr'}" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._toggleCourse(${c.id})">${c.is_published?'Unpublish':'Publish'}</button>
+                    <button class="cb cb-r" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._deleteCourse(${c.id})"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
             <div id="lms-body-${c.id}" style="display:none;">
-                <div style="padding:.75rem 1rem;background:#111827;display:flex;justify-content:space-between;align-items:center;">
+                <div style="padding:.65rem 1rem;background:#0d1117;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #1f2937;">
                     <span class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Modules</span>
-                    <button class="cb cb-p" style="font-size:.72rem;padding:.3rem .75rem;" onclick="CMSPage._lmsModuleForm(${c.id})">+ Add Module</button>
+                    <button class="cb cb-p" style="font-size:.7rem;padding:.25rem .75rem;" onclick="CMSPage._lmsModuleForm(${c.id})">
+                        <i class="fas fa-plus"></i> Add Module
+                    </button>
                 </div>
-                <div id="lms-modules-${c.id}"><div class="text-gray-600 text-xs text-center py-3"><i class="fas fa-spinner fa-spin mr-1"></i>Loading…</div></div>
+                <div id="lms-modules-${c.id}">
+                    <div class="text-gray-600 text-xs text-center py-3"><i class="fas fa-spinner fa-spin mr-1"></i>Loading…</div>
+                </div>
             </div>
         </div>`).join('');
+
+        // Auto-expand first course so user sees the module UI immediately
+        if(courses.length) this._lmsToggleCourse(courses[0].id);
     },
 
     async _lmsToggleCourse(cid){
         const body=document.getElementById(`lms-body-${cid}`);
-        const arr=document.getElementById(`lms-arr-${cid}`);
+        const arr =document.getElementById(`lms-arr-${cid}`);
         if(!body) return;
-        const open=body.style.display==='none';
-        body.style.display=open?'block':'none';
-        if(arr) arr.style.transform=open?'rotate(90deg)':'';
+        const open = body.style.display==='none';
+        body.style.display = open ? 'block' : 'none';
+        if(arr) arr.style.transform = open ? 'rotate(90deg)' : '';
         if(open) await this._loadModules(cid);
     },
 
@@ -554,9 +565,22 @@ const CMSPage = {
         </div>`).join('')||`<div class="text-gray-700 text-xs text-center py-2">No lessons yet</div>`;
     },
 
-    _lmsCourseForm(data=null){
-        const isEdit=data&&data.id; this._editingId=isEdit?data.id:null;
+    async _lmsCourseForm(idOrData=null){
+        // Accept either a numeric id (from the tree buttons) or full data object
+        let id=null, data=null;
+        if(typeof idOrData==='number'||typeof idOrData==='string'){
+            id=parseInt(idOrData)||null;
+            // fetch from cached list
+            try{
+                const list=await API.cms.listCourses();
+                data=list.find(c=>c.id===id)||null;
+            }catch(_){}
+        } else if(idOrData && idOrData.id){
+            id=idOrData.id; data=idOrData;
+        }
+        this._editingId=id;
         const d=data||{title:'',description:'',level:'Beginner',price:0,thumbnail:'',preview_video:'',is_published:false,certificate_enabled:false,pass_percentage:70};
+        const isEdit = !!id;
         const f=document.getElementById('cms-lms-form'); if(!f) return;
         f.style.display='block';
         f.innerHTML=`

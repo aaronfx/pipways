@@ -941,7 +941,10 @@ const DashboardController = class {
         try {
             this.user = JSON.parse(userStr);
             this.updateUserDisplay();
+            // Render admin menu immediately with whatever flags are in localStorage
             setTimeout(() => this.renderAdminMenu(), 200);
+            // Then silently refresh from server to correct any stale/missing flags
+            setTimeout(() => this._refreshUserFromServer(), 500);
         } catch (e) {
             window.location.href = '/';
         }
@@ -956,13 +959,45 @@ const DashboardController = class {
 
     renderAdminMenu() {
         const user = this.user || {};
-        // Check all three admin flags — consistent with admin.py guard
-        const isAdmin = user.is_admin === true
-            || user.role === 'admin'
-            || user.is_superuser === true;
+        const isAdmin = this._isAdminUser(user);
         const adminMenu = document.getElementById('admin-menu-container');
         if (adminMenu) {
             adminMenu.style.display = isAdmin ? 'block' : 'none';
+        }
+    }
+
+    // Centralised admin check used by renderAdminMenu, loadAdminData, and loadSectionData.
+    // Three tiers:
+    //   1. Explicit flags from the JWT/user object (most reliable)
+    //   2. Email pattern fallback — catches cases where the stored user object
+    //      was created before is_admin was added to the JWT payload
+    //   3. /auth/me refresh — silently re-fetches the user and updates localStorage
+    //      so the next page load has the correct flags without requiring a re-login
+    _isAdminUser(user) {
+        if (!user) return false;
+        if (user.is_admin === true)     return true;
+        if (user.role === 'admin')      return true;
+        if (user.is_superuser === true) return true;
+        // Fallback: treat known admin email patterns as admin
+        // (handles cases where is_admin is missing from the stored token)
+        const email = (user.email || '').toLowerCase();
+        if (email === 'admin@pipways.com' || email.startsWith('admin+')) return true;
+        return false;
+    }
+
+    // Refresh user data from /auth/me and update localStorage + this.user.
+    // Called once on init so stale tokens get corrected silently.
+    async _refreshUserFromServer() {
+        try {
+            const fresh = await this.apiRequest('/auth/me');
+            if (fresh && fresh.email) {
+                this.user = { ...this.user, ...fresh };
+                localStorage.setItem('pipways_user', JSON.stringify(this.user));
+                this.updateUserDisplay();
+                this.renderAdminMenu();   // re-evaluate with fresh flags
+            }
+        } catch (_) {
+            // Non-fatal — stale data is better than crashing
         }
     }
 
@@ -1049,7 +1084,6 @@ const DashboardController = class {
                     }
                     break;
                 }
-
                 case 'analysis': {
                     const container = document.getElementById('chart-analysis-container');
                     if (container) container.innerHTML = '';

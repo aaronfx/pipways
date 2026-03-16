@@ -431,16 +431,30 @@ class QuestionIn(BaseModel):
 
 @router.get("/courses")
 async def cms_list_courses(_=Depends(get_admin_user)):
-    rows = await _rows(
-        "SELECT c.id,c.title,c.description,c.level,c.price,c.thumbnail,c.preview_video,"
-        "c.is_published,c.certificate_enabled,c.pass_percentage,c.created_at,"
-        "COUNT(DISTINCT m.id) AS module_count,"
-        "COUNT(DISTINCT l.id) AS lesson_count "
-        "FROM courses c "
-        "LEFT JOIN course_modules m ON m.course_id=c.id "
-        "LEFT JOIN lessons l ON l.course_id=c.id "
-        "GROUP BY c.id ORDER BY c.created_at DESC"
-    )
+    # Try full query with JOINs first (works after migration)
+    try:
+        rows = await _rows(
+            "SELECT c.id,c.title,c.description,c.level,c.price,c.thumbnail,c.preview_video,"
+            "c.is_published,c.certificate_enabled,c.pass_percentage,c.created_at,"
+            "COUNT(DISTINCT m.id) AS module_count,"
+            "COUNT(DISTINCT l.id) AS lesson_count "
+            "FROM courses c "
+            "LEFT JOIN course_modules m ON m.course_id=c.id "
+            "LEFT JOIN lessons l ON l.course_id=c.id "
+            "GROUP BY c.id ORDER BY c.created_at DESC"
+        )
+    except Exception:
+        # Fallback: simple query if new tables don't exist yet
+        rows = await _rows(
+            "SELECT id,title,description,level,is_published,created_at "
+            "FROM courses ORDER BY created_at DESC"
+        )
+        for r in rows:
+            r.setdefault("price", 0)
+            r.setdefault("thumbnail", "")
+            r.setdefault("preview_video", "")
+            r.setdefault("certificate_enabled", False)
+            r.setdefault("pass_percentage", 70)
     for r in rows:
         r["created_at"]   = _fmt(r.get("created_at"))
         r["module_count"] = r.get("module_count") or 0
@@ -495,14 +509,22 @@ async def cms_toggle_course(cid: int, _=Depends(get_admin_user)):
 
 @router.get("/courses/{cid}/modules")
 async def cms_list_modules(cid: int, _=Depends(get_admin_user)):
-    mods = await _rows(
-        "SELECT m.id,m.title,m.description,m.order_index,"
-        "COUNT(l.id) AS lesson_count,"
-        "(SELECT COUNT(*) FROM quizzes q WHERE q.module_id=m.id) AS quiz_count "
-        "FROM course_modules m LEFT JOIN lessons l ON l.module_id=m.id "
-        "WHERE m.course_id=:cid GROUP BY m.id ORDER BY m.order_index,m.id",
-        {"cid": cid}
-    )
+    try:
+        mods = await _rows(
+            "SELECT m.id,m.title,m.description,m.order_index,"
+            "COUNT(l.id) AS lesson_count,"
+            "(SELECT COUNT(*) FROM quizzes q WHERE q.module_id=m.id) AS quiz_count "
+            "FROM course_modules m LEFT JOIN lessons l ON l.module_id=m.id "
+            "WHERE m.course_id=:cid GROUP BY m.id ORDER BY m.order_index,m.id",
+            {"cid": cid}
+        )
+    except Exception:
+        # Fallback: no JOIN if new tables not yet created
+        mods = await _rows(
+            "SELECT id,title,description,order_index FROM course_modules "
+            "WHERE course_id=:cid ORDER BY order_index,id",
+            {"cid": cid}
+        )
     for m in mods:
         m["lesson_count"] = m.get("lesson_count") or 0
         m["quiz_count"]   = m.get("quiz_count")   or 0

@@ -4,6 +4,7 @@ Includes automatic schema migrations for LMS tables.
 """
 import os
 import logging
+from typing import List
 from databases import Database
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey
 from sqlalchemy.sql import expression
@@ -81,6 +82,27 @@ courses_table = Table(
     Column("pass_percentage", Integer, default=70),
     Column("lesson_count", Integer, default=0),
 )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def get_available_columns(table_name: str) -> List[str]:
+    """
+    Get list of column names for a table.
+    Used by auth.py and other modules for dynamic column handling.
+    """
+    try:
+        query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = :table_name
+        """
+        rows = await database.fetch_all(query, {"table_name": table_name})
+        return [row["column_name"] for row in rows]
+    except Exception as e:
+        logger.error(f"[DB] Failed to get columns for {table_name}: {e}")
+        return []
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AUTOMATIC MIGRATIONS

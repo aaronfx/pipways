@@ -44,10 +44,10 @@ async def get_admin_user(current_user=Depends(get_current_user)):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-async def _safe_count(query: str) -> int:
+async def _safe_count(query: str, values: dict | None = None) -> int:
     """Run a COUNT query and return the integer, or 0 on any error."""
     try:
-        row = await database.fetch_one(query)
+        row = await database.fetch_one(query, values or {})
         return int(row["count"]) if row and row["count"] is not None else 0
     except Exception as e:
         print(f"[ADMIN] count query failed ({query[:60]}…): {e}", flush=True)
@@ -197,18 +197,22 @@ async def list_users(
     """Paginated user list with optional email/name search."""
     offset = (page - 1) * per_page
 
+    # FIXED: use parameterized query — never interpolate user input into SQL strings
     if search:
-        search_clause = f"WHERE (email ILIKE '%{search}%' OR full_name ILIKE '%{search}%')"
+        where = "WHERE (email ILIKE :search OR full_name ILIKE :search)"
+        search_param = {"search": f"%{search}%"}
     else:
-        search_clause = ""
+        where = ""
+        search_param = {}
 
-    total = await _safe_count(f"SELECT COUNT(*) AS count FROM users {search_clause}")
+    total = await _safe_count(f"SELECT COUNT(*) AS count FROM users {where}", search_param)
 
     rows = await _safe_fetch(
         f"SELECT id, email, full_name, is_active, is_admin, subscription_tier, created_at "
-        f"FROM users {search_clause} "
+        f"FROM users {where} "
         f"ORDER BY created_at DESC "
-        f"LIMIT {per_page} OFFSET {offset}"
+        f"LIMIT {per_page} OFFSET {offset}",
+        search_param
     )
 
     users_out = [

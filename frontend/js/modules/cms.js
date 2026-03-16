@@ -190,6 +190,7 @@ const CMSPage = {
             {id:'webinars',icon:'fa-video',         label:'Webinars'},
             {id:'users',   icon:'fa-users',         label:'Users'},
             {id:'media',   icon:'fa-photo-video',   label:'Media'},
+            {id:'limits',  icon:'fa-sliders-h',     label:'Feature Limits'},
             {id:'settings',icon:'fa-cog',           label:'Settings'},
         ];
         return `
@@ -198,7 +199,7 @@ const CMSPage = {
                 <h2 class="text-2xl font-bold text-white flex items-center gap-2">
                     <i class="fas fa-layer-group text-purple-400"></i> Content Management
                 </h2>
-                <p class="text-sm text-gray-500 mt-0.5">Blog · LMS · Signals · Webinars · Users · Media · Settings</p>
+                <p class="text-sm text-gray-500 mt-0.5">Blog · LMS · Signals · Webinars · Users · Media · Limits · Settings</p>
             </div>
         </div>
         <div class="flex gap-1 mb-5 p-1 rounded-xl bg-gray-800/60 border border-gray-700 flex-wrap">
@@ -225,7 +226,7 @@ const CMSPage = {
     async _loadTab(tab){
         const map={blog:()=>this._blog(),lms:()=>this._lms(),signals:()=>this._signals(),
                    webinars:()=>this._webinars(),users:()=>this._users(),
-                   media:()=>this._media(),settings:()=>this._settings()};
+                   media:()=>this._media(),limits:()=>this._limits(),settings:()=>this._settings()};
         if(map[tab]) await map[tab]();
     },
 
@@ -336,7 +337,17 @@ const CMSPage = {
                 </div>
                 <div style="border:1px solid #374151;border-radius:.5rem;overflow:hidden;">
                     <div style="background:#111827;padding:.45rem .75rem;display:flex;gap:.4rem;flex-wrap:wrap;border-bottom:1px solid #374151;">
-                        ${[['bold','B','**'],['italic','I','_'],['h2','H2','## '],['h3','H3','### '],['link','🔗','[text](url)'],['ul','• List','- '],['quote','❝','> '],['code','Code','`']].map(([c,l])=>`<button type="button" style="background:#374151;color:#d1d5db;border:none;border-radius:.3rem;padding:.25rem .5rem;font-size:.75rem;cursor:pointer;" onclick="CMSPage._mdfmt('${c}')">${l}</button>`).join('')}
+                        ${[
+                            ['bold','<b>B</b>'],
+                            ['italic','<i>I</i>'],
+                            ['h1','H1'],
+                            ['h2','H2'],
+                            ['h3','H3'],
+                            ['link','🔗 Link'],
+                            ['ul','• List'],
+                            ['quote','❝ Quote'],
+                            ['code','&lt;/&gt;']
+                        ].map(([c,l])=>`<button type="button" style="background:#374151;color:#d1d5db;border:none;border-radius:.3rem;padding:.25rem .6rem;font-size:.75rem;cursor:pointer;min-width:32px;" onclick="CMSPage._mdfmt('${c}')">${l}</button>`).join('')}
                     </div>
                     <textarea class="cta" id="bf-content" style="border-radius:0;border:none;min-height:280px;">${this._e(d.content)}</textarea>
                 </div>
@@ -345,12 +356,29 @@ const CMSPage = {
         <!-- SEO score panel (populated by _runSEO) -->
         <div id="cms-seo-panel" style="display:none;" class="ccard" style="background:#0d1117;"></div>
         <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.5rem;flex-wrap:wrap;">
-            <label class="ctog" onclick="CMSPage._togCheck('bf-pub')">
-                <div class="ttrack${d.is_published?' on':''}"><div class="tthumb"></div></div>
-                <span class="text-sm text-gray-300">Published</span>
+            <div>
+                <label class="cl">Status</label>
+                <div style="display:flex;border:1px solid #374151;border-radius:.5rem;overflow:hidden;">
+                    <button type="button" id="bf-status-draft"
+                            onclick="CMSPage._setPostStatus('draft')"
+                            style="padding:.4rem 1.1rem;font-size:.8rem;font-weight:600;cursor:pointer;border:none;transition:all .15s;
+                                   background:${!d.is_published?'#4b5563':'#1f2937'};
+                                   color:${!d.is_published?'white':'#9ca3af'};">
+                        📄 Draft
+                    </button>
+                    <button type="button" id="bf-status-published"
+                            onclick="CMSPage._setPostStatus('published')"
+                            style="padding:.4rem 1.1rem;font-size:.8rem;font-weight:600;cursor:pointer;border:none;border-left:1px solid #374151;transition:all .15s;
+                                   background:${d.is_published?'#7c3aed':'#1f2937'};
+                                   color:${d.is_published?'white':'#9ca3af'};">
+                        🌐 Published
+                    </button>
+                </div>
                 <input type="hidden" id="bf-pub" value="${d.is_published?'1':'0'}">
-            </label>
-            <button class="cb cb-p" onclick="CMSPage._savePost()"><i class="fas fa-save"></i> ${id?'Update Post':'Create Post'}</button>
+            </div>
+            <button class="cb cb-p" onclick="CMSPage._savePost()" style="align-self:flex-end;margin-bottom:.1rem;">
+                <i class="fas fa-save"></i> ${id?'Update Post':'Save Post'}
+            </button>
         </div>`;
 
         f.scrollIntoView({behavior:'smooth',block:'start'});
@@ -378,6 +406,22 @@ const CMSPage = {
     },
 
     _closeBlogForm(){ const f=document.getElementById('cms-blog-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
+
+    _setPostStatus(status){
+        const isPub = status === 'published';
+        const hiddenInput = document.getElementById('bf-pub');
+        const draftBtn    = document.getElementById('bf-status-draft');
+        const pubBtn      = document.getElementById('bf-status-published');
+        if(hiddenInput) hiddenInput.value = isPub ? '1' : '0';
+        if(draftBtn){
+            draftBtn.style.background = isPub ? '#1f2937' : '#4b5563';
+            draftBtn.style.color      = isPub ? '#9ca3af' : 'white';
+        }
+        if(pubBtn){
+            pubBtn.style.background = isPub ? '#7c3aed' : '#1f2937';
+            pubBtn.style.color      = isPub ? 'white'   : '#9ca3af';
+        }
+    },
 
     async _runSEO(){
         const payload={
@@ -427,7 +471,7 @@ const CMSPage = {
     _mdfmt(cmd){
         const ta=document.getElementById('bf-content'); if(!ta) return;
         const s=ta.selectionStart,e=ta.selectionEnd,sel=ta.value.slice(s,e);
-        const m={bold:`**${sel||'bold text'}**`,italic:`_${sel||'italic text'}_`,link:`[${sel||'link text'}](url)`,h2:`## ${sel||'Heading'}`,h3:`### ${sel||'Heading'}`,ul:`- ${sel||'List item'}`,quote:`> ${sel||'Quote'}`,code:`\`${sel||'code'}\``};
+        const m={bold:`**${sel||'bold text'}**`,italic:`_${sel||'italic text'}_`,link:`[${sel||'link text'}](url)`,h1:`# ${sel||'Heading'}`,h2:`## ${sel||'Heading'}`,h3:`### ${sel||'Heading'}`,ul:`- ${sel||'List item'}`,quote:`> ${sel||'Quote'}`,code:`\`${sel||'code'}\``};
         const rep=m[cmd]||sel; ta.value=ta.value.slice(0,s)+rep+ta.value.slice(e);
         ta.focus(); ta.setSelectionRange(s,s+rep.length);
     },
@@ -1320,6 +1364,133 @@ const CMSPage = {
     _cancelMediaPick(){ document.getElementById('media-picker-overlay')?.remove(); this._mediaCallback=null; },
 
     // ═════════════════════════════════════════════════════════════════════════
+    // FEATURE LIMITS
+    // ═════════════════════════════════════════════════════════════════════════
+    async _limits(){
+        const pane=document.getElementById('cms-pane-limits'); if(!pane) return;
+        pane.innerHTML=`<div class="text-gray-400 text-sm text-center py-6"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>`;
+
+        // Load current settings
+        let s={}; try{ s=await API.cms.getSettings(); }catch(_){}
+        const g=(k,fb='')=>this._e(s[k]!=null?s[k]:fb);
+
+        const features=[
+            { key:'signals',        label:'Trading Signals',  icon:'fa-satellite-dish', color:'#a78bfa',
+              desc:'Live trading signals from the admin',
+              fields:[
+                { k:'signals_free_limit',  label:'Free tier — max visible signals',  type:'number', default:'3' },
+                { k:'signals_pro_limit',   label:'Pro tier — max visible signals',   type:'number', default:'999' },
+            ]},
+            { key:'chart_analysis', label:'Chart Analysis',   icon:'fa-chart-bar',      color:'#60a5fa',
+              desc:'AI-powered chart analysis (uploads per day)',
+              fields:[
+                { k:'chart_free_daily',    label:'Free tier — analyses per day',    type:'number', default:'2' },
+                { k:'chart_pro_daily',     label:'Pro tier — analyses per day',     type:'number', default:'50' },
+            ]},
+            { key:'ai_mentor',      label:'AI Mentor',        icon:'fa-robot',          color:'#f472b6',
+              desc:'AI trading coach — questions per day',
+              fields:[
+                { k:'mentor_free_daily',   label:'Free tier — questions per day',   type:'number', default:'5' },
+                { k:'mentor_pro_daily',    label:'Pro tier — questions per day',    type:'number', default:'200' },
+            ]},
+            { key:'ai_stock',       label:'AI Stock Research', icon:'fa-chart-pie',     color:'#34d399',
+              desc:'Stock research queries per day',
+              fields:[
+                { k:'stock_free_daily',    label:'Free tier — queries per day',     type:'number', default:'3' },
+                { k:'stock_pro_daily',     label:'Pro tier — queries per day',      type:'number', default:'100' },
+            ]},
+            { key:'journal',        label:'Trading Journal',  icon:'fa-book-open',      color:'#fbbf24',
+              desc:'Trade imports per month',
+              fields:[
+                { k:'journal_free_imports',label:'Free tier — imports per month',   type:'number', default:'1' },
+                { k:'journal_pro_imports', label:'Pro tier — imports per month',    type:'number', default:'999' },
+            ]},
+            { key:'courses',        label:'Courses / LMS',    icon:'fa-graduation-cap', color:'#818cf8',
+              desc:'Access to paid courses',
+              fields:[
+                { k:'courses_free_access', label:'Free tier — max free courses',   type:'number', default:'2' },
+            ]},
+            { key:'webinars',       label:'Webinars',         icon:'fa-video',          color:'#fb923c',
+              desc:'Webinar registrations per month',
+              fields:[
+                { k:'webinar_free_limit',  label:'Free tier — registrations/month', type:'number', default:'1' },
+                { k:'webinar_pro_limit',   label:'Pro tier — registrations/month',  type:'number', default:'999' },
+            ]},
+            { key:'blog',           label:'Blog',             icon:'fa-newspaper',      color:'#2dd4bf',
+              desc:'Articles visible to each tier',
+              fields:[
+                { k:'blog_free_limit',     label:'Free tier — articles visible',   type:'number', default:'10' },
+            ]},
+        ];
+
+        pane.innerHTML=`
+        <div class="chdr">
+            <h3 class="text-white font-semibold flex items-center gap-2">
+                <i class="fas fa-sliders-h text-purple-400"></i> Feature Limits by Tier
+            </h3>
+            <button class="cb cb-p" onclick="CMSPage._saveLimits()">
+                <i class="fas fa-save"></i> Save All Limits
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="limits-grid">
+            ${features.map(f=>`
+            <div class="ccard" style="border-color:${f.color}33;">
+                <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;">
+                    <div style="width:38px;height:38px;border-radius:.5rem;background:${f.color}20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="fas ${f.icon}" style="color:${f.color};font-size:.95rem;"></i>
+                    </div>
+                    <div>
+                        <div class="text-white font-semibold text-sm">${f.label}</div>
+                        <div class="text-gray-500 text-xs">${f.desc}</div>
+                    </div>
+                </div>
+                ${f.fields.map(fd=>`
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.6rem;">
+                    <label class="text-xs text-gray-400" style="flex:1;">${fd.label}</label>
+                    <input type="${fd.type||'number'}" class="ci"
+                           id="lim-${fd.k}"
+                           value="${g(fd.k,fd.default)}"
+                           style="max-width:90px;text-align:right;padding:.35rem .6rem;"
+                           min="0">
+                </div>`).join('')}
+                <div style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid #374151;display:flex;align-items:center;gap:.5rem;">
+                    <label class="ctog" onclick="CMSPage._togCheck('lim-${f.key}_enabled')">
+                        <div class="ttrack${s[f.key+'_enabled']==='false'?'':' on'}"><div class="tthumb"></div></div>
+                        <input type="hidden" id="lim-${f.key}_enabled" value="${s[f.key+'_enabled']==='false'?'0':'1'}">
+                    </label>
+                    <span class="text-xs text-gray-500">Feature enabled for all tiers</span>
+                </div>
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:1.5rem;background:#111827;border:1px solid #374151;border-radius:.75rem;padding:1rem;">
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                <i class="fas fa-info-circle mr-2 text-blue-400"></i>How these limits work
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-500">
+                <div><span class="text-gray-300 font-semibold block mb-1">Free Tier</span>Limited access — drives upgrade to Pro</div>
+                <div><span class="text-gray-300 font-semibold block mb-1">Pro Tier</span>Full access within pro limits</div>
+                <div><span class="text-gray-300 font-semibold block mb-1">Enterprise</span>Unlimited access on all features</div>
+            </div>
+            <div class="text-xs text-gray-600 mt-3">
+                <i class="fas fa-code mr-1"></i>
+                These values are saved to site_settings and can be read in your backend via <code style="color:#a78bfa;">GET /cms/settings</code>
+            </div>
+        </div>`;
+    },
+
+    async _saveLimits(){
+        const updates={};
+        document.querySelectorAll('[id^="lim-"]').forEach(el=>{
+            const key=el.id.slice(4); // strip "lim-"
+            updates[key]=el.value;
+        });
+        try{
+            await API.cms.saveSettings(updates);
+            this._toast('Feature limits saved');
+        }catch(e){ this._toast(e.message,'error'); }
+    },
+
+    // ═════════════════════════════════════════════════════════════════════════
     // SETTINGS
     // ═════════════════════════════════════════════════════════════════════════
     async _settings(){
@@ -1384,11 +1555,14 @@ const CMSPage = {
     },
 
     // ── Universal helpers ─────────────────────────────────────────────────
-    _togCheck(id,onVal='1',offVal='0'){
-        const el=document.getElementById(id); if(!el) return;
-        const track=el.previousElementSibling;
-        const isOn=el.value===onVal;
-        el.value=isOn?offVal:onVal;
-        if(track?.classList.contains('ttrack')) track.classList.toggle('on',!isOn);
+    _togCheck(id, onVal='1', offVal='0'){
+        const el = document.getElementById(id);
+        if (!el) return;
+        const isOn = el.value === onVal;
+        el.value = isOn ? offVal : onVal;
+        // Find the ttrack within the same label (not brittle previousSibling)
+        const track = el.closest('label')?.querySelector('.ttrack')
+                   || el.closest('[class*="ctog"]')?.querySelector('.ttrack');
+        if (track) track.classList.toggle('on', !isOn);
     },
 };

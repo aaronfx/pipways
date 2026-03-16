@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from .database import database, init_database, metadata
+from .database import database, init_database, metadata, run_migrations
 from sqlalchemy import create_engine
 
 # Import all routers
@@ -68,6 +68,12 @@ async def lifespan(app: FastAPI):
                 print("[DB] Tables created/verified", flush=True)
         except Exception as e:
             print(f"[DB] Table creation skipped: {e}", flush=True)
+
+        # ── Run column migrations (ADD COLUMN IF NOT EXISTS — fully idempotent) ─
+        try:
+            await run_migrations()
+        except Exception as e:
+            print(f"[DB MIGRATION] Error: {e}", flush=True)
 
         # ── Initialise Chart Analysis HTTP client (connection pooling) ──────────
         try:

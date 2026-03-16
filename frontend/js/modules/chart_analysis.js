@@ -166,14 +166,24 @@ const ChartAnalysisPage = {
         this.analyzeChart(file);
     },
 
+    // FIX: also clear currentAnalysis so saveSignal / validateTrade don't
+    // operate on stale data after the user clears the uploaded image.
     clearImage() {
         this.uploadedImage = null;
+        this.currentAnalysis = null;  // FIX: was missing — stale trade data bug
+        this.chartAnnotations = null;
+
         const previewDiv = document.getElementById('imagePreview');
         const chartInput = document.getElementById('chartInput');
         const results = document.getElementById('chartResults');
-        
+        const validatorResults = document.getElementById('validatorResults');
+
         if (previewDiv) previewDiv.style.display = 'none';
         if (chartInput) chartInput.value = '';
+        if (validatorResults) {
+            validatorResults.style.display = 'none';
+            validatorResults.innerHTML = '';
+        }
         if (results) {
             results.innerHTML = `
                 <div class="card" style="text-align: center; padding: 3rem;">
@@ -187,7 +197,7 @@ const ChartAnalysisPage = {
     async analyzeChart(file) {
         const results = document.getElementById('chartResults');
         if (!results) return;
-        
+
         results.innerHTML = '<div class="loading" style="text-align: center; padding: 3rem;"><div class="spinner" style="margin: 0 auto 1rem;"></div><p>Analyzing chart with AI Vision...</p><small>This may take 10-20 seconds</small></div>';
 
         const symbolInput = document.getElementById('chartSymbol');
@@ -198,15 +208,20 @@ const ChartAnalysisPage = {
         try {
             const analysis = await API.analyzeChartImage(file, symbol, timeframe);
             this.currentAnalysis = analysis;
-            
+
             // Store chart annotations for future overlay rendering
             if (analysis.chart_annotations) {
                 this.chartAnnotations = analysis.chart_annotations;
                 console.log('[Chart Analysis] Annotations stored:', this.chartAnnotations);
             }
-            
+
             this.displayResults(analysis);
         } catch (error) {
+            // FIX: on error, also clear the stored file reference so the user
+            // can attempt a fresh upload without stale state.
+            this.uploadedImage = null;
+            this.currentAnalysis = null;
+
             if (results) {
                 results.innerHTML = `<div class="alert alert-error">Analysis failed: ${error.message}</div>`;
             }
@@ -217,16 +232,16 @@ const ChartAnalysisPage = {
         const container = document.getElementById('chartResults');
         if (!container) return;
 
-        const biasColor = analysis.trading_bias === 'bullish' ? 'var(--success)' : 
+        const biasColor = analysis.trading_bias === 'bullish' ? 'var(--success)' :
                          analysis.trading_bias === 'bearish' ? 'var(--danger)' : 'var(--gray-500)';
 
-        const biasBg = analysis.trading_bias === 'bullish' ? 'rgba(16, 185, 129, 0.1)' : 
+        const biasBg = analysis.trading_bias === 'bullish' ? 'rgba(16, 185, 129, 0.1)' :
                       analysis.trading_bias === 'bearish' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)';
 
         // Build SMC Market Structure HTML
         let marketStructureHTML = '';
         if (analysis.market_structure) {
-            const msColor = analysis.market_structure === 'bullish' ? 'var(--success)' : 
+            const msColor = analysis.market_structure === 'bullish' ? 'var(--success)' :
                            analysis.market_structure === 'bearish' ? 'var(--danger)' : 'var(--gray-500)';
             marketStructureHTML = `
                 <div style="background: rgba(0,0,0,0.2); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid ${msColor};">
@@ -313,7 +328,7 @@ const ChartAnalysisPage = {
             const slEl = document.getElementById('validatorSL');
             const tpEl = document.getElementById('validatorTP');
             const dirEl = document.getElementById('validatorDirection');
-            
+
             if (entryEl) entryEl.value = setup.entry || '';
             if (slEl) slEl.value = setup.stop_loss || '';
             if (tpEl) tpEl.value = setup.take_profit || '';
@@ -323,7 +338,7 @@ const ChartAnalysisPage = {
         // Build patterns HTML using patterns_detected array with null safety
         let patternsHTML = '';
         if (analysis.patterns_detected && Array.isArray(analysis.patterns_detected) && analysis.patterns_detected.length > 0) {
-            patternsHTML = analysis.patterns_detected.map(p => 
+            patternsHTML = analysis.patterns_detected.map(p =>
                 `<span class="badge badge-info" style="margin: 0.25rem; padding: 0.5rem 1rem;">${p.name || 'Pattern'} <small style="opacity: 0.7;">(${p.reliability || 'medium'})</small></span>`
             ).join('');
         } else {
@@ -339,7 +354,7 @@ const ChartAnalysisPage = {
                         <i class="fas fa-layer-group mr-2"></i>Chart Annotations Ready
                     </strong>
                     <div style="font-size: 0.75rem; color: var(--gray-500);">
-                        ${analysis.chart_annotations.order_blocks?.length || 0} Order Blocks, 
+                        ${analysis.chart_annotations.order_blocks?.length || 0} Order Blocks,
                         ${analysis.chart_annotations.fair_value_gaps?.length || 0} FVGs,
                         ${analysis.chart_annotations.liquidity_zones?.length || 0} Liquidity Zones
                     </div>
@@ -389,13 +404,13 @@ const ChartAnalysisPage = {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                     <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius); padding: 1rem;">
                         <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; margin-bottom: 0.5rem;">Resistance Levels</div>
-                        ${analysis.resistance_levels?.length ? analysis.resistance_levels.map(l => 
+                        ${analysis.resistance_levels?.length ? analysis.resistance_levels.map(l =>
                             `<div style="font-family: monospace; color: var(--danger); font-weight: 600; margin-bottom: 0.25rem;">${l}</div>`
                         ).join('') : '<span class="text-muted">None detected</span>'}
                     </div>
                     <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius); padding: 1rem;">
                         <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; margin-bottom: 0.5rem;">Support Levels</div>
-                        ${analysis.support_levels?.length ? analysis.support_levels.map(l => 
+                        ${analysis.support_levels?.length ? analysis.support_levels.map(l =>
                             `<div style="font-family: monospace; color: var(--success); font-weight: 600; margin-bottom: 0.25rem;">${l}</div>`
                         ).join('') : '<span class="text-muted">None detected</span>'}
                     </div>
@@ -418,13 +433,13 @@ const ChartAnalysisPage = {
         const slEl = document.getElementById('validatorSL');
         const tpEl = document.getElementById('validatorTP');
         const dirEl = document.getElementById('validatorDirection');
-        
+
         // Safe DOM access - check elements exist
         if (!entryEl || !slEl || !tpEl || !dirEl) {
             console.error('[Validator] DOM elements not found');
             return;
         }
-        
+
         const entry = parseFloat(entryEl.value);
         const sl = parseFloat(slEl.value);
         const tp = parseFloat(tpEl.value);
@@ -442,7 +457,7 @@ const ChartAnalysisPage = {
 
         const resultsDiv = document.getElementById('validatorResults');
         if (!resultsDiv) return;
-        
+
         // Show loading state
         resultsDiv.style.display = 'block';
         resultsDiv.innerHTML = '<div class="loading"><div class="spinner" style="width: 24px; height: 24px;"></div><small>Validating...</small></div>';
@@ -456,16 +471,16 @@ const ChartAnalysisPage = {
                 direction: direction,
                 symbol: symbol
             };
-            
+
             console.log('[Validate] Sending payload:', payload);
 
             const result = await API.validateTrade(payload);
-            
+
             console.log('[Validate] Received result:', result);
 
             // Hide loading and render results
             const score = result.quality_score || 0;
-            const scoreColor = score >= 80 ? 'var(--success)' : 
+            const scoreColor = score >= 80 ? 'var(--success)' :
                               score >= 60 ? 'var(--warning)' : 'var(--danger)';
 
             resultsDiv.innerHTML = `
@@ -507,7 +522,7 @@ const ChartAnalysisPage = {
                     ` : ''}
                 </div>
             `;
-            
+
         } catch (error) {
             console.error('[Validate] Error:', error);
             if (resultsDiv) {
@@ -599,24 +614,14 @@ const ChartAnalysisPage = {
 
 // API Helper functions — appended to the global API object.
 //
-// FIX: dashboard.html has no global `API` object (it uses `dashboard.apiRequest`
-// instead). The block below creates a minimal shim if API is missing, so
-// ChartAnalysisPage works in both the SPA context (where API is fully defined)
-// and the dashboard context (where only dashboard.apiRequest exists).
-//
-// In dashboard.html, place this AFTER the DashboardController class definition
-// so that `dashboard` is available when this script executes:
-//
-//   const API = {
-//     _base: window.location.origin,
-//     request: (endpoint, opts = {}) => dashboard.apiRequest(endpoint, opts)
-//   };
-//
-// Or simply load chart_analysis.js after that shim is created.
+// In dashboard.html the API shim is defined in the inline <script> block and
+// chart_analysis.js is loaded after it, so `API` is always available here.
+// The guard below keeps this file safe when loaded in other contexts (e.g. tests,
+// a standalone SPA) where API might not exist yet.
 
 if (typeof API === 'undefined') {
     console.warn('[ChartAnalysisPage] Global API object not found. ' +
-        'Create an API shim before loading chart_analysis.js. See comment above.');
+        'Ensure an API shim is defined before loading chart_analysis.js.');
 }
 
 if (typeof API !== 'undefined') {

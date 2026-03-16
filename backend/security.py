@@ -8,8 +8,8 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-# ABSOLUTE imports (not relative)
-from backend.database import database, users, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+# FIXED: Use relative imports to work correctly as a package
+from .database import database, users, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -54,3 +54,47 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if user is None:
         raise credentials_exception
     return user
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SHARED USER-OBJECT HELPERS
+# Import these in every route file instead of repeating the pattern inline.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_user_id(user) -> int | None:
+    """
+    Safely extract the integer user ID from any user object type:
+      - SQLAlchemy Row   → user._mapping["id"]
+      - Plain dict       → user["id"]
+      - ORM model        → user.id
+    Returns None if the field is missing.
+    """
+    if hasattr(user, '_mapping'):
+        return user._mapping.get("id")
+    if isinstance(user, dict):
+        return user.get("id")
+    return getattr(user, "id", None)
+
+
+def get_user_attr(user, attr: str, default=None):
+    """
+    Safely read any attribute from a user object.
+    Covers SQLAlchemy Row, dict, and ORM model instances.
+    """
+    if hasattr(user, '_mapping'):
+        return user._mapping.get(attr, default)
+    if isinstance(user, dict):
+        return user.get(attr, default)
+    return getattr(user, attr, default)
+
+
+def is_admin_user(user) -> bool:
+    """
+    Return True if the user has admin privileges.
+    Accepts is_admin=True, role='admin', or is_superuser=True.
+    """
+    return (
+        bool(get_user_attr(user, "is_admin", False))
+        or get_user_attr(user, "role") == "admin"
+        or bool(get_user_attr(user, "is_superuser", False))
+    )

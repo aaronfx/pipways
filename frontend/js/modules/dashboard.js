@@ -188,14 +188,14 @@ class DashboardController {
 
     async loadDashboardStats() {
         try {
-            const signals = await api.getSignals();
+            const signals = await API.getSignals();
             document.getElementById('stat-signals').textContent = Array.isArray(signals) ? signals.length : '--';
         } catch (e) {
             document.getElementById('stat-signals').textContent = '--';
         }
 
         try {
-            const courses = await api.getCourses();
+            const courses = await API.getCourses();
             const courseList = Array.isArray(courses) ? courses : (courses.courses || []);
             document.getElementById('stat-courses').textContent = courseList.length;
         } catch (e) {
@@ -210,7 +210,7 @@ class DashboardController {
         this.showSkeleton(container, 3);
 
         try {
-            const data = await api.getSignals();
+            const data = await API.getSignals();
             const signals = Array.isArray(data) ? data : (data.signals || []);
             this.renderSignals(signals);
         } catch (error) {
@@ -255,7 +255,7 @@ class DashboardController {
         this.showSkeleton(container, 4);
 
         try {
-            const data = await api.getCourses();
+            const data = await API.getCourses();
             this.allCourses = Array.isArray(data) ? data : (data.courses || []);
             this.renderCourses(this.allCourses);
             this.setupCourseFilters();
@@ -330,7 +330,7 @@ class DashboardController {
         this.showSkeleton(container, 2);
 
         try {
-            const data = await api.getWebinars();
+            const data = await API.getWebinars();
             const webinars = Array.isArray(data) ? data : (data.webinars || []);
 
             if (!webinars || webinars.length === 0) {
@@ -375,7 +375,7 @@ class DashboardController {
         this.showSkeleton(container, 3);
 
         try {
-            const data = await api.getBlogPosts();
+            const data = await API.getBlogPosts();
             const posts = Array.isArray(data) ? data : (data.posts || []);
 
             if (!posts || posts.length === 0) {
@@ -409,36 +409,32 @@ class DashboardController {
         const container = document.getElementById('admin-container');
         if (!container) return;
 
-        try {
-            const stats = await api.getAdminStats();
+        const isAdmin = this.user && (
+            this.user.is_admin === true
+            || this.user.role === 'admin'
+            || this.user.is_superuser === true
+        );
+
+        if (!isAdmin) {
             container.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                        <div class="text-3xl font-bold text-white mb-1">${stats.total_users || 0}</div>
-                        <div class="text-sm text-gray-400">Total Users</div>
+                <div class="flex flex-col items-center justify-center py-20 text-center">
+                    <div class="w-16 h-16 rounded-full bg-red-900/30 flex items-center justify-center mb-4">
+                        <i class="fas fa-lock text-red-400 text-2xl"></i>
                     </div>
-                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                        <div class="text-3xl font-bold text-white mb-1">${stats.active_signals || 0}</div>
-                        <div class="text-sm text-gray-400">Active Signals</div>
-                    </div>
-                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                        <div class="text-3xl font-bold text-white mb-1">${stats.new_today || 0}</div>
-                        <div class="text-sm text-gray-400">New Today</div>
-                    </div>
-                </div>
-                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <h4 class="font-bold text-white mb-4">Quick Actions</h4>
-                    <div class="flex flex-wrap gap-3">
-                        <button class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Create Signal</button>
-                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Add Course</button>
-                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Schedule Webinar</button>
-                        <button class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">New Blog Post</button>
-                    </div>
-                </div>
-            `;
-        } catch (error) {
-            console.error('[Admin Error]', error);
-            container.innerHTML = '<div class="text-red-400 p-4 bg-red-900/20 rounded-lg border border-red-800">Error loading admin data. Ensure you have admin privileges.</div>';
+                    <h3 class="text-xl font-bold text-white mb-2">Access Denied</h3>
+                    <p class="text-gray-400 text-sm">Administrator privileges required.</p>
+                </div>`;
+            return;
+        }
+
+        if (typeof AdminPage !== 'undefined') {
+            await AdminPage.render(container);
+        } else {
+            container.innerHTML = `
+                <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-6 text-center">
+                    <i class="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
+                    <p class="text-red-200">Admin module failed to load. Refresh the page.</p>
+                </div>`;
         }
     }
 
@@ -555,7 +551,7 @@ class DashboardController {
         container.scrollTop = container.scrollHeight;
 
         try {
-            const response = await api.askMentor(message);
+            const response = await API.askMentor(message);
             const typingEl = document.getElementById(typingId);
             if (typingEl) typingEl.remove();
 
@@ -1391,45 +1387,7 @@ class DashboardController {
     }
 }
 
-// API Client
-const API_BASE = window.location.origin;
-
-const api = {
-    async request(endpoint, options = {}) {
-        const token = localStorage.getItem('pipways_token');
-        const headers = {
-            'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` }),
-            ...options.headers
-        };
-
-        if (options.body instanceof FormData) delete headers['Content-Type'];
-
-        try {
-            const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-            if (!res.ok) {
-                const err = await res.text();
-                throw new Error(err || `HTTP ${res.status}`);
-            }
-            return res.json();
-        } catch (e) {
-            console.error(`API Error ${endpoint}:`, e);
-            throw e;
-        }
-    },
-
-    getSignals() { return this.request('/signals/active'); },
-    getCourses() { return this.request('/courses/list'); },
-    getWebinars() { return this.request('/webinars/upcoming?upcoming=true'); },
-    getBlogPosts() { return this.request('/blog/posts'); },
-    getAdminStats() { return this.request('/admin/users'); },
-
-    askMentor(question, skillLevel = 'intermediate') { 
-        return this.request('/ai/mentor/ask', { 
-            method: 'POST', 
-            body: JSON.stringify({ question, skill_level: skillLevel }) 
-        }); 
-    }
-};
-
-const dashboard = new DashboardController();
+// ── Note: dashboard.js is loaded as a module by app.js / router.js.
+// The global `api` / `API` client and `dashboard` instance are managed by
+// the host page (dashboard.html). This file only defines DashboardController.
+// window.api = window.API is set by api.js (loaded separately).

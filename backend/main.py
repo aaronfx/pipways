@@ -26,6 +26,7 @@ from . import ai_services
 from . import chart_analysis
 from . import performance
 from . import ai_mentor
+from . import cms
 
 # ── FIX 1 (CRITICAL): Use a SINGLE relative import for stock_terminal_backend.
 #
@@ -88,6 +89,13 @@ async def lifespan(app: FastAPI):
             print(f"[STOCK] Client initialisation error: {e}", flush=True)
 
         print("[STARTUP] Database connected", flush=True)
+
+        # ── Initialise CMS settings table (idempotent) ────────────────────
+        try:
+            await cms._ensure_settings_table()
+            print("[CMS] Settings table ready", flush=True)
+        except Exception as e:
+            print(f"[CMS] Settings table init skipped: {e}", flush=True)
     except Exception as e:
         print(f"[STARTUP ERROR] {e}", flush=True)
 
@@ -167,6 +175,7 @@ app.include_router(ai_services.router,      prefix="/ai",             tags=["AI 
 app.include_router(chart_analysis.router,   prefix="/ai/chart",       tags=["Chart Analysis"])
 app.include_router(performance.router,      prefix="/ai/performance", tags=["Performance Analytics"])
 app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI Mentor v3.0"])
+app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
 
 # Stock Terminal — uses the corrected single-import router reference
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])

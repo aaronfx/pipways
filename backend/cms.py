@@ -219,12 +219,12 @@ async def cms_create_post(data: BlogPostIn, _=Depends(get_admin_user)):
     now = datetime.utcnow()
     pid = await _exec(
         "INSERT INTO blog_posts (title,slug,excerpt,content,category,tags,featured_image,"
-        "seo_title,seo_description,focus_keyword,is_published,views,created_at,updated_at) "
-        "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,0,:now,:now)",
+        "seo_title,seo_description,focus_keyword,is_published,status,views,created_at,updated_at) "
+        "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,:status,0,:now,:now)",
         {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
          "cat":data.category or "General","tags":_tags_str(data.tags),"img":data.featured_image or "",
          "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
-         "pub":data.is_published,"now":now}
+         "pub":data.is_published,"status":"published" if data.is_published else "draft","now":now}
     )
     return {"id": pid, "message": "Post created"}
 
@@ -235,11 +235,12 @@ async def cms_update_post(post_id: int, data: BlogPostIn, _=Depends(get_admin_us
     await _exec(
         "UPDATE blog_posts SET title=:title,slug=:slug,excerpt=:excerpt,content=:content,"
         "category=:cat,tags=:tags,featured_image=:img,seo_title=:stitle,seo_description=:sdesc,"
-        "focus_keyword=:kw,is_published=:pub,updated_at=:now WHERE id=:id",
+        "focus_keyword=:kw,is_published=:pub,status=:status,updated_at=:now WHERE id=:id",
         {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
          "cat":data.category or "General","tags":_tags_str(data.tags),"img":data.featured_image or "",
          "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
-         "pub":data.is_published,"now":datetime.utcnow(),"id":post_id}
+         "pub":data.is_published,"status":"published" if data.is_published else "draft",
+         "now":datetime.utcnow(),"id":post_id}
     )
     return {"message": "Post updated"}
 
@@ -253,8 +254,10 @@ async def cms_toggle_post(post_id: int, _=Depends(get_admin_user)):
     r = await _row("SELECT id,is_published FROM blog_posts WHERE id=:id", {"id": post_id})
     if not r: raise HTTPException(404, "Post not found")
     ns = not bool(r["is_published"])
-    await _exec("UPDATE blog_posts SET is_published=:pub,updated_at=:now WHERE id=:id",
-                {"pub": ns, "now": datetime.utcnow(), "id": post_id})
+    # Sync both is_published and legacy status column
+    await _exec("UPDATE blog_posts SET is_published=:pub,status=:status,updated_at=:now WHERE id=:id",
+                {"pub": ns, "status": "published" if ns else "draft",
+                 "now": datetime.utcnow(), "id": post_id})
     return {"is_published": ns, "message": "Published" if ns else "Unpublished"}
 
 class SEORequest(BaseModel):
@@ -465,11 +468,12 @@ async def cms_list_courses(_=Depends(get_admin_user)):
 async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
     cid = await _exec(
         "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
-        "is_published,certificate_enabled,pass_percentage,created_at) "
-        "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)",
+        "is_published,is_active,certificate_enabled,pass_percentage,created_at) "
+        "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:active,:cert,:pass,:now)",
         {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
          "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-         "pub":data.is_published,"cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
+         "pub":data.is_published,"active":data.is_published,  # sync is_active with is_published
+         "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
          "now":datetime.utcnow()}
     )
     return {"id": cid, "message": "Course created"}
@@ -480,11 +484,12 @@ async def cms_update_course(cid: int, data: CourseIn, _=Depends(get_admin_user))
         raise HTTPException(404, "Course not found")
     await _exec(
         "UPDATE courses SET title=:title,description=:desc,level=:level,price=:price,"
-        "thumbnail=:thumb,preview_video=:preview,is_published=:pub,"
+        "thumbnail=:thumb,preview_video=:preview,is_published=:pub,is_active=:active,"
         "certificate_enabled=:cert,pass_percentage=:pass WHERE id=:id",
         {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
          "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-         "pub":data.is_published,"cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
+         "pub":data.is_published,"active":data.is_published,  # sync is_active
+         "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
     )
     return {"message": "Course updated"}
 
@@ -502,7 +507,9 @@ async def cms_toggle_course(cid: int, _=Depends(get_admin_user)):
     r = await _row("SELECT id,is_published FROM courses WHERE id=:id", {"id": cid})
     if not r: raise HTTPException(404, "Course not found")
     ns = not bool(r["is_published"])
-    await _exec("UPDATE courses SET is_published=:pub WHERE id=:id", {"pub": ns, "id": cid})
+    # Sync both is_published and is_active so public /courses/list sees it
+    await _exec("UPDATE courses SET is_published=:pub,is_active=:pub WHERE id=:id",
+                {"pub": ns, "id": cid})
     return {"is_published": ns, "message": "Published" if ns else "Unpublished"}
 
 # ── Modules ──────────────────────────────────────────────────────────────────
@@ -699,6 +706,11 @@ async def cms_create_signal(data: SignalIn, _=Depends(get_admin_user)):
          "tf":data.timeframe or "1H","anal":data.analysis or "",
          "conf":data.ai_confidence,"status":data.status or "active","now":datetime.utcnow()}
     )
+    # Backfill pair column if it exists (older schema had pair NOT NULL)
+    try:
+        await _exec("UPDATE signals SET pair=:p WHERE id=:id", {"p": data.symbol.upper(), "id": sid})
+    except Exception:
+        pass
     return {"id": sid, "message": "Signal created"}
 
 @router.put("/signals/{sid}")
@@ -762,12 +774,13 @@ async def cms_create_webinar(data: WebinarIn, _=Depends(get_admin_user)):
     except: raise HTTPException(400, "Invalid scheduled_at format")
     wid = await _exec(
         "INSERT INTO webinars (title,description,presenter,scheduled_at,duration_minutes,"
-        "meeting_link,recording_url,thumbnail,max_attendees,is_published,created_at) "
-        "VALUES (:title,:desc,:presenter,:sched,:dur,:link,:rec,:thumb,:max,:pub,:now)",
+        "meeting_link,recording_url,thumbnail,max_attendees,is_published,status,created_at) "
+        "VALUES (:title,:desc,:presenter,:sched,:dur,:link,:rec,:thumb,:max,:pub,:status,:now)",
         {"title":data.title,"desc":data.description or "","presenter":data.presenter or "",
          "sched":sched,"dur":data.duration_minutes or 60,"link":data.meeting_link or "",
          "rec":data.recording_url or "","thumb":data.thumbnail or "",
-         "max":data.max_attendees or 100,"pub":data.is_published,"now":datetime.utcnow()}
+         "max":data.max_attendees or 100,"pub":data.is_published,
+         "status":"scheduled" if data.is_published else "draft","now":datetime.utcnow()}
     )
     return {"id": wid, "message": "Webinar created"}
 
@@ -780,11 +793,12 @@ async def cms_update_webinar(wid: int, data: WebinarIn, _=Depends(get_admin_user
     await _exec(
         "UPDATE webinars SET title=:title,description=:desc,presenter=:presenter,"
         "scheduled_at=:sched,duration_minutes=:dur,meeting_link=:link,recording_url=:rec,"
-        "thumbnail=:thumb,max_attendees=:max,is_published=:pub WHERE id=:id",
+        "thumbnail=:thumb,max_attendees=:max,is_published=:pub,status=:status WHERE id=:id",
         {"title":data.title,"desc":data.description or "","presenter":data.presenter or "",
          "sched":sched,"dur":data.duration_minutes or 60,"link":data.meeting_link or "",
          "rec":data.recording_url or "","thumb":data.thumbnail or "",
-         "max":data.max_attendees or 100,"pub":data.is_published,"id":wid}
+         "max":data.max_attendees or 100,"pub":data.is_published,
+         "status":"scheduled" if data.is_published else "draft","id":wid}
     )
     return {"message": "Webinar updated"}
 
@@ -798,7 +812,9 @@ async def cms_toggle_webinar(wid: int, _=Depends(get_admin_user)):
     r = await _row("SELECT id,is_published FROM webinars WHERE id=:id", {"id": wid})
     if not r: raise HTTPException(404, "Webinar not found")
     ns = not bool(r["is_published"])
-    await _exec("UPDATE webinars SET is_published=:pub WHERE id=:id", {"pub": ns, "id": wid})
+    # Sync both is_published and legacy status column
+    await _exec("UPDATE webinars SET is_published=:pub,status=:status WHERE id=:id",
+                {"pub": ns, "status": "scheduled" if ns else "draft", "id": wid})
     return {"is_published": ns, "message": "Published" if ns else "Unpublished"}
 
 

@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipways Trading Dashboard</title>
+    <!-- Silence Tailwind CDN development warning (safe in production) -->
+    <script>
+    (function() {
+        const _warn = console.warn.bind(console);
+        console.warn = function(...a) {
+            if (typeof a[0] === 'string' && a[0].includes('cdn.tailwindcss.com')) return;
+            _warn(...a);
+        };
+    })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -110,7 +120,7 @@
         .badge-primary { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col md:flex-row">
+<body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
 
     <!-- Mobile Menu Button -->
     <div class="md:hidden fixed top-4 left-4 z-50">
@@ -123,7 +133,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 h-screen bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
         <div class="p-6 border-b border-gray-800">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
@@ -193,7 +203,7 @@
         </div>
     </aside>
 
-    <main class="flex-1 overflow-y-auto h-screen">
+    <main class="flex-1 h-screen overflow-y-auto">
         <header class="bg-gray-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
             <div class="md:hidden w-8"></div>
             <div>
@@ -1631,7 +1641,7 @@ const ChartAnalysisPage = {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                         <div class="form-group mb-0">
                             <label>Symbol (optional)</label>
-                            <input type="text" id="chartSymbol" placeholder="EURUSD" class="form-control">
+                            <input type="text" id="chartSymbol" placeholder="Auto-detected" class="form-control">
                         </div>
                         <div class="form-group mb-0">
                             <label>Timeframe (optional)</label>
@@ -1760,21 +1770,81 @@ const ChartAnalysisPage = {
         }
     },
 
-    async analyzeChart(file) {
+    async analyzeChart(file, _retryCount = 0) {
         const results = document.getElementById('chartResults');
         if (!results) return;
+
         results.innerHTML = '<div class="loading" style="text-align:center;padding:3rem;"><div class="spinner" style="margin:0 auto 1rem;"></div><p>Analyzing chart with AI Vision...</p><small>This may take 10-20 seconds</small></div>';
-        const symbol = document.getElementById('chartSymbol')?.value || null;
+        const symbol    = document.getElementById('chartSymbol')?.value    || null;
         const timeframe = document.getElementById('chartTimeframe')?.value || null;
+
         try {
             const analysis = await API.analyzeChartImage(file, symbol, timeframe);
             this.currentAnalysis = analysis;
             if (analysis.chart_annotations) this.chartAnnotations = analysis.chart_annotations;
             this.displayResults(analysis);
         } catch (error) {
+            // ── Cold-start / 503 handler ───────────────────────────────────────
+            // Render free tier spins down after inactivity and returns a bare 503
+            // for up to ~30 s while the dyno wakes. Auto-retry up to 3 times with
+            // a 10-second countdown so the user sees progress rather than a dead error.
+            const MAX_RETRIES = 3;
+            if (error.isColdStart && _retryCount < MAX_RETRIES) {
+                const nextRetry  = _retryCount + 1;
+                const waitSecs   = 10;
+                let   remaining  = waitSecs;
+
+                const tick = () => {
+                    if (!document.getElementById('chartResults')) return; // navigated away
+                    results.innerHTML = `
+                        <div style="text-align:center;padding:3rem;">
+                            <div style="font-size:2.5rem;margin-bottom:1rem;">🌙</div>
+                            <p style="color:#f59e0b;font-weight:600;margin-bottom:0.5rem;">Server is waking up…</p>
+                            <p style="color:#9ca3af;font-size:0.875rem;margin-bottom:1.5rem;">
+                                Render spins down free services after inactivity.<br>
+                                Retrying in <strong style="color:white;">${remaining}s</strong>
+                                &nbsp;(attempt ${nextRetry}/${MAX_RETRIES})
+                            </p>
+                            <div style="width:200px;height:4px;background:#374151;border-radius:2px;margin:0 auto;">
+                                <div style="width:${Math.round(((waitSecs - remaining) / waitSecs) * 100)}%;height:100%;background:#f59e0b;border-radius:2px;transition:width 0.9s linear;"></div>
+                            </div>
+                            <button onclick="ChartAnalysisPage.analyzeChart(ChartAnalysisPage.uploadedImage)"
+                                style="margin-top:1.5rem;padding:0.5rem 1.5rem;background:#7c3aed;color:white;border:none;border-radius:0.5rem;cursor:pointer;font-size:0.875rem;">
+                                Retry now
+                            </button>
+                        </div>`;
+                    if (remaining <= 0) {
+                        this.analyzeChart(file, nextRetry);
+                        return;
+                    }
+                    remaining--;
+                    setTimeout(tick, 1000);
+                };
+                tick();
+                return;
+            }
+
+            // All retries exhausted or a real error — show final message
             this.uploadedImage = null;
             this.currentAnalysis = null;
-            if (results) results.innerHTML = `<div class="alert alert-error">Analysis failed: ${error.message}</div>`;
+
+            const isExhausted  = error.isColdStart && _retryCount >= MAX_RETRIES;
+            const userMessage  = isExhausted
+                ? 'The server is taking too long to wake up. Please wait 30 seconds and try again.'
+                : error.message;
+
+            if (results) results.innerHTML = `
+                <div class="alert alert-error" style="padding:1.25rem;">
+                    <div style="font-weight:600;margin-bottom:0.5rem;">
+                        ${isExhausted ? '⏳ Server not ready yet' : '❌ Analysis failed'}
+                    </div>
+                    <div style="font-size:0.875rem;">${userMessage}</div>
+                    ${isExhausted ? `
+                    <button onclick="ChartAnalysisPage.clearImage()"
+                        style="margin-top:1rem;padding:0.4rem 1rem;background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4);border-radius:0.5rem;cursor:pointer;font-size:0.8rem;">
+                        Clear &amp; try again
+                    </button>` : ''}
+                </div>`;
         }
     },
 
@@ -1818,6 +1888,27 @@ const ChartAnalysisPage = {
         let tradeSetupHTML = '';
         if (analysis.trade_setup) {
             const setup = analysis.trade_setup;
+
+            // ── Direction inference ────────────────────────────────────────────
+            // The AI sometimes returns "NEUTRAL" even when entry/SL/TP clearly
+            // form a directional setup. Infer direction from price geometry:
+            // if TP is above entry → price must go UP → BUY; otherwise SELL.
+            let displayDirection = (setup.direction || 'NEUTRAL').toUpperCase();
+            if (displayDirection === 'NEUTRAL') {
+                const entryNum = parseFloat(String(setup.entry).replace(',', ''));
+                const tpNum    = parseFloat(String(setup.take_profit).replace(',', ''));
+                if (!isNaN(entryNum) && !isNaN(tpNum)) {
+                    displayDirection = tpNum > entryNum ? 'BUY' : 'SELL';
+                }
+            }
+            const directionColor = displayDirection === 'BUY' ? 'var(--success)' : 'var(--danger)';
+
+            // ── Auto-fill symbol input with AI-detected value ──────────────────
+            const symInput = document.getElementById('chartSymbol');
+            if (symInput && analysis.symbol && analysis.symbol !== 'Unknown') {
+                symInput.value = analysis.symbol;
+            }
+
             tradeSetupHTML = `
                 <div style="background:linear-gradient(135deg,rgba(124,58,237,0.1) 0%,rgba(59,130,246,0.1) 100%);border:1px solid var(--primary);border-radius:var(--radius);padding:1.25rem;margin:1.5rem 0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -1849,7 +1940,7 @@ const ChartAnalysisPage = {
                         </div>
                         <div>
                             <span style="color:var(--gray-500);font-size:0.875rem;">Direction</span>
-                            <span style="color:${setup.direction === 'BUY' ? 'var(--success)' : 'var(--danger)'};font-weight:700;margin-left:0.5rem;">${setup.direction}</span>
+                            <span style="color:${directionColor};font-weight:700;margin-left:0.5rem;">${displayDirection}</span>
                         </div>
                     </div>
                     <button onclick="ChartAnalysisPage.saveSignal()" class="btn btn-success btn-block" style="background:linear-gradient(90deg,var(--success) 0%,#059669 100%);">
@@ -1864,7 +1955,7 @@ const ChartAnalysisPage = {
             if (entryEl) entryEl.value = setup.entry || '';
             if (slEl)    slEl.value    = setup.stop_loss || '';
             if (tpEl)    tpEl.value    = setup.take_profit || '';
-            if (dirEl)   dirEl.value   = (setup.direction === 'BUY' || setup.direction === 'BULLISH') ? 'BUY' : 'SELL';
+            if (dirEl)   dirEl.value   = displayDirection === 'BUY' ? 'BUY' : 'SELL';
         }
 
         let patternsHTML = (analysis.patterns_detected?.length)
@@ -1889,7 +1980,7 @@ const ChartAnalysisPage = {
         }
 
         container.innerHTML = `
-            <div class="card" style="max-height:80vh;overflow-y:auto;">
+            <div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--gray-700);">
                     <h3 style="margin:0;">${analysis.symbol || 'Unknown Symbol'}</h3>
                     <div style="display:flex;gap:0.5rem;">
@@ -2005,10 +2096,19 @@ const ChartAnalysisPage = {
     async saveSignal() {
         if (!this.currentAnalysis?.trade_setup) { alert('No trade setup to save'); return; }
         const setup = this.currentAnalysis.trade_setup;
+
+        // Re-apply the same direction inference used in displayResults
+        let direction = (setup.direction || 'NEUTRAL').toUpperCase();
+        if (direction === 'NEUTRAL') {
+            const e = parseFloat(String(setup.entry).replace(',', ''));
+            const t = parseFloat(String(setup.take_profit).replace(',', ''));
+            if (!isNaN(e) && !isNaN(t)) direction = t > e ? 'BUY' : 'SELL';
+        }
+
         try {
             const result = await API.saveSignal({
                 symbol:      this.currentAnalysis.symbol || 'Unknown',
-                direction:   setup.direction,
+                direction,
                 entry_price: parseFloat(setup.entry),
                 stop_loss:   parseFloat(setup.stop_loss),
                 take_profit: parseFloat(setup.take_profit),
@@ -2061,7 +2161,6 @@ const ChartAnalysisPage = {
 API.analyzeChartImage = async function(file, symbol, timeframe) {
     const token = localStorage.getItem('pipways_token');
 
-    // Guard: no token at all → session already gone
     if (!token) {
         _handleAuthError();
         throw new Error('Not authenticated');
@@ -2079,22 +2178,38 @@ API.analyzeChartImage = async function(file, symbol, timeframe) {
     });
 
     if (!response.ok) {
-        // 401 = token expired or invalid → force re-login
         if (response.status === 401) {
             _handleAuthError();
             throw new Error('Session expired. Please log in again.');
         }
-        // 413 = file too large (caught at nginx/server level before FastAPI)
         if (response.status === 413) {
             throw new Error('Image too large. Please use a smaller file (max 10MB).');
-        }
-        // 503/504 = AI service down
-        if (response.status === 503) {
-            throw new Error('AI analysis service is temporarily unavailable. Please try again in a moment.');
         }
         if (response.status === 504) {
             throw new Error('Analysis timed out. Please try a smaller or simpler image.');
         }
+
+        // 503: try to read the detail — empty body = Render cold start,
+        // populated body = actual AI service error (e.g. bad API key).
+        if (response.status === 503) {
+            let detail = '';
+            try {
+                const body = await response.clone().json();
+                detail = body.detail || '';
+            } catch (_) { /* empty body = cold start */ }
+
+            if (detail.toLowerCase().includes('auth') || detail.toLowerCase().includes('api key')) {
+                throw new Error('AI service authentication failed. Check your OPENROUTER_API_KEY in Render settings.');
+            }
+            if (detail.toLowerCase().includes('rate')) {
+                throw new Error('AI service rate limit reached. Please wait a moment and try again.');
+            }
+            // Empty or generic detail → cold start
+            const coldStartErr = new Error(detail || 'COLD_START');
+            coldStartErr.isColdStart = !detail || detail.toLowerCase().includes('unavailable');
+            throw coldStartErr;
+        }
+
         const detail = await _parseApiError(response);
         throw new Error(detail || 'Analysis failed');
     }

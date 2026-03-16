@@ -213,7 +213,7 @@ class DashboardController {
             const data = await API.getSignals();
             let signals = Array.isArray(data) ? data : (data.signals || []);
             // Only show published/active signals
-            signals = signals.filter(s => s.status === 'active' || s.is_published === true || s.is_active === true);
+            signals = signals.filter(s => s.status === 'active' || !!s.is_published || !!s.is_active);
             this.renderSignals(signals);
         } catch (error) {
             console.error('[Signals Error]', error);
@@ -260,7 +260,7 @@ class DashboardController {
             const data = await API.getCourses();
             let courses = Array.isArray(data) ? data : (data.courses || []);
             // Only show published courses
-            courses = courses.filter(c => c.is_published === true || c.is_active === true);
+            courses = courses.filter(c => !!c.is_published || !!c.is_active);
             this.allCourses = courses;
             this.renderCourses(courses);
             this.setupCourseFilters();
@@ -338,7 +338,7 @@ class DashboardController {
             const data = await API.getWebinars();
             let webinars = Array.isArray(data) ? data : (data.webinars || []);
             // Only show published webinars
-            webinars = webinars.filter(w => w.is_published === true || w.status === 'scheduled' || w.status === 'live');
+            webinars = webinars.filter(w => !!w.is_published || w.status === 'scheduled' || w.status === 'live');
 
             if (!webinars || webinars.length === 0) {
                 container.innerHTML = '<div class="text-center py-8 text-gray-500">No upcoming webinars scheduled</div>';
@@ -385,7 +385,7 @@ class DashboardController {
             const data = await API.getBlogPosts();
             let posts = Array.isArray(data) ? data : (data.posts || []);
             // Only show published posts
-            posts = posts.filter(p => p.is_published === true || p.status === 'published');
+            posts = posts.filter(p => !!p.is_published || p.status === 'published');
 
             if (!posts || posts.length === 0) {
                 container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No articles published yet</div>';

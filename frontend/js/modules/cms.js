@@ -1,1023 +1,1370 @@
 /**
- * cms.js — Content Management System Module
- * frontend/js/modules/cms.js  →  served at /js/modules/cms.js
+ * cms.js v2 — Full CMS Module
+ * Tabs: Blog · LMS · Signals · Webinars · Users · Media · Settings
  *
- * Five tabs: Blog · Courses/LMS · Signals · Webinars · Settings
+ * New: media upload, user management, SEO scoring, modules/quizzes, coupons, announcements
  * Depends on: window.dashboard, window.API
  */
 
-// ── CMS API methods ────────────────────────────────────────────────────────────
+// ── API extension ─────────────────────────────────────────────────────────────
 API.cms = {
+    // Media
+    uploadMedia:     (fd)        => { const t=localStorage.getItem('pipways_token'); return fetch(`${location.origin}/cms/media/upload`,{method:'POST',headers:{Authorization:`Bearer ${t}`},body:fd}).then(r=>r.ok?r.json():r.json().then(e=>{throw new Error(e.detail||'Upload failed')})); },
+    listMedia:       (folder)    => dashboard.apiRequest(`/cms/media${folder?`?folder=${folder}`:''}`),
+    deleteMedia:     (fn)        => dashboard.apiRequest(`/cms/media?filename=${encodeURIComponent(fn)}`,{method:'DELETE'}),
     // Blog
-    listPosts:      ()       => dashboard.apiRequest('/cms/blog'),
-    getPost:        (id)     => dashboard.apiRequest(`/cms/blog/${id}`),
-    createPost:     (data)   => dashboard.apiRequest('/cms/blog', { method:'POST', body:JSON.stringify(data) }),
-    updatePost:     (id, d)  => dashboard.apiRequest(`/cms/blog/${id}`, { method:'PUT', body:JSON.stringify(d) }),
-    deletePost:     (id)     => dashboard.apiRequest(`/cms/blog/${id}`, { method:'DELETE' }),
-    togglePost:     (id)     => dashboard.apiRequest(`/cms/blog/${id}/toggle-publish`, { method:'POST' }),
+    listPosts:       ()          => dashboard.apiRequest('/cms/blog'),
+    getPost:         (id)        => dashboard.apiRequest(`/cms/blog/${id}`),
+    createPost:      (d)         => dashboard.apiRequest('/cms/blog',{method:'POST',body:JSON.stringify(d)}),
+    updatePost:      (id,d)      => dashboard.apiRequest(`/cms/blog/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deletePost:      (id)        => dashboard.apiRequest(`/cms/blog/${id}`,{method:'DELETE'}),
+    togglePost:      (id)        => dashboard.apiRequest(`/cms/blog/${id}/toggle-publish`,{method:'POST'}),
+    seoScore:        (d)         => dashboard.apiRequest('/cms/blog/seo-score',{method:'POST',body:JSON.stringify(d)}),
     // Courses
-    listCourses:    ()       => dashboard.apiRequest('/cms/courses'),
-    listLessons:    (cid)    => dashboard.apiRequest(`/cms/courses/${cid}/lessons`),
-    createCourse:   (data)   => dashboard.apiRequest('/cms/courses', { method:'POST', body:JSON.stringify(data) }),
-    updateCourse:   (id, d)  => dashboard.apiRequest(`/cms/courses/${id}`, { method:'PUT', body:JSON.stringify(d) }),
-    deleteCourse:   (id)     => dashboard.apiRequest(`/cms/courses/${id}`, { method:'DELETE' }),
-    toggleCourse:   (id)     => dashboard.apiRequest(`/cms/courses/${id}/toggle-publish`, { method:'POST' }),
-    createLesson:   (data)   => dashboard.apiRequest('/cms/lessons', { method:'POST', body:JSON.stringify(data) }),
-    updateLesson:   (id, d)  => dashboard.apiRequest(`/cms/lessons/${id}`, { method:'PUT', body:JSON.stringify(d) }),
-    deleteLesson:   (id)     => dashboard.apiRequest(`/cms/lessons/${id}`, { method:'DELETE' }),
+    listCourses:     ()          => dashboard.apiRequest('/cms/courses'),
+    createCourse:    (d)         => dashboard.apiRequest('/cms/courses',{method:'POST',body:JSON.stringify(d)}),
+    updateCourse:    (id,d)      => dashboard.apiRequest(`/cms/courses/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteCourse:    (id)        => dashboard.apiRequest(`/cms/courses/${id}`,{method:'DELETE'}),
+    toggleCourse:    (id)        => dashboard.apiRequest(`/cms/courses/${id}/toggle-publish`,{method:'POST'}),
+    // Modules
+    listModules:     (cid)       => dashboard.apiRequest(`/cms/courses/${cid}/modules`),
+    createModule:    (d)         => dashboard.apiRequest('/cms/modules',{method:'POST',body:JSON.stringify(d)}),
+    updateModule:    (id,d)      => dashboard.apiRequest(`/cms/modules/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteModule:    (id)        => dashboard.apiRequest(`/cms/modules/${id}`,{method:'DELETE'}),
+    // Lessons
+    listLessons:     (mid)       => dashboard.apiRequest(`/cms/modules/${mid}/lessons`),
+    createLesson:    (d)         => dashboard.apiRequest('/cms/lessons',{method:'POST',body:JSON.stringify(d)}),
+    updateLesson:    (id,d)      => dashboard.apiRequest(`/cms/lessons/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteLesson:    (id)        => dashboard.apiRequest(`/cms/lessons/${id}`,{method:'DELETE'}),
+    // Quizzes
+    getQuiz:         (mid)       => dashboard.apiRequest(`/cms/modules/${mid}/quiz`),
+    createQuiz:      (d)         => dashboard.apiRequest('/cms/quizzes',{method:'POST',body:JSON.stringify(d)}),
+    updateQuiz:      (id,d)      => dashboard.apiRequest(`/cms/quizzes/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteQuiz:      (id)        => dashboard.apiRequest(`/cms/quizzes/${id}`,{method:'DELETE'}),
+    createQuestion:  (d)         => dashboard.apiRequest('/cms/quiz-questions',{method:'POST',body:JSON.stringify(d)}),
+    updateQuestion:  (id,d)      => dashboard.apiRequest(`/cms/quiz-questions/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteQuestion:  (id)        => dashboard.apiRequest(`/cms/quiz-questions/${id}`,{method:'DELETE'}),
     // Signals
-    listSignals:    ()       => dashboard.apiRequest('/cms/signals'),
-    createSignal:   (data)   => dashboard.apiRequest('/cms/signals', { method:'POST', body:JSON.stringify(data) }),
-    updateSignal:   (id, d)  => dashboard.apiRequest(`/cms/signals/${id}`, { method:'PUT', body:JSON.stringify(d) }),
-    deleteSignal:   (id)     => dashboard.apiRequest(`/cms/signals/${id}`, { method:'DELETE' }),
-    closeSignal:    (id, o)  => dashboard.apiRequest(`/cms/signals/${id}/close?outcome=${o}`, { method:'POST' }),
+    listSignals:     ()          => dashboard.apiRequest('/cms/signals'),
+    createSignal:    (d)         => dashboard.apiRequest('/cms/signals',{method:'POST',body:JSON.stringify(d)}),
+    updateSignal:    (id,d)      => dashboard.apiRequest(`/cms/signals/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteSignal:    (id)        => dashboard.apiRequest(`/cms/signals/${id}`,{method:'DELETE'}),
+    closeSignal:     (id,o)      => dashboard.apiRequest(`/cms/signals/${id}/close?outcome=${o}`,{method:'POST'}),
     // Webinars
-    listWebinars:   ()       => dashboard.apiRequest('/cms/webinars'),
-    createWebinar:  (data)   => dashboard.apiRequest('/cms/webinars', { method:'POST', body:JSON.stringify(data) }),
-    updateWebinar:  (id, d)  => dashboard.apiRequest(`/cms/webinars/${id}`, { method:'PUT', body:JSON.stringify(d) }),
-    deleteWebinar:  (id)     => dashboard.apiRequest(`/cms/webinars/${id}`, { method:'DELETE' }),
-    toggleWebinar:  (id)     => dashboard.apiRequest(`/cms/webinars/${id}/toggle-publish`, { method:'POST' }),
+    listWebinars:    ()          => dashboard.apiRequest('/cms/webinars'),
+    createWebinar:   (d)         => dashboard.apiRequest('/cms/webinars',{method:'POST',body:JSON.stringify(d)}),
+    updateWebinar:   (id,d)      => dashboard.apiRequest(`/cms/webinars/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteWebinar:   (id)        => dashboard.apiRequest(`/cms/webinars/${id}`,{method:'DELETE'}),
+    toggleWebinar:   (id)        => dashboard.apiRequest(`/cms/webinars/${id}/toggle-publish`,{method:'POST'}),
+    // Users
+    listUsers:       (p,s,r,t)   => dashboard.apiRequest(`/cms/users?page=${p||1}&per_page=25${s?`&search=${encodeURIComponent(s)}`:''}`),
+    setUserRole:     (id,role)   => dashboard.apiRequest(`/cms/users/${id}/role`,{method:'POST',body:JSON.stringify({role})}),
+    setUserSub:      (id,tier)   => dashboard.apiRequest(`/cms/users/${id}/subscription`,{method:'POST',body:JSON.stringify({subscription_tier:tier})}),
+    toggleUser:      (id)        => dashboard.apiRequest(`/cms/users/${id}/toggle-active`,{method:'POST'}),
+    getUserActivity: (id)        => dashboard.apiRequest(`/cms/users/${id}/activity`),
+    // Announcements
+    listAnnouncements:  ()       => dashboard.apiRequest('/cms/announcements'),
+    createAnnouncement: (d)      => dashboard.apiRequest('/cms/announcements',{method:'POST',body:JSON.stringify(d)}),
+    deleteAnnouncement: (id)     => dashboard.apiRequest(`/cms/announcements/${id}`,{method:'DELETE'}),
+    toggleAnnouncement: (id)     => dashboard.apiRequest(`/cms/announcements/${id}/toggle`,{method:'POST'}),
+    // Coupons
+    listCoupons:     ()          => dashboard.apiRequest('/cms/coupons'),
+    createCoupon:    (d)         => dashboard.apiRequest('/cms/coupons',{method:'POST',body:JSON.stringify(d)}),
+    deleteCoupon:    (id)        => dashboard.apiRequest(`/cms/coupons/${id}`,{method:'DELETE'}),
+    toggleCoupon:    (id)        => dashboard.apiRequest(`/cms/coupons/${id}/toggle`,{method:'POST'}),
     // Settings
-    getSettings:    ()       => dashboard.apiRequest('/cms/settings'),
-    saveSettings:   (data)   => dashboard.apiRequest('/cms/settings', { method:'PUT', body:JSON.stringify(data) }),
+    getSettings:     ()          => dashboard.apiRequest('/cms/settings'),
+    saveSettings:    (d)         => dashboard.apiRequest('/cms/settings',{method:'PUT',body:JSON.stringify(d)}),
 };
 
-// ── CMSPage module ─────────────────────────────────────────────────────────────
+// ── CMSPage ───────────────────────────────────────────────────────────────────
 const CMSPage = {
     _container: null,
     _activeTab: 'blog',
-    _editingId: null,         // id of row being edited (null = create mode)
-    _lessonCourseId: null,    // course expanded for lesson editor
+    _editingId: null,
+    _lmsState: { courseId:null, moduleId:null, quizId:null },
+    _usersPage: 1,
+    _usersSearch: '',
+    _mediaCallback: null,  // set when media picker is invoked from a form
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-    _esc(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
-    _date(s){ if(!s) return '—'; try{ return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }catch(_){return s;} },
-    _dt(s){ if(!s) return ''; try{ return new Date(s).toISOString().slice(0,16); }catch(_){return '';} },
-    _badge(on, onLabel='Published', offLabel='Draft'){
-        return on
-            ? `<span style="background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3);padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${onLabel}</span>`
-            : `<span style="background:rgba(107,114,128,.15);color:#9ca3af;border:1px solid rgba(107,114,128,.3);padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${offLabel}</span>`;
-    },
-    _dirBadge(dir){
-        const up = (dir||'').toUpperCase() === 'BUY';
-        return `<span style="background:${up?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)'};color:${up?'#34d399':'#f87171'};border:1px solid ${up?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'};padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${dir||'—'}</span>`;
-    },
-    _statusBadge(s){
-        const colors = { active:'rgba(16,185,129,.15)', closed:'rgba(107,114,128,.15)', cancelled:'rgba(239,68,68,.15)' };
-        const texts  = { active:'#34d399', closed:'#9ca3af', cancelled:'#f87171' };
-        const borders= { active:'rgba(16,185,129,.3)', closed:'rgba(107,114,128,.3)', cancelled:'rgba(239,68,68,.3)' };
-        const k = (s||'active').toLowerCase();
-        return `<span style="background:${colors[k]||colors.active};color:${texts[k]||texts.active};border:1px solid ${borders[k]||borders.active};padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${k}</span>`;
+    // ── micro-helpers ─────────────────────────────────────────────────────
+    _e(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+    _d(s){ if(!s)return'—'; try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}catch(_){return s;} },
+    _dt(s){ if(!s)return''; try{return new Date(s).toISOString().slice(0,16);}catch(_){return'';} },
+    _pub(on,a='Published',b='Draft'){ const c=on?'rgba(16,185,129,.15)':'rgba(107,114,128,.15)',t=on?'#34d399':'#9ca3af',br=on?'rgba(16,185,129,.3)':'rgba(107,114,128,.3)'; return `<span style="background:${c};color:${t};border:1px solid ${br};padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${on?a:b}</span>`; },
+    _role(r){ const m={'admin':'rgba(239,68,68,.15)','moderator':'rgba(245,158,11,.15)','user':'rgba(107,114,128,.15)'}; const t={'admin':'#f87171','moderator':'#fbbf24','user':'#9ca3af'}; const k=r||'user'; return `<span style="background:${m[k]||m.user};color:${t[k]||t.user};border:1px solid ${t[k]||t.user}44;padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${k}</span>`; },
+    _tier(s){ const m={'pro':'rgba(124,58,237,.15)','enterprise':'rgba(245,158,11,.15)','free':'rgba(107,114,128,.15)'}; const t={'pro':'#a78bfa','enterprise':'#fbbf24','free':'#9ca3af'}; const k=s||'free'; return `<span style="background:${m[k]||m.free};color:${t[k]||t.free};border:1px solid ${t[k]||t.free}55;padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${k}</span>`; },
+    _dir(d){ const u=(d||'').toUpperCase()==='BUY'; return `<span style="background:${u?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)'};color:${u?'#34d399':'#f87171'};border:1px solid ${u?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'};padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;">${d||'—'}</span>`; },
+
+    _toast(msg,type='success'){
+        const d=document.createElement('div');
+        d.style.cssText=`position:fixed;bottom:1.5rem;right:1.5rem;z-index:99999;padding:.75rem 1.25rem;border-radius:.75rem;font-size:.85rem;font-weight:600;color:white;max-width:340px;background:${type==='success'?'rgba(16,185,129,.95)':type==='error'?'rgba(239,68,68,.95)':type==='warning'?'rgba(245,158,11,.95)':'rgba(59,130,246,.95)'};box-shadow:0 8px 24px rgba(0,0,0,.4);`;
+        d.textContent=msg; document.body.appendChild(d); setTimeout(()=>d.remove(),3500);
     },
 
-    _toast(msg, type='success'){
-        const d = document.createElement('div');
-        d.style.cssText=`position:fixed;bottom:1.5rem;right:1.5rem;z-index:99999;
-            padding:.75rem 1.25rem;border-radius:.75rem;font-size:.85rem;font-weight:600;
-            color:white;max-width:320px;
-            background:${type==='success'?'rgba(16,185,129,.95)':type==='error'?'rgba(239,68,68,.95)':'rgba(59,130,246,.95)'};
-            box-shadow:0 8px 24px rgba(0,0,0,.4);`;
-        d.textContent=msg;
-        document.body.appendChild(d);
-        setTimeout(()=>d.remove(),3500);
-    },
-
-    _confirm(msg){ return confirm(msg); },
-
-    // ── Entry point ───────────────────────────────────────────────────────────
+    // ── Entry ─────────────────────────────────────────────────────────────
     async render(container){
         if(!container) return;
-        this._container = container;
-        container.innerHTML = this._shell();
+        this._container=container;
+        container.innerHTML=this._shell();
         this._setupTabs();
+        this._injectStyles();
         await this._loadTab(this._activeTab);
     },
 
+    _injectStyles(){
+        if(document.getElementById('cms-styles')) return;
+        const s=document.createElement('style');
+        s.id='cms-styles';
+        s.textContent=`
+        .cms-tab{padding:.45rem 1rem;border-radius:.6rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer;color:#9ca3af;background:transparent;transition:all .18s;white-space:nowrap;}
+        .cms-tab.active{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;box-shadow:0 4px 12px rgba(124,58,237,.35);}
+        .cms-tab:not(.active):hover{background:#374151;color:white;}
+        .cms-pane{display:none;}.cms-pane.visible{display:block;}
+        .cms-tbl{width:100%;border-collapse:collapse;}
+        .cms-tbl th{padding:.6rem .85rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;background:#111827;}
+        .cms-tbl td{padding:.6rem .85rem;font-size:.82rem;border-bottom:1px solid #1f2937;vertical-align:middle;}
+        .cms-tbl tr:hover td{background:rgba(124,58,237,.04);}
+        .cb{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .85rem;border-radius:.5rem;font-size:.78rem;font-weight:600;border:none;cursor:pointer;transition:all .18s;}
+        .cb-p{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;} .cb-p:hover{opacity:.9;transform:translateY(-1px);}
+        .cb-g{background:#374151;color:#d1d5db;border:1px solid #4b5563;} .cb-g:hover{background:#4b5563;color:white;}
+        .cb-r{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);} .cb-r:hover{background:rgba(239,68,68,.3);}
+        .cb-gr{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3);} .cb-gr:hover{background:rgba(16,185,129,.3);}
+        .cb-y{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3);} .cb-y:hover{background:rgba(245,158,11,.3);}
+        .ci{width:100%;background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.5rem .75rem;color:white;font-size:.875rem;box-sizing:border-box;}
+        .ci:focus{outline:none;border-color:#7c3aed;}
+        .cta{width:100%;background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.5rem .75rem;color:white;font-size:.875rem;box-sizing:border-box;resize:vertical;min-height:120px;}
+        .cta:focus{outline:none;border-color:#7c3aed;}
+        .cs{width:100%;background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.5rem .75rem;color:white;font-size:.875rem;box-sizing:border-box;}
+        .cs:focus{outline:none;border-color:#7c3aed;}
+        .cl{display:block;font-size:.78rem;color:#9ca3af;margin-bottom:.35rem;font-weight:500;}
+        .ccard{background:#1f2937;border:1px solid #374151;border-radius:.75rem;padding:1.25rem;margin-bottom:1rem;}
+        .chdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid #374151;}
+        .crow{display:grid;gap:.75rem;margin-bottom:.75rem;}
+        .crow2{grid-template-columns:1fr 1fr;}
+        .crow3{grid-template-columns:1fr 1fr 1fr;}
+        .ctog{display:flex;align-items:center;gap:.5rem;cursor:pointer;}
+        .ttrack{width:40px;height:22px;border-radius:11px;background:#374151;position:relative;transition:background .2s;}
+        .ttrack.on{background:#7c3aed;}
+        .tthumb{width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:3px;left:3px;transition:left .2s;}
+        .ttrack.on .tthumb{left:21px;}
+        /* SEO */
+        .seo-ring{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:800;flex-shrink:0;}
+        .seo-check{display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-radius:.4rem;font-size:.8rem;margin-bottom:.35rem;}
+        /* Media grid */
+        .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem;margin-top:.75rem;}
+        .media-item{background:#111827;border:2px solid #374151;border-radius:.5rem;overflow:hidden;cursor:pointer;transition:border-color .15s;}
+        .media-item:hover,.media-item.selected{border-color:#7c3aed;}
+        .media-thumb{width:100%;height:90px;object-fit:cover;display:block;background:#1f2937;}
+        .media-name{font-size:.68rem;color:#9ca3af;padding:.3rem .4rem;truncate:true;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+        /* Upload drop zone */
+        .upload-zone{border:2px dashed #374151;border-radius:.75rem;padding:2rem;text-align:center;cursor:pointer;transition:all .2s;}
+        .upload-zone.drag-over,.upload-zone:hover{border-color:#7c3aed;background:rgba(124,58,237,.05);}
+        /* LMS tree */
+        .lms-module{background:#1a2235;border:1px solid #2a3550;border-radius:.65rem;margin-bottom:.75rem;overflow:hidden;}
+        .lms-module-header{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;cursor:pointer;background:#1f2937;}
+        .lms-module-header:hover{background:#263347;}
+        .lms-lesson{display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem .6rem 2.5rem;border-top:1px solid #1a2235;font-size:.82rem;}
+        .lms-lesson:hover{background:rgba(124,58,237,.04);}
+        /* Quiz */
+        .quiz-q{background:#111827;border:1px solid #2a3550;border-radius:.5rem;padding:.85rem;margin-bottom:.65rem;}
+        /* Announcement */
+        .ann-type-info{border-left:4px solid #3b82f6;} .ann-type-warning{border-left:4px solid #f59e0b;}
+        .ann-type-success{border-left:4px solid #10b981;} .ann-type-danger{border-left:4px solid #ef4444;}
+        /* Settings groups */
+        .sg{background:#1f2937;border:1px solid #374151;border-radius:.75rem;overflow:hidden;margin-bottom:1rem;}
+        .sg-hdr{padding:.75rem 1rem;background:#111827;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;}
+        .sg-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid #1f2937;gap:1rem;}
+        .sg-row:last-child{border-bottom:none;}
+        .sg-lbl{font-size:.85rem;color:#e5e7eb;font-weight:500;min-width:180px;}
+        .sg-desc{font-size:.75rem;color:#6b7280;margin-top:.1rem;}
+        `;
+        document.head.appendChild(s);
+    },
+
     _shell(){
-        const tabs = [
-            { id:'blog',     icon:'fa-newspaper',   label:'Blog Posts' },
-            { id:'courses',  icon:'fa-graduation-cap', label:'Courses / LMS' },
-            { id:'signals',  icon:'fa-satellite-dish', label:'Signals' },
-            { id:'webinars', icon:'fa-video',        label:'Webinars' },
-            { id:'settings', icon:'fa-cog',          label:'Site Settings' },
+        const tabs=[
+            {id:'blog',    icon:'fa-newspaper',    label:'Blog'},
+            {id:'lms',     icon:'fa-graduation-cap',label:'LMS'},
+            {id:'signals', icon:'fa-satellite-dish',label:'Signals'},
+            {id:'webinars',icon:'fa-video',         label:'Webinars'},
+            {id:'users',   icon:'fa-users',         label:'Users'},
+            {id:'media',   icon:'fa-photo-video',   label:'Media'},
+            {id:'settings',icon:'fa-cog',           label:'Settings'},
         ];
         return `
-        <style>
-            .cms-tab{padding:.45rem 1rem;border-radius:.6rem;font-size:.82rem;font-weight:600;
-                border:none;cursor:pointer;color:#9ca3af;background:transparent;transition:all .18s;white-space:nowrap;}
-            .cms-tab.active{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;box-shadow:0 4px 12px rgba(124,58,237,.35);}
-            .cms-tab:not(.active):hover{background:#374151;color:white;}
-            .cms-pane{display:none;}.cms-pane.visible{display:block;}
-            .cms-table{width:100%;border-collapse:collapse;}
-            .cms-table th{padding:.6rem .85rem;text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;background:#111827;}
-            .cms-table td{padding:.6rem .85rem;font-size:.82rem;border-bottom:1px solid #1f2937;vertical-align:middle;}
-            .cms-table tr:hover td{background:rgba(124,58,237,.04);}
-            .cms-btn{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .85rem;border-radius:.5rem;font-size:.78rem;font-weight:600;border:none;cursor:pointer;transition:all .18s;}
-            .cms-btn-purple{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;}
-            .cms-btn-purple:hover{opacity:.9;transform:translateY(-1px);}
-            .cms-btn-gray{background:#374151;color:#d1d5db;border:1px solid #4b5563;}
-            .cms-btn-gray:hover{background:#4b5563;color:white;}
-            .cms-btn-red{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);}
-            .cms-btn-red:hover{background:rgba(239,68,68,.3);}
-            .cms-btn-green{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3);}
-            .cms-btn-green:hover{background:rgba(16,185,129,.3);}
-            .cms-form-row{display:grid;gap:.75rem;margin-bottom:.75rem;}
-            .cms-form-row.cols-2{grid-template-columns:1fr 1fr;}
-            .cms-form-row.cols-3{grid-template-columns:1fr 1fr 1fr;}
-            .cms-input{width:100%;background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.5rem .75rem;color:white;font-size:.875rem;box-sizing:border-box;}
-            .cms-input:focus{outline:none;border-color:#7c3aed;}
-            .cms-textarea{width:100%;background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.5rem .75rem;color:white;font-size:.875rem;box-sizing:border-box;resize:vertical;min-height:160px;}
-            .cms-textarea:focus{outline:none;border-color:#7c3aed;}
-            .cms-select{width:100%;background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.5rem .75rem;color:white;font-size:.875rem;box-sizing:border-box;}
-            .cms-select:focus{outline:none;border-color:#7c3aed;}
-            .cms-label{display:block;font-size:.78rem;color:#9ca3af;margin-bottom:.35rem;font-weight:500;}
-            .cms-card{background:#1f2937;border:1px solid #374151;border-radius:.75rem;padding:1.25rem;margin-bottom:1rem;}
-            .cms-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid #374151;}
-            .cms-toggle{display:flex;align-items:center;gap:.5rem;cursor:pointer;}
-            .toggle-track{width:40px;height:22px;border-radius:11px;background:#374151;position:relative;transition:background .2s;}
-            .toggle-track.on{background:#7c3aed;}
-            .toggle-thumb{width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:3px;left:3px;transition:left .2s;}
-            .toggle-track.on .toggle-thumb{left:21px;}
-            .settings-group{background:#1f2937;border:1px solid #374151;border-radius:.75rem;overflow:hidden;margin-bottom:1rem;}
-            .settings-group-header{padding:.75rem 1rem;background:#111827;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;}
-            .settings-row{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid #1f2937;gap:1rem;}
-            .settings-row:last-child{border-bottom:none;}
-            .settings-label{font-size:.85rem;color:#e5e7eb;font-weight:500;min-width:180px;}
-            .settings-desc{font-size:.75rem;color:#6b7280;margin-top:.1rem;}
-            .cms-editor-wrap{border:1px solid #374151;border-radius:.5rem;overflow:hidden;}
-            .cms-editor-toolbar{background:#111827;padding:.5rem .75rem;display:flex;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid #374151;}
-            .editor-btn{background:#374151;color:#d1d5db;border:none;border-radius:.35rem;padding:.25rem .55rem;font-size:.78rem;cursor:pointer;}
-            .editor-btn:hover{background:#4b5563;color:white;}
-        </style>
-
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
             <div>
                 <h2 class="text-2xl font-bold text-white flex items-center gap-2">
                     <i class="fas fa-layer-group text-purple-400"></i> Content Management
                 </h2>
-                <p class="text-sm text-gray-500 mt-0.5">Manage blog, courses, signals, webinars &amp; site settings</p>
+                <p class="text-sm text-gray-500 mt-0.5">Blog · LMS · Signals · Webinars · Users · Media · Settings</p>
             </div>
         </div>
-
-        <div class="flex gap-1 mb-6 p-1 rounded-xl bg-gray-800/60 border border-gray-700 w-fit flex-wrap">
+        <div class="flex gap-1 mb-5 p-1 rounded-xl bg-gray-800/60 border border-gray-700 flex-wrap">
             ${tabs.map(t=>`<button class="cms-tab${t.id===this._activeTab?' active':''}" data-tab="${t.id}">
                 <i class="fas ${t.icon} mr-1.5"></i>${t.label}
             </button>`).join('')}
         </div>
-
         ${tabs.map(t=>`<div id="cms-pane-${t.id}" class="cms-pane${t.id===this._activeTab?' visible':''}"></div>`).join('')}`;
     },
 
     _setupTabs(){
-        document.querySelectorAll('.cms-tab').forEach(btn=>{
-            btn.addEventListener('click', async ()=>{
-                document.querySelectorAll('.cms-tab').forEach(b=>b.classList.remove('active'));
-                document.querySelectorAll('.cms-pane').forEach(p=>p.classList.remove('visible'));
-                btn.classList.add('active');
-                this._activeTab = btn.dataset.tab;
-                document.getElementById(`cms-pane-${btn.dataset.tab}`)?.classList.add('visible');
-                await this._loadTab(btn.dataset.tab);
+        document.querySelectorAll('.cms-tab').forEach(b=>{
+            b.addEventListener('click', async ()=>{
+                document.querySelectorAll('.cms-tab').forEach(x=>x.classList.remove('active'));
+                document.querySelectorAll('.cms-pane').forEach(x=>x.classList.remove('visible'));
+                b.classList.add('active');
+                this._activeTab=b.dataset.tab;
+                document.getElementById(`cms-pane-${b.dataset.tab}`)?.classList.add('visible');
+                await this._loadTab(b.dataset.tab);
             });
         });
     },
 
     async _loadTab(tab){
-        switch(tab){
-            case 'blog':     await this._renderBlog();     break;
-            case 'courses':  await this._renderCourses();  break;
-            case 'signals':  await this._renderSignals();  break;
-            case 'webinars': await this._renderWebinars(); break;
-            case 'settings': await this._renderSettings(); break;
-        }
+        const map={blog:()=>this._blog(),lms:()=>this._lms(),signals:()=>this._signals(),
+                   webinars:()=>this._webinars(),users:()=>this._users(),
+                   media:()=>this._media(),settings:()=>this._settings()};
+        if(map[tab]) await map[tab]();
     },
 
-    // ══════════════════════════════════════════════════════════════════════════
+    // ═════════════════════════════════════════════════════════════════════════
     // BLOG
-    // ══════════════════════════════════════════════════════════════════════════
-    async _renderBlog(editData=null){
-        const pane = document.getElementById('cms-pane-blog');
-        if(!pane) return;
-
-        // Load posts list
-        let posts = [];
-        try{ posts = await API.cms.listPosts(); } catch(_){}
-
-        pane.innerHTML = `
-        <div class="cms-section-header">
+    // ═════════════════════════════════════════════════════════════════════════
+    async _blog(){
+        const pane=document.getElementById('cms-pane-blog'); if(!pane) return;
+        let posts=[]; try{posts=await API.cms.listPosts();}catch(_){}
+        pane.innerHTML=`
+        <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2">
                 <i class="fas fa-newspaper text-blue-400"></i> Blog Posts
-                <span style="background:#374151;color:#9ca3af;padding:.1rem .55rem;border-radius:9999px;font-size:.72rem;">${posts.length}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${posts.length}</span>
             </h3>
-            <button class="cms-btn cms-btn-purple" onclick="CMSPage._openBlogForm()">
-                <i class="fas fa-plus"></i> New Post
-            </button>
+            <button class="cb cb-p" onclick="CMSPage._blogForm()"><i class="fas fa-plus"></i> New Post</button>
         </div>
-
-        <div id="cms-blog-form" style="display:none;" class="cms-card mb-4"></div>
-
+        <div id="cms-blog-form" style="display:none;" class="ccard mb-4"></div>
         <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="cms-table">
-                    <thead><tr>
-                        <th>Title</th><th>Category</th><th>Status</th>
-                        <th>Views</th><th>Created</th><th class="text-right">Actions</th>
-                    </tr></thead>
-                    <tbody id="cms-blog-tbody">
-                        ${posts.length
-                            ? posts.map(p=>`
-                            <tr>
-                                <td>
-                                    <div class="text-white font-medium text-sm">${this._esc(p.title)}</div>
-                                    <div class="text-gray-600 text-xs font-mono">/${this._esc(p.slug)}</div>
-                                </td>
-                                <td class="text-gray-400">${this._esc(p.category||'General')}</td>
-                                <td>${this._badge(p.is_published)}</td>
-                                <td class="text-gray-400">${p.views||0}</td>
-                                <td class="text-gray-500">${this._date(p.created_at)}</td>
-                                <td class="text-right">
-                                    <div style="display:flex;gap:.35rem;justify-content:flex-end;">
-                                        <button class="cms-btn cms-btn-gray" onclick="CMSPage._openBlogForm(${p.id})">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="cms-btn ${p.is_published?'cms-btn-gray':'cms-btn-green'}"
-                                                onclick="CMSPage._toggleBlogPost(${p.id},this)">
-                                            ${p.is_published?'Unpublish':'Publish'}
-                                        </button>
-                                        <button class="cms-btn cms-btn-red" onclick="CMSPage._deleteBlogPost(${p.id})">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>`).join('')
-                            : '<tr><td colspan="6" class="text-center py-8 text-gray-500 text-sm"><i class="fas fa-newspaper text-2xl block mb-2 opacity-30"></i>No posts yet. Create your first one.</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </div>`;
-    },
-
-    async _openBlogForm(id=null){
-        this._editingId = id;
-        let data = { title:'', slug:'', excerpt:'', content:'', category:'General', tags:'', featured_image:'', is_published:false };
-        if(id){ try{ data = await API.cms.getPost(id); data.tags = (data.tags||[]).join(', '); } catch(_){} }
-
-        const formDiv = document.getElementById('cms-blog-form');
-        if(!formDiv) return;
-        formDiv.style.display = 'block';
-        formDiv.innerHTML = `
-            <div class="cms-section-header">
-                <h4 class="text-white font-semibold">${id?'Edit Post':'New Post'}</h4>
-                <button class="cms-btn cms-btn-gray" onclick="CMSPage._closeBlogForm()">
-                    <i class="fas fa-times"></i> Cancel
-                </button>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Title *</label>
-                    <input class="cms-input" id="bf-title" value="${this._esc(data.title)}" placeholder="Post title"></div>
-                <div><label class="cms-label">Slug *</label>
-                    <input class="cms-input" id="bf-slug" value="${this._esc(data.slug)}" placeholder="url-friendly-slug"></div>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Category</label>
-                    <select class="cms-select" id="bf-category">
-                        ${['General','Strategy','Analysis','Psychology','Risk Management','SMC','Forex','Crypto','Indices']
-                            .map(c=>`<option value="${c}" ${data.category===c?'selected':''}>${c}</option>`).join('')}
-                    </select></div>
-                <div><label class="cms-label">Tags (comma separated)</label>
-                    <input class="cms-input" id="bf-tags" value="${this._esc(Array.isArray(data.tags)?data.tags.join(', '):data.tags)}" placeholder="forex, strategy, smc"></div>
-            </div>
-            <div class="cms-form-row">
-                <div><label class="cms-label">Excerpt</label>
-                    <input class="cms-input" id="bf-excerpt" value="${this._esc(data.excerpt)}" placeholder="Short description for listings"></div>
-            </div>
-            <div class="cms-form-row">
-                <div><label class="cms-label">Featured Image URL</label>
-                    <input class="cms-input" id="bf-img" value="${this._esc(data.featured_image)}" placeholder="https://..."></div>
-            </div>
-            <div class="cms-form-row">
-                <div>
-                    <label class="cms-label">Content (Markdown supported)</label>
-                    <div class="cms-editor-wrap">
-                        <div class="cms-editor-toolbar">
-                            ${[['bold','B'],['italic','I'],['h2','H2'],['h3','H3'],['link','🔗'],['ul','• List'],['blockquote','❝']].map(([cmd,label])=>
-                                `<button type="button" class="editor-btn" onclick="CMSPage._fmt('${cmd}')">${label}</button>`).join('')}
-                        </div>
-                        <textarea class="cms-textarea" id="bf-content" style="border-radius:0;border:none;">${this._esc(data.content)}</textarea>
-                    </div>
-                </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.5rem;">
-                <label class="cms-toggle" onclick="CMSPage._toggleCheck('bf-published')">
-                    <div class="toggle-track${data.is_published?' on':''}"><div class="toggle-thumb"></div></div>
-                    <span class="text-sm text-gray-300">Published</span>
-                    <input type="hidden" id="bf-published" value="${data.is_published?'1':'0'}">
-                </label>
-                <button class="cms-btn cms-btn-purple" onclick="CMSPage._saveBlogPost()">
-                    <i class="fas fa-save"></i> ${id?'Update Post':'Create Post'}
-                </button>
-            </div>`;
-
-        formDiv.scrollIntoView({ behavior:'smooth', block:'start' });
-
-        // Auto-generate slug from title
-        document.getElementById('bf-title').addEventListener('input', e=>{
-            if(!id){
-                document.getElementById('bf-slug').value = e.target.value
-                    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
-            }
-        });
-    },
-
-    _closeBlogForm(){
-        const f = document.getElementById('cms-blog-form');
-        if(f){ f.style.display='none'; f.innerHTML=''; }
-        this._editingId = null;
-    },
-
-    async _saveBlogPost(){
-        const title    = document.getElementById('bf-title')?.value.trim();
-        const slug     = document.getElementById('bf-slug')?.value.trim();
-        const content  = document.getElementById('bf-content')?.value.trim();
-        if(!title||!slug||!content){ this._toast('Title, slug and content are required','error'); return; }
-        const payload = {
-            title, slug,
-            excerpt:       document.getElementById('bf-excerpt')?.value||'',
-            content,
-            category:      document.getElementById('bf-category')?.value||'General',
-            tags:          (document.getElementById('bf-tags')?.value||'').split(',').map(t=>t.trim()).filter(Boolean),
-            featured_image:document.getElementById('bf-img')?.value||'',
-            is_published:  document.getElementById('bf-published')?.value==='1',
-        };
-        try{
-            if(this._editingId){ await API.cms.updatePost(this._editingId, payload); this._toast('Post updated'); }
-            else               { await API.cms.createPost(payload);                  this._toast('Post created'); }
-            this._closeBlogForm();
-            await this._renderBlog();
-        } catch(e){ this._toast(e.message,'error'); }
-    },
-
-    async _toggleBlogPost(id, btn){
-        try{
-            const r = await API.cms.togglePost(id);
-            this._toast(r.message);
-            await this._renderBlog();
-        } catch(e){ this._toast(e.message,'error'); }
-    },
-
-    async _deleteBlogPost(id){
-        if(!this._confirm('Delete this post? This cannot be undone.')) return;
-        try{ await API.cms.deletePost(id); this._toast('Post deleted'); await this._renderBlog(); }
-        catch(e){ this._toast(e.message,'error'); }
-    },
-
-    // Text editor helpers
-    _fmt(cmd){
-        const ta = document.getElementById('bf-content');
-        if(!ta) return;
-        const s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s,e);
-        const wrap = { bold:`**${sel}**`, italic:`_${sel}_`, link:`[${sel}](url)`,
-                       h2:`## ${sel}`, h3:`### ${sel}`, ul:`- ${sel}`, blockquote:`> ${sel}` };
-        const rep = wrap[cmd] || sel;
-        ta.value = ta.value.slice(0,s) + rep + ta.value.slice(e);
-        ta.focus();
-    },
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // COURSES / LMS
-    // ══════════════════════════════════════════════════════════════════════════
-    async _renderCourses(){
-        const pane = document.getElementById('cms-pane-courses');
-        if(!pane) return;
-        let courses = [];
-        try{ courses = await API.cms.listCourses(); } catch(_){}
-
-        pane.innerHTML = `
-        <div class="cms-section-header">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-graduation-cap text-blue-400"></i> Courses
-                <span style="background:#374151;color:#9ca3af;padding:.1rem .55rem;border-radius:9999px;font-size:.72rem;">${courses.length}</span>
-            </h3>
-            <button class="cms-btn cms-btn-purple" onclick="CMSPage._openCourseForm()">
-                <i class="fas fa-plus"></i> New Course
-            </button>
-        </div>
-
-        <div id="cms-course-form" style="display:none;" class="cms-card mb-4"></div>
-        <div id="cms-lesson-editor" style="display:none;" class="cms-card mb-4"></div>
-
-        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="cms-table">
-                    <thead><tr><th>Title</th><th>Level</th><th>Lessons</th><th>Price</th><th>Status</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
+                <table class="cms-tbl">
+                    <thead><tr><th>Title</th><th>Category</th><th>SEO</th><th>Status</th><th>Views</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
                     <tbody>
-                        ${courses.length
-                            ? courses.map(c=>`
-                            <tr>
-                                <td>
-                                    <div class="text-white font-medium text-sm">${this._esc(c.title)}</div>
-                                    <div class="text-gray-600 text-xs">${this._esc(c.description||'').slice(0,60)}${(c.description||'').length>60?'…':''}</div>
-                                </td>
-                                <td><span style="color:#a78bfa;font-size:.75rem;font-weight:600;">${c.level||'Beginner'}</span></td>
-                                <td class="text-gray-300">${c.lesson_count||0}</td>
-                                <td class="text-gray-300">${c.price>0?'$'+Number(c.price).toFixed(2):'Free'}</td>
-                                <td>${this._badge(c.is_published)}</td>
-                                <td class="text-gray-500">${this._date(c.created_at)}</td>
-                                <td class="text-right">
-                                    <div style="display:flex;gap:.35rem;justify-content:flex-end;">
-                                        <button class="cms-btn cms-btn-gray" onclick="CMSPage._openLessonEditor(${c.id},'${this._esc(c.title)}')">
-                                            <i class="fas fa-list"></i> Lessons
-                                        </button>
-                                        <button class="cms-btn cms-btn-gray" onclick="CMSPage._openCourseForm(${c.id})">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="cms-btn ${c.is_published?'cms-btn-gray':'cms-btn-green'}" onclick="CMSPage._toggleCourse(${c.id})">
-                                            ${c.is_published?'Unpublish':'Publish'}
-                                        </button>
-                                        <button class="cms-btn cms-btn-red" onclick="CMSPage._deleteCourse(${c.id})">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>`).join('')
-                            : '<tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm"><i class="fas fa-graduation-cap text-2xl block mb-2 opacity-30"></i>No courses yet.</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </div>`;
-    },
-
-    _openCourseForm(id=null){
-        this._editingId = id;
-        const formDiv = document.getElementById('cms-course-form');
-        if(!formDiv) return;
-        formDiv.style.display='block';
-        formDiv.innerHTML=`
-            <div class="cms-section-header">
-                <h4 class="text-white font-semibold">${id?'Edit Course':'New Course'}</h4>
-                <button class="cms-btn cms-btn-gray" onclick="CMSPage._closeCourseForm()"><i class="fas fa-times"></i> Cancel</button>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Title *</label><input class="cms-input" id="cf-title" placeholder="Course title"></div>
-                <div><label class="cms-label">Level</label>
-                    <select class="cms-select" id="cf-level">
-                        ${['Beginner','Intermediate','Advanced'].map(l=>`<option value="${l}">${l}</option>`).join('')}
-                    </select></div>
-            </div>
-            <div class="cms-form-row">
-                <div><label class="cms-label">Description</label><textarea class="cms-textarea" id="cf-desc" style="min-height:80px;"></textarea></div>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Price (0 = Free)</label><input type="number" class="cms-input" id="cf-price" step="0.01" min="0" placeholder="0.00"></div>
-                <div><label class="cms-label">Thumbnail URL</label><input class="cms-input" id="cf-thumb" placeholder="https://..."></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.5rem;">
-                <label class="cms-toggle" onclick="CMSPage._toggleCheck('cf-published')">
-                    <div class="toggle-track"><div class="toggle-thumb"></div></div>
-                    <span class="text-sm text-gray-300">Published</span>
-                    <input type="hidden" id="cf-published" value="0">
-                </label>
-                <button class="cms-btn cms-btn-purple" onclick="CMSPage._saveCourse()">
-                    <i class="fas fa-save"></i> ${id?'Update Course':'Create Course'}
-                </button>
-            </div>`;
-
-        if(id){
-            API.cms.listCourses().then(list=>{
-                const c = list.find(x=>x.id===id);
-                if(!c) return;
-                document.getElementById('cf-title').value  = c.title||'';
-                document.getElementById('cf-desc').value   = c.description||'';
-                document.getElementById('cf-level').value  = c.level||'Beginner';
-                document.getElementById('cf-price').value  = c.price||0;
-                document.getElementById('cf-thumb').value  = c.thumbnail||'';
-                const track = document.querySelector('#cms-course-form .toggle-track');
-                const hid   = document.getElementById('cf-published');
-                if(c.is_published){ track.classList.add('on'); hid.value='1'; }
-            }).catch(()=>{});
-        }
-        formDiv.scrollIntoView({behavior:'smooth',block:'start'});
-    },
-
-    _closeCourseForm(){
-        const f=document.getElementById('cms-course-form');
-        if(f){f.style.display='none';f.innerHTML='';}
-        this._editingId=null;
-    },
-
-    async _saveCourse(){
-        const title=document.getElementById('cf-title')?.value.trim();
-        if(!title){this._toast('Title is required','error');return;}
-        const payload={
-            title,
-            description: document.getElementById('cf-desc')?.value||'',
-            level:       document.getElementById('cf-level')?.value||'Beginner',
-            price:       parseFloat(document.getElementById('cf-price')?.value)||0,
-            thumbnail:   document.getElementById('cf-thumb')?.value||'',
-            is_published:document.getElementById('cf-published')?.value==='1',
-        };
-        try{
-            if(this._editingId){ await API.cms.updateCourse(this._editingId,payload); this._toast('Course updated'); }
-            else               { await API.cms.createCourse(payload);                 this._toast('Course created'); }
-            this._closeCourseForm();
-            await this._renderCourses();
-        }catch(e){this._toast(e.message,'error');}
-    },
-
-    async _toggleCourse(id){
-        try{ const r=await API.cms.toggleCourse(id); this._toast(r.message); await this._renderCourses(); }
-        catch(e){this._toast(e.message,'error');}
-    },
-
-    async _deleteCourse(id){
-        if(!this._confirm('Delete this course and ALL its lessons?')) return;
-        try{ await API.cms.deleteCourse(id); this._toast('Course deleted'); await this._renderCourses(); }
-        catch(e){this._toast(e.message,'error');}
-    },
-
-    async _openLessonEditor(courseId, courseTitle){
-        this._lessonCourseId = courseId;
-        const div = document.getElementById('cms-lesson-editor');
-        if(!div) return;
-        div.style.display='block';
-        div.innerHTML=`<div class="text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading lessons…</div>`;
-        div.scrollIntoView({behavior:'smooth',block:'start'});
-
-        let lessons=[];
-        try{ lessons=await API.cms.listLessons(courseId); }catch(_){}
-
-        div.innerHTML=`
-        <div class="cms-section-header">
-            <h4 class="text-white font-semibold"><i class="fas fa-list text-purple-400 mr-2"></i>Lessons — ${this._esc(courseTitle)}</h4>
-            <button class="cms-btn cms-btn-gray" onclick="document.getElementById('cms-lesson-editor').style.display='none';">
-                <i class="fas fa-times"></i> Close
-            </button>
-        </div>
-
-        <div id="cms-lesson-form" class="mb-4">
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Lesson Title *</label><input class="cms-input" id="lf-title" placeholder="Lesson title"></div>
-                <div><label class="cms-label">Video URL</label><input class="cms-input" id="lf-video" placeholder="https://youtube.com/..."></div>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Duration (minutes)</label><input type="number" class="cms-input" id="lf-dur" min="0" placeholder="15"></div>
-                <div><label class="cms-label">Order</label><input type="number" class="cms-input" id="lf-ord" min="0" placeholder="1"></div>
-            </div>
-            <div class="cms-form-row">
-                <div><label class="cms-label">Content</label><textarea class="cms-textarea" id="lf-content" style="min-height:80px;" placeholder="Lesson content…"></textarea></div>
-            </div>
-            <div style="display:flex;gap:.75rem;">
-                <button class="cms-btn cms-btn-purple" onclick="CMSPage._saveLesson()"><i class="fas fa-plus"></i> Add Lesson</button>
-                <button class="cms-btn cms-btn-gray" onclick="CMSPage._clearLessonForm()">Clear</button>
-            </div>
-        </div>
-
-        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-            <table class="cms-table">
-                <thead><tr><th>#</th><th>Title</th><th>Duration</th><th>Video</th><th class="text-right">Actions</th></tr></thead>
-                <tbody id="cms-lesson-tbody">
-                    ${lessons.length
-                        ? lessons.map((l,i)=>`<tr>
-                            <td class="text-gray-600 font-mono">${String(l.order_index||i+1).padStart(2,'0')}</td>
-                            <td class="text-white">${this._esc(l.title)}</td>
-                            <td class="text-gray-400">${l.duration_minutes||0}m</td>
-                            <td>${l.video_url?`<a href="${this._esc(l.video_url)}" target="_blank" class="text-purple-400 hover:underline text-xs">▶ Watch</a>`:'<span class="text-gray-600">—</span>'}</td>
+                        ${posts.length?posts.map(p=>`<tr>
+                            <td><div class="text-white font-medium text-sm">${this._e(p.title)}</div>
+                                <div class="text-gray-600 text-xs font-mono">/${this._e(p.slug)}</div></td>
+                            <td class="text-gray-400">${this._e(p.category||'General')}</td>
+                            <td>${p.focus_keyword?`<span class="text-xs text-green-400"><i class="fas fa-check-circle mr-1"></i>Set</span>`:`<span class="text-xs text-gray-600">—</span>`}</td>
+                            <td>${this._pub(p.is_published)}</td>
+                            <td class="text-gray-400">${p.views||0}</td>
+                            <td class="text-gray-500">${this._d(p.created_at)}</td>
                             <td class="text-right">
-                                <div style="display:flex;gap:.35rem;justify-content:flex-end;">
-                                    <button class="cms-btn cms-btn-gray" onclick="CMSPage._editLesson(${JSON.stringify(l).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
-                                    <button class="cms-btn cms-btn-red" onclick="CMSPage._deleteLesson(${l.id})"><i class="fas fa-trash"></i></button>
+                                <div style="display:flex;gap:.3rem;justify-content:flex-end;">
+                                    <button class="cb cb-g" onclick="CMSPage._blogForm(${p.id})"><i class="fas fa-edit"></i></button>
+                                    <button class="cb ${p.is_published?'cb-g':'cb-gr'}" onclick="CMSPage._togglePost(${p.id})">${p.is_published?'Unpublish':'Publish'}</button>
+                                    <button class="cb cb-r" onclick="CMSPage._deletePost(${p.id})"><i class="fas fa-trash"></i></button>
                                 </div>
                             </td>
                         </tr>`).join('')
-                        : '<tr><td colspan="5" class="text-center py-6 text-gray-500 text-sm">No lessons yet. Add the first one above.</td></tr>'}
-                </tbody>
-            </table>
+                        :`<tr><td colspan="7" class="text-center py-10 text-gray-500 text-sm"><i class="fas fa-newspaper text-2xl block mb-2 opacity-30"></i>No posts yet</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
         </div>`;
     },
 
-    _editLesson(lesson){
-        document.getElementById('lf-title').value   = lesson.title||'';
-        document.getElementById('lf-video').value   = lesson.video_url||'';
-        document.getElementById('lf-dur').value     = lesson.duration_minutes||0;
-        document.getElementById('lf-ord').value     = lesson.order_index||0;
-        document.getElementById('lf-content').value = lesson.content||'';
-        this._editingId = lesson.id;
-        document.getElementById('lf-title').focus();
-    },
+    async _blogForm(id=null){
+        this._editingId=id;
+        let d={title:'',slug:'',excerpt:'',content:'',category:'General',tags:'',featured_image:'',seo_title:'',seo_description:'',focus_keyword:'',is_published:false};
+        if(id){ try{d=await API.cms.getPost(id); d.tags=(d.tags||[]).join(', ');}catch(_){} }
+        const f=document.getElementById('cms-blog-form'); if(!f) return;
+        f.style.display='block';
+        f.innerHTML=`
+        <div class="chdr">
+            <h4 class="text-white font-semibold">${id?'Edit Post':'New Post'}</h4>
+            <div class="flex gap-2">
+                <button class="cb cb-y" onclick="CMSPage._runSEO()"><i class="fas fa-chart-line"></i> SEO Score</button>
+                <button class="cb cb-g" onclick="CMSPage._closeBlogForm()"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Title *</label><input class="ci" id="bf-title" value="${this._e(d.title)}" placeholder="Post title…"></div>
+            <div><label class="cl">Slug *</label><input class="ci" id="bf-slug" value="${this._e(d.slug)}" placeholder="url-slug"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Category</label>
+                <select class="cs" id="bf-cat">${['General','Strategy','Analysis','Psychology','Risk Management','SMC','Forex','Crypto','Indices'].map(c=>`<option value="${c}"${d.category===c?' selected':''}>${c}</option>`).join('')}</select></div>
+            <div><label class="cl">Tags (comma-separated)</label><input class="ci" id="bf-tags" value="${this._e(Array.isArray(d.tags)?d.tags.join(', '):d.tags)}" placeholder="forex, smc, strategy"></div>
+        </div>
+        <div class="crow">
+            <div><label class="cl">Excerpt / Meta Description</label>
+                <textarea class="cta" id="bf-excerpt" style="min-height:60px;">${this._e(d.excerpt)}</textarea>
+                <span id="bf-excerpt-count" class="text-xs text-gray-600"></span>
+            </div>
+        </div>
+        <!-- Featured image with upload button -->
+        <div class="crow crow2">
+            <div>
+                <label class="cl">Featured Image URL</label>
+                <div style="display:flex;gap:.5rem;">
+                    <input class="ci" id="bf-img" value="${this._e(d.featured_image)}" placeholder="https:// or pick from media…">
+                    <button class="cb cb-g" style="white-space:nowrap;" onclick="CMSPage._pickMedia('bf-img')"><i class="fas fa-images"></i></button>
+                </div>
+                <div id="bf-img-preview" style="margin-top:.5rem;${d.featured_image?'':'display:none;'}">
+                    <img src="${this._e(d.featured_image)}" style="max-height:80px;border-radius:.4rem;border:1px solid #374151;">
+                </div>
+            </div>
+            <div><label class="cl">Focus Keyword</label>
+                <input class="ci" id="bf-kw" value="${this._e(d.focus_keyword)}" placeholder="e.g. forex trading strategy"></div>
+        </div>
+        <!-- SEO fields -->
+        <div class="crow crow2" style="background:#0d1117;border:1px solid #1f2937;border-radius:.5rem;padding:.75rem;">
+            <div><label class="cl" style="color:#a78bfa;"><i class="fas fa-search mr-1"></i>SEO Title</label>
+                <input class="ci" id="bf-stitle" value="${this._e(d.seo_title)}" placeholder="Overrides title in search results">
+                <span id="bf-stitle-count" class="text-xs text-gray-600"></span>
+            </div>
+            <div><label class="cl" style="color:#a78bfa;"><i class="fas fa-search mr-1"></i>SEO Description</label>
+                <input class="ci" id="bf-sdesc" value="${this._e(d.seo_description)}" placeholder="160 char search snippet">
+                <span id="bf-sdesc-count" class="text-xs text-gray-600"></span>
+            </div>
+        </div>
+        <!-- Content editor -->
+        <div class="crow">
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
+                    <label class="cl" style="margin:0;">Content *</label>
+                    <span id="bf-wc" class="text-xs text-gray-600"></span>
+                </div>
+                <div style="border:1px solid #374151;border-radius:.5rem;overflow:hidden;">
+                    <div style="background:#111827;padding:.45rem .75rem;display:flex;gap:.4rem;flex-wrap:wrap;border-bottom:1px solid #374151;">
+                        ${[['bold','B','**'],['italic','I','_'],['h2','H2','## '],['h3','H3','### '],['link','🔗','[text](url)'],['ul','• List','- '],['quote','❝','> '],['code','Code','`']].map(([c,l])=>`<button type="button" style="background:#374151;color:#d1d5db;border:none;border-radius:.3rem;padding:.25rem .5rem;font-size:.75rem;cursor:pointer;" onclick="CMSPage._mdfmt('${c}')">${l}</button>`).join('')}
+                    </div>
+                    <textarea class="cta" id="bf-content" style="border-radius:0;border:none;min-height:280px;">${this._e(d.content)}</textarea>
+                </div>
+            </div>
+        </div>
+        <!-- SEO score panel (populated by _runSEO) -->
+        <div id="cms-seo-panel" style="display:none;" class="ccard" style="background:#0d1117;"></div>
+        <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.5rem;flex-wrap:wrap;">
+            <label class="ctog" onclick="CMSPage._togCheck('bf-pub')">
+                <div class="ttrack${d.is_published?' on':''}"><div class="tthumb"></div></div>
+                <span class="text-sm text-gray-300">Published</span>
+                <input type="hidden" id="bf-pub" value="${d.is_published?'1':'0'}">
+            </label>
+            <button class="cb cb-p" onclick="CMSPage._savePost()"><i class="fas fa-save"></i> ${id?'Update Post':'Create Post'}</button>
+        </div>`;
 
-    _clearLessonForm(){
-        ['lf-title','lf-video','lf-dur','lf-ord','lf-content'].forEach(id=>{
-            const el=document.getElementById(id);
-            if(el) el.value='';
+        f.scrollIntoView({behavior:'smooth',block:'start'});
+
+        // Live counters
+        const wc=()=>{ const t=document.getElementById('bf-content')?.value||''; document.getElementById('bf-wc').textContent=`${t.split(/\s+/).filter(Boolean).length} words`; };
+        const ec=()=>{ const t=document.getElementById('bf-excerpt')?.value||''; const el=document.getElementById('bf-excerpt-count'); if(el)el.textContent=`${t.length}/160`; el.style.color=t.length>160?'#f87171':'#6b7280'; };
+        const sc=()=>{ const t=document.getElementById('bf-stitle')?.value||''; const el=document.getElementById('bf-stitle-count'); if(el)el.textContent=`${t.length}/60`; };
+        const dc=()=>{ const t=document.getElementById('bf-sdesc')?.value||''; const el=document.getElementById('bf-sdesc-count'); if(el)el.textContent=`${t.length}/160`; };
+        document.getElementById('bf-content')?.addEventListener('input',wc); wc();
+        document.getElementById('bf-excerpt')?.addEventListener('input',ec); ec();
+        document.getElementById('bf-stitle')?.addEventListener('input',sc); sc();
+        document.getElementById('bf-sdesc')?.addEventListener('input',dc); dc();
+
+        // Auto-slug from title
+        document.getElementById('bf-title')?.addEventListener('input',e=>{
+            if(!id) document.getElementById('bf-slug').value=e.target.value.toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
         });
-        this._editingId=null;
+
+        // Image preview
+        document.getElementById('bf-img')?.addEventListener('input',e=>{
+            const pv=document.getElementById('bf-img-preview');
+            if(pv){ const img=pv.querySelector('img'); if(img)img.src=e.target.value; pv.style.display=e.target.value?'block':'none'; }
+        });
     },
 
-    async _saveLesson(){
-        const title=document.getElementById('lf-title')?.value.trim();
-        if(!title){this._toast('Lesson title required','error');return;}
+    _closeBlogForm(){ const f=document.getElementById('cms-blog-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
+
+    async _runSEO(){
         const payload={
-            course_id:        this._lessonCourseId,
-            title,
-            content:          document.getElementById('lf-content')?.value||'',
-            video_url:        document.getElementById('lf-video')?.value||'',
-            duration_minutes: parseInt(document.getElementById('lf-dur')?.value)||0,
-            order_index:      parseInt(document.getElementById('lf-ord')?.value)||0,
+            title:    document.getElementById('bf-title')?.value||'',
+            content:  document.getElementById('bf-content')?.value||'',
+            excerpt:  document.getElementById('bf-excerpt')?.value||'',
+            focus_keyword: document.getElementById('bf-kw')?.value||'',
+            slug:     document.getElementById('bf-slug')?.value||'',
         };
+        const panel=document.getElementById('cms-seo-panel'); if(!panel) return;
+        panel.style.display='block';
+        panel.innerHTML=`<div class="text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Analysing SEO…</div>`;
         try{
-            if(this._editingId){ await API.cms.updateLesson(this._editingId,payload); this._toast('Lesson updated'); }
-            else               { await API.cms.createLesson(payload);                  this._toast('Lesson added'); }
-            this._clearLessonForm();
-            await this._openLessonEditor(this._lessonCourseId,'');
-        }catch(e){this._toast(e.message,'error');}
-    },
-
-    async _deleteLesson(id){
-        if(!this._confirm('Delete this lesson?')) return;
-        try{ await API.cms.deleteLesson(id); this._toast('Lesson deleted'); await this._openLessonEditor(this._lessonCourseId,''); }
-        catch(e){this._toast(e.message,'error');}
-    },
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // SIGNALS
-    // ══════════════════════════════════════════════════════════════════════════
-    async _renderSignals(){
-        const pane=document.getElementById('cms-pane-signals');
-        if(!pane) return;
-        let signals=[];
-        try{ signals=await API.cms.listSignals(); }catch(_){}
-
-        pane.innerHTML=`
-        <div class="cms-section-header">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-satellite-dish text-purple-400"></i> Trading Signals
-                <span style="background:#374151;color:#9ca3af;padding:.1rem .55rem;border-radius:9999px;font-size:.72rem;">${signals.length}</span>
-            </h3>
-            <button class="cms-btn cms-btn-purple" onclick="CMSPage._openSignalForm()">
-                <i class="fas fa-plus"></i> New Signal
-            </button>
-        </div>
-
-        <div id="cms-signal-form" style="display:none;" class="cms-card mb-4"></div>
-
-        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="cms-table">
-                    <thead><tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>TF</th><th>Status</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
-                    <tbody>
-                        ${signals.length
-                            ? signals.map(s=>`<tr>
-                                <td class="font-bold text-white">${this._esc(s.symbol)}</td>
-                                <td>${this._dirBadge(s.direction)}</td>
-                                <td class="font-mono text-gray-300">${s.entry_price}</td>
-                                <td class="font-mono text-red-400">${s.stop_loss}</td>
-                                <td class="font-mono text-green-400">${s.take_profit}</td>
-                                <td class="text-gray-500">${s.timeframe||'—'}</td>
-                                <td>${this._statusBadge(s.status)}</td>
-                                <td class="text-gray-500">${this._date(s.created_at)}</td>
-                                <td class="text-right">
-                                    <div style="display:flex;gap:.35rem;justify-content:flex-end;">
-                                        <button class="cms-btn cms-btn-gray" onclick="CMSPage._openSignalForm(${JSON.stringify(s).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
-                                        ${s.status==='active'?`<button class="cms-btn cms-btn-gray" onclick="CMSPage._closeSignal(${s.id})">Close</button>`:''}
-                                        <button class="cms-btn cms-btn-red" onclick="CMSPage._deleteSignal(${s.id})"><i class="fas fa-trash"></i></button>
-                                    </div>
-                                </td>
-                            </tr>`).join('')
-                            : '<tr><td colspan="9" class="text-center py-8 text-gray-500 text-sm"><i class="fas fa-satellite-dish text-2xl block mb-2 opacity-30"></i>No signals yet.</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </div>`;
-    },
-
-    _openSignalForm(data=null){
-        const isEdit = data && data.id;
-        this._editingId = isEdit ? data.id : null;
-        const d = data || { symbol:'',direction:'BUY',entry_price:'',stop_loss:'',take_profit:'',timeframe:'1H',analysis:'',ai_confidence:'',status:'active' };
-        const formDiv=document.getElementById('cms-signal-form');
-        if(!formDiv) return;
-        formDiv.style.display='block';
-        formDiv.innerHTML=`
-            <div class="cms-section-header">
-                <h4 class="text-white font-semibold">${isEdit?'Edit Signal':'New Signal'}</h4>
-                <button class="cms-btn cms-btn-gray" onclick="CMSPage._closeSignalForm()"><i class="fas fa-times"></i> Cancel</button>
-            </div>
-            <div class="cms-form-row cols-3">
-                <div><label class="cms-label">Symbol *</label><input class="cms-input" id="sf-symbol" value="${this._esc(d.symbol)}" placeholder="EURUSD"></div>
-                <div><label class="cms-label">Direction *</label>
-                    <select class="cms-select" id="sf-dir">
-                        <option value="BUY" ${d.direction==='BUY'?'selected':''}>BUY</option>
-                        <option value="SELL" ${d.direction==='SELL'?'selected':''}>SELL</option>
-                    </select></div>
-                <div><label class="cms-label">Timeframe</label>
-                    <select class="cms-select" id="sf-tf">
-                        ${['1M','5M','15M','1H','4H','1D','1W'].map(t=>`<option value="${t}" ${d.timeframe===t?'selected':''}>${t}</option>`).join('')}
-                    </select></div>
-            </div>
-            <div class="cms-form-row cols-3">
-                <div><label class="cms-label">Entry Price *</label><input type="number" step="0.00001" class="cms-input" id="sf-entry" value="${d.entry_price}"></div>
-                <div><label class="cms-label">Stop Loss *</label><input type="number" step="0.00001" class="cms-input" id="sf-sl" value="${d.stop_loss}"></div>
-                <div><label class="cms-label">Take Profit *</label><input type="number" step="0.00001" class="cms-input" id="sf-tp" value="${d.take_profit}"></div>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">AI Confidence (0-1)</label><input type="number" step="0.01" min="0" max="1" class="cms-input" id="sf-conf" value="${d.ai_confidence||''}"></div>
-                <div><label class="cms-label">Status</label>
-                    <select class="cms-select" id="sf-status">
-                        ${['active','closed','cancelled'].map(s=>`<option value="${s}" ${d.status===s?'selected':''}>${s}</option>`).join('')}
-                    </select></div>
-            </div>
-            <div class="cms-form-row">
-                <div><label class="cms-label">Analysis Notes</label><textarea class="cms-textarea" id="sf-analysis" style="min-height:80px;">${this._esc(d.analysis||'')}</textarea></div>
-            </div>
-            <button class="cms-btn cms-btn-purple" onclick="CMSPage._saveSignal()"><i class="fas fa-save"></i> ${isEdit?'Update':'Create'} Signal</button>`;
-        formDiv.scrollIntoView({behavior:'smooth',block:'start'});
-    },
-
-    _closeSignalForm(){
-        const f=document.getElementById('cms-signal-form');
-        if(f){f.style.display='none';f.innerHTML='';}
-        this._editingId=null;
-    },
-
-    async _saveSignal(){
-        const symbol=document.getElementById('sf-symbol')?.value.trim().toUpperCase();
-        const entry =parseFloat(document.getElementById('sf-entry')?.value);
-        const sl    =parseFloat(document.getElementById('sf-sl')?.value);
-        const tp    =parseFloat(document.getElementById('sf-tp')?.value);
-        if(!symbol||isNaN(entry)||isNaN(sl)||isNaN(tp)){this._toast('Symbol, entry, SL and TP are required','error');return;}
-        const confRaw=document.getElementById('sf-conf')?.value;
-        const payload={
-            symbol, direction:document.getElementById('sf-dir')?.value||'BUY',
-            entry_price:entry, stop_loss:sl, take_profit:tp,
-            timeframe:document.getElementById('sf-tf')?.value||'1H',
-            analysis:document.getElementById('sf-analysis')?.value||'',
-            ai_confidence:confRaw?parseFloat(confRaw):null,
-            status:document.getElementById('sf-status')?.value||'active',
-        };
-        try{
-            if(this._editingId){ await API.cms.updateSignal(this._editingId,payload); this._toast('Signal updated'); }
-            else               { await API.cms.createSignal(payload);                  this._toast('Signal created'); }
-            this._closeSignalForm();
-            await this._renderSignals();
-        }catch(e){this._toast(e.message,'error');}
-    },
-
-    async _closeSignal(id){
-        const outcome=prompt('Outcome (win / loss / breakeven):','win');
-        if(outcome===null) return;
-        try{ await API.cms.closeSignal(id,outcome); this._toast('Signal closed'); await this._renderSignals(); }
-        catch(e){this._toast(e.message,'error');}
-    },
-
-    async _deleteSignal(id){
-        if(!this._confirm('Delete this signal?')) return;
-        try{ await API.cms.deleteSignal(id); this._toast('Signal deleted'); await this._renderSignals(); }
-        catch(e){this._toast(e.message,'error');}
-    },
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // WEBINARS
-    // ══════════════════════════════════════════════════════════════════════════
-    async _renderWebinars(){
-        const pane=document.getElementById('cms-pane-webinars');
-        if(!pane) return;
-        let webinars=[];
-        try{ webinars=await API.cms.listWebinars(); }catch(_){}
-
-        pane.innerHTML=`
-        <div class="cms-section-header">
-            <h3 class="text-white font-semibold flex items-center gap-2">
-                <i class="fas fa-video text-pink-400"></i> Webinars
-                <span style="background:#374151;color:#9ca3af;padding:.1rem .55rem;border-radius:9999px;font-size:.72rem;">${webinars.length}</span>
-            </h3>
-            <button class="cms-btn cms-btn-purple" onclick="CMSPage._openWebinarForm()">
-                <i class="fas fa-plus"></i> New Webinar
-            </button>
-        </div>
-
-        <div id="cms-webinar-form" style="display:none;" class="cms-card mb-4"></div>
-
-        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="cms-table">
-                    <thead><tr><th>Title</th><th>Presenter</th><th>Date</th><th>Duration</th><th>Status</th><th>Attendees</th><th class="text-right">Actions</th></tr></thead>
-                    <tbody>
-                        ${webinars.length
-                            ? webinars.map(w=>`<tr>
-                                <td>
-                                    <div class="text-white font-medium text-sm">${this._esc(w.title)}</div>
-                                    ${w.meeting_link?`<a href="${this._esc(w.meeting_link)}" target="_blank" class="text-purple-400 text-xs hover:underline">🔗 Join link</a>`:''}
-                                </td>
-                                <td class="text-gray-400">${this._esc(w.presenter||'—')}</td>
-                                <td class="text-gray-300">${this._date(w.scheduled_at)}</td>
-                                <td class="text-gray-400">${w.duration_minutes||60}m</td>
-                                <td>${this._badge(w.is_published)}</td>
-                                <td class="text-gray-400">${w.max_attendees||100}</td>
-                                <td class="text-right">
-                                    <div style="display:flex;gap:.35rem;justify-content:flex-end;">
-                                        <button class="cms-btn cms-btn-gray" onclick="CMSPage._openWebinarForm(${JSON.stringify(w).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
-                                        <button class="cms-btn ${w.is_published?'cms-btn-gray':'cms-btn-green'}" onclick="CMSPage._toggleWebinar(${w.id})">${w.is_published?'Unpublish':'Publish'}</button>
-                                        <button class="cms-btn cms-btn-red" onclick="CMSPage._deleteWebinar(${w.id})"><i class="fas fa-trash"></i></button>
-                                    </div>
-                                </td>
-                            </tr>`).join('')
-                            : '<tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm"><i class="fas fa-video text-2xl block mb-2 opacity-30"></i>No webinars yet.</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-        </div>`;
-    },
-
-    _openWebinarForm(data=null){
-        const isEdit=data&&data.id;
-        this._editingId=isEdit?data.id:null;
-        const d=data||{title:'',description:'',presenter:'',scheduled_at:'',duration_minutes:60,meeting_link:'',max_attendees:100,is_published:false};
-        const formDiv=document.getElementById('cms-webinar-form');
-        if(!formDiv) return;
-        formDiv.style.display='block';
-        formDiv.innerHTML=`
-            <div class="cms-section-header">
-                <h4 class="text-white font-semibold">${isEdit?'Edit Webinar':'New Webinar'}</h4>
-                <button class="cms-btn cms-btn-gray" onclick="CMSPage._closeWebinarForm()"><i class="fas fa-times"></i> Cancel</button>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Title *</label><input class="cms-input" id="wf-title" value="${this._esc(d.title)}" placeholder="Webinar title"></div>
-                <div><label class="cms-label">Presenter</label><input class="cms-input" id="wf-presenter" value="${this._esc(d.presenter||'')}" placeholder="Presenter name"></div>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Date &amp; Time *</label><input type="datetime-local" class="cms-input" id="wf-date" value="${this._dt(d.scheduled_at)}"></div>
-                <div><label class="cms-label">Duration (minutes)</label><input type="number" class="cms-input" id="wf-dur" value="${d.duration_minutes||60}" min="1"></div>
-            </div>
-            <div class="cms-form-row cols-2">
-                <div><label class="cms-label">Meeting Link</label><input class="cms-input" id="wf-link" value="${this._esc(d.meeting_link||'')}" placeholder="https://zoom.us/..."></div>
-                <div><label class="cms-label">Max Attendees</label><input type="number" class="cms-input" id="wf-max" value="${d.max_attendees||100}" min="1"></div>
-            </div>
-            <div class="cms-form-row">
-                <div><label class="cms-label">Description</label><textarea class="cms-textarea" id="wf-desc" style="min-height:80px;">${this._esc(d.description||'')}</textarea></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:1.5rem;margin-top:.5rem;">
-                <label class="cms-toggle" onclick="CMSPage._toggleCheck('wf-published')">
-                    <div class="toggle-track${d.is_published?' on':''}"><div class="toggle-thumb"></div></div>
-                    <span class="text-sm text-gray-300">Published</span>
-                    <input type="hidden" id="wf-published" value="${d.is_published?'1':'0'}">
-                </label>
-                <button class="cms-btn cms-btn-purple" onclick="CMSPage._saveWebinar()"><i class="fas fa-save"></i> ${isEdit?'Update':'Create'} Webinar</button>
+            const r=await API.cms.seoScore(payload);
+            const gc=r.score>=80?'#34d399':r.score>=65?'#fbbf24':r.score>=50?'#f97316':'#f87171';
+            const bg=r.score>=80?'rgba(16,185,129,.12)':r.score>=65?'rgba(245,158,11,.12)':'rgba(239,68,68,.12)';
+            panel.innerHTML=`
+            <div style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap;">
+                <div class="seo-ring" style="background:${bg};border:3px solid ${gc};color:${gc};">
+                    ${r.score}<span style="font-size:.55rem;font-weight:600;">/100</span>
+                </div>
+                <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;">
+                        <span style="font-size:1.1rem;font-weight:700;color:${gc};">Grade ${r.grade}</span>
+                        <span class="text-xs text-gray-500">${r.word_count} words</span>
+                        ${r.ai_powered?'<span style="background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3);padding:.1rem .5rem;border-radius:9999px;font-size:.7rem;">AI Enhanced</span>':''}
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem;">
+                        ${r.checks.map(c=>`
+                        <div class="seo-check" style="background:${c.passed?'rgba(16,185,129,.08)':'rgba(239,68,68,.08)'};border:1px solid ${c.passed?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'};">
+                            <i class="fas ${c.passed?'fa-check-circle':'fa-times-circle'}" style="color:${c.passed?'#34d399':'#f87171'};font-size:.8rem;flex-shrink:0;"></i>
+                            <span style="color:${c.passed?'#d1d5db':'#9ca3af'};font-size:.77rem;">${this._e(c.label)}</span>
+                            <span style="color:${c.passed?'#34d399':'#f87171'};font-size:.7rem;margin-left:auto;font-weight:700;">+${c.points}</span>
+                        </div>`).join('')}
+                    </div>
+                    ${r.ai_suggestions?.length?`
+                    <div style="background:#111827;border:1px solid #1f2937;border-radius:.5rem;padding:.75rem;">
+                        <div style="font-size:.75rem;font-weight:700;color:#a78bfa;margin-bottom:.5rem;"><i class="fas fa-robot mr-1"></i>AI Recommendations</div>
+                        ${r.ai_suggestions.map((s,i)=>`<div style="font-size:.78rem;color:#9ca3af;margin-bottom:.3rem;">
+                            <span style="color:#7c3aed;font-weight:700;margin-right:.4rem;">${i+1}.</span>${this._e(s)}</div>`).join('')}
+                    </div>`:''}
+                </div>
             </div>`;
-        formDiv.scrollIntoView({behavior:'smooth',block:'start'});
+        }catch(e){ panel.innerHTML=`<div class="text-red-400 text-sm">${this._e(e.message)}</div>`; }
     },
 
-    _closeWebinarForm(){
-        const f=document.getElementById('cms-webinar-form');
-        if(f){f.style.display='none';f.innerHTML='';}
-        this._editingId=null;
+    _mdfmt(cmd){
+        const ta=document.getElementById('bf-content'); if(!ta) return;
+        const s=ta.selectionStart,e=ta.selectionEnd,sel=ta.value.slice(s,e);
+        const m={bold:`**${sel||'bold text'}**`,italic:`_${sel||'italic text'}_`,link:`[${sel||'link text'}](url)`,h2:`## ${sel||'Heading'}`,h3:`### ${sel||'Heading'}`,ul:`- ${sel||'List item'}`,quote:`> ${sel||'Quote'}`,code:`\`${sel||'code'}\``};
+        const rep=m[cmd]||sel; ta.value=ta.value.slice(0,s)+rep+ta.value.slice(e);
+        ta.focus(); ta.setSelectionRange(s,s+rep.length);
     },
 
-    async _saveWebinar(){
-        const title=document.getElementById('wf-title')?.value.trim();
-        const sched=document.getElementById('wf-date')?.value;
-        if(!title||!sched){this._toast('Title and date are required','error');return;}
-        const payload={
-            title, description:document.getElementById('wf-desc')?.value||'',
-            presenter:document.getElementById('wf-presenter')?.value||'',
-            scheduled_at:sched,
-            duration_minutes:parseInt(document.getElementById('wf-dur')?.value)||60,
-            meeting_link:document.getElementById('wf-link')?.value||'',
-            max_attendees:parseInt(document.getElementById('wf-max')?.value)||100,
-            is_published:document.getElementById('wf-published')?.value==='1',
-        };
+    async _savePost(){
+        const title=document.getElementById('bf-title')?.value.trim();
+        const slug=document.getElementById('bf-slug')?.value.trim();
+        const content=document.getElementById('bf-content')?.value.trim();
+        if(!title||!slug||!content){this._toast('Title, slug and content required','error');return;}
+        const p={title,slug,excerpt:document.getElementById('bf-excerpt')?.value||'',content,
+            category:document.getElementById('bf-cat')?.value||'General',
+            tags:(document.getElementById('bf-tags')?.value||'').split(',').map(t=>t.trim()).filter(Boolean),
+            featured_image:document.getElementById('bf-img')?.value||'',
+            seo_title:document.getElementById('bf-stitle')?.value||'',
+            seo_description:document.getElementById('bf-sdesc')?.value||'',
+            focus_keyword:document.getElementById('bf-kw')?.value||'',
+            is_published:document.getElementById('bf-pub')?.value==='1'};
         try{
-            if(this._editingId){ await API.cms.updateWebinar(this._editingId,payload); this._toast('Webinar updated'); }
-            else               { await API.cms.createWebinar(payload);                  this._toast('Webinar created'); }
-            this._closeWebinarForm();
-            await this._renderWebinars();
+            if(this._editingId){await API.cms.updatePost(this._editingId,p);this._toast('Post updated');}
+            else{await API.cms.createPost(p);this._toast('Post created');}
+            this._closeBlogForm(); await this._blog();
         }catch(e){this._toast(e.message,'error');}
     },
 
-    async _toggleWebinar(id){
-        try{ const r=await API.cms.toggleWebinar(id); this._toast(r.message); await this._renderWebinars(); }
-        catch(e){this._toast(e.message,'error');}
-    },
+    async _togglePost(id){ try{const r=await API.cms.togglePost(id);this._toast(r.message);await this._blog();}catch(e){this._toast(e.message,'error');} },
+    async _deletePost(id){ if(!confirm('Delete this post permanently?'))return; try{await API.cms.deletePost(id);this._toast('Post deleted');await this._blog();}catch(e){this._toast(e.message,'error');} },
 
-    async _deleteWebinar(id){
-        if(!this._confirm('Delete this webinar?')) return;
-        try{ await API.cms.deleteWebinar(id); this._toast('Webinar deleted'); await this._renderWebinars(); }
-        catch(e){this._toast(e.message,'error');}
-    },
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // SITE SETTINGS
-    // ══════════════════════════════════════════════════════════════════════════
-    async _renderSettings(){
-        const pane=document.getElementById('cms-pane-settings');
-        if(!pane) return;
-        pane.innerHTML=`<div class="text-gray-400 text-sm text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading settings…</div>`;
-
-        let settings={};
-        try{ settings=await API.cms.getSettings(); }catch(_){}
-
-        const g=(k,fallback='')=>this._esc(settings[k]!=null?settings[k]:fallback);
-
+    // ═════════════════════════════════════════════════════════════════════════
+    // LMS — Course → Modules → Lessons → Quiz
+    // ═════════════════════════════════════════════════════════════════════════
+    async _lms(){
+        const pane=document.getElementById('cms-pane-lms'); if(!pane) return;
+        let courses=[]; try{courses=await API.cms.listCourses();}catch(_){}
         pane.innerHTML=`
-        <div class="cms-section-header">
+        <div class="chdr">
+            <h3 class="text-white font-semibold flex items-center gap-2">
+                <i class="fas fa-graduation-cap text-purple-400"></i> Courses
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${courses.length}</span>
+            </h3>
+            <button class="cb cb-p" onclick="CMSPage._lmsCourseForm()"><i class="fas fa-plus"></i> New Course</button>
+        </div>
+        <div id="cms-lms-form" style="display:none;" class="ccard mb-4"></div>
+        <div id="cms-lms-tree"></div>`;
+        this._renderLMSTree(courses);
+    },
+
+    _renderLMSTree(courses){
+        const el=document.getElementById('cms-lms-tree'); if(!el) return;
+        if(!courses.length){ el.innerHTML=`<div class="text-center py-10 text-gray-500 text-sm"><i class="fas fa-graduation-cap text-2xl block mb-2 opacity-30"></i>No courses yet</div>`; return; }
+        el.innerHTML=courses.map(c=>`
+        <div class="lms-module">
+            <div class="lms-module-header" onclick="CMSPage._lmsToggleCourse(${c.id})">
+                <i class="fas fa-chevron-right text-gray-600 text-xs transition-transform" id="lms-arr-${c.id}"></i>
+                <div style="flex:1;">
+                    <div class="text-white font-semibold text-sm">${this._e(c.title)}</div>
+                    <div class="text-gray-500 text-xs">${c.level||'Beginner'} · ${c.module_count||0} modules · ${c.lesson_count||0} lessons · ${c.price>0?'$'+Number(c.price).toFixed(2):'Free'}</div>
+                </div>
+                ${this._pub(c.is_published)}
+                <div style="display:flex;gap:.3rem;" onclick="event.stopPropagation()">
+                    <button class="cb cb-g cb-sm" onclick="CMSPage._lmsCourseForm(${JSON.stringify(c).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
+                    <button class="cb ${c.is_published?'cb-g':'cb-gr'} cb-sm" onclick="CMSPage._toggleCourse(${c.id})">${c.is_published?'Unpublish':'Publish'}</button>
+                    <button class="cb cb-r cb-sm" onclick="CMSPage._deleteCourse(${c.id})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div id="lms-body-${c.id}" style="display:none;">
+                <div style="padding:.75rem 1rem;background:#111827;display:flex;justify-content:space-between;align-items:center;">
+                    <span class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Modules</span>
+                    <button class="cb cb-p" style="font-size:.72rem;padding:.3rem .75rem;" onclick="CMSPage._lmsModuleForm(${c.id})">+ Add Module</button>
+                </div>
+                <div id="lms-modules-${c.id}"><div class="text-gray-600 text-xs text-center py-3"><i class="fas fa-spinner fa-spin mr-1"></i>Loading…</div></div>
+            </div>
+        </div>`).join('');
+    },
+
+    async _lmsToggleCourse(cid){
+        const body=document.getElementById(`lms-body-${cid}`);
+        const arr=document.getElementById(`lms-arr-${cid}`);
+        if(!body) return;
+        const open=body.style.display==='none';
+        body.style.display=open?'block':'none';
+        if(arr) arr.style.transform=open?'rotate(90deg)':'';
+        if(open) await this._loadModules(cid);
+    },
+
+    async _loadModules(cid){
+        const el=document.getElementById(`lms-modules-${cid}`); if(!el) return;
+        let mods=[]; try{mods=await API.cms.listModules(cid);}catch(_){}
+        if(!mods.length){ el.innerHTML=`<div class="text-gray-600 text-xs text-center py-4">No modules yet — add one above.</div>`; return; }
+        el.innerHTML=mods.map(m=>`
+        <div style="border-top:1px solid #1a2235;">
+            <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem .6rem 2rem;background:#161f2e;">
+                <i class="fas fa-layer-group text-purple-500 text-xs"></i>
+                <div style="flex:1;">
+                    <span class="text-gray-200 text-sm font-medium">${this._e(m.title)}</span>
+                    <span class="text-gray-600 text-xs ml-2">${m.lesson_count||0} lessons · ${m.quiz_count?'Has quiz':'No quiz'}</span>
+                </div>
+                <div style="display:flex;gap:.3rem;">
+                    <button class="cb cb-g" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._lmsModuleForm(${cid},${JSON.stringify(m).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
+                    <button class="cb cb-p" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._lmsLessonForm(${cid},${m.id})">+ Lesson</button>
+                    <button class="cb cb-y" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._lmsQuizPanel(${m.id})"><i class="fas fa-question-circle"></i> Quiz</button>
+                    <button class="cb cb-r" style="font-size:.7rem;padding:.25rem .6rem;" onclick="CMSPage._deleteModule(${m.id},${cid})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div id="lms-lessons-${m.id}"></div>
+        </div>`).join('');
+        // Load lessons for each module
+        for(const m of mods) await this._loadLessons(m.id);
+    },
+
+    async _loadLessons(mid){
+        const el=document.getElementById(`lms-lessons-${mid}`); if(!el) return;
+        let lessons=[]; try{lessons=await API.cms.listLessons(mid);}catch(_){}
+        el.innerHTML=lessons.map(l=>`
+        <div class="lms-lesson">
+            <i class="fas ${l.video_url?'fa-play-circle text-purple-400':'fa-file-alt text-gray-600'} text-xs"></i>
+            <span class="text-gray-300 text-xs flex-1">${String(l.order_index||0).padStart(2,'0')}. ${this._e(l.title)}</span>
+            <span class="text-gray-600 text-xs">${l.duration_minutes||0}m</span>
+            ${l.is_free_preview?'<span class="text-xs text-green-500">Free preview</span>':''}
+            ${l.attachment_url?'<i class="fas fa-paperclip text-gray-600 text-xs"></i>':''}
+            <div style="display:flex;gap:.25rem;">
+                <button class="cb cb-g" style="font-size:.68rem;padding:.2rem .5rem;" onclick="CMSPage._lmsLessonForm(null,${mid},${JSON.stringify(l).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
+                <button class="cb cb-r" style="font-size:.68rem;padding:.2rem .5rem;" onclick="CMSPage._deleteLesson(${l.id},${mid})"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`).join('')||`<div class="text-gray-700 text-xs text-center py-2">No lessons yet</div>`;
+    },
+
+    _lmsCourseForm(data=null){
+        const isEdit=data&&data.id; this._editingId=isEdit?data.id:null;
+        const d=data||{title:'',description:'',level:'Beginner',price:0,thumbnail:'',preview_video:'',is_published:false,certificate_enabled:false,pass_percentage:70};
+        const f=document.getElementById('cms-lms-form'); if(!f) return;
+        f.style.display='block';
+        f.innerHTML=`
+        <div class="chdr">
+            <h4 class="text-white font-semibold">${isEdit?'Edit Course':'New Course'}</h4>
+            <button class="cb cb-g" onclick="CMSPage._closeLMSForm()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Title *</label><input class="ci" id="cf-title" value="${this._e(d.title)}" placeholder="Course title"></div>
+            <div><label class="cl">Level</label>
+                <select class="cs" id="cf-level">${['Beginner','Intermediate','Advanced'].map(l=>`<option${d.level===l?' selected':''}>${l}</option>`).join('')}</select></div>
+        </div>
+        <div class="crow"><div><label class="cl">Description</label><textarea class="cta" id="cf-desc" style="min-height:70px;">${this._e(d.description)}</textarea></div></div>
+        <div class="crow crow2">
+            <div><label class="cl">Price (0 = Free)</label><input type="number" class="ci" id="cf-price" step="0.01" min="0" value="${d.price||0}"></div>
+            <div><label class="cl">Pass Percentage for Certificate</label><input type="number" class="ci" id="cf-pass" min="0" max="100" value="${d.pass_percentage||70}"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Thumbnail URL</label>
+                <div style="display:flex;gap:.5rem;">
+                    <input class="ci" id="cf-thumb" value="${this._e(d.thumbnail)}" placeholder="https://…">
+                    <button class="cb cb-g" onclick="CMSPage._pickMedia('cf-thumb')"><i class="fas fa-images"></i></button>
+                </div>
+            </div>
+            <div><label class="cl">Preview Video URL</label><input class="ci" id="cf-preview" value="${this._e(d.preview_video)}" placeholder="YouTube/Vimeo URL"></div>
+        </div>
+        <div style="display:flex;gap:1.5rem;margin-top:.5rem;align-items:center;flex-wrap:wrap;">
+            <label class="ctog" onclick="CMSPage._togCheck('cf-pub')">
+                <div class="ttrack${d.is_published?' on':''}"><div class="tthumb"></div></div>
+                <span class="text-sm text-gray-300">Published</span>
+                <input type="hidden" id="cf-pub" value="${d.is_published?'1':'0'}">
+            </label>
+            <label class="ctog" onclick="CMSPage._togCheck('cf-cert')">
+                <div class="ttrack${d.certificate_enabled?' on':''}"><div class="tthumb"></div></div>
+                <span class="text-sm text-gray-300">Certificate Enabled</span>
+                <input type="hidden" id="cf-cert" value="${d.certificate_enabled?'1':'0'}">
+            </label>
+            <button class="cb cb-p" onclick="CMSPage._saveCourse()"><i class="fas fa-save"></i> ${isEdit?'Update':'Create'} Course</button>
+        </div>`;
+        f.scrollIntoView({behavior:'smooth',block:'start'});
+    },
+
+    _closeLMSForm(){ const f=document.getElementById('cms-lms-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
+
+    async _saveCourse(){
+        const title=document.getElementById('cf-title')?.value.trim();
+        if(!title){this._toast('Title required','error');return;}
+        const p={title,description:document.getElementById('cf-desc')?.value||'',level:document.getElementById('cf-level')?.value||'Beginner',
+            price:parseFloat(document.getElementById('cf-price')?.value)||0,
+            thumbnail:document.getElementById('cf-thumb')?.value||'',
+            preview_video:document.getElementById('cf-preview')?.value||'',
+            is_published:document.getElementById('cf-pub')?.value==='1',
+            certificate_enabled:document.getElementById('cf-cert')?.value==='1',
+            pass_percentage:parseInt(document.getElementById('cf-pass')?.value)||70};
+        try{
+            if(this._editingId){await API.cms.updateCourse(this._editingId,p);this._toast('Course updated');}
+            else{await API.cms.createCourse(p);this._toast('Course created');}
+            this._closeLMSForm(); await this._lms();
+        }catch(e){this._toast(e.message,'error');}
+    },
+
+    async _toggleCourse(id){ try{const r=await API.cms.toggleCourse(id);this._toast(r.message);await this._lms();}catch(e){this._toast(e.message,'error');} },
+    async _deleteCourse(id){ if(!confirm('Delete course and ALL its content?'))return; try{await API.cms.deleteCourse(id);this._toast('Course deleted');await this._lms();}catch(e){this._toast(e.message,'error');} },
+
+    _lmsModuleForm(cid, mod=null){
+        const isEdit=mod&&mod.id;
+        const title=prompt(isEdit?'Edit module title:':'Module title:', mod?.title||'');
+        if(!title) return;
+        const p={course_id:cid,title,description:mod?.description||'',order_index:mod?.order_index||0};
+        const fn=isEdit?API.cms.updateModule(mod.id,p):API.cms.createModule(p);
+        fn.then(()=>{this._toast(isEdit?'Module updated':'Module added');this._loadModules(cid);}).catch(e=>this._toast(e.message,'error'));
+    },
+
+    async _deleteModule(id,cid){ if(!confirm('Delete module and all its lessons/quiz?'))return; try{await API.cms.deleteModule(id);this._toast('Module deleted');await this._loadModules(cid);}catch(e){this._toast(e.message,'error');} },
+
+    _lmsLessonForm(cid, mid, lesson=null){
+        const isEdit=lesson&&lesson.id; this._editingId=isEdit?lesson.id:null;
+        const d=lesson||{title:'',content:'',video_url:'',attachment_url:'',duration_minutes:0,order_index:0,is_free_preview:false};
+        // find the form panel (re-use lms-form)
+        const f=document.getElementById('cms-lms-form'); if(!f) return;
+        f.style.display='block';
+        f.innerHTML=`
+        <div class="chdr">
+            <h4 class="text-white font-semibold">${isEdit?'Edit Lesson':'Add Lesson'} — Module ${mid}</h4>
+            <button class="cb cb-g" onclick="CMSPage._closeLMSForm()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Title *</label><input class="ci" id="lf-title" value="${this._e(d.title)}"></div>
+            <div><label class="cl">Video URL</label>
+                <div style="display:flex;gap:.4rem;">
+                    <input class="ci" id="lf-video" value="${this._e(d.video_url)}" placeholder="YouTube/Vimeo…">
+                    <button class="cb cb-g" onclick="CMSPage._pickMedia('lf-video','video')"><i class="fas fa-film"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Attachment URL</label>
+                <div style="display:flex;gap:.4rem;">
+                    <input class="ci" id="lf-attach" value="${this._e(d.attachment_url)}" placeholder="PDF, slides…">
+                    <button class="cb cb-g" onclick="CMSPage._pickMedia('lf-attach','docs')"><i class="fas fa-paperclip"></i></button>
+                </div>
+            </div>
+            <div class="crow2" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                <div><label class="cl">Duration (min)</label><input type="number" class="ci" id="lf-dur" value="${d.duration_minutes||0}" min="0"></div>
+                <div><label class="cl">Order</label><input type="number" class="ci" id="lf-ord" value="${d.order_index||0}" min="0"></div>
+            </div>
+        </div>
+        <div class="crow"><div><label class="cl">Content / Notes</label><textarea class="cta" id="lf-content" style="min-height:100px;">${this._e(d.content)}</textarea></div></div>
+        <div style="display:flex;gap:1.5rem;align-items:center;margin-top:.5rem;flex-wrap:wrap;">
+            <label class="ctog" onclick="CMSPage._togCheck('lf-preview')">
+                <div class="ttrack${d.is_free_preview?' on':''}"><div class="tthumb"></div></div>
+                <span class="text-sm text-gray-300">Free Preview</span>
+                <input type="hidden" id="lf-preview" value="${d.is_free_preview?'1':'0'}">
+            </label>
+            <button class="cb cb-p" onclick="CMSPage._saveLesson(${mid},${cid||d.course_id||0})"><i class="fas fa-save"></i> ${isEdit?'Update':'Add'} Lesson</button>
+        </div>`;
+        f.scrollIntoView({behavior:'smooth',block:'start'});
+    },
+
+    async _saveLesson(mid,cid){
+        const title=document.getElementById('lf-title')?.value.trim();
+        if(!title){this._toast('Title required','error');return;}
+        const p={module_id:mid,course_id:cid,title,content:document.getElementById('lf-content')?.value||'',
+            video_url:document.getElementById('lf-video')?.value||'',attachment_url:document.getElementById('lf-attach')?.value||'',
+            duration_minutes:parseInt(document.getElementById('lf-dur')?.value)||0,
+            order_index:parseInt(document.getElementById('lf-ord')?.value)||0,
+            is_free_preview:document.getElementById('lf-preview')?.value==='1'};
+        try{
+            if(this._editingId){await API.cms.updateLesson(this._editingId,p);this._toast('Lesson updated');}
+            else{await API.cms.createLesson(p);this._toast('Lesson added');}
+            this._closeLMSForm(); await this._loadLessons(mid);
+        }catch(e){this._toast(e.message,'error');}
+    },
+
+    async _deleteLesson(id,mid){ if(!confirm('Delete this lesson?'))return; try{await API.cms.deleteLesson(id);this._toast('Lesson deleted');await this._loadLessons(mid);}catch(e){this._toast(e.message,'error');} },
+
+    async _lmsQuizPanel(mid){
+        const f=document.getElementById('cms-lms-form'); if(!f) return;
+        f.style.display='block';
+        f.innerHTML=`<div class="text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading quiz…</div>`;
+        f.scrollIntoView({behavior:'smooth',block:'start'});
+        let quiz=null; try{quiz=await API.cms.getQuiz(mid);}catch(_){}
+        this._renderQuizEditor(mid,quiz,f);
+    },
+
+    _renderQuizEditor(mid,quiz,f){
+        f.innerHTML=`
+        <div class="chdr">
+            <h4 class="text-white font-semibold"><i class="fas fa-question-circle text-yellow-400 mr-2"></i>Quiz — Module ${mid}</h4>
+            <button class="cb cb-g" onclick="CMSPage._closeLMSForm()"><i class="fas fa-times"></i></button>
+        </div>
+        ${!quiz?`
+        <div class="crow crow2">
+            <div><label class="cl">Quiz Title *</label><input class="ci" id="qz-title" placeholder="Module Quiz"></div>
+            <div class="crow2" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                <div><label class="cl">Pass % </label><input type="number" class="ci" id="qz-pass" value="70" min="0" max="100"></div>
+                <div><label class="cl">Max Attempts</label><input type="number" class="ci" id="qz-attempts" value="3" min="1"></div>
+            </div>
+        </div>
+        <button class="cb cb-p" onclick="CMSPage._createQuiz(${mid})"><i class="fas fa-plus"></i> Create Quiz</button>`:`
+        <div class="crow crow2">
+            <div><label class="cl">Quiz Title</label><input class="ci" id="qz-title" value="${this._e(quiz.title)}"></div>
+            <div class="crow2" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                <div><label class="cl">Pass %</label><input type="number" class="ci" id="qz-pass" value="${quiz.pass_percentage||70}" min="0" max="100"></div>
+                <div><label class="cl">Max Attempts</label><input type="number" class="ci" id="qz-attempts" value="${quiz.max_attempts||3}" min="1"></div>
+            </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+            <button class="cb cb-p" onclick="CMSPage._updateQuiz(${quiz.id},${mid})"><i class="fas fa-save"></i> Save Quiz Settings</button>
+            <button class="cb cb-r" onclick="CMSPage._deleteQuiz(${quiz.id},${mid})"><i class="fas fa-trash"></i> Delete Quiz</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+            <span class="text-white font-semibold text-sm">Questions (${(quiz.questions||[]).length})</span>
+            <button class="cb cb-p" style="font-size:.75rem;" onclick="CMSPage._addQuestionForm(${quiz.id},${mid})"><i class="fas fa-plus"></i> Add Question</button>
+        </div>
+        <div id="quiz-questions-list">
+            ${(quiz.questions||[]).map((q,i)=>this._questionHtml(q,i,mid)).join('')}
+        </div>`}`;
+    },
+
+    _questionHtml(q,i,mid){
+        const opts=['a','b','c','d'];
+        return `<div class="quiz-q">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem;">
+                <span class="text-gray-300 text-sm font-medium">${i+1}. ${this._e(q.question)}</span>
+                <div style="display:flex;gap:.3rem;flex-shrink:0;">
+                    <button class="cb cb-g" style="font-size:.68rem;padding:.2rem .5rem;" onclick="CMSPage._editQuestionForm(${JSON.stringify(q).replace(/"/g,'&quot;')},${q.quiz_id||0},${mid})"><i class="fas fa-edit"></i></button>
+                    <button class="cb cb-r" style="font-size:.68rem;padding:.2rem .5rem;" onclick="CMSPage._delQuestion(${q.id},${mid})"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;">
+                ${opts.filter(o=>q[`option_${o}`]).map(o=>`
+                <div style="background:${q.correct_option===o?'rgba(16,185,129,.15)':'rgba(31,41,55,.8)'};border:1px solid ${q.correct_option===o?'rgba(16,185,129,.4)':'#374151'};border-radius:.4rem;padding:.35rem .6rem;font-size:.78rem;color:${q.correct_option===o?'#34d399':'#9ca3af'};">
+                    <span style="font-weight:700;margin-right:.35rem;">${o.toUpperCase()}.</span>${this._e(q[`option_${o}`])}
+                    ${q.correct_option===o?'<i class="fas fa-check ml-1"></i>':''}
+                </div>`).join('')}
+            </div>
+            ${q.explanation?`<div style="margin-top:.4rem;font-size:.75rem;color:#6b7280;"><i class="fas fa-info-circle mr-1"></i>${this._e(q.explanation)}</div>`:''}
+        </div>`;
+    },
+
+    async _createQuiz(mid){
+        const t=document.getElementById('qz-title')?.value.trim();
+        if(!t){this._toast('Quiz title required','error');return;}
+        try{
+            await API.cms.createQuiz({module_id:mid,title:t,pass_percentage:parseInt(document.getElementById('qz-pass')?.value)||70,max_attempts:parseInt(document.getElementById('qz-attempts')?.value)||3});
+            this._toast('Quiz created'); await this._lmsQuizPanel(mid);
+        }catch(e){this._toast(e.message,'error');}
+    },
+
+    async _updateQuiz(qid,mid){
+        const t=document.getElementById('qz-title')?.value.trim();
+        try{
+            await API.cms.updateQuiz(qid,{module_id:mid,title:t,pass_percentage:parseInt(document.getElementById('qz-pass')?.value)||70,max_attempts:parseInt(document.getElementById('qz-attempts')?.value)||3});
+            this._toast('Quiz updated');
+        }catch(e){this._toast(e.message,'error');}
+    },
+
+    async _deleteQuiz(qid,mid){ if(!confirm('Delete quiz and all questions?'))return; try{await API.cms.deleteQuiz(qid);this._toast('Quiz deleted');await this._lmsQuizPanel(mid);}catch(e){this._toast(e.message,'error');} },
+
+    _addQuestionForm(quizId,mid,q=null){
+        const isEdit=q&&q.id;
+        const d=q||{question:'',option_a:'',option_b:'',option_c:'',option_d:'',correct_option:'a',explanation:'',order_index:0};
+        const overlay=document.createElement('div');
+        overlay.id='qform-overlay';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9998;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML=`
+        <div style="background:#1f2937;border:1px solid #374151;border-radius:.75rem;padding:1.5rem;width:min(620px,95vw);max-height:90vh;overflow-y:auto;">
+            <div class="chdr"><h4 class="text-white font-semibold">${isEdit?'Edit Question':'Add Question'}</h4>
+            <button class="cb cb-g" onclick="document.getElementById('qform-overlay').remove()"><i class="fas fa-times"></i></button></div>
+            <div class="crow"><div><label class="cl">Question *</label><textarea class="cta" id="qf-q" style="min-height:60px;">${this._e(d.question)}</textarea></div></div>
+            <div class="crow crow2">
+                <div><label class="cl">Option A *</label><input class="ci" id="qf-a" value="${this._e(d.option_a)}"></div>
+                <div><label class="cl">Option B *</label><input class="ci" id="qf-b" value="${this._e(d.option_b)}"></div>
+                <div><label class="cl">Option C</label><input class="ci" id="qf-c" value="${this._e(d.option_c||'')}"></div>
+                <div><label class="cl">Option D</label><input class="ci" id="qf-d" value="${this._e(d.option_d||'')}"></div>
+            </div>
+            <div class="crow crow2">
+                <div><label class="cl">Correct Answer *</label>
+                    <select class="cs" id="qf-correct">
+                        ${['a','b','c','d'].map(o=>`<option value="${o}"${d.correct_option===o?' selected':''}>${o.toUpperCase()}</option>`).join('')}
+                    </select></div>
+                <div><label class="cl">Order</label><input type="number" class="ci" id="qf-ord" value="${d.order_index||0}"></div>
+            </div>
+            <div class="crow"><div><label class="cl">Explanation (shown after answer)</label><input class="ci" id="qf-expl" value="${this._e(d.explanation||'')}"></div></div>
+            <button class="cb cb-p" style="margin-top:.5rem;" onclick="CMSPage._saveQuestion(${quizId},${mid},${isEdit?d.id:'null'})"><i class="fas fa-save"></i> ${isEdit?'Update':'Add'} Question</button>
+        </div>`;
+        document.body.appendChild(overlay);
+    },
+
+    _editQuestionForm(q,quizId,mid){ this._addQuestionForm(quizId,mid,q); },
+
+    async _saveQuestion(quizId,mid,qid=null){
+        const question=document.getElementById('qf-q')?.value.trim();
+        const a=document.getElementById('qf-a')?.value.trim();
+        const b=document.getElementById('qf-b')?.value.trim();
+        if(!question||!a||!b){this._toast('Question and options A/B required','error');return;}
+        const p={quiz_id:quizId,question,option_a:a,option_b:b,
+            option_c:document.getElementById('qf-c')?.value||'',option_d:document.getElementById('qf-d')?.value||'',
+            correct_option:document.getElementById('qf-correct')?.value||'a',
+            explanation:document.getElementById('qf-expl')?.value||'',
+            order_index:parseInt(document.getElementById('qf-ord')?.value)||0};
+        try{
+            if(qid){await API.cms.updateQuestion(qid,p);this._toast('Question updated');}
+            else{await API.cms.createQuestion(p);this._toast('Question added');}
+            document.getElementById('qform-overlay')?.remove();
+            await this._lmsQuizPanel(mid);
+        }catch(e){this._toast(e.message,'error');}
+    },
+
+    async _delQuestion(id,mid){ if(!confirm('Delete this question?'))return; try{await API.cms.deleteQuestion(id);this._toast('Question deleted');await this._lmsQuizPanel(mid);}catch(e){this._toast(e.message,'error');} },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // SIGNALS  (compact)
+    // ═════════════════════════════════════════════════════════════════════════
+    async _signals(){
+        const pane=document.getElementById('cms-pane-signals'); if(!pane) return;
+        let sigs=[]; try{sigs=await API.cms.listSignals();}catch(_){}
+        pane.innerHTML=`
+        <div class="chdr">
+            <h3 class="text-white font-semibold flex items-center gap-2">
+                <i class="fas fa-satellite-dish text-purple-400"></i> Signals
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${sigs.length}</span>
+            </h3>
+            <button class="cb cb-p" onclick="CMSPage._sigForm()"><i class="fas fa-plus"></i> New Signal</button>
+        </div>
+        <div id="cms-sig-form" style="display:none;" class="ccard mb-4"></div>
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <div class="overflow-x-auto"><table class="cms-tbl">
+                <thead><tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>TF</th><th>Status</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
+                <tbody>${sigs.length?sigs.map(s=>`<tr>
+                    <td class="font-bold text-white">${this._e(s.symbol)}</td>
+                    <td>${this._dir(s.direction)}</td>
+                    <td class="font-mono text-gray-300">${s.entry_price}</td>
+                    <td class="font-mono text-red-400">${s.stop_loss}</td>
+                    <td class="font-mono text-green-400">${s.take_profit}</td>
+                    <td class="text-gray-500">${s.timeframe||'—'}</td>
+                    <td>${this._pub(s.status==='active','Active','Closed')}</td>
+                    <td class="text-gray-500">${this._d(s.created_at)}</td>
+                    <td class="text-right"><div style="display:flex;gap:.3rem;justify-content:flex-end;">
+                        <button class="cb cb-g" onclick="CMSPage._sigForm(${JSON.stringify(s).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
+                        ${s.status==='active'?`<button class="cb cb-y" onclick="CMSPage._closeSignal(${s.id})">Close</button>`:''}
+                        <button class="cb cb-r" onclick="CMSPage._deleteSignal(${s.id})"><i class="fas fa-trash"></i></button>
+                    </div></td>
+                </tr>`).join(''):`<tr><td colspan="9" class="text-center py-8 text-gray-500 text-sm">No signals yet</td></tr>`}
+                </tbody>
+            </table></div>
+        </div>`;
+    },
+
+    _sigForm(d=null){
+        const isEdit=d&&d.id; this._editingId=isEdit?d.id:null;
+        d=d||{symbol:'',direction:'BUY',entry_price:'',stop_loss:'',take_profit:'',timeframe:'1H',analysis:'',ai_confidence:'',status:'active'};
+        const f=document.getElementById('cms-sig-form'); if(!f) return;
+        f.style.display='block';
+        f.innerHTML=`
+        <div class="chdr"><h4 class="text-white font-semibold">${isEdit?'Edit Signal':'New Signal'}</h4>
+            <button class="cb cb-g" onclick="CMSPage._closeSigForm()"><i class="fas fa-times"></i></button></div>
+        <div class="crow crow3">
+            <div><label class="cl">Symbol *</label><input class="ci" id="sf-sym" value="${this._e(d.symbol)}" placeholder="EURUSD"></div>
+            <div><label class="cl">Direction</label><select class="cs" id="sf-dir"><option${d.direction==='BUY'?' selected':''}>BUY</option><option${d.direction==='SELL'?' selected':''}>SELL</option></select></div>
+            <div><label class="cl">Timeframe</label><select class="cs" id="sf-tf">${['1M','5M','15M','1H','4H','1D','1W'].map(t=>`<option${d.timeframe===t?' selected':''}>${t}</option>`).join('')}</select></div>
+        </div>
+        <div class="crow crow3">
+            <div><label class="cl">Entry *</label><input type="number" step="0.00001" class="ci" id="sf-entry" value="${d.entry_price}"></div>
+            <div><label class="cl">Stop Loss *</label><input type="number" step="0.00001" class="ci" id="sf-sl" value="${d.stop_loss}"></div>
+            <div><label class="cl">Take Profit *</label><input type="number" step="0.00001" class="ci" id="sf-tp" value="${d.take_profit}"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">AI Confidence (0–1)</label><input type="number" step="0.01" min="0" max="1" class="ci" id="sf-conf" value="${d.ai_confidence||''}"></div>
+            <div><label class="cl">Status</label><select class="cs" id="sf-status">${['active','closed','cancelled'].map(s=>`<option${d.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
+        </div>
+        <div class="crow"><div><label class="cl">Analysis Notes</label><textarea class="cta" id="sf-anal" style="min-height:70px;">${this._e(d.analysis||'')}</textarea></div></div>
+        <button class="cb cb-p" onclick="CMSPage._saveSig()"><i class="fas fa-save"></i> ${isEdit?'Update':'Create'} Signal</button>`;
+    },
+    _closeSigForm(){ const f=document.getElementById('cms-sig-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
+    async _saveSig(){
+        const sym=document.getElementById('sf-sym')?.value.trim().toUpperCase();
+        const entry=parseFloat(document.getElementById('sf-entry')?.value),sl=parseFloat(document.getElementById('sf-sl')?.value),tp=parseFloat(document.getElementById('sf-tp')?.value);
+        if(!sym||isNaN(entry)||isNaN(sl)||isNaN(tp)){this._toast('Symbol, Entry, SL, TP required','error');return;}
+        const p={symbol:sym,direction:document.getElementById('sf-dir')?.value||'BUY',entry_price:entry,stop_loss:sl,take_profit:tp,
+            timeframe:document.getElementById('sf-tf')?.value||'1H',analysis:document.getElementById('sf-anal')?.value||'',
+            ai_confidence:document.getElementById('sf-conf')?.value?parseFloat(document.getElementById('sf-conf').value):null,
+            status:document.getElementById('sf-status')?.value||'active'};
+        try{
+            if(this._editingId){await API.cms.updateSignal(this._editingId,p);this._toast('Signal updated');}
+            else{await API.cms.createSignal(p);this._toast('Signal created');}
+            this._closeSigForm(); await this._signals();
+        }catch(e){this._toast(e.message,'error');}
+    },
+    async _closeSignal(id){ const o=prompt('Outcome (win/loss/breakeven):','win'); if(!o)return; try{await API.cms.closeSignal(id,o);this._toast('Signal closed');await this._signals();}catch(e){this._toast(e.message,'error');} },
+    async _deleteSignal(id){ if(!confirm('Delete signal?'))return; try{await API.cms.deleteSignal(id);this._toast('Deleted');await this._signals();}catch(e){this._toast(e.message,'error');} },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // WEBINARS
+    // ═════════════════════════════════════════════════════════════════════════
+    async _webinars(){
+        const pane=document.getElementById('cms-pane-webinars'); if(!pane) return;
+        let ws=[]; try{ws=await API.cms.listWebinars();}catch(_){}
+        pane.innerHTML=`
+        <div class="chdr">
+            <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-video text-pink-400"></i> Webinars <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${ws.length}</span></h3>
+            <button class="cb cb-p" onclick="CMSPage._webinarForm()"><i class="fas fa-plus"></i> New Webinar</button>
+        </div>
+        <div id="cms-web-form" style="display:none;" class="ccard mb-4"></div>
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <div class="overflow-x-auto"><table class="cms-tbl">
+                <thead><tr><th>Title</th><th>Presenter</th><th>Date</th><th>Duration</th><th>Status</th><th>Capacity</th><th class="text-right">Actions</th></tr></thead>
+                <tbody>${ws.length?ws.map(w=>`<tr>
+                    <td><div class="text-white font-medium text-sm">${this._e(w.title)}</div>
+                        ${w.meeting_link?`<a href="${this._e(w.meeting_link)}" target="_blank" class="text-purple-400 text-xs hover:underline">🔗 Join</a>`:''}</td>
+                    <td class="text-gray-400">${this._e(w.presenter||'—')}</td>
+                    <td class="text-gray-300">${this._d(w.scheduled_at)}</td>
+                    <td class="text-gray-400">${w.duration_minutes||60}m</td>
+                    <td>${this._pub(w.is_published)}</td>
+                    <td class="text-gray-400">${w.max_attendees||100}</td>
+                    <td class="text-right"><div style="display:flex;gap:.3rem;justify-content:flex-end;">
+                        <button class="cb cb-g" onclick="CMSPage._webinarForm(${JSON.stringify(w).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
+                        <button class="cb ${w.is_published?'cb-g':'cb-gr'}" onclick="CMSPage._toggleWebinar(${w.id})">${w.is_published?'Unpublish':'Publish'}</button>
+                        <button class="cb cb-r" onclick="CMSPage._deleteWebinar(${w.id})"><i class="fas fa-trash"></i></button>
+                    </div></td>
+                </tr>`).join(''):`<tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm">No webinars yet</td></tr>`}
+                </tbody>
+            </table></div>
+        </div>`;
+    },
+
+    _webinarForm(d=null){
+        const isEdit=d&&d.id; this._editingId=isEdit?d.id:null;
+        d=d||{title:'',description:'',presenter:'',scheduled_at:'',duration_minutes:60,meeting_link:'',recording_url:'',thumbnail:'',max_attendees:100,is_published:false};
+        const f=document.getElementById('cms-web-form'); if(!f) return;
+        f.style.display='block';
+        f.innerHTML=`
+        <div class="chdr"><h4 class="text-white font-semibold">${isEdit?'Edit Webinar':'New Webinar'}</h4>
+            <button class="cb cb-g" onclick="CMSPage._closeWebForm()"><i class="fas fa-times"></i></button></div>
+        <div class="crow crow2">
+            <div><label class="cl">Title *</label><input class="ci" id="wf-title" value="${this._e(d.title)}"></div>
+            <div><label class="cl">Presenter</label><input class="ci" id="wf-presenter" value="${this._e(d.presenter||'')}"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Date & Time *</label><input type="datetime-local" class="ci" id="wf-date" value="${this._dt(d.scheduled_at)}"></div>
+            <div><label class="cl">Duration (min)</label><input type="number" class="ci" id="wf-dur" value="${d.duration_minutes||60}" min="1"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Meeting Link</label><input class="ci" id="wf-link" value="${this._e(d.meeting_link||'')}" placeholder="https://zoom.us/…"></div>
+            <div><label class="cl">Recording URL</label><input class="ci" id="wf-rec" value="${this._e(d.recording_url||'')}" placeholder="After event"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Thumbnail</label>
+                <div style="display:flex;gap:.4rem;">
+                    <input class="ci" id="wf-thumb" value="${this._e(d.thumbnail||'')}">
+                    <button class="cb cb-g" onclick="CMSPage._pickMedia('wf-thumb')"><i class="fas fa-images"></i></button>
+                </div>
+            </div>
+            <div><label class="cl">Max Attendees</label><input type="number" class="ci" id="wf-max" value="${d.max_attendees||100}" min="1"></div>
+        </div>
+        <div class="crow"><div><label class="cl">Description</label><textarea class="cta" id="wf-desc" style="min-height:70px;">${this._e(d.description||'')}</textarea></div></div>
+        <div style="display:flex;gap:1.5rem;align-items:center;margin-top:.5rem;flex-wrap:wrap;">
+            <label class="ctog" onclick="CMSPage._togCheck('wf-pub')">
+                <div class="ttrack${d.is_published?' on':''}"><div class="tthumb"></div></div>
+                <span class="text-sm text-gray-300">Published</span>
+                <input type="hidden" id="wf-pub" value="${d.is_published?'1':'0'}">
+            </label>
+            <button class="cb cb-p" onclick="CMSPage._saveWebinar()"><i class="fas fa-save"></i> ${isEdit?'Update':'Create'} Webinar</button>
+        </div>`;
+    },
+    _closeWebForm(){ const f=document.getElementById('cms-web-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
+    async _saveWebinar(){
+        const title=document.getElementById('wf-title')?.value.trim(),sched=document.getElementById('wf-date')?.value;
+        if(!title||!sched){this._toast('Title and date required','error');return;}
+        const p={title,description:document.getElementById('wf-desc')?.value||'',presenter:document.getElementById('wf-presenter')?.value||'',scheduled_at:sched,
+            duration_minutes:parseInt(document.getElementById('wf-dur')?.value)||60,meeting_link:document.getElementById('wf-link')?.value||'',
+            recording_url:document.getElementById('wf-rec')?.value||'',thumbnail:document.getElementById('wf-thumb')?.value||'',
+            max_attendees:parseInt(document.getElementById('wf-max')?.value)||100,is_published:document.getElementById('wf-pub')?.value==='1'};
+        try{
+            if(this._editingId){await API.cms.updateWebinar(this._editingId,p);this._toast('Webinar updated');}
+            else{await API.cms.createWebinar(p);this._toast('Webinar created');}
+            this._closeWebForm(); await this._webinars();
+        }catch(e){this._toast(e.message,'error');}
+    },
+    async _toggleWebinar(id){ try{const r=await API.cms.toggleWebinar(id);this._toast(r.message);await this._webinars();}catch(e){this._toast(e.message,'error');} },
+    async _deleteWebinar(id){ if(!confirm('Delete webinar?'))return; try{await API.cms.deleteWebinar(id);this._toast('Deleted');await this._webinars();}catch(e){this._toast(e.message,'error');} },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // USERS
+    // ═════════════════════════════════════════════════════════════════════════
+    async _users(){
+        const pane=document.getElementById('cms-pane-users'); if(!pane) return;
+        pane.innerHTML=`
+        <div class="chdr">
+            <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-users text-blue-400"></i> User Management</h3>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+                <div style="position:relative;">
+                    <i class="fas fa-search" style="position:absolute;left:.6rem;top:50%;transform:translateY(-50%);color:#6b7280;font-size:.75rem;"></i>
+                    <input type="text" id="usr-search" placeholder="Search by email or name…" style="padding:.4rem .75rem .4rem 2rem;background:#111827;border:1px solid #374151;border-radius:.5rem;color:white;font-size:.82rem;width:200px;" oninput="CMSPage._usrSearch(this.value)">
+                </div>
+            </div>
+        </div>
+        <!-- Announcements & Coupons mini-panels -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+            <div class="ccard">
+                <div class="chdr" style="margin-bottom:.75rem;padding-bottom:.5rem;">
+                    <span class="text-white font-semibold text-sm"><i class="fas fa-bullhorn text-yellow-400 mr-2"></i>Announcements</span>
+                    <button class="cb cb-p" style="font-size:.72rem;padding:.25rem .75rem;" onclick="CMSPage._addAnnouncement()"><i class="fas fa-plus"></i> New</button>
+                </div>
+                <div id="ann-list"><div class="text-gray-600 text-xs">Loading…</div></div>
+            </div>
+            <div class="ccard">
+                <div class="chdr" style="margin-bottom:.75rem;padding-bottom:.5rem;">
+                    <span class="text-white font-semibold text-sm"><i class="fas fa-tag text-green-400 mr-2"></i>Coupons</span>
+                    <button class="cb cb-p" style="font-size:.72rem;padding:.25rem .75rem;" onclick="CMSPage._addCoupon()"><i class="fas fa-plus"></i> New</button>
+                </div>
+                <div id="coup-list"><div class="text-gray-600 text-xs">Loading…</div></div>
+            </div>
+        </div>
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <div id="usr-table-wrap" class="overflow-x-auto"></div>
+            <div id="usr-pager" class="px-5 py-4 border-t border-gray-700 flex items-center justify-between"></div>
+        </div>`;
+        await Promise.all([this._loadUsersTable(1,''),this._loadAnnouncements(),this._loadCoupons()]);
+    },
+
+    _usrSearch: (()=>{ let t; return (v)=>{ clearTimeout(t); t=setTimeout(()=>CMSPage._loadUsersTable(1,v),350); }; })(),
+
+    async _loadUsersTable(page,search){
+        this._usersPage=page; this._usersSearch=search;
+        const wrap=document.getElementById('usr-table-wrap'); const pager=document.getElementById('usr-pager');
+        if(!wrap) return;
+        wrap.innerHTML=`<div class="py-8 text-center text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</div>`;
+        try{
+            const data=await API.cms.listUsers(page,search);
+            const users=data.users||[]; const total=data.total||0; const pages=data.pages||1;
+            wrap.innerHTML=`<table class="cms-tbl">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Subscription</th><th>Status</th><th>Joined</th><th class="text-right">Actions</th></tr></thead>
+                <tbody>${users.length?users.map(u=>`<tr>
+                    <td class="text-white font-medium">${this._e(u.full_name||'—')}</td>
+                    <td class="text-gray-400">${this._e(u.email)}</td>
+                    <td>${this._role(u.display_role||u.role)}</td>
+                    <td>${this._tier(u.subscription_tier)}</td>
+                    <td>${this._pub(u.is_active,'Active','Banned')}</td>
+                    <td class="text-gray-500">${this._d(u.created_at)}</td>
+                    <td class="text-right">
+                        <div style="display:flex;gap:.3rem;justify-content:flex-end;flex-wrap:wrap;">
+                            <select class="cs" style="font-size:.72rem;padding:.2rem .4rem;width:100px;" onchange="CMSPage._setRole(${u.id},this.value)">
+                                ${['user','moderator','admin'].map(r=>`<option value="${r}"${(u.display_role||u.role||'user')===r?' selected':''}>${r}</option>`).join('')}
+                            </select>
+                            <select class="cs" style="font-size:.72rem;padding:.2rem .4rem;width:100px;" onchange="CMSPage._setSub(${u.id},this.value)">
+                                ${['free','pro','enterprise'].map(t=>`<option value="${t}"${(u.subscription_tier||'free')===t?' selected':''}>${t}</option>`).join('')}
+                            </select>
+                            <button class="cb ${u.is_active?'cb-r':'cb-gr'}" style="font-size:.7rem;padding:.22rem .6rem;" onclick="CMSPage._toggleUserStatus(${u.id})">${u.is_active?'Ban':'Unban'}</button>
+                            <button class="cb cb-g" style="font-size:.7rem;padding:.22rem .6rem;" onclick="CMSPage._viewActivity(${u.id},'${this._e(u.email)}')"><i class="fas fa-chart-bar"></i></button>
+                        </div>
+                    </td>
+                </tr>`).join(''):`<tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm">No users found</td></tr>`}
+                </tbody>
+            </table>`;
+            if(pager) pager.innerHTML=`
+                <span class="text-xs text-gray-500">${((page-1)*25)+1}–${Math.min(page*25,total)} of ${total}</span>
+                <div class="flex gap-1">
+                    <button onclick="CMSPage._loadUsersTable(${page-1},'${this._usersSearch}')" ${page<=1?'disabled':''} class="cb cb-g" style="font-size:.72rem;padding:.2rem .6rem;disabled:opacity-30;">← Prev</button>
+                    <span class="text-xs text-gray-500 px-2">${page}/${pages}</span>
+                    <button onclick="CMSPage._loadUsersTable(${page+1},'${this._usersSearch}')" ${page>=pages?'disabled':''} class="cb cb-g" style="font-size:.72rem;padding:.2rem .6rem;">Next →</button>
+                </div>`;
+        }catch(e){ wrap.innerHTML=`<div class="py-8 text-center text-red-400 text-sm">${this._e(e.message)}</div>`; }
+    },
+
+    async _setRole(id,role){ try{await API.cms.setUserRole(id,role);this._toast(`Role set to ${role}`);}catch(e){this._toast(e.message,'error');} },
+    async _setSub(id,tier){ try{await API.cms.setUserSub(id,tier);this._toast(`Subscription set to ${tier}`);}catch(e){this._toast(e.message,'error');} },
+    async _toggleUserStatus(id){ try{const r=await API.cms.toggleUser(id);this._toast(r.message);await this._loadUsersTable(this._usersPage,this._usersSearch);}catch(e){this._toast(e.message,'error');} },
+
+    async _viewActivity(id,email){
+        let a={}; try{a=await API.cms.getUserActivity(id);}catch(_){}
+        const overlay=document.createElement('div');
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9998;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML=`<div style="background:#1f2937;border:1px solid #374151;border-radius:.75rem;padding:1.5rem;width:min(480px,95vw);">
+            <div class="chdr"><h4 class="text-white font-semibold"><i class="fas fa-user-circle text-purple-400 mr-2"></i>${this._e(email)}</h4>
+            <button class="cb cb-g" onclick="this.closest('.overlay-close').remove()"><i class="fas fa-times"></i></button></div>
+            <div class="grid grid-cols-2 gap-3">
+                ${[['fa-satellite-dish','Signals Created',a.signal_count||0],['fa-file-upload','Journal Uploads',a.journal_uploads||0],['fa-robot','AI Mentor Requests',a.mentor_requests||0],['fa-chart-bar','Charts Analyzed',a.charts_analyzed||0]].map(([ic,lb,v])=>`
+                <div style="background:#111827;border:1px solid #374151;border-radius:.5rem;padding:.85rem;text-align:center;">
+                    <i class="fas ${ic} text-purple-400 mb-1 block"></i>
+                    <div class="text-2xl font-bold text-white">${v}</div>
+                    <div class="text-xs text-gray-500">${lb}</div>
+                </div>`).join('')}
+            </div>
+            ${a.recent_logins?.length?`<div style="margin-top:1rem;"><div class="text-xs text-gray-500 mb-1">Recent Logins</div>${a.recent_logins.slice(0,5).map(d=>`<div class="text-xs text-gray-400">${d||'—'}</div>`).join('')}</div>`:''}
+        </div>`;
+        overlay.classList.add('overlay-close');
+        overlay.addEventListener('click',e=>{ if(e.target===overlay)overlay.remove(); });
+        document.body.appendChild(overlay);
+    },
+
+    async _loadAnnouncements(){
+        const el=document.getElementById('ann-list'); if(!el) return;
+        let anns=[]; try{anns=await API.cms.listAnnouncements();}catch(_){}
+        const colors={info:'#60a5fa',warning:'#fbbf24',success:'#34d399',danger:'#f87171'};
+        el.innerHTML=anns.length?anns.map(a=>`
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.4rem;background:#111827;margin-bottom:.35rem;border-left:3px solid ${colors[a.type]||colors.info};">
+            <span class="text-xs text-gray-300 flex-1 truncate">${this._e(a.message)}</span>
+            ${this._pub(a.is_active,'Live','Off')}
+            <button class="cb cb-g" style="font-size:.68rem;padding:.15rem .45rem;" onclick="CMSPage._toggleAnn(${a.id})"><i class="fas fa-toggle-on"></i></button>
+            <button class="cb cb-r" style="font-size:.68rem;padding:.15rem .45rem;" onclick="CMSPage._deleteAnn(${a.id})"><i class="fas fa-trash"></i></button>
+        </div>`).join(''):`<div class="text-gray-600 text-xs">No announcements</div>`;
+    },
+
+    async _addAnnouncement(){
+        const msg=prompt('Announcement message:','');
+        if(!msg) return;
+        const type=prompt('Type (info/warning/success/danger):','info')||'info';
+        try{await API.cms.createAnnouncement({message:msg,type,is_active:true});this._toast('Announcement created');await this._loadAnnouncements();}
+        catch(e){this._toast(e.message,'error');}
+    },
+    async _toggleAnn(id){ try{await API.cms.toggleAnnouncement(id);await this._loadAnnouncements();}catch(e){this._toast(e.message,'error');} },
+    async _deleteAnn(id){ if(!confirm('Delete?'))return; try{await API.cms.deleteAnnouncement(id);await this._loadAnnouncements();}catch(e){this._toast(e.message,'error');} },
+
+    async _loadCoupons(){
+        const el=document.getElementById('coup-list'); if(!el) return;
+        let coupons=[]; try{coupons=await API.cms.listCoupons();}catch(_){}
+        el.innerHTML=coupons.length?coupons.map(c=>`
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.4rem;background:#111827;margin-bottom:.35rem;">
+            <span style="font-family:monospace;color:#a78bfa;font-size:.8rem;font-weight:700;">${this._e(c.code)}</span>
+            <span class="text-gray-400 text-xs">${c.discount_type==='percent'?c.discount_value+'%':'$'+c.discount_value} off</span>
+            <span class="text-gray-600 text-xs">${c.uses||0}/${c.max_uses} uses</span>
+            ${this._pub(c.is_active,'Active','Off')}
+            <button class="cb cb-g" style="font-size:.68rem;padding:.15rem .45rem;" onclick="CMSPage._toggleCoupon(${c.id})"><i class="fas fa-toggle-on"></i></button>
+            <button class="cb cb-r" style="font-size:.68rem;padding:.15rem .45rem;" onclick="CMSPage._deleteCoupon(${c.id})"><i class="fas fa-trash"></i></button>
+        </div>`).join(''):`<div class="text-gray-600 text-xs">No coupons</div>`;
+    },
+
+    async _addCoupon(){
+        const code=prompt('Coupon code:','SUMMER25'); if(!code) return;
+        const type=prompt('Type (percent/fixed):','percent')||'percent';
+        const val=parseFloat(prompt('Discount value:','25')); if(isNaN(val)) return;
+        try{await API.cms.createCoupon({code,discount_type:type,discount_value:val,max_uses:100,is_active:true});this._toast('Coupon created');await this._loadCoupons();}
+        catch(e){this._toast(e.message,'error');}
+    },
+    async _toggleCoupon(id){ try{await API.cms.toggleCoupon(id);await this._loadCoupons();}catch(e){this._toast(e.message,'error');} },
+    async _deleteCoupon(id){ if(!confirm('Delete coupon?'))return; try{await API.cms.deleteCoupon(id);await this._loadCoupons();}catch(e){this._toast(e.message,'error');} },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // MEDIA LIBRARY
+    // ═════════════════════════════════════════════════════════════════════════
+    async _media(callback=null){
+        const pane=document.getElementById('cms-pane-media'); if(!pane&&!callback) return;
+        let files=[]; try{files=await API.cms.listMedia();}catch(_){}
+        const container=callback?document.createElement('div'):pane;
+        container.innerHTML=`
+        <div class="chdr">
+            <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-photo-video text-green-400"></i> Media Library <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${files.length}</span></h3>
+        </div>
+        <!-- Upload zone -->
+        <div class="upload-zone" id="media-drop-zone" onclick="document.getElementById('media-file-input').click()">
+            <input type="file" id="media-file-input" style="display:none;" multiple accept="image/*,video/mp4,application/pdf" onchange="CMSPage._uploadFiles(this.files)">
+            <i class="fas fa-cloud-upload-alt text-3xl text-gray-600 mb-2"></i>
+            <p class="text-gray-400 text-sm">Drop files here or click to upload</p>
+            <p class="text-gray-600 text-xs mt-1">Images, Videos, PDFs — max 20 MB each</p>
+        </div>
+        <div id="media-upload-progress" style="display:none;" class="mt-2"></div>
+        <!-- Filter bar -->
+        <div style="display:flex;gap:.5rem;margin:.75rem 0;flex-wrap:wrap;">
+            ${['all','general','blog','courses','webinars'].map(f=>`<button class="cb cb-g" style="font-size:.72rem;" onclick="CMSPage._filterMedia('${f}')">${f}</button>`).join('')}
+            ${callback?`<button class="cb cb-gr" style="margin-left:auto;" onclick="CMSPage._cancelMediaPick()">Cancel</button>`:''}
+        </div>
+        <div class="media-grid" id="media-grid">
+            ${files.length?files.map(f=>this._mediaItem(f,callback)).join(''):`<div class="text-gray-600 text-sm col-span-full text-center py-6">No files yet — upload one above</div>`}
+        </div>`;
+
+        if(!callback){
+            this._setupMediaDrop();
+        }
+    },
+
+    _mediaItem(f,callback=null){
+        const isImg=/\.(jpg|jpeg|png|webp|gif|svg)/i.test(f.url);
+        const isPdf=/\.pdf$/i.test(f.url);
+        const isVid=/\.(mp4|webm)/i.test(f.url);
+        const thumb=isImg?`<img src="${this._e(f.url)}" class="media-thumb" loading="lazy">`
+            :`<div class="media-thumb" style="display:flex;align-items:center;justify-content:center;">
+                <i class="fas ${isPdf?'fa-file-pdf text-red-400':isVid?'fa-film text-purple-400':'fa-file text-gray-500'} text-2xl"></i>
+            </div>`;
+        const clickFn=callback
+            ?`CMSPage._selectMedia('${this._e(f.url)}','${this._e(f.filename)}')`
+            :`window.open('${this._e(f.url)}','_blank')`;
+        return `<div class="media-item" onclick="${clickFn}" title="${this._e(f.original_name||f.filename)}">
+            ${thumb}
+            <div class="media-name">${this._e((f.original_name||f.filename||'').split('/').pop())}</div>
+            ${!callback?`<div style="display:flex;justify-content:space-between;padding:.2rem .4rem;">
+                <button class="cb cb-r" style="font-size:.65rem;padding:.1rem .4rem;" onclick="event.stopPropagation();CMSPage._deleteMedia('${this._e(f.filename)}')"><i class="fas fa-trash"></i></button>
+                <button class="cb cb-g" style="font-size:.65rem;padding:.1rem .4rem;" onclick="event.stopPropagation();navigator.clipboard.writeText('${this._e(f.url)}');CMSPage._toast('URL copied')"><i class="fas fa-copy"></i></button>
+            </div>`:''}
+        </div>`;
+    },
+
+    _setupMediaDrop(){
+        const zone=document.getElementById('media-drop-zone'); if(!zone) return;
+        zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+        zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+        zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag-over');this._uploadFiles(e.dataTransfer.files);});
+    },
+
+    async _uploadFiles(files){
+        const prog=document.getElementById('media-upload-progress'); if(prog){prog.style.display='block';prog.innerHTML='';}
+        const folder=this._activeTab==='blog'?'blog':this._activeTab==='lms'?'courses':this._activeTab==='webinars'?'webinars':'general';
+        for(const file of files){
+            const row=document.createElement('div');
+            row.style.cssText='font-size:.78rem;color:#9ca3af;margin-bottom:.25rem;';
+            row.innerHTML=`<i class="fas fa-spinner fa-spin mr-1"></i> Uploading ${this._e(file.name)}…`;
+            if(prog) prog.appendChild(row);
+            try{
+                const fd=new FormData(); fd.append('file',file); fd.append('folder',folder);
+                const r=await API.cms.uploadMedia(fd);
+                row.innerHTML=`<i class="fas fa-check-circle text-green-400 mr-1"></i> ${this._e(file.name)} → <a href="${r.url}" target="_blank" class="text-purple-400 hover:underline">${r.url}</a>`;
+            }catch(e){
+                row.innerHTML=`<i class="fas fa-times-circle text-red-400 mr-1"></i> ${this._e(file.name)}: ${this._e(e.message)}`;
+            }
+        }
+        await this._media();
+    },
+
+    async _filterMedia(folder){
+        const grid=document.getElementById('media-grid'); if(!grid) return;
+        grid.innerHTML='<div class="col-span-full text-gray-600 text-xs text-center py-4"><i class="fas fa-spinner fa-spin mr-1"></i>Loading…</div>';
+        let files=[]; try{files=await API.cms.listMedia(folder==='all'?null:folder);}catch(_){}
+        grid.innerHTML=files.length?files.map(f=>this._mediaItem(f)).join(''):'<div class="text-gray-600 text-sm col-span-full text-center py-6">No files in this folder</div>';
+    },
+
+    async _deleteMedia(fn){
+        if(!confirm('Delete this file permanently?'))return;
+        try{await API.cms.deleteMedia(fn);this._toast('File deleted');await this._media();}
+        catch(e){this._toast(e.message,'error');}
+    },
+
+    // Media picker (called from form image buttons)
+    _pickMedia(targetInputId,folder=''){
+        this._mediaCallback=targetInputId;
+        const overlay=document.createElement('div');
+        overlay.id='media-picker-overlay';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:2rem;overflow-y:auto;';
+        const inner=document.createElement('div');
+        inner.style.cssText='background:#1f2937;border:1px solid #374151;border-radius:.75rem;padding:1.5rem;width:min(900px,95vw);';
+        overlay.appendChild(inner);
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click',e=>{if(e.target===overlay){overlay.remove();this._mediaCallback=null;}});
+        this._renderMediaPicker(inner,folder);
+    },
+
+    async _renderMediaPicker(container,folder){
+        let files=[]; try{files=await API.cms.listMedia(folder||null);}catch(_){}
+        container.innerHTML=`
+        <div class="chdr">
+            <h4 class="text-white font-semibold"><i class="fas fa-images text-green-400 mr-2"></i>Select Media</h4>
+            <button class="cb cb-g" onclick="document.getElementById('media-picker-overlay').remove();CMSPage._mediaCallback=null;"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="margin-bottom:.75rem;">
+            <input type="file" id="picker-upload" style="display:none;" multiple accept="image/*,video/mp4,application/pdf" onchange="CMSPage._pickerUpload(this.files)">
+            <button class="cb cb-p" onclick="document.getElementById('picker-upload').click()"><i class="fas fa-upload"></i> Upload New</button>
+        </div>
+        <div class="media-grid">
+            ${files.length?files.map(f=>this._mediaItem(f,'picker')).join(''):`<div class="text-gray-600 text-sm col-span-full text-center py-6">No files yet — upload one above</div>`}
+        </div>`;
+    },
+
+    async _pickerUpload(files){
+        const folder='general'; const container=document.querySelector('#media-picker-overlay > div');
+        for(const file of files){
+            try{const fd=new FormData();fd.append('file',file);fd.append('folder',folder);await API.cms.uploadMedia(fd);}catch(e){this._toast(e.message,'error');}
+        }
+        if(container) this._renderMediaPicker(container,folder);
+    },
+
+    _selectMedia(url,fn){
+        const input=document.getElementById(this._mediaCallback);
+        if(input){ input.value=url; input.dispatchEvent(new Event('input')); }
+        document.getElementById('media-picker-overlay')?.remove();
+        this._mediaCallback=null;
+    },
+    _cancelMediaPick(){ document.getElementById('media-picker-overlay')?.remove(); this._mediaCallback=null; },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // SETTINGS
+    // ═════════════════════════════════════════════════════════════════════════
+    async _settings(){
+        const pane=document.getElementById('cms-pane-settings'); if(!pane) return;
+        pane.innerHTML=`<div class="text-gray-400 text-sm text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading settings…</div>`;
+        let s={}; try{s=await API.cms.getSettings();}catch(_){}
+        const g=(k,fb='')=>this._e(s[k]!=null?s[k]:fb);
+        pane.innerHTML=`
+        <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-cog text-yellow-400"></i> Site Settings</h3>
-            <button class="cms-btn cms-btn-purple" onclick="CMSPage._saveSettings()"><i class="fas fa-save"></i> Save All Changes</button>
+            <button class="cb cb-p" onclick="CMSPage._saveSettings()"><i class="fas fa-save"></i> Save All</button>
         </div>
-
-        <!-- General -->
-        <div class="settings-group">
-            <div class="settings-group-header"><i class="fas fa-globe mr-2"></i>General</div>
-            <div class="settings-row"><div><div class="settings-label">Site Name</div></div><input class="cms-input" style="max-width:280px;" id="s-site_name" value="${g('site_name','Pipways')}"></div>
-            <div class="settings-row"><div><div class="settings-label">Tagline</div></div><input class="cms-input" style="max-width:280px;" id="s-site_tagline" value="${g('site_tagline','Professional Trading Platform')}"></div>
-            <div class="settings-row"><div><div class="settings-label">Footer Text</div></div><input class="cms-input" style="max-width:360px;" id="s-footer_text" value="${g('footer_text','© 2025 Pipways. All rights reserved.')}"></div>
-            <div class="settings-row"><div><div class="settings-label">Currency</div></div>
-                <select class="cms-select" style="max-width:120px;" id="s-currency">
-                    ${['USD','EUR','GBP','NGN','ZAR','AED'].map(c=>`<option value="${c}" ${settings.currency===c?'selected':''}>${c}</option>`).join('')}
-                </select></div>
-            <div class="settings-row"><div><div class="settings-label">Timezone</div></div>
-                <select class="cms-select" style="max-width:200px;" id="s-timezone">
-                    ${['UTC','America/New_York','America/Los_Angeles','Europe/London','Europe/Berlin','Asia/Dubai','Africa/Lagos'].map(t=>`<option value="${t}" ${settings.timezone===t?'selected':''}>${t}</option>`).join('')}
-                </select></div>
+        <div class="sg"><div class="sg-hdr"><i class="fas fa-globe mr-2"></i>General</div>
+            <div class="sg-row"><div><div class="sg-lbl">Site Name</div></div><input class="ci" style="max-width:260px;" id="s-site_name" value="${g('site_name','Pipways')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">Tagline</div></div><input class="ci" style="max-width:320px;" id="s-site_tagline" value="${g('site_tagline')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">Footer Text</div></div><input class="ci" style="max-width:360px;" id="s-footer_text" value="${g('footer_text')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">Currency</div></div><select class="cs" style="max-width:100px;" id="s-currency">${['USD','EUR','GBP','NGN','ZAR','AED'].map(c=>`<option${s.currency===c?' selected':''}>${c}</option>`).join('')}</select></div>
+            <div class="sg-row"><div><div class="sg-lbl">Timezone</div></div><select class="cs" style="max-width:220px;" id="s-timezone">${['UTC','America/New_York','America/Los_Angeles','Europe/London','Europe/Berlin','Asia/Dubai','Africa/Lagos'].map(t=>`<option value="${t}"${s.timezone===t?' selected':''}>${t}</option>`).join('')}</select></div>
         </div>
-
-        <!-- Contact & Email -->
-        <div class="settings-group">
-            <div class="settings-group-header"><i class="fas fa-envelope mr-2"></i>Contact &amp; Email</div>
-            <div class="settings-row"><div><div class="settings-label">Contact Email</div></div><input class="cms-input" style="max-width:280px;" id="s-contact_email" value="${g('contact_email')}"></div>
-            <div class="settings-row"><div><div class="settings-label">Support Email</div></div><input class="cms-input" style="max-width:280px;" id="s-support_email" value="${g('support_email')}"></div>
-            <div class="settings-row"><div><div class="settings-label">SMTP Host</div></div><input class="cms-input" style="max-width:280px;" id="s-smtp_host" value="${g('smtp_host')}"></div>
-            <div class="settings-row"><div><div class="settings-label">SMTP Port</div></div><input type="number" class="cms-input" style="max-width:100px;" id="s-smtp_port" value="${g('smtp_port','587')}"></div>
-            <div class="settings-row"><div><div class="settings-label">SMTP Username</div></div><input class="cms-input" style="max-width:280px;" id="s-smtp_user" value="${g('smtp_user')}"></div>
+        <div class="sg"><div class="sg-hdr"><i class="fas fa-envelope mr-2"></i>Contact & Email</div>
+            <div class="sg-row"><div><div class="sg-lbl">Contact Email</div></div><input class="ci" style="max-width:280px;" id="s-contact_email" value="${g('contact_email')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">Support Email</div></div><input class="ci" style="max-width:280px;" id="s-support_email" value="${g('support_email')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">SMTP Host</div></div><input class="ci" style="max-width:280px;" id="s-smtp_host" value="${g('smtp_host')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">SMTP Port</div></div><input type="number" class="ci" style="max-width:90px;" id="s-smtp_port" value="${g('smtp_port','587')}"></div>
+            <div class="sg-row"><div><div class="sg-lbl">SMTP Username</div></div><input class="ci" style="max-width:280px;" id="s-smtp_user" value="${g('smtp_user')}"></div>
         </div>
-
-        <!-- Branding -->
-        <div class="settings-group">
-            <div class="settings-group-header"><i class="fas fa-palette mr-2"></i>Branding</div>
-            <div class="settings-row"><div><div class="settings-label">Logo URL</div><div class="settings-desc">Full URL to your logo image</div></div><input class="cms-input" style="max-width:360px;" id="s-logo_url" value="${g('logo_url')}"></div>
-            <div class="settings-row"><div><div class="settings-label">Favicon URL</div></div><input class="cms-input" style="max-width:360px;" id="s-favicon_url" value="${g('favicon_url')}"></div>
-            <div class="settings-row"><div><div class="settings-label">Analytics ID</div><div class="settings-desc">Google Analytics GA4 measurement ID</div></div><input class="cms-input" style="max-width:200px;" id="s-analytics_id" value="${g('analytics_id')}" placeholder="G-XXXXXXXXXX"></div>
+        <div class="sg"><div class="sg-hdr"><i class="fas fa-palette mr-2"></i>Branding</div>
+            <div class="sg-row"><div><div class="sg-lbl">Logo URL</div></div>
+                <div style="display:flex;gap:.4rem;"><input class="ci" style="max-width:300px;" id="s-logo_url" value="${g('logo_url')}"><button class="cb cb-g" onclick="CMSPage._pickMedia('s-logo_url')"><i class="fas fa-images"></i></button></div></div>
+            <div class="sg-row"><div><div class="sg-lbl">Favicon URL</div></div>
+                <div style="display:flex;gap:.4rem;"><input class="ci" style="max-width:300px;" id="s-favicon_url" value="${g('favicon_url')}"><button class="cb cb-g" onclick="CMSPage._pickMedia('s-favicon_url')"><i class="fas fa-images"></i></button></div></div>
+            <div class="sg-row"><div><div class="sg-lbl">Analytics ID</div><div class="sg-desc">Google Analytics GA4</div></div><input class="ci" style="max-width:180px;" id="s-analytics_id" value="${g('analytics_id')}" placeholder="G-XXXXXXXXXX"></div>
         </div>
-
-        <!-- Social Media -->
-        <div class="settings-group">
-            <div class="settings-group-header"><i class="fas fa-share-alt mr-2"></i>Social Media</div>
-            ${[['twitter_url','fab fa-twitter','Twitter/X URL'],['instagram_url','fab fa-instagram','Instagram URL'],['telegram_url','fab fa-telegram','Telegram URL'],['youtube_url','fab fa-youtube','YouTube URL'],['discord_url','fab fa-discord','Discord URL']].map(([key,icon,label])=>`
-            <div class="settings-row">
-                <div><div class="settings-label"><i class="${icon} mr-1.5"></i>${label}</div></div>
-                <input class="cms-input" style="max-width:320px;" id="s-${key}" value="${g(key)}" placeholder="https://...">
-            </div>`).join('')}
+        <div class="sg"><div class="sg-hdr"><i class="fas fa-share-alt mr-2"></i>Social Media</div>
+            ${[['twitter_url','fab fa-twitter','Twitter / X'],['instagram_url','fab fa-instagram','Instagram'],['telegram_url','fab fa-telegram','Telegram'],['youtube_url','fab fa-youtube','YouTube'],['discord_url','fab fa-discord','Discord']].map(([k,ic,lb])=>`
+            <div class="sg-row"><div><div class="sg-lbl"><i class="${ic} mr-1"></i>${lb}</div></div><input class="ci" style="max-width:300px;" id="s-${k}" value="${g(k)}" placeholder="https://…"></div>`).join('')}
         </div>
-
-        <!-- Platform Controls -->
-        <div class="settings-group">
-            <div class="settings-group-header"><i class="fas fa-sliders-h mr-2"></i>Platform Controls</div>
-            <div class="settings-row">
-                <div><div class="settings-label">Maintenance Mode</div><div class="settings-desc">Redirects all visitors to a maintenance page</div></div>
-                <label class="cms-toggle" onclick="CMSPage._toggleCheck('s-maintenance_mode','true','false')">
-                    <div class="toggle-track${settings.maintenance_mode==='true'?' on':''}"><div class="toggle-thumb"></div></div>
+        <div class="sg"><div class="sg-hdr"><i class="fas fa-sliders-h mr-2"></i>Platform Controls</div>
+            <div class="sg-row"><div><div class="sg-lbl">Maintenance Mode</div><div class="sg-desc">Redirects visitors to maintenance page</div></div>
+                <label class="ctog" onclick="CMSPage._togCheck('s-maintenance_mode','true','false')">
+                    <div class="ttrack${s.maintenance_mode==='true'?' on':''}"><div class="tthumb"></div></div>
                     <input type="hidden" id="s-maintenance_mode" value="${g('maintenance_mode','false')}">
-                </label>
-            </div>
-            <div class="settings-row">
-                <div><div class="settings-label">Allow Registration</div><div class="settings-desc">New users can sign up</div></div>
-                <label class="cms-toggle" onclick="CMSPage._toggleCheck('s-allow_registration','true','false')">
-                    <div class="toggle-track${settings.allow_registration!=='false'?' on':''}"><div class="toggle-thumb"></div></div>
+                </label></div>
+            <div class="sg-row"><div><div class="sg-lbl">Allow Registration</div></div>
+                <label class="ctog" onclick="CMSPage._togCheck('s-allow_registration','true','false')">
+                    <div class="ttrack${s.allow_registration!=='false'?' on':''}"><div class="tthumb"></div></div>
                     <input type="hidden" id="s-allow_registration" value="${g('allow_registration','true')}">
-                </label>
-            </div>
-            <div class="settings-row">
-                <div><div class="settings-label">Free Signals Limit</div><div class="settings-desc">Max signals visible to free-tier users</div></div>
-                <input type="number" class="cms-input" style="max-width:80px;" id="s-free_signals_limit" value="${g('free_signals_limit','3')}" min="0">
-            </div>
+                </label></div>
+            <div class="sg-row"><div><div class="sg-lbl">Free Signal Limit</div><div class="sg-desc">Max signals for free-tier users</div></div>
+                <input type="number" class="ci" style="max-width:80px;" id="s-free_signals_limit" value="${g('free_signals_limit','3')}" min="0"></div>
         </div>
-
         <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
-            <button class="cms-btn cms-btn-purple" style="padding:.6rem 1.5rem;font-size:.9rem;" onclick="CMSPage._saveSettings()">
-                <i class="fas fa-save mr-2"></i> Save All Changes
-            </button>
+            <button class="cb cb-p" style="padding:.6rem 1.5rem;font-size:.9rem;" onclick="CMSPage._saveSettings()"><i class="fas fa-save mr-2"></i>Save All Changes</button>
         </div>`;
     },
 
     async _saveSettings(){
-        // Collect all setting inputs
         const updates={};
-        document.querySelectorAll('[id^="s-"]').forEach(el=>{
-            const key=el.id.slice(2);
-            updates[key]=el.value;
-        });
-        try{
-            await API.cms.saveSettings(updates);
-            this._toast('Settings saved successfully');
-        }catch(e){ this._toast(e.message,'error'); }
+        document.querySelectorAll('[id^="s-"]').forEach(el=>{ updates[el.id.slice(2)]=el.value; });
+        try{await API.cms.saveSettings(updates);this._toast('Settings saved');}
+        catch(e){this._toast(e.message,'error');}
     },
 
-    // Reusable toggle helper
-    _toggleCheck(id, onVal='1', offVal='0'){
-        const input=document.getElementById(id);
-        if(!input) return;
-        const track=input.previousElementSibling;
-        const isOn=input.value===onVal;
-        input.value=isOn?offVal:onVal;
-        if(track && track.classList.contains('toggle-track')){
-            track.classList.toggle('on',!isOn);
-        }
+    // ── Universal helpers ─────────────────────────────────────────────────
+    _togCheck(id,onVal='1',offVal='0'){
+        const el=document.getElementById(id); if(!el) return;
+        const track=el.previousElementSibling;
+        const isOn=el.value===onVal;
+        el.value=isOn?offVal:onVal;
+        if(track?.classList.contains('ttrack')) track.classList.toggle('on',!isOn);
     },
 };

@@ -744,6 +744,27 @@
     <script>
 const API_BASE = window.location.origin;
 
+// ── Auth & error helpers — defined here (first script block) so they are
+// available immediately when DashboardController initialises and calls
+// apiRequest during page load, before the chart-analysis block further down.
+
+async function _parseApiError(response) {
+    const text = await response.text().catch(() => '');
+    try {
+        const json = JSON.parse(text);
+        if (json.detail)  return json.detail;
+        if (json.message) return json.message;
+    } catch (_) { /* not JSON */ }
+    return text || `HTTP ${response.status}`;
+}
+
+function _handleAuthError() {
+    localStorage.removeItem('pipways_token');
+    localStorage.removeItem('pipways_user');
+    alert('Your session has expired. Please log in again.');
+    window.location.href = '/';
+}
+
 const DashboardController = class {
     constructor() {
         this.user = null;
@@ -911,7 +932,24 @@ const DashboardController = class {
         };
         if (options.body instanceof FormData) delete headers['Content-Type'];
         const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // 401 anywhere in the app → session expired, force re-login
+        if (res.status === 401) {
+            _handleAuthError();
+            throw new Error('Session expired. Please log in again.');
+        }
+
+        if (!res.ok) {
+            // Try to surface FastAPI's {"detail":"..."} cleanly
+            let msg = `HTTP ${res.status}`;
+            try {
+                const body = await res.json();
+                if (body.detail) msg = body.detail;
+                else if (body.message) msg = body.message;
+            } catch (_) { /* ignore */ }
+            throw new Error(msg);
+        }
+
         return res.json();
     }
 
@@ -2017,21 +2055,50 @@ const ChartAnalysisPage = {
 // Attach Chart Analysis API methods to the global API shim.
 // Both API and dashboard are guaranteed to exist here since this <script>
 // block runs after the inline block above that defines them.
+// ── Chart Analysis API methods ─────────────────────────────────────────────
+// _parseApiError and _handleAuthError are defined in the first script block above.
+
 API.analyzeChartImage = async function(file, symbol, timeframe) {
+    const token = localStorage.getItem('pipways_token');
+
+    // Guard: no token at all → session already gone
+    if (!token) {
+        _handleAuthError();
+        throw new Error('Not authenticated');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     if (symbol)    formData.append('symbol', symbol);
     if (timeframe) formData.append('timeframe', timeframe);
-    const token    = localStorage.getItem('pipways_token');
+
     const response = await fetch(`${API_BASE}/ai/chart/analyze`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
     });
+
     if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Analysis failed');
+        // 401 = token expired or invalid → force re-login
+        if (response.status === 401) {
+            _handleAuthError();
+            throw new Error('Session expired. Please log in again.');
+        }
+        // 413 = file too large (caught at nginx/server level before FastAPI)
+        if (response.status === 413) {
+            throw new Error('Image too large. Please use a smaller file (max 10MB).');
+        }
+        // 503/504 = AI service down
+        if (response.status === 503) {
+            throw new Error('AI analysis service is temporarily unavailable. Please try again in a moment.');
+        }
+        if (response.status === 504) {
+            throw new Error('Analysis timed out. Please try a smaller or simpler image.');
+        }
+        const detail = await _parseApiError(response);
+        throw new Error(detail || 'Analysis failed');
     }
+
     return response.json();
 };
 

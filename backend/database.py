@@ -416,32 +416,68 @@ async def run_migrations():
             print(f"[DB MIGRATION] col {table}.{col} warn: {e}", flush=True)
             warn += 1
 
-    # ── Phase 3: back-fill is_published ──────────────────────────────────────
-    # blog_posts: if status = 'published', set is_published = TRUE
+    # ── Phase 3: fix legacy NOT NULL constraints & sync dual-column data ─────
+
+    # The live signals table may have a "pair" column (older schema) that is NOT NULL.
+    # Make it nullable so CMS inserts (which use symbol/direction) don't fail.
+    for sql in [
+        "ALTER TABLE signals ALTER COLUMN pair DROP NOT NULL",
+        "ALTER TABLE signals ALTER COLUMN pair SET DEFAULT ''",
+    ]:
+        try: await database.execute(sql)
+        except Exception: pass  # column may not exist — safe to ignore
+
+    # Backfill pair = symbol for any rows where pair is null/empty
     try:
         await database.execute(
-            "UPDATE blog_posts SET is_published = TRUE "
-            "WHERE is_published = FALSE AND status = 'published'"
+            "UPDATE signals SET pair = symbol WHERE (pair IS NULL OR pair = '') AND symbol IS NOT NULL"
         )
-    except Exception:
-        pass
+    except Exception: pass
 
-    # webinars: if status != 'cancelled' / 'draft', treat as published
+    # Sync is_active with is_published for courses
+    # (public /courses/list filters by is_active, CMS sets is_published)
+    try:
+        await database.execute(
+            "UPDATE courses SET is_active = TRUE WHERE is_published = TRUE"
+        )
+    except Exception: pass
+
+    # Sync is_published with is_active for courses (reverse direction for old data)
+    try:
+        await database.execute(
+            "UPDATE courses SET is_published = TRUE WHERE is_active = TRUE AND (is_published IS NULL OR is_published = FALSE)"
+        )
+    except Exception: pass
+
+    # Sync webinar status = 'scheduled' for all published webinars
+    try:
+        await database.execute(
+            "UPDATE webinars SET status = 'scheduled' "
+            "WHERE is_published = TRUE AND (status IS NULL OR status = '' OR status = 'draft')"
+        )
+    except Exception: pass
+
+    # Sync is_published from status for webinars (old data)
     try:
         await database.execute(
             "UPDATE webinars SET is_published = TRUE "
-            "WHERE is_published = FALSE AND status NOT IN ('cancelled', 'draft')"
+            "WHERE status NOT IN ('cancelled', 'draft', '') AND (is_published IS NULL OR is_published = FALSE)"
         )
-    except Exception:
-        pass
+    except Exception: pass
 
-    # courses: if is_active = TRUE, treat as published
+    # Sync blog status = 'published' for all posts with is_published = TRUE
     try:
         await database.execute(
-            "UPDATE courses SET is_published = TRUE "
-            "WHERE is_published = FALSE AND is_active = TRUE"
+            "UPDATE blog_posts SET status = 'published' WHERE is_published = TRUE"
         )
-    except Exception:
-        pass
+    except Exception: pass
+
+    # Sync is_published from status for blog posts (old data)
+    try:
+        await database.execute(
+            "UPDATE blog_posts SET is_published = TRUE "
+            "WHERE status = 'published' AND (is_published IS NULL OR is_published = FALSE)"
+        )
+    except Exception: pass
 
     print(f"[DB MIGRATION] Complete — {ok} statements ok, {warn} warnings", flush=True)

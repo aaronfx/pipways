@@ -1,27 +1,30 @@
 /**
- * Pipways API Client — Production Grade
- * Fixes: baseURL, defaultHeaders, captureEmail, admin methods,
- *        trading analytics, AI stats, user toggle.
+ * Pipways — Canonical API Client  (replaces both app.js API object and api.js)
+ *
+ * Usage in every page:
+ *   <script src="/js/api.js"></script>
+ *   const data = await API.getSignals();
+ *
+ * Exposed as both  window.API  and  window.api  (lowercase alias for legacy modules).
  */
 
 const API_BASE = window.location.origin;
 
 const API = {
 
-    // ── FIX: baseURL alias so blog_enhanced.js (uses API.baseURL) doesn't crash ──
+    // ── Meta ─────────────────────────────────────────────────────────────────
     baseURL: window.location.origin,
 
-    // ── FIX: defaultHeaders getter so blog_enhanced.js doesn't crash ──────────
     get defaultHeaders() {
         const token = localStorage.getItem('pipways_token');
         return {
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            'Accept':        'application/json',
             ...(token && { 'Authorization': `Bearer ${token}` }),
         };
     },
 
-    // ── Core request handler ──────────────────────────────────────────────────
+    // ── Core request ─────────────────────────────────────────────────────────
     async request(endpoint, options = {}) {
         const token = localStorage.getItem('pipways_token');
         const headers = {
@@ -53,32 +56,26 @@ const API = {
             return res.json();
         } catch (error) {
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                throw new Error('Network error. Check your connection.');
+                throw new Error('Network error. Please check your connection.');
             }
             throw error;
         }
     },
 
     // ── Authentication ────────────────────────────────────────────────────────
-    async login(username, password) {
+    async login(email, password) {
         const params = new URLSearchParams();
-        params.append('username', username);
+        params.append('username', email);
         params.append('password', password);
-
         const res = await fetch(`${API_BASE}/auth/token`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
             body: params,
         });
-
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || 'Login failed');
         }
-
         const data = await res.json();
         localStorage.setItem('pipways_token', data.access_token);
         localStorage.setItem('pipways_user', JSON.stringify(data.user));
@@ -86,15 +83,10 @@ const API = {
     },
 
     register(data) {
-        return this.request('/auth/register', {
-            method: 'POST',
-            body: JSON.stringify(data),
-        });
+        return this.request('/auth/register', { method: 'POST', body: JSON.stringify(data) });
     },
 
-    getMe() {
-        return this.request('/auth/me');
-    },
+    getMe() { return this.request('/auth/me'); },
 
     logout() {
         localStorage.removeItem('pipways_token');
@@ -105,52 +97,26 @@ const API = {
     // ── Signals ───────────────────────────────────────────────────────────────
     getSignals(params = {}) {
         const qs = new URLSearchParams(params).toString();
-        return this.request(`/signals/active?${qs}`);
+        return this.request(`/signals/active${qs ? '?' + qs : ''}`);
     },
 
     createSignal(data) {
-        return this.request('/signals/create', {
-            method: 'POST',
-            body: JSON.stringify(data),
-        });
-    },
-
-    updateSignal(id, data) {
-        return this.request(`/signals/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(data),
-        });
-    },
-
-    deleteSignal(id) {
-        return this.request(`/signals/${id}`, { method: 'DELETE' });
+        return this.request('/signals/create', { method: 'POST', body: JSON.stringify(data) });
     },
 
     // ── Courses ───────────────────────────────────────────────────────────────
-    getCourses() {
-        return this.request('/courses/list');
-    },
-
-    getCourseProgress() {
-        return this.request('/courses-enhanced/progress');
-    },
+    getCourses()        { return this.request('/courses/list'); },
+    getCourseProgress() { return this.request('/courses-enhanced/progress'); },
+    getCourse(id)       { return this.request(`/courses/${id}`); },
 
     // ── Blog ──────────────────────────────────────────────────────────────────
     getBlogPosts(params = {}) {
         const qs = new URLSearchParams(params).toString();
-        return this.request(`/blog/posts?${qs}`);
+        return this.request(`/blog/posts${qs ? '?' + qs : ''}`);
     },
-
-    getBlogPost(slug) {
-        return this.request(`/blog/posts/${slug}`);
-    },
-
-    // ── FIX: captureEmail was missing — referenced in blog_enhanced.js ────────
+    getBlogPost(slug) { return this.request(`/blog/posts/${slug}`); },
     captureEmail(data) {
-        return this.request('/blog/capture-email', {
-            method: 'POST',
-            body: JSON.stringify(data),
-        });
+        return this.request('/blog/capture-email', { method: 'POST', body: JSON.stringify(data) });
     },
 
     // ── Webinars ──────────────────────────────────────────────────────────────
@@ -162,49 +128,37 @@ const API = {
     askMentor(question, skillLevel = 'intermediate', topic = null) {
         return this.request('/ai/mentor/ask', {
             method: 'POST',
-            body: JSON.stringify({
-                question,
-                skill_level: skillLevel,
-                topic,
-                context: window.location.hash,
-            }),
+            body: JSON.stringify({ question, skill_level: skillLevel, topic, context: window.location.hash }),
         });
+    },
+
+    getMentorInsights() { return this.request('/ai/mentor/insights'); },
+    getMentorHistory()  { return this.request('/ai/mentor/history'); },
+
+    clearMentorHistory() {
+        return this.request('/ai/mentor/clear-history', { method: 'POST' });
     },
 
     getLearningPath(goal, currentLevel, timeAvailable, markets = ['forex']) {
         return this.request('/ai/mentor/learning-path', {
             method: 'POST',
-            body: JSON.stringify({
-                goal,
-                current_level: currentLevel,
-                time_available: timeAvailable,
-                preferred_markets: markets,
-            }),
+            body: JSON.stringify({ goal, current_level: currentLevel, time_available: timeAvailable, preferred_markets: markets }),
         });
     },
 
     reviewTrade(tradeData) {
-        return this.request('/ai/mentor/review-trade', {
-            method: 'POST',
-            body: JSON.stringify(tradeData),
-        });
+        return this.request('/ai/mentor/review-trade', { method: 'POST', body: JSON.stringify(tradeData) });
     },
 
-    getDailyWisdom() {
-        return this.request('/ai/mentor/daily-wisdom');
-    },
+    getDailyWisdom() { return this.request('/ai/mentor/daily-wisdom'); },
 
     // ── Chart Analysis ────────────────────────────────────────────────────────
     analyzeChartImage(file, symbol = null, timeframe = null) {
         const formData = new FormData();
         formData.append('file', file);
-        if (symbol) formData.append('symbol', symbol);
+        if (symbol)    formData.append('symbol', symbol);
         if (timeframe) formData.append('timeframe', timeframe);
-        return this.request('/ai/chart/analyze', {
-            method: 'POST',
-            headers: {},          // browser sets Content-Type with boundary
-            body: formData,
-        });
+        return this.request('/ai/chart/analyze', { method: 'POST', headers: {}, body: formData });
     },
 
     getPatternLibrary(patternType = null) {
@@ -216,10 +170,7 @@ const API = {
 
     // ── Performance / Journal ─────────────────────────────────────────────────
     analyzeJournal(trades) {
-        return this.request('/ai/performance/analyze-journal', {
-            method: 'POST',
-            body: JSON.stringify(trades),
-        });
+        return this.request('/ai/performance/analyze-journal', { method: 'POST', body: JSON.stringify(trades) });
     },
 
     getPerformanceStats(days = 30) {
@@ -228,47 +179,39 @@ const API = {
 
     // ── Risk Calculator ───────────────────────────────────────────────────────
     calculateRisk(data) {
-        return this.request('/risk/calculate', {
-            method: 'POST',
-            body: JSON.stringify(data),
-        });
+        return this.request('/risk/calculate', { method: 'POST', body: JSON.stringify(data) });
     },
 
-    getRiskHistory() {
-        return this.request('/risk/history');
-    },
+    getRiskHistory() { return this.request('/risk/history'); },
 
-    // ── Admin — overview stats (backward-compat path) ────────────────────────
-    getAdminStats() {
-        return this.request('/admin/users');
-    },
+    // ── Stock Terminal ────────────────────────────────────────────────────────
+    analyzeStock(symbol)    { return this.request(`/api/stock/analyze/${encodeURIComponent(symbol)}`); },
+    buildPortfolio(data)    { return this.request('/api/stock/portfolio',   { method: 'POST', body: JSON.stringify(data) }); },
+    compareStocks(symbols)  { return this.request('/api/stock/compare',     { method: 'POST', body: JSON.stringify({ symbols }) }); },
 
-    // ── Admin — paginated user list ───────────────────────────────────────────
+    // ── Admin ─────────────────────────────────────────────────────────────────
+    /** Full dashboard stats — total users, signals, AI usage, recent users, growth chart */
+    getAdminStats() { return this.request('/admin/users'); },
+
+    /** Paginated user list with optional search */
     getAdminUsers(page = 1, perPage = 20, search = '') {
-        const qs = new URLSearchParams({
-            page,
-            per_page: perPage,
-            ...(search && { search }),
-        }).toString();
+        const qs = new URLSearchParams({ page, per_page: perPage, ...(search && { search }) }).toString();
         return this.request(`/admin/users/list?${qs}`);
     },
 
-    // ── Admin — toggle user active / inactive ─────────────────────────────────
-    toggleUser(userId) {
-        return this.request(`/admin/users/${userId}/toggle`, { method: 'POST' });
-    },
+    /** Toggle a user's is_active flag */
+    toggleUser(userId) { return this.request(`/admin/users/${userId}/toggle`, { method: 'POST' }); },
 
-    // ── Admin — trading analytics ─────────────────────────────────────────────
-    getTradingAnalytics() {
-        return this.request('/admin/trading-analytics');
-    },
+    /** Aggregated trading performance metrics */
+    getTradingAnalytics() { return this.request('/admin/trading-analytics'); },
 
-    // ── Admin — AI usage stats ────────────────────────────────────────────────
-    getAIStats() {
-        return this.request('/admin/ai-stats');
-    },
+    /** AI feature usage stats */
+    getAIStats() { return this.request('/admin/ai-stats'); },
+
+    // ── CMS helpers (used by cms.js module) ──────────────────────────────────
+    cms: {},   // populated by cms.js when it loads
 };
 
-// Make available globally under both names
+// Expose globally under both names for backward compatibility
 window.API = API;
-window.api = API;   // backward compat for modules that use lowercase `api`
+window.api = API;

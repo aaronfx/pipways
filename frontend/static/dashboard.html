@@ -1014,6 +1014,8 @@ const DashboardController = class {
                 case 'dashboard': this.loadDashboardStats(); break;
                 case 'signals':   await this.loadSignals();  break;
                 case 'courses':   await this.loadCourses();  break;
+                case 'webinars':  await this.loadWebinars(); break;
+                case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
 
@@ -1616,47 +1618,151 @@ const DashboardController = class {
     async loadSignals() {
         const container = document.getElementById('signals-container');
         if (!container) return;
+        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading signals…</div>';
         try {
             const data = await this.apiRequest('/signals/active');
             const signals = Array.isArray(data) ? data : (data.signals || []);
+            if (!signals.length) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
+                    <i class="fas fa-satellite-dish text-4xl mb-3 block opacity-30"></i>
+                    <p class="font-medium">No active signals at the moment</p>
+                    <p class="text-sm mt-1 text-gray-600">Check back soon for new trading opportunities</p>
+                </div>`;
+                return;
+            }
             container.innerHTML = signals.map(s => `
-                <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                    <div class="flex justify-between items-start mb-2">
-                        <h4 class="font-bold text-white text-lg">${s.symbol}</h4>
-                        <span class="px-2 py-1 rounded text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${s.direction}</span>
+                <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 hover:border-purple-600/50 transition-colors">
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="font-bold text-white text-lg">${s.symbol || '—'}</h4>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-900/60 text-green-300 border border-green-700' : 'bg-red-900/60 text-red-300 border border-red-700'}">${s.direction || '—'}</span>
                     </div>
-                    <div class="text-sm text-gray-400 space-y-1">
-                        <div class="flex justify-between"><span>Entry:</span><span class="text-white">${s.entry_price}</span></div>
-                        <div class="flex justify-between"><span>SL:</span><span class="text-red-400">${s.stop_loss}</span></div>
-                        <div class="flex justify-between"><span>TP:</span><span class="text-green-400">${s.take_profit}</span></div>
+                    <div class="text-sm text-gray-400 space-y-1.5">
+                        <div class="flex justify-between"><span>Entry</span><span class="text-white font-mono">${s.entry_price ?? '—'}</span></div>
+                        <div class="flex justify-between"><span>Stop Loss</span><span class="text-red-400 font-mono">${s.stop_loss ?? '—'}</span></div>
+                        <div class="flex justify-between"><span>Take Profit</span><span class="text-green-400 font-mono">${s.take_profit ?? '—'}</span></div>
+                        <div class="flex justify-between"><span>Timeframe</span><span class="text-gray-300">${s.timeframe || '—'}</span></div>
+                    </div>
+                    <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-700">
+                        <small class="text-gray-600">${s.created_at ? new Date(s.created_at).toLocaleDateString() : ''}</small>
+                        ${s.ai_confidence ? `<span class="text-xs text-purple-400 font-semibold">AI ${Math.round(s.ai_confidence * 100)}%</span>` : ''}
                     </div>
                 </div>
             `).join('');
         } catch (error) {
-            container.innerHTML = '<div class="text-gray-500">No active signals</div>';
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load signals. Please try again.</div>';
         }
     }
 
     async loadCourses() {
         const container = document.getElementById('courses-container');
         if (!container) return;
+        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>';
         try {
             const data = await this.apiRequest('/courses/list');
             const courses = Array.isArray(data) ? data : (data.courses || []);
+            if (!courses.length) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
+                    <i class="fas fa-graduation-cap text-4xl mb-3 block opacity-30"></i>
+                    <p class="font-medium">No courses available yet</p>
+                </div>`;
+                return;
+            }
             container.innerHTML = courses.map(c => `
-                <div class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-                    <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-                        <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
-                    </div>
+                <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors">
+                    ${c.thumbnail_url
+                        ? `<img src="${c.thumbnail_url}" class="w-full h-40 object-cover" onerror="this.parentElement.innerHTML='<div class=\\'h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center\\'><i class=\\'fas fa-graduation-cap text-5xl text-white/20\\'></i></div>'"+this.outerHTML">`
+                        : `<div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center"><i class="fas fa-graduation-cap text-5xl text-white/20"></i></div>`}
                     <div class="p-4">
-                        <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
-                        <h4 class="font-bold text-white mb-2">${c.title}</h4>
-                        <p class="text-sm text-gray-400 line-clamp-2">${c.description || ''}</p>
+                        <span class="text-xs text-purple-400 font-semibold uppercase tracking-wide">${c.level || 'Beginner'}</span>
+                        <h4 class="font-bold text-white mt-1 mb-2">${c.title}</h4>
+                        <p class="text-sm text-gray-400 line-clamp-2 mb-3">${c.description || ''}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span><i class="fas fa-book-open mr-1"></i>${c.lesson_count || 0} lessons</span>
+                            ${c.progress > 0 ? `<span class="text-green-400">${c.progress}% complete</span>` : '<span class="text-purple-400 cursor-pointer hover:text-purple-300">Start Learning →</span>'}
+                        </div>
                     </div>
                 </div>
             `).join('');
         } catch (error) {
-            container.innerHTML = '<div class="text-gray-500">No courses available</div>';
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load courses.</div>';
+        }
+    }
+
+    async loadWebinars() {
+        const container = document.getElementById('webinars-container');
+        if (!container) return;
+        container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading webinars…</div>';
+        try {
+            const data = await this.apiRequest('/webinars/upcoming?upcoming=true');
+            const webinars = Array.isArray(data) ? data : (data.webinars || []);
+            if (!webinars.length) {
+                container.innerHTML = `<div class="text-center py-12 text-gray-500">
+                    <i class="fas fa-video text-4xl mb-3 block opacity-30"></i>
+                    <p class="font-medium">No upcoming webinars scheduled</p>
+                    <p class="text-sm mt-1 text-gray-600">Check back soon for live sessions</p>
+                </div>`;
+                return;
+            }
+            container.innerHTML = webinars.map(w => {
+                const date = w.scheduled_at ? new Date(w.scheduled_at) : null;
+                return `
+                <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-yellow-600/40 transition-colors">
+                    <div class="flex gap-4 items-start">
+                        ${date ? `<div class="text-center min-w-[56px] bg-gray-700 rounded-lg p-2 flex-shrink-0">
+                            <div class="text-2xl font-bold text-yellow-400">${date.getDate()}</div>
+                            <div class="text-xs text-gray-400 uppercase">${date.toLocaleString('default',{month:'short'})}</div>
+                        </div>` : ''}
+                        <div>
+                            <h4 class="font-bold text-white">${w.title}</h4>
+                            <p class="text-sm text-gray-400 mt-0.5">${w.description || ''}</p>
+                            <div class="text-xs text-gray-500 mt-1.5 flex gap-3 flex-wrap">
+                                ${w.presenter ? `<span><i class="fas fa-user mr-1"></i>${w.presenter}</span>` : ''}
+                                ${w.duration_minutes ? `<span><i class="fas fa-clock mr-1"></i>${w.duration_minutes} mins</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    ${w.meeting_link
+                        ? `<a href="${w.meeting_link}" target="_blank" class="px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap flex-shrink-0 transition-colors" style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">Join Now →</a>`
+                        : `<span class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-500 border border-gray-700 flex-shrink-0">Coming Soon</span>`}
+                </div>`;
+            }).join('');
+        } catch (error) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">Failed to load webinars.</div>';
+        }
+    }
+
+    async loadBlog() {
+        const container = document.getElementById('blog-container');
+        if (!container) return;
+        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading articles…</div>';
+        try {
+            const data = await this.apiRequest('/blog/posts');
+            const posts = Array.isArray(data) ? data : (data.posts || []);
+            if (!posts.length) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
+                    <i class="fas fa-newspaper text-4xl mb-3 block opacity-30"></i>
+                    <p class="font-medium">No articles published yet</p>
+                </div>`;
+                return;
+            }
+            container.innerHTML = posts.map(p => `
+                <article class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/40 transition-colors cursor-pointer group">
+                    ${p.featured_image
+                        ? `<img src="${p.featured_image}" class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.style.display='none'">`
+                        : `<div class="h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-5xl text-white/20 group-hover:scale-110 transition-transform"></i></div>`}
+                    <div class="p-4">
+                        <div class="text-xs text-purple-400 font-semibold uppercase tracking-wide mb-1">${p.category || 'General'}</div>
+                        <h4 class="font-bold text-white mb-2 group-hover:text-purple-300 transition-colors">${p.title}</h4>
+                        <p class="text-sm text-gray-400 line-clamp-3 mb-3">${p.excerpt || ''}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</span>
+                            <span class="text-purple-400">Read more →</span>
+                        </div>
+                    </div>
+                </article>
+            `).join('');
+        } catch (error) {
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load articles.</div>';
         }
     }
 

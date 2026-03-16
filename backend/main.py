@@ -27,6 +27,7 @@ from . import chart_analysis
 from . import performance
 from . import ai_mentor
 from . import cms
+from .lms_init import init_lms_tables
 
 # ── FIX 1 (CRITICAL): Use a SINGLE relative import for stock_terminal_backend.
 #
@@ -74,6 +75,12 @@ async def lifespan(app: FastAPI):
             await run_migrations()
         except Exception as e:
             print(f"[DB MIGRATION] Error: {e}", flush=True)
+
+        # ── Run LMS table initialisation (idempotent) ──────────────────────
+        try:
+            await init_lms_tables()
+        except Exception as e:
+            print(f"[LMS INIT] Error: {e}", flush=True)
 
         # ── Initialise Chart Analysis HTTP client (connection pooling) ──────────
         try:

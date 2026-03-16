@@ -5,7 +5,7 @@ Returns real course data from database with graceful error handling
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from .database import database, courses_table
-from .security import get_current_user
+from .security import get_current_user, get_user_id
 
 router = APIRouter()
 
@@ -17,13 +17,8 @@ async def get_courses(current_user = Depends(get_current_user)):
     FIXED: Safe SQLAlchemy Row access for user_id.
     """
     try:
-        # FIXED: SQLAlchemy Row doesn't support .get() — use _mapping or getattr
-        if hasattr(current_user, '_mapping'):
-            user_id = current_user._mapping.get("id")
-        elif isinstance(current_user, dict):
-            user_id = current_user.get("id")
-        else:
-            user_id = getattr(current_user, "id", None)
+        # Use shared helper — handles SQLAlchemy Row, dict, and ORM models
+        user_id = get_user_id(current_user)
 
         # FIXED: Check BOTH is_active AND is_published so courses published via CMS
         # are visible regardless of which column was set.

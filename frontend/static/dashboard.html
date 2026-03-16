@@ -20,104 +20,100 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        .chart-container { position: relative; height: 300px; width: 100%; }
-        .stat-card { transition: all 0.3s ease; }
-        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.3); }
-        
-        /* Chart Analysis Styles */
-        .page-header { margin-bottom: 2rem; }
-        .page-header h1 { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.5rem; }
-        .page-header p { color: #9ca3af; }
-        .upload-area { 
-            border: 2px dashed #4b5563; 
-            border-radius: 0.75rem; 
-            padding: 2rem; 
-            text-align: center; 
-            cursor: pointer; 
-            transition: all 0.2s;
-            background: #111827;
-        }
-        .upload-area:hover { border-color: #7c3aed; background: #1f2937; }
-        .card { background: #1f2937; border: 1px solid #374151; border-radius: 0.75rem; padding: 1.5rem; }
-        .card-header { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #374151; }
-        .card-title { font-size: 1.125rem; font-weight: 600; color: white; margin: 0; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; font-size: 0.875rem; color: #9ca3af; margin-bottom: 0.5rem; }
-        .form-control { 
-            width: 100%; 
-            background: #111827; 
-            border: 1px solid #374151; 
-            border-radius: 0.5rem; 
-            padding: 0.5rem 0.75rem; 
-            color: white;
-            box-sizing: border-box;
-        }
-        .form-control:focus { outline: none; border-color: #7c3aed; }
-        .btn { 
-            display: inline-flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 0.5rem; 
-            padding: 0.5rem 1rem; 
-            border-radius: 0.5rem; 
-            font-weight: 500; 
-            cursor: pointer; 
-            border: none; 
-            transition: all 0.2s;
-        }
-        .btn-primary { background: #7c3aed; color: white; }
-        .btn-primary:hover { background: #6d28d9; }
-        .btn-success { background: #059669; color: white; }
-        .btn-success:hover { background: #047857; }
-        .btn-block { width: 100%; }
-        .badge { 
-            display: inline-flex; 
-            align-items: center; 
-            padding: 0.25rem 0.75rem; 
-            border-radius: 9999px; 
-            font-size: 0.75rem; 
-            font-weight: 600;
-        }
-        .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-        .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
-        .badge-info { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-        .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-        .alert { padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
-        .alert-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; }
-        .alert-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; }
-        .loading { text-align: center; padding: 2rem; }
-        .spinner { 
-            width: 40px; height: 40px; 
-            border: 3px solid #374151; 
-            border-top-color: #7c3aed; 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite; 
-            margin: 0 auto 1rem;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .text-primary { color: #7c3aed; }
-        .text-success { color: #10b981; }
-        .text-danger { color: #ef4444; }
-        .text-warning { color: #f59e0b; }
-        .text-muted { color: #6b7280; }
-        .mr-2 { margin-right: 0.5rem; }
-        .mt-1 { margin-top: 0.25rem; }
-        .mb-0 { margin-bottom: 0 !important; }
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
 
-        /* FIX: .card-body was used in chart_analysis.js templates but never defined */
-        .card-body { padding: 1rem 0 0; }
+        /* ── Animations ── */
+        @keyframes fadeIn  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes ticker  { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+        @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+        @keyframes countUp { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+        @keyframes glowPulse { 0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,0);} 50%{box-shadow:0 0 12px 2px rgba(124,58,237,0.25);} }
+        .animate-fade-in { animation: fadeIn 0.45s ease-out both; }
+        .count-animate    { animation: countUp 0.4s ease-out both; }
 
-        /* FIX: .badge-secondary was used in pattern reliability rendering but never defined */
-        .badge-secondary { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+        /* ── Chart containers ── */
+        .chart-container { position:relative; height:300px; width:100%; }
 
-        /* Additional badge variants used in chart analysis */
-        .badge-primary { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
+        /* ── Ticker ── */
+        .ticker-wrap { overflow:hidden; background:linear-gradient(90deg,#0f172a,#1e1b4b,#0f172a); border-bottom:1px solid #1e293b; padding:0.4rem 0; }
+        .ticker-track { display:flex; gap:0; width:max-content; animation: ticker 35s linear infinite; }
+        .ticker-track:hover { animation-play-state:paused; }
+        .ticker-item { display:flex; align-items:center; gap:0.5rem; padding:0 2rem; border-right:1px solid #1e293b; white-space:nowrap; font-size:0.78rem; }
+        .ticker-sym  { font-weight:700; color:#e2e8f0; letter-spacing:.03em; }
+        .ticker-price{ color:#94a3b8; font-family:monospace; }
+        .ticker-up   { color:#34d399; font-weight:600; }
+        .ticker-dn   { color:#f87171; font-weight:600; }
+
+        /* ── Stat cards ── */
+        .stat-card { transition:transform .2s,box-shadow .2s; cursor:default; position:relative; overflow:hidden; }
+        .stat-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px -6px rgba(0,0,0,.5); }
+        .stat-card::before { content:''; position:absolute; inset:0; border-radius:0.75rem; opacity:0; transition:opacity .3s; background:radial-gradient(ellipse at 30% 0%,rgba(124,58,237,.12),transparent 70%); }
+        .stat-card:hover::before { opacity:1; }
+        .sparkline { display:block; }
+
+        /* ── Quick actions ── */
+        .qa-btn { display:inline-flex; align-items:center; gap:0.5rem; padding:0.55rem 1.1rem; border-radius:0.6rem; font-size:0.82rem; font-weight:600; border:1px solid transparent; cursor:pointer; transition:all .18s; white-space:nowrap; }
+        .qa-btn:hover { transform:translateY(-1px); }
+
+        /* ── Signals table ── */
+        .sig-row:hover { background:rgba(124,58,237,.07); }
+        .sig-row td { padding:.6rem .75rem; font-size:.82rem; border-bottom:1px solid #1f2937; }
+        .pill { display:inline-block; padding:.2rem .65rem; border-radius:9999px; font-size:.7rem; font-weight:700; letter-spacing:.04em; }
+        .pill-buy  { background:rgba(16,185,129,.15); color:#34d399; border:1px solid rgba(16,185,129,.3); }
+        .pill-sell { background:rgba(239,68,68,.15);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+
+        /* ── Market overview card ── */
+        .mkt-row { display:flex; justify-content:space-between; align-items:center; padding:.55rem 0; border-bottom:1px solid #1f2937; font-size:.82rem; }
+        .mkt-row:last-child { border-bottom:none; }
+        .mkt-bar-track { width:80px; height:4px; background:#1f2937; border-radius:2px; overflow:hidden; }
+        .mkt-bar-fill  { height:100%; border-radius:2px; }
+
+        /* ── Activity feed ── */
+        .feed-item { display:flex; gap:.75rem; padding:.6rem 0; border-bottom:1px solid #1f2937; align-items:flex-start; }
+        .feed-item:last-child { border-bottom:none; }
+        .feed-dot  { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+
+        /* ── Sidebar polish ── */
+        .nav-link { position:relative; }
+        .nav-link.active { background:linear-gradient(90deg,#7c3aed,#6d28d9) !important; box-shadow:0 4px 14px rgba(124,58,237,.35); }
+        .nav-link:not(.active):hover { background:#1f2937; }
+
+        /* ── Chart analysis ── */
+        .upload-area { border:2px dashed #4b5563; border-radius:.75rem; padding:2rem; text-align:center; cursor:pointer; transition:all .2s; background:#111827; }
+        .upload-area:hover { border-color:#7c3aed; background:#1f2937; }
+        .card { background:#1f2937; border:1px solid #374151; border-radius:.75rem; padding:1.5rem; }
+        .card-header { margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid #374151; }
+        .card-title  { font-size:1.125rem; font-weight:600; color:white; margin:0; }
+        .card-body   { padding:1rem 0 0; }
+        .form-group  { margin-bottom:1rem; }
+        .form-group label { display:block; font-size:.875rem; color:#9ca3af; margin-bottom:.5rem; }
+        .form-control { width:100%; background:#111827; border:1px solid #374151; border-radius:.5rem; padding:.5rem .75rem; color:white; box-sizing:border-box; }
+        .form-control:focus { outline:none; border-color:#7c3aed; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; padding:.5rem 1rem; border-radius:.5rem; font-weight:500; cursor:pointer; border:none; transition:all .2s; }
+        .btn-primary { background:#7c3aed; color:white; }
+        .btn-primary:hover { background:#6d28d9; }
+        .btn-success { background:#059669; color:white; }
+        .btn-success:hover { background:#047857; }
+        .btn-block { width:100%; }
+        .badge { display:inline-flex; align-items:center; padding:.25rem .75rem; border-radius:9999px; font-size:.75rem; font-weight:600; }
+        .badge-success   { background:rgba(16,185,129,.2); color:#34d399; }
+        .badge-warning   { background:rgba(245,158,11,.2);  color:#fbbf24; }
+        .badge-info      { background:rgba(59,130,246,.2);  color:#60a5fa; }
+        .badge-danger    { background:rgba(239,68,68,.2);   color:#f87171; }
+        .badge-secondary { background:rgba(107,114,128,.2); color:#9ca3af; }
+        .badge-primary   { background:rgba(124,58,237,.2);  color:#a78bfa; }
+        .alert      { padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
+        .alert-error{ background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#f87171; }
+        .loading    { text-align:center; padding:2rem; }
+        .spinner    { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .text-primary { color:#7c3aed; } .text-success { color:#10b981; } .text-danger { color:#ef4444; }
+        .text-warning { color:#f59e0b; } .text-muted   { color:#6b7280; }
+        .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
+        .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
@@ -146,43 +142,43 @@
             </div>
         </div>
 
-        <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">Main</div>
-            <a href="#" data-section="dashboard" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-white bg-purple-600 transition-all">
-                <i class="fas fa-home w-5"></i><span>Dashboard</span>
+        <nav class="flex-1 overflow-y-auto p-3 space-y-0.5" style="scrollbar-width:none;">
+            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 px-3 mt-1">Main</div>
+            <a href="#" data-section="dashboard" class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-white transition-all">
+                <i class="fas fa-home w-4 text-sm"></i><span class="text-sm">Dashboard</span>
             </a>
-            <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-satellite-dish w-5"></i><span>Trading Signals</span>
+            <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-satellite-dish w-4 text-sm"></i><span class="text-sm">Trading Signals</span>
             </a>
-            <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-book w-5"></i><span>Trading Journal</span>
-                <span class="ml-auto bg-green-600 text-xs px-2 py-1 rounded-full">New</span>
+            <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-book w-4 text-sm"></i><span class="text-sm">Trading Journal</span>
+                <span class="ml-auto text-xs px-1.5 py-0.5 rounded-full font-bold" style="background:#065f46;color:#34d399;">New</span>
             </a>
-            <a href="#" data-section="stocks" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-chart-pie w-5"></i><span>AI Stock Research</span>
+            <a href="#" data-section="stocks" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-chart-pie w-4 text-sm"></i><span class="text-sm">AI Stock Research</span>
             </a>
-            <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-chart-line w-5"></i><span>Chart Analysis</span>
+            <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-chart-line w-4 text-sm"></i><span class="text-sm">Chart Analysis</span>
             </a>
-            <a href="#" data-section="mentor" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-robot w-5"></i><span>AI Mentor</span>
+            <a href="#" data-section="mentor" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-robot w-4 text-sm"></i><span class="text-sm">AI Mentor</span>
             </a>
 
-            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-2 px-2">Education</div>
-            <a href="#" data-section="courses" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-graduation-cap w-5"></i><span>Courses</span>
+            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mt-5 mb-2 px-3">Education</div>
+            <a href="#" data-section="courses" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-graduation-cap w-4 text-sm"></i><span class="text-sm">Courses</span>
             </a>
-            <a href="#" data-section="webinars" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-video w-5"></i><span>Webinars</span>
+            <a href="#" data-section="webinars" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-video w-4 text-sm"></i><span class="text-sm">Webinars</span>
             </a>
-            <a href="#" data-section="blog" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">
-                <i class="fas fa-newspaper w-5"></i><span>Blog</span>
+            <a href="#" data-section="blog" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
+                <i class="fas fa-newspaper w-4 text-sm"></i><span class="text-sm">Blog</span>
             </a>
 
             <div id="admin-menu-container" class="hidden">
-                <div class="text-xs font-semibold text-red-500 uppercase tracking-wider mt-6 mb-2 px-2">Admin</div>
-                <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-all border-l-2 border-red-500">
-                    <i class="fas fa-shield-alt w-5 text-red-400"></i><span>Admin</span>
+                <div class="text-xs font-semibold text-red-600 uppercase tracking-wider mt-5 mb-2 px-3">Admin</div>
+                <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all border-l-2 border-red-600">
+                    <i class="fas fa-shield-alt w-4 text-sm text-red-400"></i><span class="text-sm">Admin Panel</span>
                 </a>
             </div>
         </nav>
@@ -204,67 +200,210 @@
     </aside>
 
     <main class="flex-1 h-screen overflow-y-auto">
-        <header class="bg-gray-900/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+
+        <!-- ── Live Market Ticker ── -->
+        <div class="ticker-wrap">
+            <div class="ticker-track" id="ticker-track">
+                <!-- populated by JS -->
+            </div>
+        </div>
+
+        <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-3 flex justify-between items-center">
             <div class="md:hidden w-8"></div>
             <div>
-                <h2 id="page-title" class="text-2xl font-bold text-white">Dashboard</h2>
-                <p class="text-sm text-gray-400">Welcome back, <span id="header-user-name">Trader</span></p>
+                <h2 id="page-title" class="text-xl font-bold text-white leading-tight">Dashboard</h2>
+                <p class="text-xs text-gray-500">Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">Trader</span></p>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400">
+                    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" style="animation:pulse-dot 2s infinite;"></span>
+                    <span id="live-clock">--:--:--</span>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-green-400 font-medium">Markets Open</span>
+                </div>
                 <button class="relative p-2 text-gray-400 hover:text-white transition-colors">
-                    <i class="fas fa-bell text-xl"></i>
-                    <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                    <i class="fas fa-bell text-lg"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                 </button>
             </div>
         </header>
 
         <div class="p-6 max-w-7xl mx-auto">
 
-            <!-- DASHBOARD -->
-            <section id="section-dashboard" class="section">
-                <div class="mb-8">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-300">Featured</h3>
+            <!-- ══════════════════════════════════════════════════════════
+                 DASHBOARD — redesigned
+            ═══════════════════════════════════════════════════════════ -->
+            <section id="section-dashboard" class="section animate-fade-in">
+
+                <!-- ── Greeting + Quick Actions ── -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 id="greeting-text" class="text-xl font-bold text-white">Good morning 👋</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">Here's what's happening in your trading world today.</p>
                     </div>
-                    <div class="bg-gradient-to-r from-purple-900 to-blue-900 rounded-2xl p-6 md:p-8">
-                        <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Trading Journal Upgrade</h2>
-                        <p class="text-gray-300 mb-4">New AI-powered analytics: Equity curves, drawdown analysis, and trading coach</p>
-                        <button onclick="dashboard.navigate('journal')" class="bg-white text-purple-900 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-                            Try It Now
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="dashboard.navigate('analysis')" class="qa-btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border-color:#7c3aed;">
+                            <i class="fas fa-chart-bar text-xs"></i> Analyze Chart
+                        </button>
+                        <button onclick="dashboard.navigate('journal')" class="qa-btn" style="background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.3);">
+                            <i class="fas fa-plus text-xs"></i> Add Trade
+                        </button>
+                        <button onclick="dashboard.navigate('mentor')" class="qa-btn" style="background:rgba(59,130,246,.12);color:#60a5fa;border-color:rgba(59,130,246,.3);">
+                            <i class="fas fa-robot text-xs"></i> Ask Mentor
+                        </button>
+                        <button onclick="dashboard.navigate('signals')" class="qa-btn" style="background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.3);">
+                            <i class="fas fa-satellite-dish text-xs"></i> Signals
                         </button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="p-3 bg-purple-600/20 rounded-lg"><i class="fas fa-satellite-dish text-purple-400 text-xl"></i></div>
+                <!-- ── Stat Cards ── -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+                    <!-- Active Signals -->
+                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('signals')">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(124,58,237,.18);">
+                                <i class="fas fa-satellite-dish text-purple-400 text-sm"></i>
+                            </div>
+                            <svg class="sparkline" width="64" height="28" id="spark-signals"></svg>
                         </div>
-                        <h4 class="text-gray-400 text-sm mb-1">Active Signals</h4>
-                        <p class="text-2xl font-bold text-white" id="stat-signals">--</p>
-                    </div>
-                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="p-3 bg-blue-600/20 rounded-lg"><i class="fas fa-graduation-cap text-blue-400 text-xl"></i></div>
+                        <p class="text-xs text-gray-500 mb-1">Active Signals</p>
+                        <div class="flex items-end gap-2">
+                            <p class="text-2xl font-bold text-white leading-none" id="stat-signals">--</p>
+                            <span class="text-xs text-purple-400 mb-0.5" id="stat-signals-sub">live</span>
                         </div>
-                        <h4 class="text-gray-400 text-sm mb-1">Courses</h4>
-                        <p class="text-2xl font-bold text-white" id="stat-courses">--</p>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#7c3aed,transparent);"></div>
                     </div>
-                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="p-3 bg-green-600/20 rounded-lg"><i class="fas fa-chart-line text-green-400 text-xl"></i></div>
+
+                    <!-- Courses -->
+                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('courses')">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(59,130,246,.18);">
+                                <i class="fas fa-graduation-cap text-blue-400 text-sm"></i>
+                            </div>
+                            <svg class="sparkline" width="64" height="28" id="spark-courses"></svg>
                         </div>
-                        <h4 class="text-gray-400 text-sm mb-1">Win Rate</h4>
-                        <p class="text-2xl font-bold text-white" id="stat-winrate">--</p>
-                    </div>
-                    <div class="stat-card bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="p-3 bg-pink-600/20 rounded-lg"><i class="fas fa-robot text-pink-400 text-xl"></i></div>
+                        <p class="text-xs text-gray-500 mb-1">Courses</p>
+                        <div class="flex items-end gap-2">
+                            <p class="text-2xl font-bold text-white leading-none" id="stat-courses">--</p>
+                            <span class="text-xs text-blue-400 mb-0.5">available</span>
                         </div>
-                        <h4 class="text-gray-400 text-sm mb-1">AI Insights</h4>
-                        <p class="text-2xl font-bold text-white">24</p>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#3b82f6,transparent);"></div>
                     </div>
+
+                    <!-- Win Rate -->
+                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('journal')">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(16,185,129,.18);">
+                                <i class="fas fa-chart-line text-green-400 text-sm"></i>
+                            </div>
+                            <svg class="sparkline" width="64" height="28" id="spark-winrate"></svg>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-1">Win Rate</p>
+                        <div class="flex items-end gap-2">
+                            <p class="text-2xl font-bold text-white leading-none" id="stat-winrate">--</p>
+                            <span class="text-xs text-green-400 mb-0.5">all time</span>
+                        </div>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#10b981,transparent);"></div>
+                    </div>
+
+                    <!-- AI Insights -->
+                    <div class="stat-card bg-gray-800 rounded-xl p-4 border border-gray-700/80 cursor-pointer" onclick="dashboard.navigate('mentor')" style="animation:glowPulse 3s ease-in-out infinite;">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:rgba(236,72,153,.18);">
+                                <i class="fas fa-robot text-pink-400 text-sm"></i>
+                            </div>
+                            <svg class="sparkline" width="64" height="28" id="spark-ai"></svg>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-1">AI Insights</p>
+                        <div class="flex items-end gap-2">
+                            <p class="text-2xl font-bold text-white leading-none">24</p>
+                            <span class="text-xs text-pink-400 mb-0.5">this week</span>
+                        </div>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#ec4899,transparent);"></div>
+                    </div>
+
                 </div>
+
+                <!-- ── Main Content Grid ── -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+                    <!-- Recent Signals (2/3 width) -->
+                    <div class="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden">
+                        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700/80">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-purple-400" style="animation:pulse-dot 2s infinite;"></div>
+                                <h4 class="font-semibold text-white text-sm">Recent Signals</h4>
+                            </div>
+                            <button onclick="dashboard.navigate('signals')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">View all →</button>
+                        </div>
+                        <div id="dashboard-signals-table" class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr style="background:#111827;">
+                                        <th class="px-5 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Symbol</th>
+                                        <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Dir</th>
+                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Entry</th>
+                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">SL</th>
+                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">TP</th>
+                                        <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Conf.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-signals-body">
+                                    <tr><td colspan="6" class="px-5 py-8 text-center text-gray-500 text-sm">Loading signals…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Market Overview (1/3 width) -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden">
+                        <div class="flex items-center gap-2 px-5 py-4 border-b border-gray-700/80">
+                            <i class="fas fa-globe-americas text-blue-400 text-xs"></i>
+                            <h4 class="font-semibold text-white text-sm">Market Snapshot</h4>
+                        </div>
+                        <div class="px-5 py-3" id="market-overview-list">
+                            <!-- populated by JS -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ── Bottom Grid ── -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                    <!-- Featured Banner (2/3) -->
+                    <div class="lg:col-span-2 rounded-xl p-6 relative overflow-hidden" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#1e3a5f 100%);border:1px solid rgba(124,58,237,.3);">
+                        <div class="absolute inset-0 opacity-10" style="background:radial-gradient(ellipse at 80% 50%,#7c3aed,transparent 65%);"></div>
+                        <div class="relative z-10">
+                            <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold mb-3" style="background:rgba(124,58,237,.3);color:#c4b5fd;border:1px solid rgba(124,58,237,.4);">✨ NEW</span>
+                            <h2 class="text-xl font-bold text-white mb-1">Trading Journal Upgrade</h2>
+                            <p class="text-sm text-indigo-200 mb-4">AI-powered analytics: Equity curves, drawdown tracking &amp; personal trading coach.</p>
+                            <div class="flex gap-3">
+                                <button onclick="dashboard.navigate('journal')" class="px-5 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105" style="background:white;color:#4c1d95;">
+                                    Try It Now
+                                </button>
+                                <button onclick="dashboard.navigate('analysis')" class="px-5 py-2 rounded-lg font-semibold text-sm border transition-all hover:bg-white/10" style="border-color:rgba(255,255,255,.25);color:white;">
+                                    Analyze Chart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Activity Feed (1/3) -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden">
+                        <div class="flex items-center gap-2 px-5 py-4 border-b border-gray-700/80">
+                            <i class="fas fa-bolt text-yellow-400 text-xs"></i>
+                            <h4 class="font-semibold text-white text-sm">Activity</h4>
+                        </div>
+                        <div class="px-5 py-3" id="activity-feed">
+                            <!-- populated by JS -->
+                        </div>
+                    </div>
+
+                </div>
+
             </section>
 
             <!-- SIGNALS -->
@@ -859,13 +998,13 @@ const DashboardController = class {
 
     navigate(section) {
         document.querySelectorAll('.nav-link').forEach(el => {
-            el.classList.remove('bg-purple-600', 'text-white');
-            el.classList.add('text-gray-300');
+            el.classList.remove('active', 'text-white');
+            el.classList.add('text-gray-400');
         });
         const activeLink = document.querySelector(`[data-section="${section}"]`);
         if (activeLink) {
-            activeLink.classList.add('bg-purple-600', 'text-white');
-            activeLink.classList.remove('text-gray-300');
+            activeLink.classList.add('active', 'text-white');
+            activeLink.classList.remove('text-gray-400');
         }
         document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
         const target = document.getElementById(`section-${section}`);
@@ -875,8 +1014,8 @@ const DashboardController = class {
         }
         const titles = {
             'dashboard': 'Dashboard', 'signals': 'Trading Signals', 'journal': 'Trading Journal',
-            'stocks': 'AI Stock Research', 'courses': 'Trading Courses', 'webinars': 'Webinars', 
-            'blog': 'Trading Blog', 'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis', 
+            'stocks': 'AI Stock Research', 'courses': 'Trading Courses', 'webinars': 'Webinars',
+            'blog': 'Trading Blog', 'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis',
             'mentor': 'AI Mentor'
         };
         document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
@@ -922,15 +1061,182 @@ const DashboardController = class {
     }
 
     async loadDashboardStats() {
+        this._initClock();
+        this._initTicker();
+        this._renderMarketOverview();
+        this._renderActivityFeed();
+        this._renderSparklines();
+        this._setGreeting();
+
+        // Active signals
         try {
             const signals = await this.apiRequest('/signals/active');
-            document.getElementById('stat-signals').textContent = Array.isArray(signals) ? signals.length : '--';
-        } catch (e) { document.getElementById('stat-signals').textContent = '--'; }
+            const list = Array.isArray(signals) ? signals : (signals.signals || []);
+            const el = document.getElementById('stat-signals');
+            if (el) { el.textContent = list.length; el.classList.add('count-animate'); }
+            this._renderSignalsTable(list);
+        } catch (e) {
+            const el = document.getElementById('stat-signals');
+            if (el) el.textContent = '0';
+            this._renderSignalsTable([]);
+        }
+
+        // Courses
         try {
             const courses = await this.apiRequest('/courses/list');
-            const courseList = Array.isArray(courses) ? courses : (courses.courses || []);
-            document.getElementById('stat-courses').textContent = courseList.length;
-        } catch (e) { document.getElementById('stat-courses').textContent = '--'; }
+            const list = Array.isArray(courses) ? courses : (courses.courses || []);
+            const el = document.getElementById('stat-courses');
+            if (el) { el.textContent = list.length; el.classList.add('count-animate'); }
+        } catch (e) {
+            const el = document.getElementById('stat-courses');
+            if (el) el.textContent = '0';
+        }
+    }
+
+    _setGreeting() {
+        const h = new Date().getHours();
+        const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+        const emojis = h < 12 ? '☀️' : h < 17 ? '📈' : '🌙';
+        const el = document.getElementById('greeting-text');
+        const name = this.user?.full_name?.split(' ')[0] || 'Trader';
+        if (el) el.textContent = `${greet}, ${name} ${emojis}`;
+    }
+
+    _initClock() {
+        const tick = () => {
+            const el = document.getElementById('live-clock');
+            if (!el) return;
+            el.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+        };
+        tick();
+        this._clockTimer = setInterval(tick, 1000);
+    }
+
+    _initTicker() {
+        const pairs = [
+            { sym: 'EUR/USD', price: '1.0847', chg: '+0.0012', pct: '+0.11%', up: true },
+            { sym: 'GBP/USD', price: '1.2634', chg: '-0.0028', pct: '-0.22%', up: false },
+            { sym: 'USD/JPY', price: '149.82', chg: '+0.34',   pct: '+0.23%', up: true  },
+            { sym: 'XAU/USD', price: '3,024.5', chg: '+8.20',  pct: '+0.27%', up: true  },
+            { sym: 'BTC/USD', price: '83,412',  chg: '-1,240', pct: '-1.47%', up: false },
+            { sym: 'ETH/USD', price: '1,894.3', chg: '-32.1',  pct: '-1.67%', up: false },
+            { sym: 'USD/CHF', price: '0.9021',  chg: '-0.0008',pct: '-0.09%', up: false },
+            { sym: 'AUD/USD', price: '0.6341',  chg: '+0.0019',pct: '+0.30%', up: true  },
+            { sym: 'NZD/USD', price: '0.5762',  chg: '+0.0011',pct: '+0.19%', up: true  },
+            { sym: 'USD/CAD', price: '1.3892',  chg: '-0.0023',pct: '-0.17%', up: false },
+            { sym: 'US30',    price: '41,850',  chg: '+120',   pct: '+0.29%', up: true  },
+            { sym: 'US100',   price: '18,240',  chg: '-85',    pct: '-0.46%', up: false },
+        ];
+        const html = pairs.map(p => `
+            <div class="ticker-item">
+                <span class="ticker-sym">${p.sym}</span>
+                <span class="ticker-price">${p.price}</span>
+                <span class="${p.up ? 'ticker-up' : 'ticker-dn'}">${p.pct}</span>
+            </div>`).join('');
+        const track = document.getElementById('ticker-track');
+        if (track) track.innerHTML = html + html; // duplicate for seamless loop
+    }
+
+    _renderSparklines() {
+        const configs = [
+            { id: 'spark-signals',  color: '#a78bfa', data: [2,3,2,4,3,5,4,6,5,7,6,5] },
+            { id: 'spark-courses',  color: '#60a5fa', data: [5,5,6,6,7,7,8,8,8,9,9,10] },
+            { id: 'spark-winrate',  color: '#34d399', data: [55,58,54,62,60,65,63,68,66,70,67,72] },
+            { id: 'spark-ai',       color: '#f472b6', data: [10,12,11,14,13,16,15,18,17,20,19,24] },
+        ];
+        configs.forEach(({ id, color, data }) => {
+            const svg = document.getElementById(id);
+            if (!svg) return;
+            const W = 64, H = 28, pad = 2;
+            const min = Math.min(...data), max = Math.max(...data);
+            const range = max - min || 1;
+            const pts = data.map((v, i) => {
+                const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+                const y = H - pad - ((v - min) / range) * (H - pad * 2);
+                return `${x},${y}`;
+            }).join(' ');
+            // Area fill
+            const first = pts.split(' ')[0];
+            const last  = pts.split(' ').slice(-1)[0];
+            const fx = first.split(',')[0], lx = last.split(',')[0];
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="sg-${id}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <polygon points="${pts} ${lx},${H} ${fx},${H}" fill="url(#sg-${id})"/>
+                <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+        });
+    }
+
+    _renderSignalsTable(signals) {
+        const tbody = document.getElementById('dashboard-signals-body');
+        if (!tbody) return;
+        if (!signals.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-gray-500 text-sm">
+                <i class="fas fa-satellite-dish mb-2 text-2xl block opacity-30"></i>No active signals right now</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = signals.slice(0, 6).map(s => {
+            const isBuy = (s.direction || '').toUpperCase() === 'BUY';
+            const conf  = s.confidence ? Math.round(s.confidence * 100) + '%' : '--';
+            const confColor = (s.confidence || 0) > 0.7 ? '#34d399' : '#fbbf24';
+            return `<tr class="sig-row">
+                <td class="px-5 font-semibold text-white">${s.symbol || '--'}</td>
+                <td class="px-3"><span class="pill ${isBuy ? 'pill-buy' : 'pill-sell'}">${s.direction || '--'}</span></td>
+                <td class="px-3 text-right font-mono text-gray-300">${s.entry_price ?? '--'}</td>
+                <td class="px-3 text-right font-mono text-red-400">${s.stop_loss ?? '--'}</td>
+                <td class="px-3 text-right font-mono text-green-400">${s.take_profit ?? '--'}</td>
+                <td class="px-3 text-right font-bold hidden md:table-cell" style="color:${confColor};">${conf}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    _renderMarketOverview() {
+        const markets = [
+            { name: 'Gold (XAU)',   val: '3,024', chg: '+0.27%', up: true,  pct: 72 },
+            { name: 'BTC/USD',      val: '83,412', chg: '-1.47%', up: false, pct: 38 },
+            { name: 'EUR/USD',      val: '1.0847', chg: '+0.11%', up: true,  pct: 58 },
+            { name: 'S&P 500',      val: '5,614',  chg: '+0.18%', up: true,  pct: 65 },
+            { name: 'DXY Index',    val: '103.42',  chg: '-0.09%', up: false, pct: 44 },
+        ];
+        const el = document.getElementById('market-overview-list');
+        if (!el) return;
+        el.innerHTML = markets.map(m => `
+            <div class="mkt-row">
+                <div>
+                    <div class="text-white text-xs font-medium">${m.name}</div>
+                    <div class="font-mono text-gray-400 text-xs">${m.val}</div>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                    <span class="text-xs font-bold ${m.up ? 'text-green-400' : 'text-red-400'}">${m.chg}</span>
+                    <div class="mkt-bar-track">
+                        <div class="mkt-bar-fill" style="width:${m.pct}%;background:${m.up ? '#34d399' : '#f87171'};"></div>
+                    </div>
+                </div>
+            </div>`).join('');
+    }
+
+    _renderActivityFeed() {
+        const items = [
+            { color:'#a78bfa', icon:'fa-robot',          text:'AI analysed XAUUSD 4H chart',       time:'2m ago'  },
+            { color:'#34d399', icon:'fa-satellite-dish', text:'New BUY signal: GBPUSD',             time:'18m ago' },
+            { color:'#60a5fa', icon:'fa-graduation-cap', text:'SMC Masterclass module unlocked',    time:'1h ago'  },
+            { color:'#fbbf24', icon:'fa-exclamation',    text:'FOMC minutes release today 19:00',   time:'3h ago'  },
+            { color:'#f472b6', icon:'fa-brain',          text:'Trading coach insight ready',        time:'5h ago'  },
+        ];
+        const el = document.getElementById('activity-feed');
+        if (!el) return;
+        el.innerHTML = items.map(a => `
+            <div class="feed-item">
+                <div class="feed-dot" style="background:${a.color};box-shadow:0 0 6px ${a.color}55;"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs text-gray-300 leading-snug">${a.text}</p>
+                    <p class="text-xs text-gray-600 mt-0.5">${a.time}</p>
+                </div>
+            </div>`).join('');
     }
 
     async apiRequest(endpoint, options = {}) {

@@ -27,12 +27,11 @@ async def get_active_signals(
         # Query active signals from database
         # Assuming you have a signals table - adjust column names as needed
         query = """
-            SELECT id, symbol, direction, entry_price, stop_loss, take_profit, 
+            SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
                    timeframe, created_at, ai_confidence, status
-            FROM signals 
-            WHERE status = 'active' 
-            AND created_at > NOW() - INTERVAL '7 days'
-            ORDER BY created_at DESC 
+            FROM signals
+            WHERE status = 'active'
+            ORDER BY created_at DESC
             LIMIT :limit
         """
         

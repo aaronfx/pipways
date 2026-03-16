@@ -1,221 +1,144 @@
 """
-Enhanced course features (progress tracking, certificates).
-PRODUCTION READY
+Enhanced course features - FIXED progress tracking and certificates
 """
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
-from .security import get_current_user
-from .database import database, courses_table, user_progress
+from datetime import datetime
+from .security import get_current_user, get_user_id, get_user_attr
+from .database import database
 
 router = APIRouter()
 
-@router.get("/enhanced/progress")
-async def get_progress(current_user = Depends(get_current_user)):
+@router.get("/progress")
+async def get_enhanced_progress(current_user = Depends(get_current_user)):
     """
-    Get user learning progress across all courses.
-    Includes completion percentage, certificates earned, and streak data.
+    Get comprehensive learning progress including certificates.
+    FIXED: Proper SQL joins and null handling.
     """
     try:
-        user_id = current_user.get("id")
+        user_id = get_user_id(current_user)
         
-        # Get all user progress with course details
         query = """
             SELECT 
                 c.id as course_id,
                 c.title,
-                c.lesson_count,
+                c.thumbnail,
+                COUNT(DISTINCT l.id) as total_lessons,
                 COALESCE(up.progress_percent, 0) as progress_percent,
                 COALESCE(up.completed_lessons, 0) as completed_lessons,
                 up.completed_at,
-                up.last_accessed
+                up.last_accessed,
+                cert.certificate_number,
+                cert.issued_at as cert_date
             FROM courses c
-            LEFT JOIN user_progress up ON c.id = up.course_id 
-                AND up.user_id = :user_id
-            WHERE c.is_active = true
+            LEFT JOIN course_modules m ON m.course_id = c.id
+            LEFT JOIN lessons l ON l.module_id = m.id
+            LEFT JOIN user_progress up ON up.course_id = c.id AND up.user_id = :user_id
+            LEFT JOIN certificates cert ON cert.course_id = c.id AND cert.user_id = :user_id
+            WHERE c.is_active = TRUE OR c.is_published = TRUE
+            GROUP BY c.id, c.title, c.thumbnail, up.progress_percent, up.completed_lessons, 
+                     up.completed_at, up.last_accessed, cert.certificate_number, cert.issued_at
             ORDER BY up.last_accessed DESC NULLS LAST
         """
         
         rows = await database.fetch_all(query, {"user_id": user_id})
         
-        courses = []
-        total_completed = 0
+        courses_in_progress = []
+        completed_courses = []
         certificates = []
         
         for row in rows:
+            total_lessons = row.get("total_lessons", 0)
+            completed = row.get("completed_lessons", 0)
+            progress = row.get("progress_percent", 0)
+            
             course_data = {
                 "course_id": row["course_id"],
                 "title": row["title"],
-                "progress_percent": row["progress_percent"],
-                "completed_lessons": row["completed_lessons"],
-                "total_lessons": row["lesson_count"],
-                "is_completed": row["progress_percent"] == 100,
-                "last_accessed": row["last_accessed"].isoformat() if row["last_accessed"] else None,
-                "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None
+                "thumbnail": row.get("thumbnail", ""),
+                "progress_percent": progress,
+                "completed_lessons": completed,
+                "total_lessons": total_lessons,
+                "last_accessed": row.get("last_accessed").isoformat() if row.get("last_accessed") else None,
             }
             
-            if row["progress_percent"] == 100:
-                total_completed += 1
-                certificates.append({
-                    "course_id": row["course_id"],
-                    "course_title": row["title"],
-                    "issued_at": row["completed_at"].isoformat() if row["completed_at"] else None,
-                    "certificate_id": f"CERT-{user_id}-{row['course_id']}"
-                })
-            
-            courses.append(course_data)
+            if progress == 100 and row.get("completed_at"):
+                completed_courses.append(course_data)
+                
+                if row.get("certificate_number"):
+                    certificates.append({
+                        "course_id": row["course_id"],
+                        "course_title": row["title"],
+                        "certificate_id": row["certificate_number"],
+                        "issued_at": row.get("cert_date").isoformat() if row.get("cert_date") else None
+                    })
+            elif progress > 0:
+                courses_in_progress.append(course_data)
         
         # Calculate overall stats
-        total_courses = len(courses)
-        overall_progress = sum(c["progress_percent"] for c in courses) / total_courses if total_courses > 0 else 0
+        total_enrolled = len(rows)
+        avg_progress = sum(r.get("progress_percent", 0) for r in rows) / total_enrolled if total_enrolled > 0 else 0
         
         return {
             "user_id": user_id,
-            "courses_in_progress": courses,
-            "completed_courses": total_completed,
+            "courses_in_progress": courses_in_progress,
+            "completed_courses": completed_courses,
             "certificates_earned": certificates,
-            "overall_progress_percent": round(overall_progress, 1),
-            "total_courses_available": total_courses
+            "overall_progress_percent": round(avg_progress, 1),
+            "total_courses_available": total_enrolled,
+            "completed_count": len(completed_courses),
+            "in_progress_count": len(courses_in_progress)
         }
         
     except Exception as e:
-        print(f"[COURSES ENHANCED] Error: {e}", flush=True)
-        # Graceful fallback
+        print(f"[ENHANCED PROGRESS ERROR] {e}", flush=True)
         return {
-            "completed_lessons": [],
-            "certificates": [],
-            "progress_percent": 0,
+            "courses_in_progress": [],
+            "completed_courses": [],
+            "certificates_earned": [],
+            "overall_progress_percent": 0,
             "error": str(e)
         }
 
-@router.post("/enhanced/courses/{course_id}/complete")
-async def complete_lesson(
-    course_id: int, 
-    lesson_id: int, 
-    current_user = Depends(get_current_user)
-):
+@router.get("/certificate/{course_id}")
+async def get_certificate_detail(course_id: int, current_user = Depends(get_current_user)):
     """
-    Mark a lesson as complete and update progress.
-    Awards certificate if course fully completed.
+    Get detailed certificate information for a specific course.
     """
     try:
-        user_id = current_user.get("id")
+        user_id = get_user_id(current_user)
         
-        # Verify course exists
-        course = await database.fetch_one(
-            "SELECT id, title, lesson_count FROM courses WHERE id = :id AND is_active = true",
-            {"id": course_id}
-        )
+        query = """
+            SELECT 
+                cert.certificate_number,
+                cert.issued_at,
+                c.title as course_title,
+                c.description,
+                u.full_name,
+                u.email
+            FROM certificates cert
+            JOIN courses c ON cert.course_id = c.id
+            JOIN users u ON cert.user_id = u.id
+            WHERE cert.user_id = :uid AND cert.course_id = :cid
+        """
         
-        if not course:
-            raise HTTPException(404, "Course not found")
+        cert = await database.fetch_one(query, {"uid": user_id, "cid": course_id})
         
-        # Check if progress record exists
-        existing = await database.fetch_one(
-            "SELECT id, completed_lessons, progress_percent FROM user_progress WHERE user_id = :user_id AND course_id = :course_id",
-            {"user_id": user_id, "course_id": course_id}
-        )
-        
-        if existing:
-            # Update existing progress
-            # Add lesson to completed list (assuming array or count)
-            new_completed = existing["completed_lessons"] + 1
-            new_percent = min(100, int((new_completed / course["lesson_count"]) * 100))
-            
-            await database.execute(
-                """
-                UPDATE user_progress 
-                SET completed_lessons = :completed,
-                    progress_percent = :percent,
-                    last_accessed = NOW(),
-                    completed_at = CASE WHEN :percent = 100 THEN NOW() ELSE completed_at END
-                WHERE user_id = :user_id AND course_id = :course_id
-                """,
-                {
-                    "completed": new_completed,
-                    "percent": new_percent,
-                    "user_id": user_id,
-                    "course_id": course_id
-                }
-            )
-        else:
-            # Create new progress record
-            new_percent = min(100, int((1 / course["lesson_count"]) * 100))
-            
-            await database.execute(
-                """
-                INSERT INTO user_progress (user_id, course_id, completed_lessons, progress_percent, last_accessed)
-                VALUES (:user_id, :course_id, 1, :percent, NOW())
-                """,
-                {
-                    "user_id": user_id,
-                    "course_id": course_id,
-                    "percent": new_percent
-                }
-            )
-        
-        is_course_complete = new_percent == 100
+        if not cert:
+            raise HTTPException(404, "Certificate not found. Complete the course to earn one.")
         
         return {
-            "course_id": course_id,
-            "lesson_id": lesson_id,
-            "status": "completed",
-            "progress_percent": new_percent,
-            "course_completed": is_course_complete,
-            "certificate_issued": is_course_complete,
-            "message": "Course completed! Certificate earned!" if is_course_complete else "Progress saved"
+            "certificate_id": cert["certificate_number"],
+            "recipient_name": cert["full_name"] or cert["email"].split("@")[0],
+            "course_name": cert["course_title"],
+            "course_description": cert["description"],
+            "issue_date": cert["issued_at"].isoformat() if cert["issued_at"] else None,
+            "verification_url": f"/api/courses/enhanced/verify/{cert['certificate_number']}",
+            "skills_earned": ["Technical Analysis", "Risk Management", "Trading Strategy"]
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[COMPLETE LESSON] Error: {e}", flush=True)
-        # Demo mode response
-        return {
-            "course_id": course_id,
-            "lesson_id": lesson_id,
-            "status": "demo_completed",
-            "progress_percent": 100,
-            "message": "Lesson marked complete (demo mode - database not configured)"
-        }
-
-@router.get("/enhanced/courses/{course_id}/certificate")
-async def get_certificate(course_id: int, current_user = Depends(get_current_user)):
-    """Generate or retrieve completion certificate for a course."""
-    try:
-        user_id = current_user.get("id")
-        
-        # Check if course is completed
-        progress = await database.fetch_one(
-            """
-            SELECT up.progress_percent, up.completed_at, c.title, c.description, u.full_name, u.email
-            FROM user_progress up
-            JOIN courses c ON up.course_id = c.id
-            JOIN users u ON up.user_id = u.id
-            WHERE up.user_id = :user_id AND up.course_id = :course_id
-            """,
-            {"user_id": user_id, "course_id": course_id}
-        )
-        
-        if not progress or progress["progress_percent"] < 100:
-            raise HTTPException(403, "Course not yet completed")
-        
-        return {
-            "certificate_id": f"CERT-{user_id}-{course_id}-{progress['completed_at'].strftime('%Y%m%d')}",
-            "recipient_name": progress["full_name"] or progress["email"].split("@")[0],
-            "course_name": progress["title"],
-            "issue_date": progress["completed_at"].isoformat(),
-            "verification_url": f"/verify/certificate/{user_id}/{course_id}",
-            "skills_earned": ["Trading Strategy", "Risk Management", "Technical Analysis"]
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[CERTIFICATE] Error: {e}", flush=True)
-        return {
-            "certificate_id": f"DEMO-CERT-{course_id}",
-            "recipient_name": current_user.get("email", "Student"),
-            "course_name": "Trading Masterclass",
-            "issue_date": "2024-03-13",
-            "status": "demo_mode"
-        }
+        print(f"[CERTIFICATE ERROR] {e}", flush=True)
+        raise HTTPException(500, "Failed to retrieve certificate")

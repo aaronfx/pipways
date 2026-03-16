@@ -272,6 +272,7 @@ _COLUMN_MIGRATIONS = [
     ("courses", "price",               "FLOAT",        "DEFAULT 0"),
     ("courses", "thumbnail",           "VARCHAR(500)", "DEFAULT ''"),
     ("courses", "preview_video",       "VARCHAR(500)", "DEFAULT ''"),
+    ("courses", "is_active",           "BOOLEAN",      "DEFAULT TRUE"),   # was missing — caused INSERT 500
     ("courses", "is_published",        "BOOLEAN",      "DEFAULT FALSE"),
     ("courses", "certificate_enabled", "BOOLEAN",      "DEFAULT FALSE"),
     ("courses", "pass_percentage",     "INTEGER",      "DEFAULT 70"),
@@ -280,6 +281,9 @@ _COLUMN_MIGRATIONS = [
     ("users", "last_login",        "TIMESTAMP",   ""),
     # role / subscription_tier already exist in the ORM, guard anyway
     ("users", "role",              "VARCHAR(50)", "DEFAULT 'user'"),
+    # ── ai_mentor_logs — add message/role columns for persistent history ──────
+    ("ai_mentor_logs", "role",    "VARCHAR(20)", "DEFAULT 'user'"),
+    ("ai_mentor_logs", "message", "TEXT",        "DEFAULT ''"),
 ]
 
 # New tables required by CMS v2 — all CREATE … IF NOT EXISTS so safe to re-run.
@@ -368,6 +372,8 @@ _TABLE_MIGRATIONS = [
         id             SERIAL PRIMARY KEY,
         user_id        INTEGER,
         question_topic VARCHAR(255) DEFAULT '',
+        role           VARCHAR(20)  DEFAULT 'user',
+        message        TEXT         DEFAULT '',
         created_at     TIMESTAMP DEFAULT NOW()
     )""",
     """CREATE TABLE IF NOT EXISTS chart_analysis_logs (

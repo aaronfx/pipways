@@ -239,233 +239,112 @@
             <section id="section-dashboard" class="section animate-fade-in">
 
                 <style>
-                    /* ── Feature Carousel ───────────────────────────────────── */
-                    .fc-track { display:flex; gap:1rem; transition:transform .45s cubic-bezier(.4,0,.2,1); will-change:transform; }
-                    .fc-slide  { flex:0 0 calc(33.333% - .67rem); min-width:0; border-radius:.875rem; overflow:hidden;
-                                 position:relative; cursor:pointer; transition:transform .2s,box-shadow .2s; }
-                    @media(max-width:900px){ .fc-slide{ flex:0 0 calc(50% - .5rem); } }
-                    @media(max-width:600px){ .fc-slide{ flex:0 0 90%; } }
-                    .fc-slide:hover{ transform:translateY(-4px); box-shadow:0 16px 40px -8px rgba(0,0,0,.6); }
-                    .fc-slide-inner{ height:220px; display:flex; flex-direction:column; justify-content:flex-end;
-                                     padding:1.25rem; position:relative; overflow:hidden; }
-                    .fc-slide-inner::before{ content:''; position:absolute; inset:0;
-                                             background:linear-gradient(180deg,transparent 20%,rgba(0,0,0,.75) 100%); z-index:1; }
-                    .fc-art{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-                    .fc-content{ position:relative; z-index:2; }
-                    .fc-tag{ display:inline-block; padding:.2rem .65rem; border-radius:9999px; font-size:.7rem;
-                              font-weight:700; margin-bottom:.5rem; backdrop-filter:blur(4px); }
-                    .fc-title{ font-size:1.1rem; font-weight:800; color:white; line-height:1.2; margin-bottom:.3rem; }
-                    .fc-desc{ font-size:.78rem; color:rgba(255,255,255,.72); line-height:1.4; margin-bottom:.75rem; }
-                    .fc-btn{ display:inline-flex; align-items:center; gap:.4rem; padding:.4rem 1rem;
-                              border-radius:.5rem; font-size:.78rem; font-weight:700; border:none; cursor:pointer;
-                              background:rgba(255,255,255,.15); color:white; backdrop-filter:blur(6px);
-                              transition:background .15s; border:1px solid rgba(255,255,255,.2); }
-                    .fc-btn:hover{ background:rgba(255,255,255,.25); }
-                    .fc-dot{ width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.3);
-                              cursor:pointer; transition:all .2s; flex-shrink:0; }
-                    .fc-dot.act{ background:white; transform:scale(1.3); }
-                    /* ── Platform Feature Cards ─────────────────────────────── */
-                    .pf-card{ border-radius:.75rem; padding:1.1rem; cursor:pointer; position:relative;
-                               overflow:hidden; border:1px solid; transition:transform .2s,box-shadow .2s; }
-                    .pf-card:hover{ transform:translateY(-3px); box-shadow:0 12px 28px -6px rgba(0,0,0,.5); }
-                    .pf-card::after{ content:'→'; position:absolute; bottom:.85rem; right:.9rem;
-                                     font-size:.75rem; opacity:.4; transition:opacity .2s,transform .2s; }
-                    .pf-card:hover::after{ opacity:.9; transform:translateX(3px); }
-                    /* ── Mini stat strip ────────────────────────────────────── */
-                    .ms-card{ background:#1f2937; border:1px solid #374151; border-radius:.75rem;
-                               padding:.9rem 1rem; cursor:pointer; transition:transform .2s; overflow:hidden; position:relative; }
-                    .ms-card:hover{ transform:translateY(-2px); }
-                    .ms-card::before{ content:''; position:absolute; bottom:0; left:0; right:0; height:2px; }
+                    .dash-feature-pill { display:flex; align-items:center; gap:.65rem; padding:.85rem 1rem;
+                        background:#1f2937; border:1px solid #374151; border-radius:.75rem;
+                        cursor:pointer; transition:all .18s; text-decoration:none; }
+                    .dash-feature-pill:hover { border-color:var(--pill-color); background:rgba(var(--pill-rgb),.07);
+                        transform:translateY(-2px); box-shadow:0 8px 20px -4px rgba(0,0,0,.4); }
+                    .dash-feature-pill .pill-icon { width:36px; height:36px; border-radius:.5rem; flex-shrink:0;
+                        display:flex; align-items:center; justify-content:center; font-size:.95rem; }
+                    .dash-feature-pill .pill-label { font-size:.85rem; font-weight:600; color:#e5e7eb; }
+                    .dash-feature-pill .pill-sub { font-size:.72rem; color:#6b7280; margin-top:.1rem; }
+                    .dash-stat { background:#1f2937; border:1px solid #374151; border-radius:.75rem;
+                        padding:1rem 1.1rem; cursor:pointer; transition:transform .18s; }
+                    .dash-stat:hover { transform:translateY(-2px); }
                 </style>
 
-                <!-- ── Greeting ─────────────────────────────────────────────── -->
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+                <!-- Greeting row -->
+                <div class="flex items-center justify-between mb-6">
                     <div>
-                        <h3 id="greeting-text" class="text-2xl font-bold text-white">Good morning 👋</h3>
-                        <p class="text-sm text-gray-500 mt-0.5">Your complete trading education &amp; analysis platform.</p>
+                        <h2 id="greeting-text" class="text-xl font-bold text-white">Good morning 👋</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Welcome to your trading platform</p>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="dashboard.navigate('analysis')" class="qa-btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border-color:#7c3aed;"><i class="fas fa-chart-bar text-xs"></i> Analyze Chart</button>
-                        <button onclick="dashboard.navigate('courses')"  class="qa-btn" style="background:rgba(59,130,246,.12);color:#60a5fa;border-color:rgba(59,130,246,.3);"><i class="fas fa-graduation-cap text-xs"></i> Courses</button>
-                        <button onclick="dashboard.navigate('mentor')"   class="qa-btn" style="background:rgba(236,72,153,.12);color:#f472b6;border-color:rgba(236,72,153,.3);"><i class="fas fa-robot text-xs"></i> AI Mentor</button>
-                        <button onclick="dashboard.navigate('webinars')" class="qa-btn" style="background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.3);"><i class="fas fa-video text-xs"></i> Webinars</button>
+                    <div class="hidden md:flex items-center gap-2 text-xs text-gray-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" style="animation:pulse-dot 2s infinite;"></span>
+                        Markets Open
                     </div>
                 </div>
 
-                <!-- ── Feature Carousel ─────────────────────────────────────── -->
-                <div class="mb-5">
+                <!-- Stat strip: 4 key numbers -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    <div class="dash-stat" onclick="dashboard.navigate('courses')">
+                        <p class="text-xs text-gray-500 mb-1">Courses</p>
+                        <p class="text-2xl font-bold text-white" id="stat-courses">--</p>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#a78bfa,transparent);"></div>
+                    </div>
+                    <div class="dash-stat" onclick="dashboard.navigate('webinars')">
+                        <p class="text-xs text-gray-500 mb-1">Upcoming Webinars</p>
+                        <p class="text-2xl font-bold text-white" id="stat-webinars">--</p>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#fbbf24,transparent);"></div>
+                    </div>
+                    <div class="dash-stat" onclick="dashboard.navigate('blog')">
+                        <p class="text-xs text-gray-500 mb-1">Articles</p>
+                        <p class="text-2xl font-bold text-white" id="stat-blog">--</p>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#60a5fa,transparent);"></div>
+                    </div>
+                    <div class="dash-stat" onclick="dashboard.navigate('signals')">
+                        <p class="text-xs text-gray-500 mb-1">Active Signals</p>
+                        <p class="text-2xl font-bold text-white" id="stat-signals">--</p>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#34d399,transparent);"></div>
+                    </div>
+                </div>
+
+                <!-- Feature carousel (the visual anchor) -->
+                <div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
-                        <h4 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Platform Features</h4>
-                        <div class="flex items-center gap-2">
-                            <div id="fc-dots" class="flex gap-1.5"></div>
-                            <button id="fc-prev" onclick="dashboard._fcMove(-1)" style="background:#1f2937;border:1px solid #374151;color:#9ca3af;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.7rem;transition:all .15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#9ca3af'"><i class="fas fa-chevron-left"></i></button>
-                            <button id="fc-next" onclick="dashboard._fcMove(1)"  style="background:#1f2937;border:1px solid #374151;color:#9ca3af;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.7rem;transition:all .15s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#9ca3af'"><i class="fas fa-chevron-right"></i></button>
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Platform Features</p>
+                        <div class="flex items-center gap-1.5">
+                            <div id="fc-dots" class="flex gap-1.5 mr-1"></div>
+                            <button onclick="dashboard._fcMove(-1)" style="width:26px;height:26px;border-radius:50%;background:#1f2937;border:1px solid #374151;color:#9ca3af;cursor:pointer;font-size:.65rem;"><i class="fas fa-chevron-left"></i></button>
+                            <button onclick="dashboard._fcMove(1)"  style="width:26px;height:26px;border-radius:50%;background:#1f2937;border:1px solid #374151;color:#9ca3af;cursor:pointer;font-size:.65rem;"><i class="fas fa-chevron-right"></i></button>
                         </div>
                     </div>
                     <div style="overflow:hidden;border-radius:.875rem;">
-                        <div id="fc-track" class="fc-track"></div>
+                        <div id="fc-track" style="display:flex;gap:.875rem;transition:transform .45s cubic-bezier(.4,0,.2,1);"></div>
                     </div>
                 </div>
 
-                <!-- ── Mini Stats Strip ─────────────────────────────────────── -->
-                <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-5" id="dash-stats-strip">
-                    <div class="ms-card" style="--accent:#a78bfa;" onclick="dashboard.navigate('courses')" >
-                        <div class="ms-card::before" style="background:#a78bfa;"></div>
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(167,139,250,.15);"><i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i></div>
-                        <p class="text-xl font-bold text-white leading-none" id="stat-courses">--</p>
-                        <p class="text-xs text-gray-500 mt-0.5">Courses</p>
-                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#a78bfa,transparent);"></div>
+                <!-- Bottom: features nav + market snapshot -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                    <!-- Feature nav pills (2/3) -->
+                    <div class="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-2.5">
+
+                        <a class="dash-feature-pill" style="--pill-color:#a78bfa;--pill-rgb:167,139,250;" onclick="dashboard.navigate('analysis')">
+                            <div class="pill-icon" style="background:rgba(124,58,237,.18);color:#a78bfa;"><i class="fas fa-chart-bar"></i></div>
+                            <div><div class="pill-label">Chart Analysis</div><div class="pill-sub">AI · SMC · Patterns</div></div>
+                        </a>
+                        <a class="dash-feature-pill" style="--pill-color:#34d399;--pill-rgb:52,211,153;" onclick="dashboard.navigate('journal')">
+                            <div class="pill-icon" style="background:rgba(16,185,129,.18);color:#34d399;"><i class="fas fa-book-open"></i></div>
+                            <div><div class="pill-label">Trading Journal</div><div class="pill-sub">MT4 · MT5 · CSV</div></div>
+                        </a>
+                        <a class="dash-feature-pill" style="--pill-color:#f472b6;--pill-rgb:244,114,182;" onclick="dashboard.navigate('mentor')">
+                            <div class="pill-icon" style="background:rgba(236,72,153,.18);color:#f472b6;"><i class="fas fa-robot"></i></div>
+                            <div><div class="pill-label">AI Mentor</div><div class="pill-sub">24/7 trading coach</div></div>
+                        </a>
+                        <a class="dash-feature-pill" style="--pill-color:#60a5fa;--pill-rgb:96,165,250;" onclick="dashboard.navigate('courses')">
+                            <div class="pill-icon" style="background:rgba(59,130,246,.18);color:#60a5fa;"><i class="fas fa-graduation-cap"></i></div>
+                            <div><div class="pill-label">Academy</div><div class="pill-sub">Courses · Quizzes</div></div>
+                        </a>
+                        <a class="dash-feature-pill" style="--pill-color:#fbbf24;--pill-rgb:251,191,36;" onclick="dashboard.navigate('webinars')">
+                            <div class="pill-icon" style="background:rgba(245,158,11,.18);color:#fbbf24;"><i class="fas fa-video"></i></div>
+                            <div><div class="pill-label">Live Webinars</div><div class="pill-sub">Expert sessions</div></div>
+                        </a>
+                        <a class="dash-feature-pill" style="--pill-color:#2dd4bf;--pill-rgb:45,212,191;" onclick="dashboard.navigate('blog')">
+                            <div class="pill-icon" style="background:rgba(20,184,166,.18);color:#2dd4bf;"><i class="fas fa-newspaper"></i></div>
+                            <div><div class="pill-label">Market Blog</div><div class="pill-sub">Analysis · Research</div></div>
+                        </a>
                     </div>
-                    <div class="ms-card" onclick="dashboard.navigate('webinars')">
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(251,191,36,.15);"><i class="fas fa-video text-xs" style="color:#fbbf24;"></i></div>
-                        <p class="text-xl font-bold text-white leading-none" id="stat-webinars">--</p>
-                        <p class="text-xs text-gray-500 mt-0.5">Webinars</p>
-                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#fbbf24,transparent);"></div>
-                    </div>
-                    <div class="ms-card" onclick="dashboard.navigate('blog')">
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(96,165,250,.15);"><i class="fas fa-newspaper text-xs" style="color:#60a5fa;"></i></div>
-                        <p class="text-xl font-bold text-white leading-none" id="stat-blog">--</p>
-                        <p class="text-xs text-gray-500 mt-0.5">Articles</p>
-                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#60a5fa,transparent);"></div>
-                    </div>
-                    <div class="ms-card" onclick="dashboard.navigate('journal')">
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(52,211,153,.15);"><i class="fas fa-chart-line text-xs" style="color:#34d399;"></i></div>
-                        <p class="text-xl font-bold text-white leading-none" id="stat-winrate">--</p>
-                        <p class="text-xs text-gray-500 mt-0.5">Win Rate</p>
-                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#34d399,transparent);"></div>
-                    </div>
-                    <div class="ms-card" onclick="dashboard.navigate('analysis')">
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(124,58,237,.15);"><i class="fas fa-chart-bar text-xs" style="color:#8b5cf6;"></i></div>
-                        <p class="text-xl font-bold text-white leading-none" id="stat-analyses">--</p>
-                        <p class="text-xs text-gray-500 mt-0.5">Analyses</p>
-                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#8b5cf6,transparent);"></div>
-                    </div>
-                    <div class="ms-card" onclick="dashboard.navigate('mentor')" style="animation:glowPulse 3s ease-in-out infinite;">
-                        <div class="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style="background:rgba(244,114,182,.15);"><i class="fas fa-robot text-xs" style="color:#f472b6;"></i></div>
-                        <p class="text-xl font-bold text-white leading-none" id="stat-signals">--</p>
-                        <p class="text-xs text-gray-500 mt-0.5">AI Sessions</p>
-                        <div class="absolute bottom-0 left-0 right-0 h-0.5" style="background:linear-gradient(90deg,#f472b6,transparent);"></div>
-                    </div>
-                </div>
 
-                <!-- ── Main Grid ────────────────────────────────────────────── -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-
-                    <!-- Platform Feature Showcase (2/3) -->
-                    <div class="lg:col-span-2">
-                        <h4 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Everything You Need</h4>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="pf-grid">
-
-                            <!-- Chart Analysis -->
-                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(124,58,237,.18),rgba(109,40,217,.08));border-color:rgba(124,58,237,.3);" onclick="dashboard.navigate('analysis')">
-                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#7c3aed,#5b21b6);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(124,58,237,.4);">
-                                    <i class="fas fa-chart-bar text-white text-lg"></i>
-                                </div>
-                                <div class="font-bold text-white text-sm mb-1">AI Chart Analysis</div>
-                                <div class="text-gray-400 text-xs leading-relaxed">SMC · institutional order flow · pattern detection</div>
-                                <div class="mt-2 text-xs font-semibold" style="color:#a78bfa;">Analyze now</div>
-                            </div>
-
-                            <!-- Trading Journal -->
-                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.08));border-color:rgba(16,185,129,.3);" onclick="dashboard.navigate('journal')">
-                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#059669,#047857);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(16,185,129,.35);">
-                                    <i class="fas fa-book-open text-white text-lg"></i>
-                                </div>
-                                <div class="font-bold text-white text-sm mb-1">Trading Journal</div>
-                                <div class="text-gray-400 text-xs leading-relaxed">Import MT4/MT5 · equity curves · psychology insights</div>
-                                <div class="mt-2 text-xs font-semibold" style="color:#34d399;">Log trades</div>
-                            </div>
-
-                            <!-- AI Mentor -->
-                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(236,72,153,.18),rgba(219,39,119,.08));border-color:rgba(236,72,153,.3);" onclick="dashboard.navigate('mentor')">
-                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#db2777,#9d174d);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(236,72,153,.35);">
-                                    <i class="fas fa-robot text-white text-lg"></i>
-                                </div>
-                                <div class="font-bold text-white text-sm mb-1">AI Mentor</div>
-                                <div class="text-gray-400 text-xs leading-relaxed">24/7 trading coach · strategy review · Q&amp;A</div>
-                                <div class="mt-2 text-xs font-semibold" style="color:#f472b6;">Ask anything</div>
-                            </div>
-
-                            <!-- Courses -->
-                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(59,130,246,.18),rgba(37,99,235,.08));border-color:rgba(59,130,246,.3);" onclick="dashboard.navigate('courses')">
-                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(59,130,246,.35);">
-                                    <i class="fas fa-graduation-cap text-white text-lg"></i>
-                                </div>
-                                <div class="font-bold text-white text-sm mb-1">Trading Academy</div>
-                                <div class="text-gray-400 text-xs leading-relaxed">Structured courses · video lessons · quizzes &amp; certificates</div>
-                                <div class="mt-2 text-xs font-semibold" style="color:#60a5fa;">Start learning</div>
-                            </div>
-
-                            <!-- Webinars -->
-                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(217,119,6,.08));border-color:rgba(245,158,11,.3);" onclick="dashboard.navigate('webinars')">
-                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#d97706,#b45309);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(245,158,11,.35);">
-                                    <i class="fas fa-video text-white text-lg"></i>
-                                </div>
-                                <div class="font-bold text-white text-sm mb-1">Live Webinars</div>
-                                <div class="text-gray-400 text-xs leading-relaxed">Expert-led sessions · market walkthroughs · live Q&amp;A</div>
-                                <div class="mt-2 text-xs font-semibold" style="color:#fbbf24;">Join session</div>
-                            </div>
-
-                            <!-- Blog -->
-                            <div class="pf-card" style="background:linear-gradient(135deg,rgba(20,184,166,.18),rgba(15,118,110,.08));border-color:rgba(20,184,166,.3);" onclick="dashboard.navigate('blog')">
-                                <div style="width:42px;height:42px;border-radius:.6rem;background:linear-gradient(135deg,#0f766e,#115e59);display:flex;align-items:center;justify-content:center;margin-bottom:.65rem;box-shadow:0 4px 12px rgba(20,184,166,.35);">
-                                    <i class="fas fa-newspaper text-white text-lg"></i>
-                                </div>
-                                <div class="font-bold text-white text-sm mb-1">Market Blog</div>
-                                <div class="text-gray-400 text-xs leading-relaxed">Daily analysis · strategy breakdowns · market outlook</div>
-                                <div class="mt-2 text-xs font-semibold" style="color:#2dd4bf;">Read articles</div>
-                            </div>
-
+                    <!-- Market snapshot (1/3) -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Markets</span>
+                            <i class="fas fa-globe-americas text-blue-400 text-xs"></i>
                         </div>
+                        <div class="px-4 py-2" id="market-overview-list"></div>
                     </div>
 
-                    <!-- Right Column: Market + Activity -->
-                    <div class="flex flex-col gap-4">
-                        <!-- Market Snapshot -->
-                        <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden flex-1">
-                            <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-700/80">
-                                <i class="fas fa-globe-americas text-blue-400 text-xs"></i>
-                                <h4 class="font-semibold text-white text-sm">Market Snapshot</h4>
-                            </div>
-                            <div class="px-4 py-2" id="market-overview-list"></div>
-                        </div>
-                        <!-- Activity -->
-                        <div class="bg-gray-800 rounded-xl border border-gray-700/80 overflow-hidden flex-1">
-                            <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-700/80">
-                                <i class="fas fa-bolt text-yellow-400 text-xs"></i>
-                                <h4 class="font-semibold text-white text-sm">Recent Activity</h4>
-                            </div>
-                            <div class="px-4 py-2" id="activity-feed"></div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- ── Upcoming Webinars Banner ──────────────────────────────── -->
-                <div id="dash-webinar-banner" class="rounded-xl p-5 relative overflow-hidden mb-1" style="background:linear-gradient(135deg,#1a1035 0%,#2d1b5e 50%,#1a2a4a 100%);border:1px solid rgba(124,58,237,.25);">
-                    <div class="absolute inset-0" style="background:radial-gradient(ellipse at 85% 50%,rgba(124,58,237,.2),transparent 65%);"></div>
-                    <!-- Decorative SVG art -->
-                    <svg class="absolute right-4 top-1/2 -translate-y-1/2 opacity-10" width="180" height="100" viewBox="0 0 180 100">
-                        <circle cx="90" cy="50" r="48" fill="none" stroke="#a78bfa" stroke-width="1.5"/>
-                        <circle cx="90" cy="50" r="32" fill="none" stroke="#7c3aed" stroke-width="1"/>
-                        <circle cx="90" cy="50" r="16" fill="rgba(124,58,237,.3)"/>
-                        <line x1="20" y1="50" x2="160" y2="50" stroke="#a78bfa" stroke-width=".75" stroke-dasharray="4,3"/>
-                        <line x1="90" y1="5"  x2="90"  y2="95" stroke="#a78bfa" stroke-width=".75" stroke-dasharray="4,3"/>
-                    </svg>
-                    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="inline-block w-2 h-2 rounded-full bg-green-400" style="animation:pulse-dot 2s infinite;"></span>
-                                <span class="text-xs font-bold text-green-400 uppercase tracking-wider">Platform Overview</span>
-                            </div>
-                            <h2 class="text-lg font-bold text-white mb-1">More than signals — a complete trading ecosystem</h2>
-                            <p class="text-sm text-indigo-200">AI-powered analysis · Structured education · Live mentoring · Trading psychology · Market research</p>
-                        </div>
-                        <div class="flex gap-2 flex-shrink-0 flex-wrap">
-                            <button onclick="dashboard.navigate('courses')"  class="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105 whitespace-nowrap" style="background:white;color:#4c1d95;">Explore Courses</button>
-                            <button onclick="dashboard.navigate('webinars')" class="px-4 py-2 rounded-lg font-semibold text-sm border transition-all hover:bg-white/10 whitespace-nowrap" style="border-color:rgba(255,255,255,.25);color:white;">View Webinars</button>
-                        </div>
-                    </div>
                 </div>
 
             </section>
@@ -1194,73 +1073,182 @@ const DashboardController = class {
         this._initClock();
         this._initTicker();
         this._renderMarketOverview();
-        this._renderActivityFeed();
         this._setGreeting();
         this._initFeatureCarousel();
 
-        // Courses
-        try {
-            const data = await this.apiRequest('/courses/list');
-            const list = Array.isArray(data) ? data : (data.courses || []);
-            const el = document.getElementById('stat-courses');
-            if (el) el.textContent = list.length;
-        } catch (_) {
-            const el = document.getElementById('stat-courses');
-            if (el) el.textContent = '0';
-        }
+        // Fetch 4 live stats in parallel
+        const safe = fn => fn.catch(() => null);
+        const [courses, webinars, blog, signals] = await Promise.all([
+            safe(this.apiRequest('/courses/list')),
+            safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
+            safe(this.apiRequest('/blog/posts')),
+            safe(this.apiRequest('/signals/active')),
+        ]);
 
-        // Webinars
-        try {
-            const data = await this.apiRequest('/webinars/upcoming?upcoming=true');
-            const list = Array.isArray(data) ? data : (data.webinars || []);
-            const el = document.getElementById('stat-webinars');
-            if (el) el.textContent = list.length;
-        } catch (_) {
-            const el = document.getElementById('stat-webinars');
-            if (el) el.textContent = '0';
-        }
+        const count = d => Array.isArray(d) ? d.length : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
+        const set   = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
-        // Blog
-        try {
-            const data = await this.apiRequest('/blog/posts');
-            const list = Array.isArray(data) ? data : (data.posts || []);
-            const el = document.getElementById('stat-blog');
-            if (el) el.textContent = list.length;
-        } catch (_) {
-            const el = document.getElementById('stat-blog');
-            if (el) el.textContent = '0';
-        }
-
-        // AI sessions / signals — used as "platform usage" metric
-        try {
-            const data = await this.apiRequest('/signals/active');
-            const list = Array.isArray(data) ? data : (data.signals || []);
-            const el = document.getElementById('stat-signals');
-            if (el) el.textContent = list.length;
-        } catch (_) {
-            const el = document.getElementById('stat-signals');
-            if (el) el.textContent = '0';
-        }
-
-        // Analyses stat (placeholder)
-        const aEl = document.getElementById('stat-analyses');
-        if (aEl) aEl.textContent = '--';
-
-        // Win rate
-        const wEl = document.getElementById('stat-winrate');
-        if (wEl) wEl.textContent = '--%';
+        set('stat-courses',  count(courses));
+        set('stat-webinars', count(webinars));
+        set('stat-blog',     count(blog));
+        set('stat-signals',  count(signals));
     }
 
     _setGreeting() {
         const h = new Date().getHours();
         const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-        const emojis = h < 12 ? '☀️' : h < 17 ? '📈' : '🌙';
+        const emoji = h < 12 ? '☀️' : h < 17 ? '📈' : '🌙';
         const el = document.getElementById('greeting-text');
         const name = this.user?.full_name?.split(' ')[0] || 'Trader';
-        if (el) el.textContent = `${greet}, ${name} ${emojis}`;
+        if (el) el.textContent = `${greet}, ${name} ${emoji}`;
     }
 
     _initFeatureCarousel() {
+        const slides = [
+            { section:'analysis', bg:'linear-gradient(135deg,#1e1035 0%,#3b0764 50%,#1e1b4b 100%)',
+              tag:'🤖 AI-Powered', tagBg:'rgba(124,58,237,.45)', tagColor:'#e9d5ff',
+              title:'AI Chart Analysis', desc:'Upload any chart — get SMC analysis, order blocks, fair value gaps & a full trade setup in seconds.',
+              btn:'Analyse a chart',
+              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <defs><linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".35"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></linearGradient></defs>
+                <polyline points="0,170 50,150 100,160 150,120 200,130 250,95 300,108 350,72 400,82" fill="none" stroke="#a78bfa" stroke-width="2.5" opacity=".85"/>
+                <polygon points="0,170 50,150 100,160 150,120 200,130 250,95 300,108 350,72 400,82 400,200 0,200" fill="url(#ag)"/>
+                <rect x="145" y="78" width="110" height="30" rx="5" fill="rgba(124,58,237,.4)" stroke="rgba(167,139,250,.5)" stroke-width="1"/>
+                <text x="200" y="97" text-anchor="middle" fill="#e9d5ff" font-size="11" font-family="monospace">SMC BULLISH ✓</text>
+                ${[80,160,240,320].map(x=>`<line x1="${x}" y1="20" x2="${x}" y2="200" stroke="rgba(167,139,250,.08)" stroke-width="1"/>`).join('')}
+              </svg>` },
+            { section:'courses', bg:'linear-gradient(135deg,#0c1a3a 0%,#1e3a8a 50%,#0c2461 100%)',
+              tag:'📚 Academy', tagBg:'rgba(37,99,235,.45)', tagColor:'#bfdbfe',
+              title:'Trading Academy', desc:'Structured courses from beginner to advanced. Video lessons, quizzes, certificates and live webinars.',
+              btn:'Browse courses',
+              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+                ${[0,1,2,3,4].map(i=>`<rect x="${25+i*74}" y="${55+i*20}" width="60" height="${140-i*20}" rx="5" fill="rgba(59,130,246,${.12+i*.06})" stroke="rgba(96,165,250,.25)" stroke-width="1"/>
+                <rect x="${25+i*74}" y="${55+i*20}" width="60" height="${(140-i*20)*.65}" rx="5" fill="rgba(37,99,235,${.2+i*.05})"/>`).join('')}
+                <text x="200" y="190" text-anchor="middle" fill="rgba(96,165,250,.4)" font-size="9" font-family="sans-serif">BEGINNER → ADVANCED</text>
+              </svg>` },
+            { section:'mentor', bg:'linear-gradient(135deg,#1a0a2e 0%,#831843 60%,#1a0a2e 100%)',
+              tag:'🧠 AI Mentor', tagBg:'rgba(219,39,119,.45)', tagColor:'#fbcfe8',
+              title:'Personal AI Trading Coach', desc:'Ask any trading question 24/7. Strategy reviews, psychology insights, risk management guidance.',
+              btn:'Ask the mentor',
+              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <circle cx="200" cy="100" r="65" fill="rgba(219,39,119,.1)" stroke="rgba(244,114,182,.2)" stroke-width="1.5"/>
+                <circle cx="200" cy="100" r="40" fill="rgba(219,39,119,.15)" stroke="rgba(244,114,182,.3)" stroke-width="1"/>
+                <circle cx="200" cy="100" r="20" fill="rgba(219,39,119,.3)"/>
+                <text x="200" y="108" text-anchor="middle" fill="white" font-size="18">🤖</text>
+                ${[[120,45,'SMC?'],[275,50,'Entry?'],[100,148,'Risk?'],[295,140,'Setup?']].map(([x,y,t])=>`
+                  <rect x="${x-22}" y="${y-10}" width="44" height="18" rx="9" fill="rgba(244,114,182,.15)" stroke="rgba(244,114,182,.3)" stroke-width=".8"/>
+                  <text x="${x}" y="${y+4}" text-anchor="middle" fill="rgba(251,207,232,.85)" font-size="8">${t}</text>`).join('')}
+              </svg>` },
+            { section:'webinars', bg:'linear-gradient(135deg,#1c0f00 0%,#78350f 50%,#1c1000 100%)',
+              tag:'🎥 Live Sessions', tagBg:'rgba(217,119,6,.45)', tagColor:'#fde68a',
+              title:'Live Webinars', desc:'Expert-led live trading sessions, real-time market walkthroughs and interactive Q&A.',
+              btn:'View schedule',
+              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <rect x="55" y="30" width="290" height="150" rx="10" fill="rgba(245,158,11,.08)" stroke="rgba(251,191,36,.2)" stroke-width="1.5"/>
+                <circle cx="200" cy="105" r="30" fill="rgba(245,158,11,.2)" stroke="rgba(251,191,36,.35)" stroke-width="1.5"/>
+                <polygon points="193,94 193,117 217,105" fill="rgba(251,191,36,.85)"/>
+                <circle cx="100" cy="35" r="5" fill="#ef4444"/> <circle cx="116" cy="35" r="5" fill="#f59e0b"/> <circle cx="132" cy="35" r="5" fill="#10b981"/>
+                <rect x="70" y="165" width="260" height="4" rx="2" fill="rgba(245,158,11,.12)"/>
+                <rect x="70" y="165" width="155" height="4" rx="2" fill="rgba(251,191,36,.4)"/>
+                <text x="200" y="192" text-anchor="middle" fill="rgba(251,191,36,.45)" font-size="9">47 ATTENDING LIVE</text>
+              </svg>` },
+            { section:'journal', bg:'linear-gradient(135deg,#022c22 0%,#065f46 50%,#022c22 100%)',
+              tag:'📔 Journal', tagBg:'rgba(5,150,105,.45)', tagColor:'#a7f3d0',
+              title:'Trading Journal', desc:'Import MT4/MT5/CSV. Track equity curves, drawdown, win rate & identify psychology patterns.',
+              btn:'Open journal',
+              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+                <defs><linearGradient id="jg" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#059669" stop-opacity=".4"/><stop offset="100%" stop-color="#059669" stop-opacity="0"/></linearGradient></defs>
+                <polyline points="20,170 60,155 100,162 140,138 180,142 220,110 260,118 300,88 340,94 380,68" fill="none" stroke="#34d399" stroke-width="2.2" opacity=".9"/>
+                <polygon points="20,170 60,155 100,162 140,138 180,142 220,110 260,118 300,88 340,94 380,68 380,200 20,200" fill="url(#jg)"/>
+                ${[70,140,210,280,350].map(x=>`<line x1="${x}" y1="40" x2="${x}" y2="190" stroke="rgba(52,211,153,.07)" stroke-width="1"/>`).join('')}
+                <rect x="15" y="45" width="105" height="22" rx="4" fill="rgba(5,150,105,.4)" stroke="rgba(52,211,153,.3)"/>
+                <text x="67" y="60" text-anchor="middle" fill="#a7f3d0" font-size="9">Win Rate: 68% ↑</text>
+              </svg>` },
+            { section:'blog', bg:'linear-gradient(135deg,#032420 0%,#134e4a 50%,#032420 100%)',
+              tag:'📰 Research', tagBg:'rgba(15,118,110,.45)', tagColor:'#99f6e4',
+              title:'Market Blog', desc:'Daily market analysis, SMC breakdowns, economic event coverage and trading insights.',
+              btn:'Read articles',
+              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+                ${[0,1,2].map(i=>`<rect x="25" y="${20+i*60}" width="170" height="50" rx="6" fill="rgba(20,184,166,.08)" stroke="rgba(45,212,191,.15)" stroke-width="1"/>
+                <rect x="38" y="${33+i*60}" width="65" height="8" rx="4" fill="rgba(45,212,191,.3)"/>
+                <rect x="38" y="${46+i*60}" width="144" height="5" rx="2.5" fill="rgba(45,212,191,.12)"/>
+                <rect x="38" y="${54+i*60}" width="110" height="5" rx="2.5" fill="rgba(45,212,191,.08)"/>`).join('')}
+                <rect x="215" y="20" width="165" height="160" rx="8" fill="rgba(20,184,166,.1)" stroke="rgba(45,212,191,.2)" stroke-width="1"/>
+                <text x="297" y="92" text-anchor="middle" fill="rgba(45,212,191,.4)" font-size="44">📈</text>
+                <rect x="228" y="150" width="139" height="8" rx="4" fill="rgba(45,212,191,.2)"/>
+                <rect x="228" y="163" width="90" height="8" rx="4" fill="rgba(45,212,191,.12)"/>
+              </svg>` },
+        ];
+
+        const track = document.getElementById('fc-track');
+        const dotsEl = document.getElementById('fc-dots');
+        if (!track || !dotsEl) return;
+
+        // Build slides
+        track.innerHTML = slides.map(s => `
+            <div onclick="dashboard.navigate('${s.section}')" style="flex:0 0 calc(33.333% - .6rem);min-width:0;border-radius:.875rem;overflow:hidden;cursor:pointer;position:relative;transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px -8px rgba(0,0,0,.6)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                <div style="height:200px;display:flex;flex-direction:column;justify-content:flex-end;padding:1.1rem;position:relative;overflow:hidden;background:${s.bg};">
+                    <div style="position:absolute;inset:0;">${s.art}</div>
+                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 25%,rgba(0,0,0,.72) 100%);"></div>
+                    <div style="position:relative;z-index:2;">
+                        <span style="display:inline-block;padding:.18rem .6rem;border-radius:9999px;font-size:.68rem;font-weight:700;margin-bottom:.4rem;background:${s.tagBg};color:${s.tagColor};">${s.tag}</span>
+                        <div style="font-size:1rem;font-weight:800;color:white;line-height:1.2;margin-bottom:.25rem;">${s.title}</div>
+                        <div style="font-size:.73rem;color:rgba(255,255,255,.68);line-height:1.35;margin-bottom:.65rem;">${s.desc}</div>
+                        <span style="display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .85rem;border-radius:.4rem;font-size:.73rem;font-weight:700;background:rgba(255,255,255,.12);color:white;border:1px solid rgba(255,255,255,.18);">→ ${s.btn}</span>
+                    </div>
+                </div>
+            </div>`).join('');
+
+        // Dots
+        this._fcTotal = slides.length;
+        this._fcIndex = 0;
+        dotsEl.innerHTML = slides.map((_, i) =>
+            `<div onclick="dashboard._fcGoTo(${i})" style="width:6px;height:6px;border-radius:50%;cursor:pointer;transition:all .2s;background:${i===0?'white':'rgba(255,255,255,.3)'};${i===0?'transform:scale(1.3);':''}"></div>`).join('');
+
+        this._fcUpdateTrack();
+        if (this._fcTimer) clearInterval(this._fcTimer);
+        this._fcTimer = setInterval(() => this._fcMove(1), 4500);
+        track.addEventListener('mouseenter', () => clearInterval(this._fcTimer));
+        track.addEventListener('mouseleave', () => {
+            if (this._fcTimer) clearInterval(this._fcTimer);
+            this._fcTimer = setInterval(() => this._fcMove(1), 4500);
+        });
+        window.addEventListener('resize', () => this._fcUpdateTrack(), { passive: true });
+    }
+
+    _fcVisibleCount() {
+        const w = window.innerWidth;
+        return w < 600 ? 1 : w < 900 ? 2 : 3;
+    }
+
+    _fcMove(dir) {
+        const vis    = this._fcVisibleCount();
+        const maxIdx = Math.max(0, (this._fcTotal || 6) - vis);
+        this._fcIndex = this._fcIndex + dir;
+        if (this._fcIndex > maxIdx) this._fcIndex = 0;
+        if (this._fcIndex < 0)      this._fcIndex = maxIdx;
+        this._fcUpdateTrack();
+    }
+
+    _fcGoTo(i) { this._fcIndex = i; this._fcUpdateTrack(); }
+
+    _fcUpdateTrack() {
+        const track = document.getElementById('fc-track');
+        if (!track || !track.children.length) return;
+        const vis    = this._fcVisibleCount();
+        // Slide width = (container width - gaps) / visible count
+        const containerW = track.parentElement?.offsetWidth || track.offsetWidth || 900;
+        const gap  = 14;
+        const slideW = (containerW - gap * (vis - 1)) / vis;
+        Array.from(track.children).forEach(s => { s.style.flex = `0 0 ${slideW}px`; });
+        track.style.transform = `translateX(-${this._fcIndex * (slideW + gap)}px)`;
+        // Update dots
+        const dots = document.querySelectorAll('#fc-dots > div');
+        dots.forEach((d, i) => {
+            d.style.background = i === this._fcIndex ? 'white' : 'rgba(255,255,255,.3)';
+            d.style.transform  = i === this._fcIndex ? 'scale(1.3)' : '';
+        });
+    }
         const slides = [
             {
                 section: 'analysis',
@@ -1416,37 +1404,6 @@ const DashboardController = class {
         });
     }
 
-    _fcVisibleCount() {
-        const w = window.innerWidth;
-        return w < 600 ? 1 : w < 900 ? 2 : 3;
-    }
-
-    _fcMove(dir) {
-        const total = this._fcTotal || 0;
-        if (!total) return;
-        const vis = this._fcVisibleCount();
-        const maxIdx = Math.max(0, total - vis);
-        this._fcIndex = Math.min(Math.max(0, this._fcIndex + dir), maxIdx);
-        if (dir > 0 && this._fcIndex >= maxIdx) this._fcIndex = 0;  // wrap
-        this._fcUpdateTrack();
-    }
-
-    _fcGoTo(i) {
-        this._fcIndex = i;
-        this._fcUpdateTrack();
-    }
-
-    _fcUpdateTrack() {
-        const track = document.getElementById('fc-track');
-        if (!track) return;
-        const slideW = track.children[0]?.offsetWidth || 0;
-        const gap    = 16;
-        track.style.transform = `translateX(-${this._fcIndex * (slideW + gap)}px)`;
-        document.querySelectorAll('.fc-dot').forEach((d, i) => {
-            d.classList.toggle('act', i === this._fcIndex);
-        });
-    }
-
     _initClock() {
         const tick = () => {
             const el = document.getElementById('live-clock');
@@ -1479,73 +1436,16 @@ const DashboardController = class {
                 <span class="${p.up ? 'ticker-up' : 'ticker-dn'}">${p.pct}</span>
             </div>`).join('');
         const track = document.getElementById('ticker-track');
-        if (track) track.innerHTML = html + html; // duplicate for seamless loop
-    }
-
-    _renderSparklines() {
-        const configs = [
-            { id: 'spark-signals',  color: '#a78bfa', data: [2,3,2,4,3,5,4,6,5,7,6,5] },
-            { id: 'spark-courses',  color: '#60a5fa', data: [5,5,6,6,7,7,8,8,8,9,9,10] },
-            { id: 'spark-winrate',  color: '#34d399', data: [55,58,54,62,60,65,63,68,66,70,67,72] },
-            { id: 'spark-ai',       color: '#f472b6', data: [10,12,11,14,13,16,15,18,17,20,19,24] },
-        ];
-        configs.forEach(({ id, color, data }) => {
-            const svg = document.getElementById(id);
-            if (!svg) return;
-            const W = 64, H = 28, pad = 2;
-            const min = Math.min(...data), max = Math.max(...data);
-            const range = max - min || 1;
-            const pts = data.map((v, i) => {
-                const x = pad + (i / (data.length - 1)) * (W - pad * 2);
-                const y = H - pad - ((v - min) / range) * (H - pad * 2);
-                return `${x},${y}`;
-            }).join(' ');
-            // Area fill
-            const first = pts.split(' ')[0];
-            const last  = pts.split(' ').slice(-1)[0];
-            const fx = first.split(',')[0], lx = last.split(',')[0];
-            svg.innerHTML = `
-                <defs>
-                    <linearGradient id="sg-${id}" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
-                        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-                    </linearGradient>
-                </defs>
-                <polygon points="${pts} ${lx},${H} ${fx},${H}" fill="url(#sg-${id})"/>
-                <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
-        });
-    }
-
-    _renderSignalsTable(signals) {
-        const tbody = document.getElementById('dashboard-signals-body');
-        if (!tbody) return;
-        if (!signals.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="px-5 py-8 text-center text-gray-500 text-sm">
-                <i class="fas fa-satellite-dish mb-2 text-2xl block opacity-30"></i>No active signals right now</td></tr>`;
-            return;
-        }
-        tbody.innerHTML = signals.slice(0, 6).map(s => {
-            const isBuy = (s.direction || '').toUpperCase() === 'BUY';
-            const conf  = s.confidence ? Math.round(s.confidence * 100) + '%' : '--';
-            const confColor = (s.confidence || 0) > 0.7 ? '#34d399' : '#fbbf24';
-            return `<tr class="sig-row">
-                <td class="px-5 font-semibold text-white">${s.symbol || '--'}</td>
-                <td class="px-3"><span class="pill ${isBuy ? 'pill-buy' : 'pill-sell'}">${s.direction || '--'}</span></td>
-                <td class="px-3 text-right font-mono text-gray-300">${s.entry_price ?? '--'}</td>
-                <td class="px-3 text-right font-mono text-red-400">${s.stop_loss ?? '--'}</td>
-                <td class="px-3 text-right font-mono text-green-400">${s.take_profit ?? '--'}</td>
-                <td class="px-3 text-right font-bold hidden md:table-cell" style="color:${confColor};">${conf}</td>
-            </tr>`;
-        }).join('');
+        if (track) track.innerHTML = html + html;
     }
 
     _renderMarketOverview() {
         const markets = [
-            { name: 'Gold (XAU)',   val: '3,024', chg: '+0.27%', up: true,  pct: 72 },
-            { name: 'BTC/USD',      val: '83,412', chg: '-1.47%', up: false, pct: 38 },
-            { name: 'EUR/USD',      val: '1.0847', chg: '+0.11%', up: true,  pct: 58 },
-            { name: 'S&P 500',      val: '5,614',  chg: '+0.18%', up: true,  pct: 65 },
-            { name: 'DXY Index',    val: '103.42',  chg: '-0.09%', up: false, pct: 44 },
+            { name: 'Gold (XAU)',  val: '3,024',   chg: '+0.27%', up: true,  pct: 72 },
+            { name: 'BTC/USD',     val: '83,412',  chg: '-1.47%', up: false, pct: 38 },
+            { name: 'EUR/USD',     val: '1.0847',  chg: '+0.11%', up: true,  pct: 58 },
+            { name: 'S&P 500',     val: '5,614',   chg: '+0.18%', up: true,  pct: 65 },
+            { name: 'DXY Index',   val: '103.42',  chg: '-0.09%', up: false, pct: 44 },
         ];
         const el = document.getElementById('market-overview-list');
         if (!el) return;
@@ -1560,26 +1460,6 @@ const DashboardController = class {
                     <div class="mkt-bar-track">
                         <div class="mkt-bar-fill" style="width:${m.pct}%;background:${m.up ? '#34d399' : '#f87171'};"></div>
                     </div>
-                </div>
-            </div>`).join('');
-    }
-
-    _renderActivityFeed() {
-        const items = [
-            { color:'#a78bfa', icon:'fa-robot',          text:'AI analysed XAUUSD 4H chart',       time:'2m ago'  },
-            { color:'#34d399', icon:'fa-satellite-dish', text:'New BUY signal: GBPUSD',             time:'18m ago' },
-            { color:'#60a5fa', icon:'fa-graduation-cap', text:'SMC Masterclass module unlocked',    time:'1h ago'  },
-            { color:'#fbbf24', icon:'fa-exclamation',    text:'FOMC minutes release today 19:00',   time:'3h ago'  },
-            { color:'#f472b6', icon:'fa-brain',          text:'Trading coach insight ready',        time:'5h ago'  },
-        ];
-        const el = document.getElementById('activity-feed');
-        if (!el) return;
-        el.innerHTML = items.map(a => `
-            <div class="feed-item">
-                <div class="feed-dot" style="background:${a.color};box-shadow:0 0 6px ${a.color}55;"></div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-xs text-gray-300 leading-snug">${a.text}</p>
-                    <p class="text-xs text-gray-600 mt-0.5">${a.time}</p>
                 </div>
             </div>`).join('');
     }

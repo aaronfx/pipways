@@ -24,6 +24,18 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # In-memory conversation storage (use Redis in production)
 conversation_history = defaultdict(list)  # user_id -> list of messages
+def _user_id(current_user) -> str:
+    """Safely extract user id from SQLAlchemy Row or dict."""
+    if hasattr(current_user, '_mapping'):
+        return str(current_user._mapping.get('id', 'anonymous'))
+    if isinstance(current_user, dict):
+        return str(current_user.get('id', 'anonymous'))
+    try:
+        return str(current_user.id)
+    except Exception:
+        return 'anonymous'
+
+
 MAX_HISTORY = 10
 
 # ==========================================
@@ -134,7 +146,7 @@ async def fetch_blog_posts(client: httpx.AsyncClient, base_url: str) -> List[Dic
     """Fetch recent blog posts"""
     try:
         resp = await client.get(
-            f"{base_url}/blog/list",
+            f"{base_url}/blog/posts",
             timeout=5.0
         )
         if resp.status_code == 200:
@@ -488,7 +500,7 @@ async def ask_mentor(
     Advanced AI Mentor with platform-wide context awareness.
     Provides intelligent recommendations from courses, signals, and blogs.
     """
-    user_id = str(current_user.get("id", "anonymous"))
+    user_id = _user_id(current_user)
 
     # Check for special commands
     command = detect_special_command(query.question)
@@ -640,16 +652,20 @@ async def get_coach_insights(
     Get AI Coach insights for the dashboard display.
     Returns trading personality, strengths, weaknesses, and recommendations.
     """
-    user_id = str(current_user.get("id", "anonymous"))
+    # FIXED: SQLAlchemy Row objects need dict() or attribute access, not .get()
+    if hasattr(current_user, '_mapping'):
+        user_id = str(current_user._mapping.get("id", "anonymous"))
+    elif isinstance(current_user, dict):
+        user_id = _user_id(current_user)
+    else:
+        try:
+            user_id = str(current_user.id)
+        except Exception:
+            user_id = "anonymous"
 
-    try:
-        async with httpx.AsyncClient() as client:
-            token = "dummy_token"
-            base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
-            context = await get_user_trading_context(client, token, user_id, base_url)
-    except Exception as e:
-        print(f"[INSIGHTS] Error fetching context: {e}", flush=True)
-        context = UserContext()
+    # Use a safe context with empty defaults — skip internal HTTP call
+    # (the dummy_token approach always fails; we have no journal data here)
+    context = UserContext()
 
     # Analyze trading personality
     personality = "Developing Trader"
@@ -722,7 +738,7 @@ async def get_conversation_history(
     current_user = Depends(get_current_user)
 ):
     """Retrieve last 10 conversation messages for the user"""
-    user_id = str(current_user.get("id", "anonymous"))
+    user_id = _user_id(current_user)
     history = conversation_history.get(user_id, [])
     return {"messages": history[-MAX_HISTORY*2:], "count": len(history)}
 
@@ -731,7 +747,7 @@ async def clear_history(
     current_user = Depends(get_current_user)
 ):
     """Clear conversation history"""
-    user_id = str(current_user.get("id", "anonymous"))
+    user_id = _user_id(current_user)
     conversation_history[user_id] = []
     return {"status": "cleared"}
 

@@ -254,9 +254,10 @@ _COLUMN_MIGRATIONS = [
     ("signals", "timeframe",     "VARCHAR(10)",  "DEFAULT '1H'"),
     ("signals", "analysis",      "TEXT",         "DEFAULT ''"),
     ("signals", "outcome",       "VARCHAR(20)",  ""),
+    ("signals", "ai_confidence", "FLOAT",        ""),
     ("signals", "created_by",    "INTEGER",      ""),
     ("signals", "result_pips",   "FLOAT",        ""),
-    # ai_confidence / status / closed_at already exist per the ORM definition
+    # status / closed_at already exist per the ORM definition
 
     # ── webinars ──────────────────────────────────────────────────────────────
     # presenter + recording_url are in the ORM but missing from some live DBs

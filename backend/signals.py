@@ -69,8 +69,17 @@ async def create_signal(
     """Create new trading signal (admin only)"""
     try:
         # Verify admin
-        user_data = dict(current_user) if hasattr(current_user, '__iter__') else current_user
-        is_admin = user_data.get('is_admin') or user_data.get('role') == 'admin'
+        # FIXED: SQLAlchemy Row objects don't support dict() directly
+        # Use _mapping for Row objects, fallback to dict for plain dicts
+        if hasattr(current_user, '_mapping'):
+            is_admin = bool(current_user._mapping.get('is_admin', False)) or \
+                       current_user._mapping.get('role') == 'admin'
+        elif isinstance(current_user, dict):
+            is_admin = bool(current_user.get('is_admin', False)) or \
+                       current_user.get('role') == 'admin'
+        else:
+            is_admin = bool(getattr(current_user, 'is_admin', False)) or \
+                       getattr(current_user, 'role', None) == 'admin'
         
         if not is_admin:
             raise HTTPException(403, "Admin access required")

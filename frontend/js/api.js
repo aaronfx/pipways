@@ -1,38 +1,48 @@
 /**
- * API Client - Production Grade
- * Handles OAuth2 authentication and JWT Bearer token management
+ * Pipways API Client — Production Grade
+ * Fixes: baseURL, defaultHeaders, captureEmail, admin methods,
+ *        trading analytics, AI stats, user toggle.
  */
+
 const API_BASE = window.location.origin;
 
 const API = {
-    /**
-     * Generic request handler with auth header injection
-     */
+
+    // ── FIX: baseURL alias so blog_enhanced.js (uses API.baseURL) doesn't crash ──
+    baseURL: window.location.origin,
+
+    // ── FIX: defaultHeaders getter so blog_enhanced.js doesn't crash ──────────
+    get defaultHeaders() {
+        const token = localStorage.getItem('pipways_token');
+        return {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
+        };
+    },
+
+    // ── Core request handler ──────────────────────────────────────────────────
     async request(endpoint, options = {}) {
         const token = localStorage.getItem('pipways_token');
         const headers = {
             'Accept': 'application/json',
             ...(token && { 'Authorization': `Bearer ${token}` }),
-            ...options.headers
+            ...options.headers,
         };
 
-        // Don't override Content-Type for FormData (file uploads)
+        // Never override Content-Type for FormData (file uploads)
         if (options.body && !(options.body instanceof FormData)) {
             headers['Content-Type'] = headers['Content-Type'] || 'application/json';
         }
 
         try {
-            const res = await fetch(`${API_BASE}${endpoint}`, {
-                ...options,
-                headers
-            });
+            const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
 
             if (res.status === 401) {
-                // Token expired or invalid
                 localStorage.removeItem('pipways_token');
                 localStorage.removeItem('pipways_user');
                 window.location.href = '/';
-                throw new Error('Session expired. Please login again.');
+                throw new Error('Session expired. Please log in again.');
             }
 
             if (!res.ok) {
@@ -49,65 +59,50 @@ const API = {
         }
     },
 
-    /**
-     * OAuth2 Login - Uses URLSearchParams for form-urlencoded format
-     */
+    // ── Authentication ────────────────────────────────────────────────────────
     async login(username, password) {
-        // CRITICAL: URLSearchParams ensures application/x-www-form-urlencoded
         const params = new URLSearchParams();
         params.append('username', username);
         params.append('password', password);
-        
+
         const res = await fetch(`${API_BASE}/auth/token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
             },
-            body: params
+            body: params,
         });
-        
+
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || 'Login failed');
         }
-        
+
         const data = await res.json();
-        
-        // Store credentials
         localStorage.setItem('pipways_token', data.access_token);
         localStorage.setItem('pipways_user', JSON.stringify(data.user));
-        
         return data;
     },
 
-    /**
-     * Registration
-     */
     register(data) {
         return this.request('/auth/register', {
             method: 'POST',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
     },
 
-    /**
-     * Get current user profile
-     */
     getMe() {
         return this.request('/auth/me');
     },
 
-    /**
-     * Logout helper
-     */
     logout() {
         localStorage.removeItem('pipways_token');
         localStorage.removeItem('pipways_user');
         window.location.href = '/';
     },
 
-    // Signals
+    // ── Signals ───────────────────────────────────────────────────────────────
     getSignals(params = {}) {
         const qs = new URLSearchParams(params).toString();
         return this.request(`/signals/active?${qs}`);
@@ -116,24 +111,22 @@ const API = {
     createSignal(data) {
         return this.request('/signals/create', {
             method: 'POST',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
     },
 
     updateSignal(id, data) {
         return this.request(`/signals/${id}`, {
             method: 'PUT',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
     },
 
     deleteSignal(id) {
-        return this.request(`/signals/${id}`, {
-            method: 'DELETE'
-        });
+        return this.request(`/signals/${id}`, { method: 'DELETE' });
     },
 
-    // Courses
+    // ── Courses ───────────────────────────────────────────────────────────────
     getCourses() {
         return this.request('/courses/list');
     },
@@ -142,7 +135,7 @@ const API = {
         return this.request('/courses-enhanced/progress');
     },
 
-    // Blog
+    // ── Blog ──────────────────────────────────────────────────────────────────
     getBlogPosts(params = {}) {
         const qs = new URLSearchParams(params).toString();
         return this.request(`/blog/posts?${qs}`);
@@ -152,12 +145,20 @@ const API = {
         return this.request(`/blog/posts/${slug}`);
     },
 
-    // Webinars
+    // ── FIX: captureEmail was missing — referenced in blog_enhanced.js ────────
+    captureEmail(data) {
+        return this.request('/blog/capture-email', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    // ── Webinars ──────────────────────────────────────────────────────────────
     getWebinars(upcoming = true) {
         return this.request(`/webinars/upcoming?upcoming=${upcoming}`);
     },
 
-    // AI Mentor
+    // ── AI Mentor ─────────────────────────────────────────────────────────────
     askMentor(question, skillLevel = 'intermediate', topic = null) {
         return this.request('/ai/mentor/ask', {
             method: 'POST',
@@ -165,8 +166,8 @@ const API = {
                 question,
                 skill_level: skillLevel,
                 topic,
-                context: window.location.hash
-            })
+                context: window.location.hash,
+            }),
         });
     },
 
@@ -177,15 +178,15 @@ const API = {
                 goal,
                 current_level: currentLevel,
                 time_available: timeAvailable,
-                preferred_markets: markets
-            })
+                preferred_markets: markets,
+            }),
         });
     },
 
     reviewTrade(tradeData) {
         return this.request('/ai/mentor/review-trade', {
             method: 'POST',
-            body: JSON.stringify(tradeData)
+            body: JSON.stringify(tradeData),
         });
     },
 
@@ -193,32 +194,31 @@ const API = {
         return this.request('/ai/mentor/daily-wisdom');
     },
 
-    // Chart Analysis
+    // ── Chart Analysis ────────────────────────────────────────────────────────
     analyzeChartImage(file, symbol = null, timeframe = null) {
         const formData = new FormData();
         formData.append('file', file);
         if (symbol) formData.append('symbol', symbol);
         if (timeframe) formData.append('timeframe', timeframe);
-        
         return this.request('/ai/chart/analyze', {
             method: 'POST',
-            headers: {}, // Let browser set Content-Type with boundary for FormData
-            body: formData
+            headers: {},          // browser sets Content-Type with boundary
+            body: formData,
         });
     },
 
     getPatternLibrary(patternType = null) {
-        const url = patternType 
+        const url = patternType
             ? `/ai/chart/pattern-library?pattern_type=${patternType}`
             : '/ai/chart/pattern-library';
         return this.request(url);
     },
 
-    // Performance
+    // ── Performance / Journal ─────────────────────────────────────────────────
     analyzeJournal(trades) {
         return this.request('/ai/performance/analyze-journal', {
             method: 'POST',
-            body: JSON.stringify(trades)
+            body: JSON.stringify(trades),
         });
     },
 
@@ -226,31 +226,49 @@ const API = {
         return this.request(`/ai/performance/dashboard-stats?days=${days}`);
     },
 
-    // Admin
-    getAdminStats() {
-        return this.request('/admin/users');
-    },
-
-    getUsers(params = {}) {
-        const qs = new URLSearchParams(params).toString();
-        return this.request(`/admin/users?${qs}`);
-    },
-
-    // Risk Calculator
+    // ── Risk Calculator ───────────────────────────────────────────────────────
     calculateRisk(data) {
         return this.request('/risk/calculate', {
             method: 'POST',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         });
     },
 
     getRiskHistory() {
         return this.request('/risk/history');
-    }
+    },
+
+    // ── Admin — overview stats (backward-compat path) ────────────────────────
+    getAdminStats() {
+        return this.request('/admin/users');
+    },
+
+    // ── Admin — paginated user list ───────────────────────────────────────────
+    getAdminUsers(page = 1, perPage = 20, search = '') {
+        const qs = new URLSearchParams({
+            page,
+            per_page: perPage,
+            ...(search && { search }),
+        }).toString();
+        return this.request(`/admin/users/list?${qs}`);
+    },
+
+    // ── Admin — toggle user active / inactive ─────────────────────────────────
+    toggleUser(userId) {
+        return this.request(`/admin/users/${userId}/toggle`, { method: 'POST' });
+    },
+
+    // ── Admin — trading analytics ─────────────────────────────────────────────
+    getTradingAnalytics() {
+        return this.request('/admin/trading-analytics');
+    },
+
+    // ── Admin — AI usage stats ────────────────────────────────────────────────
+    getAIStats() {
+        return this.request('/admin/ai-stats');
+    },
 };
 
-// Export for global use
+// Make available globally under both names
 window.API = API;
-
-// COMPATIBILITY FIX: Alias for modules using lowercase 'api'
-window.api = API;
+window.api = API;   // backward compat for modules that use lowercase `api`

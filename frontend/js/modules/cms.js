@@ -570,7 +570,16 @@ const CMSPage = {
     async _loadModules(cid){
         const el=document.getElementById(`lms-modules-${cid}`); if(!el) return;
         let mods=[]; try{mods=await API.cms.listModules(cid);}catch(_){}
-        if(!mods.length){ el.innerHTML=`<div class="text-gray-600 text-xs text-center py-4">No modules yet — add one above.</div>`; return; }
+        if(!mods.length){
+            el.innerHTML=`
+            <div style="padding:1rem 1.5rem;text-align:center;">
+                <p class="text-gray-500 text-xs mb-2">No modules yet.</p>
+                <button class="cb cb-p" style="font-size:.72rem;" onclick="CMSPage._lmsModuleForm(${cid})">
+                    <i class="fas fa-plus"></i> Add First Module
+                </button>
+            </div>`;
+            return;
+        }
         el.innerHTML=mods.map(m=>`
         <div style="border-top:1px solid #1a2235;">
             <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem .6rem 2rem;background:#161f2e;">
@@ -680,9 +689,21 @@ const CMSPage = {
             certificate_enabled:document.getElementById('cf-cert')?.value==='1',
             pass_percentage:parseInt(document.getElementById('cf-pass')?.value)||70};
         try{
-            if(this._editingId){await API.cms.updateCourse(this._editingId,p);this._toast('Course updated');}
-            else{await API.cms.createCourse(p);this._toast('Course created');}
-            this._closeLMSForm(); await this._lms();
+            if(this._editingId){
+                await API.cms.updateCourse(this._editingId,p);
+                this._toast('Course updated');
+                this._closeLMSForm();
+                await this._lms();
+            } else {
+                const result = await API.cms.createCourse(p);
+                this._toast('Course created — now add modules & lessons below');
+                this._closeLMSForm();
+                await this._lms();
+                // Auto-expand the new course so user can immediately add modules
+                if(result && result.id){
+                    setTimeout(()=>this._lmsToggleCourse(result.id), 300);
+                }
+            }
         }catch(e){this._toast(e.message,'error');}
     },
 
@@ -916,7 +937,7 @@ const CMSPage = {
             <div class="overflow-x-auto"><table class="cms-tbl">
                 <thead><tr><th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>TF</th><th>Status</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
                 <tbody>${sigs.length?sigs.map(s=>`<tr>
-                    <td class="font-bold text-white">${this._e(s.symbol)}</td>
+                    <td class="font-bold text-white">${this._e(s.symbol||'—')}</td>
                     <td>${this._dir(s.direction)}</td>
                     <td class="font-mono text-gray-300">${s.entry_price}</td>
                     <td class="font-mono text-red-400">${s.stop_loss}</td>

@@ -1,381 +1,436 @@
 """
-Courses API - PRODUCTION READY with CMS Integration
-Returns real course data with module/lesson counts from CMS
+Courses LMS API - PRODUCTION READY
+Endpoints:
+  GET  /courses/list
+  GET  /courses/{id}
+  GET  /courses/{id}/curriculum
+  POST /courses/{id}/lessons/{lesson_id}/complete
+  GET  /courses/{id}/quizzes/{quiz_id}
+  POST /courses/{id}/quizzes/{quiz_id}/submit
 """
+import json
+import uuid
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Optional
 from .database import database
 from .security import get_current_user, get_user_id
 
 router = APIRouter()
 
-@router.get("/list")
-async def get_courses(current_user = Depends(get_current_user)):
-    """
-    Get all available courses with user's progress and CMS curriculum counts.
-    """
-    try:
-        user_id = get_user_id(current_user)
-        
-        # FIXED: Query counts modules and lessons from CMS tables
-        query = """
-            SELECT 
-                c.id, c.title, c.description, c.level,
-                c.thumbnail, c.preview_video, c.price,
-                c.is_published, c.is_active,
-                COALESCE(c.certificate_enabled, false) as certificate_enabled,
-                COALESCE(c.pass_percentage, 70) as pass_percentage,
-                COUNT(DISTINCT m.id) as module_count,
-                COUNT(DISTINCT l.id) as lesson_count,
-                COALESCE(up.progress_percent, 0) as progress,
-                COALESCE(up.completed_lessons, 0) as completed_lessons
-            FROM courses c
-            LEFT JOIN course_modules m ON m.course_id = c.id
-            LEFT JOIN lessons l ON l.course_id = c.id
-            LEFT JOIN user_progress up ON c.id = up.course_id AND up.user_id = :user_id
-            WHERE c.is_active = TRUE OR c.is_published = TRUE
-            GROUP BY c.id, up.progress_percent, up.completed_lessons
-            ORDER BY c.created_at DESC
-        """
-        
-        rows = await database.fetch_all(query, {"user_id": user_id})
-        
-        courses = []
-        for row in rows:
-            courses.append({
-                "id": row["id"],
-                "title": row["title"],
-                "description": row["description"],
-                "level": row["level"] or "Beginner",
-                "module_count": row.get("module_count", 0),
-                "lesson_count": row.get("lesson_count", 0),
-                "thumbnail_url": row.get("thumbnail") or row.get("thumbnail_url", ""),
-                "preview_video": row.get("preview_video", ""),
-                "price": float(row.get("price", 0)),
-                "progress": row.get("progress", 0),
-                "completed_lessons": row.get("completed_lessons", 0),
-                "certificate_enabled": row.get("certificate_enabled", False),
-                "pass_percentage": row.get("pass_percentage", 70),
-                "is_published": row.get("is_published", False),
-            })
-        
-        return courses
 
-    except Exception as e:
-        print(f"[COURSES ERROR] {e}", flush=True)
-        raise HTTPException(500, "Failed to load courses")
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _row(r) -> dict:
+    return dict(r) if r else {}
+
+
+async def _safe(query: str, params: dict = None):
+    """Execute a fetch_all silently returning [] on error."""
+    try:
+        return await database.fetch_all(query, params or {})
+    except Exception:
+        return []
+
+
+async def _safe_one(query: str, params: dict = None):
+    """Execute a fetch_one silently returning None on error."""
+    try:
+        return await database.fetch_one(query, params or {})
+    except Exception:
+        return None
+
+
+# ── Course listing ────────────────────────────────────────────────────────────
+
+@router.get("/list")
+async def list_courses(current_user=Depends(get_current_user)):
+    """
+    Return all published courses with the current user's progress.
+    Falls back gracefully if LMS columns or tables don't exist yet.
+    """
+    user_id = get_user_id(current_user)
+
+    try:
+        rows = await database.fetch_all(
+            """
+            SELECT c.id, c.title, c.description, c.level,
+                   COALESCE(c.lesson_count, 0)       AS lesson_count,
+                   COALESCE(c.thumbnail_url, c.thumbnail, '') AS thumbnail_url,
+                   COALESCE(c.instructor, '')         AS instructor,
+                   COALESCE(up.progress_percent, 0)  AS progress,
+                   COALESCE(up.completed_lessons, 0) AS completed_lessons
+            FROM courses c
+            LEFT JOIN user_progress up
+                   ON c.id = up.course_id AND up.user_id = :uid
+            WHERE COALESCE(c.is_active, TRUE) = TRUE
+               OR COALESCE(c.is_published, FALSE) = TRUE
+            ORDER BY c.created_at DESC
+            """,
+            {"uid": user_id},
+        )
+    except Exception:
+        # Fallback: user_progress table or new columns may not exist
+        rows = await _safe(
+            """
+            SELECT id, title, description, level,
+                   COALESCE(lesson_count, 0) AS lesson_count,
+                   COALESCE(thumbnail_url, '') AS thumbnail_url,
+                   COALESCE(instructor, '') AS instructor
+            FROM courses
+            WHERE COALESCE(is_active, TRUE) = TRUE
+               OR COALESCE(is_published, FALSE) = TRUE
+            ORDER BY created_at DESC
+            """
+        )
+
+    return [
+        {
+            "id":                r["id"],
+            "title":             r["title"],
+            "description":       r.get("description", ""),
+            "level":             r.get("level", "Beginner"),
+            "lesson_count":      r.get("lesson_count", 0),
+            "thumbnail_url":     r.get("thumbnail_url", ""),
+            "instructor":        r.get("instructor", ""),
+            "progress":          r.get("progress", 0),
+            "completed_lessons": r.get("completed_lessons", 0),
+        }
+        for r in rows
+    ]
+
+
+# ── Course detail ─────────────────────────────────────────────────────────────
+
+@router.get("/{course_id}")
+async def get_course(course_id: int, current_user=Depends(get_current_user)):
+    row = await _safe_one(
+        "SELECT * FROM courses WHERE id = :id AND (COALESCE(is_active,TRUE)=TRUE OR COALESCE(is_published,FALSE)=TRUE)",
+        {"id": course_id},
+    )
+    if not row:
+        raise HTTPException(404, "Course not found")
+    return _row(row)
+
+
+# ── Curriculum ────────────────────────────────────────────────────────────────
 
 @router.get("/{course_id}/curriculum")
-async def get_course_curriculum(
-    course_id: int, 
-    current_user = Depends(get_current_user)
-):
+async def get_curriculum(course_id: int, current_user=Depends(get_current_user)):
     """
-    Get full curriculum structure: Modules → Lessons → Quiz availability
+    Returns full course structure:
+    { course, modules: [ {module, lessons, quiz} ] }
     """
-    try:
-        # Verify course exists and is published
-        course = await database.fetch_one(
-            """SELECT id, title, description, level, thumbnail, preview_video, 
-               price, certificate_enabled, pass_percentage
-               FROM courses 
-               WHERE id = :id AND (is_active = TRUE OR is_published = TRUE)""",
-            {"id": course_id}
-        )
-        
-        if not course:
-            raise HTTPException(404, "Course not found")
-        
-        # Get modules with lesson counts
-        modules_query = """
-            SELECT 
-                m.id, m.title, m.description, m.order_index,
-                COUNT(l.id) as lesson_count,
-                (SELECT COUNT(*) FROM quizzes q WHERE q.module_id = m.id) as has_quiz
-            FROM course_modules m
-            LEFT JOIN lessons l ON l.module_id = m.id
-            WHERE m.course_id = :course_id
-            GROUP BY m.id
-            ORDER BY m.order_index, m.id
+    user_id = get_user_id(current_user)
+
+    course = await _safe_one("SELECT * FROM courses WHERE id = :id", {"id": course_id})
+    if not course:
+        raise HTTPException(404, "Course not found")
+
+    # Fetch modules
+    modules_rows = await _safe(
+        "SELECT * FROM course_modules WHERE course_id = :cid ORDER BY order_index, id",
+        {"cid": course_id},
+    )
+
+    # Fetch completed lesson IDs for this user
+    done_rows = await _safe(
         """
-        modules = await database.fetch_all(modules_query, {"course_id": course_id})
-        
-        curriculum = []
-        for module in modules:
-            # Get lessons for this module
-            lessons = await database.fetch_all(
-                """SELECT id, title, content, video_url, attachment_url, 
-                   duration_minutes, order_index, is_free_preview
-                   FROM lessons 
-                   WHERE module_id = :mid 
-                   ORDER BY order_index, id""",
-                {"mid": module["id"]}
-            )
-            
-            # Get quiz if exists
-            quiz = await database.fetch_one(
-                "SELECT id, title, pass_percentage FROM quizzes WHERE module_id = :mid",
-                {"mid": module["id"]}
-            )
-            
-            lesson_list = []
-            for lesson in lessons:
-                # Check completion status
-                completed = await database.fetch_one(
-                    """SELECT 1 FROM user_lesson_progress 
-                       WHERE user_id = :uid AND lesson_id = :lid""",
-                    {"uid": get_user_id(current_user), "lid": lesson["id"]}
-                )
-                
-                lesson_list.append({
-                    "id": lesson["id"],
-                    "title": lesson["title"],
-                    "video_url": lesson["video_url"],
-                    "duration_minutes": lesson["duration_minutes"] or 0,
-                    "is_free_preview": lesson["is_free_preview"] or False,
-                    "completed": completed is not None
-                })
-            
-            mod_data = {
-                "id": module["id"],
-                "title": module["title"],
-                "description": module["description"],
-                "order_index": module["order_index"],
-                "lessons": lesson_list,
-                "quiz": {
-                    "id": quiz["id"],
-                    "title": quiz["title"],
-                    "pass_percentage": quiz["pass_percentage"]
-                } if quiz else None
+        SELECT lesson_id FROM user_lesson_progress
+        WHERE user_id = :uid
+        """,
+        {"uid": user_id},
+    )
+    done_ids = {r["lesson_id"] for r in done_rows}
+
+    modules_out = []
+    for mod in modules_rows:
+        mid = mod["id"]
+
+        # Lessons under this module
+        lessons_rows = await _safe(
+            "SELECT * FROM lessons WHERE module_id = :mid ORDER BY order_index, id",
+            {"mid": mid},
+        )
+        lessons_out = [
+            {
+                "id":               l["id"],
+                "title":            l["title"],
+                "content":          l.get("content", ""),
+                "video_url":        l.get("video_url", ""),
+                "duration_minutes": l.get("duration_minutes", 0),
+                "order_index":      l.get("order_index", 0),
+                "is_free_preview":  bool(l.get("is_free_preview", False)),
+                "completed":        l["id"] in done_ids,
             }
-            curriculum.append(mod_data)
-        
-        return {
-            "course": dict(course),
-            "modules": curriculum
+            for l in lessons_rows
+        ]
+
+        # Quiz for this module (if any)
+        quiz_row = await _safe_one(
+            "SELECT id, title, pass_percentage, max_attempts FROM quizzes WHERE module_id = :mid",
+            {"mid": mid},
+        )
+        quiz_out = None
+        if quiz_row:
+            q_count = await _safe_one(
+                "SELECT COUNT(*) AS c FROM quiz_questions WHERE quiz_id = :qid",
+                {"qid": quiz_row["id"]},
+            )
+            quiz_out = {
+                "id":             quiz_row["id"],
+                "title":          quiz_row["title"],
+                "pass_percentage": quiz_row.get("pass_percentage", 70),
+                "question_count": (q_count or {}).get("c", 0) if q_count else 0,
+            }
+
+        modules_out.append(
+            {
+                "id":          mid,
+                "title":       mod["title"],
+                "description": mod.get("description", ""),
+                "order_index": mod.get("order_index", 0),
+                "lessons":     lessons_out,
+                "quiz":        quiz_out,
+            }
+        )
+
+    # Also include lessons not attached to a module (order_index only)
+    loose_rows = await _safe(
+        "SELECT * FROM lessons WHERE course_id = :cid AND (module_id IS NULL) ORDER BY order_index, id",
+        {"cid": course_id},
+    )
+    loose_out = [
+        {
+            "id":               l["id"],
+            "title":            l["title"],
+            "content":          l.get("content", ""),
+            "video_url":        l.get("video_url", ""),
+            "duration_minutes": l.get("duration_minutes", 0),
+            "order_index":      l.get("order_index", 0),
+            "is_free_preview":  bool(l.get("is_free_preview", False)),
+            "completed":        l["id"] in done_ids,
         }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[CURRICULUM ERROR] {e}", flush=True)
-        raise HTTPException(500, "Failed to load curriculum")
+        for l in loose_rows
+    ]
+
+    return {
+        "course":         _row(course),
+        "modules":        modules_out,
+        "loose_lessons":  loose_out,
+    }
+
+
+# ── Complete a lesson ─────────────────────────────────────────────────────────
 
 @router.post("/{course_id}/lessons/{lesson_id}/complete")
 async def complete_lesson(
     course_id: int,
     lesson_id: int,
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
-    """
-    Mark lesson as complete and recalculate course progress.
-    """
+    user_id = get_user_id(current_user)
+
+    # Mark lesson as complete (UPSERT)
     try:
-        user_id = get_user_id(current_user)
-        
-        # Verify lesson exists and belongs to course
-        lesson = await database.fetch_one(
-            """SELECT l.*, m.course_id 
-               FROM lessons l 
-               JOIN course_modules m ON l.module_id = m.id
-               WHERE l.id = :lid AND m.course_id = :cid""",
-            {"lid": lesson_id, "cid": course_id}
-        )
-        
-        if not lesson:
-            raise HTTPException(404, "Lesson not found")
-        
-        # Insert completion record (idempotent)
         await database.execute(
-            """INSERT INTO user_lesson_progress (user_id, lesson_id, completed_at, time_spent_seconds)
-               VALUES (:uid, :lid, NOW(), 0)
-               ON CONFLICT (user_id, lesson_id) DO UPDATE SET completed_at = NOW()""",
-            {"uid": user_id, "lid": lesson_id}
+            """
+            INSERT INTO user_lesson_progress (user_id, lesson_id, completed_at)
+            VALUES (:uid, :lid, NOW())
+            ON CONFLICT (user_id, lesson_id) DO NOTHING
+            """,
+            {"uid": user_id, "lid": lesson_id},
         )
-        
-        # Calculate new progress
-        total_lessons = await database.fetch_val(
-            """SELECT COUNT(*) FROM lessons l
-               JOIN course_modules m ON l.module_id = m.id
-               WHERE m.course_id = :cid""",
-            {"cid": course_id}
-        ) or 1
-        
-        completed_count = await database.fetch_val(
-            """SELECT COUNT(*) FROM user_lesson_progress ulp
-               JOIN lessons l ON ulp.lesson_id = l.id
-               JOIN course_modules m ON l.module_id = m.id
-               WHERE ulp.user_id = :uid AND m.course_id = :cid""",
-            {"uid": user_id, "cid": course_id}
-        ) or 0
-        
-        progress_percent = int((completed_count / total_lessons) * 100)
-        is_completed = progress_percent == 100
-        
-        # Update or create user_progress
-        existing = await database.fetch_one(
-            "SELECT id FROM user_progress WHERE user_id = :uid AND course_id = :cid",
-            {"uid": user_id, "cid": course_id}
-        )
-        
-        if existing:
-            await database.execute(
-                """UPDATE user_progress 
-                   SET progress_percent = :prog,
-                       completed_lessons = :completed,
-                       completed_at = CASE WHEN :completed THEN NOW() ELSE completed_at END,
-                       last_accessed = NOW()
-                   WHERE user_id = :uid AND course_id = :cid""",
-                {
-                    "prog": progress_percent,
-                    "completed": completed_count,
-                    "uid": user_id,
-                    "cid": course_id
-                }
-            )
-        else:
-            await database.execute(
-                """INSERT INTO user_progress 
-                   (user_id, course_id, progress_percent, completed_lessons, last_accessed)
-                   VALUES (:uid, :cid, :prog, :completed, NOW())""",
-                {
-                    "uid": user_id,
-                    "cid": course_id,
-                    "prog": progress_percent,
-                    "completed": completed_count
-                }
-            )
-        
-        # Check for certificate eligibility
-        certificate = None
-        if is_completed:
-            cert_check = await database.fetch_one(
-                "SELECT id FROM certificates WHERE user_id = :uid AND course_id = :cid",
-                {"uid": user_id, "cid": course_id}
-            )
-            if not cert_check:
-                cert_id = f"CERT-{user_id}-{course_id}-{datetime.utcnow().strftime('%Y%m%d')}"
-                await database.execute(
-                    """INSERT INTO certificates (user_id, course_id, certificate_number, issued_at)
-                       VALUES (:uid, :cid, :cert_num, NOW())""",
-                    {"uid": user_id, "cid": course_id, "cert_num": cert_id}
-                )
-                certificate = cert_id
-        
-        return {
-            "lesson_completed": True,
-            "progress_percent": progress_percent,
-            "course_completed": is_completed,
-            "certificate_issued": certificate is not None,
-            "certificate_id": certificate
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"[COMPLETE LESSON ERROR] {e}", flush=True)
-        raise HTTPException(500, "Failed to update progress")
+        raise HTTPException(500, f"Could not save progress: {e}")
+
+    # Count total lessons in course and how many user has completed
+    total_row = await _safe_one(
+        "SELECT COUNT(*) AS c FROM lessons WHERE course_id = :cid AND COALESCE(is_active, TRUE) = TRUE",
+        {"cid": course_id},
+    )
+    total_lessons = (total_row or {}).get("c", 1) or 1
+
+    done_row = await _safe_one(
+        """
+        SELECT COUNT(*) AS c
+        FROM user_lesson_progress ulp
+        JOIN lessons l ON ulp.lesson_id = l.id
+        WHERE ulp.user_id = :uid AND l.course_id = :cid
+        """,
+        {"uid": user_id, "cid": course_id},
+    )
+    completed = (done_row or {}).get("c", 0) or 0
+    pct = min(100, int(completed / total_lessons * 100))
+
+    # Upsert user_progress
+    try:
+        await database.execute(
+            """
+            INSERT INTO user_progress (user_id, course_id, progress_percent, completed_lessons, last_accessed)
+            VALUES (:uid, :cid, :pct, :done, NOW())
+            ON CONFLICT (user_id, course_id) DO UPDATE
+                SET progress_percent  = EXCLUDED.progress_percent,
+                    completed_lessons = EXCLUDED.completed_lessons,
+                    last_accessed     = NOW(),
+                    completed_at      = CASE WHEN EXCLUDED.progress_percent = 100 THEN NOW() ELSE user_progress.completed_at END
+            """,
+            {"uid": user_id, "cid": course_id, "pct": pct, "done": completed},
+        )
+    except Exception as e:
+        print(f"[LMS] user_progress upsert error: {e}", flush=True)
+
+    # Auto-issue certificate when course is 100% complete
+    cert_issued = False
+    cert_number = None
+    if pct == 100:
+        existing = await _safe_one(
+            "SELECT id FROM certificates WHERE user_id = :uid AND course_id = :cid",
+            {"uid": user_id, "cid": course_id},
+        )
+        if not existing:
+            cert_number = f"PW-{course_id}-{user_id}-{uuid.uuid4().hex[:8].upper()}"
+            try:
+                await database.execute(
+                    """
+                    INSERT INTO certificates (user_id, course_id, certificate_number, issued_at)
+                    VALUES (:uid, :cid, :num, NOW())
+                    ON CONFLICT (user_id, course_id) DO NOTHING
+                    """,
+                    {"uid": user_id, "cid": course_id, "num": cert_number},
+                )
+                cert_issued = True
+            except Exception as e:
+                print(f"[LMS] certificate insert error: {e}", flush=True)
+
+    return {
+        "lesson_id":        lesson_id,
+        "progress_percent": pct,
+        "completed_lessons": completed,
+        "total_lessons":    total_lessons,
+        "course_complete":  pct == 100,
+        "certificate_issued": cert_issued,
+        "certificate_number": cert_number,
+    }
+
+
+# ── Quiz ──────────────────────────────────────────────────────────────────────
 
 @router.get("/{course_id}/quizzes/{quiz_id}")
-async def get_quiz(
-    course_id: int, 
-    quiz_id: int,
-    current_user = Depends(get_current_user)
-):
-    """
-    Get quiz questions for student (no correct answers exposed).
-    """
-    try:
-        # Verify quiz belongs to course
-        quiz = await database.fetch_one(
-            """SELECT q.* FROM quizzes q
-               JOIN course_modules m ON q.module_id = m.id
-               WHERE q.id = :qid AND m.course_id = :cid""",
-            {"qid": quiz_id, "cid": course_id}
-        )
-        
-        if not quiz:
-            raise HTTPException(404, "Quiz not found")
-        
-        # Get questions without correct answers
-        questions = await database.fetch_all(
-            """SELECT id, question, option_a, option_b, option_c, option_d, order_index
-               FROM quiz_questions 
-               WHERE quiz_id = :qid 
-               ORDER BY order_index""",
-            {"qid": quiz_id}
-        )
-        
-        return {
-            "id": quiz["id"],
-            "title": quiz["title"],
-            "pass_percentage": quiz["pass_percentage"],
-            "max_attempts": quiz["max_attempts"],
-            "questions": [dict(q) for q in questions]
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[GET QUIZ ERROR] {e}", flush=True)
-        raise HTTPException(500, "Failed to load quiz")
+async def get_quiz(course_id: int, quiz_id: int, current_user=Depends(get_current_user)):
+    quiz = await _safe_one(
+        "SELECT id, title, pass_percentage, max_attempts FROM quizzes WHERE id = :qid",
+        {"qid": quiz_id},
+    )
+    if not quiz:
+        raise HTTPException(404, "Quiz not found")
+
+    questions = await _safe(
+        """
+        SELECT id, question, option_a, option_b,
+               COALESCE(option_c, '') AS option_c,
+               COALESCE(option_d, '') AS option_d,
+               order_index
+        FROM quiz_questions
+        WHERE quiz_id = :qid
+        ORDER BY order_index, id
+        """,
+        {"qid": quiz_id},
+    )
+
+    return {
+        "id":              quiz["id"],
+        "title":           quiz["title"],
+        "pass_percentage": quiz.get("pass_percentage", 70),
+        "max_attempts":    quiz.get("max_attempts", 3),
+        "questions": [
+            {
+                "id":       q["id"],
+                "question": q["question"],
+                "options": {
+                    "a": q["option_a"],
+                    "b": q["option_b"],
+                    "c": q.get("option_c", ""),
+                    "d": q.get("option_d", ""),
+                },
+            }
+            for q in questions
+        ],
+    }
+
 
 @router.post("/{course_id}/quizzes/{quiz_id}/submit")
 async def submit_quiz(
     course_id: int,
     quiz_id: int,
-    answers: dict,  # {question_id: "a" | "b" | "c" | "d"}
-    current_user = Depends(get_current_user)
+    answers: dict,               # {question_id: "a" | "b" | "c" | "d"}
+    current_user=Depends(get_current_user),
 ):
     """
-    Submit quiz answers and return results.
+    Grade submitted quiz answers.
+    answers: { "123": "a", "124": "c", ... }
     """
+    user_id = get_user_id(current_user)
+
+    quiz = await _safe_one(
+        "SELECT id, pass_percentage FROM quizzes WHERE id = :qid",
+        {"qid": quiz_id},
+    )
+    if not quiz:
+        raise HTTPException(404, "Quiz not found")
+
+    pass_pct = quiz.get("pass_percentage", 70)
+
+    questions = await _safe(
+        "SELECT id, correct_option, explanation FROM quiz_questions WHERE quiz_id = :qid",
+        {"qid": quiz_id},
+    )
+    if not questions:
+        raise HTTPException(400, "Quiz has no questions")
+
+    correct = 0
+    breakdown = []
+    for q in questions:
+        qid    = str(q["id"])
+        given  = (answers.get(qid) or "").lower().strip()
+        answer = q["correct_option"].lower().strip()
+        ok     = given == answer
+        if ok:
+            correct += 1
+        breakdown.append({
+            "question_id":    q["id"],
+            "your_answer":    given,
+            "correct_answer": answer,
+            "correct":        ok,
+            "explanation":    q.get("explanation", ""),
+        })
+
+    total  = len(questions)
+    score  = round(correct / total * 100, 1) if total else 0
+    passed = score >= pass_pct
+
+    # Save attempt
     try:
-        # Get correct answers
-        questions = await database.fetch_all(
-            "SELECT id, correct_option FROM quiz_questions WHERE quiz_id = :qid",
-            {"qid": quiz_id}
+        await database.execute(
+            """
+            INSERT INTO quiz_attempts (user_id, quiz_id, score, passed, answers, attempted_at)
+            VALUES (:uid, :qid, :score, :passed, :answers, NOW())
+            """,
+            {
+                "uid":     user_id,
+                "qid":     quiz_id,
+                "score":   score,
+                "passed":  passed,
+                "answers": json.dumps(answers),
+            },
         )
-        
-        if not questions:
-            raise HTTPException(404, "Quiz questions not found")
-        
-        quiz = await database.fetch_one(
-            "SELECT pass_percentage, max_attempts FROM quizzes WHERE id = :qid",
-            {"qid": quiz_id}
-        )
-        
-        total = len(questions)
-        correct = 0
-        results = []
-        
-        for q in questions:
-            user_answer = answers.get(str(q["id"]), "").lower()
-            is_correct = user_answer == q["correct_option"].lower()
-            if is_correct:
-                correct += 1
-            
-            results.append({
-                "question_id": q["id"],
-                "user_answer": user_answer,
-                "correct_answer": q["correct_option"],
-                "is_correct": is_correct
-            })
-        
-        score = int((correct / total) * 100)
-        passed = score >= (quiz["pass_percentage"] or 70)
-        
-        return {
-            "score": score,
-            "passed": passed,
-            "correct_count": correct,
-            "total_questions": total,
-            "passing_score": quiz["pass_percentage"] or 70,
-            "results": results
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"[SUBMIT QUIZ ERROR] {e}", flush=True)
-        raise HTTPException(500, "Failed to submit quiz")
+        print(f"[LMS] quiz_attempt save error: {e}", flush=True)
+
+    return {
+        "score":            score,
+        "passed":           passed,
+        "correct_answers":  correct,
+        "total_questions":  total,
+        "pass_percentage":  pass_pct,
+        "results_breakdown": breakdown,
+    }

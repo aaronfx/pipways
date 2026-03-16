@@ -310,18 +310,34 @@ async def run_migrations():
         # Don't raise - allow app to start even if some migrations fail
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CONNECTION MANAGEMENT
+# CONNECTION MANAGEMENT (for main.py compatibility)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+async def init_database():
+    """
+    Initialize database connection and run migrations.
+    This is the main entry point called by main.py on startup.
+    """
+    logger.info("[DB] Initializing database...")
+    try:
+        await connect()
+        await run_migrations()
+        logger.info("[DB] Database initialization complete")
+    except Exception as e:
+        logger.error(f"[DB] Initialization failed: {e}")
+        raise
 
 async def connect():
     """Connect to database"""
-    await database.connect()
-    logger.info("[DB] Database connected")
+    if not database.is_connected:
+        await database.connect()
+        logger.info("[DB] Database connected")
 
 async def disconnect():
     """Disconnect from database"""
-    await database.disconnect()
-    logger.info("[DB] Database disconnected")
+    if database.is_connected:
+        await database.disconnect()
+        logger.info("[DB] Database disconnected")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECURITY CONSTANTS (imported by security.py)

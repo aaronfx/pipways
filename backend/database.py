@@ -255,6 +255,7 @@ _COLUMN_MIGRATIONS = [
     ("signals", "analysis",      "TEXT",         "DEFAULT ''"),
     ("signals", "outcome",       "VARCHAR(20)",  ""),
     ("signals", "ai_confidence", "FLOAT",        ""),
+    ("signals", "is_published",  "BOOLEAN",      "DEFAULT FALSE"),  # was missing — caused COALESCE to fail
     ("signals", "created_by",    "INTEGER",      ""),
     ("signals", "result_pips",   "FLOAT",        ""),
     # status / closed_at already exist per the ORM definition

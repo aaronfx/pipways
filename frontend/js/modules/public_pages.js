@@ -241,7 +241,8 @@ const PublicPages = (() => {
                     return `
                     <article class="col-span-full bg-gray-800/80 rounded-xl border border-gray-700
                                     hover:border-blue-600/40 transition-all cursor-pointer group overflow-hidden
-                                    grid grid-cols-1 lg:grid-cols-2">
+                                    grid grid-cols-1 lg:grid-cols-2"
+                         onclick="PublicPages.openPost(${JSON.stringify(p.slug)}, event)">
                         <div class="relative overflow-hidden ${p.featured_image ? '' : 'h-56 lg:h-auto'}">
                             ${p.featured_image
                                 ? `<img src="${p.featured_image}" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -271,7 +272,8 @@ const PublicPages = (() => {
 
                 return `
                 <article class="bg-gray-800/80 rounded-xl border border-gray-700 hover:border-blue-600/40
-                                transition-all cursor-pointer group overflow-hidden hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-900/10">
+                                transition-all cursor-pointer group overflow-hidden hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-900/10"
+                         onclick="PublicPages.openPost(${JSON.stringify(p.slug)}, event)">
                     ${p.featured_image
                         ? `<div class="overflow-hidden h-44">
                                <img src="${p.featured_image}" class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500"
@@ -368,8 +370,61 @@ const PublicPages = (() => {
     }
 
 
+    // ── Blog post viewer ─────────────────────────────────────────────────────
+    async function openPost(slug, _event) {
+        // Fetch the full post
+        let post;
+        try {
+            const token = localStorage.getItem('pipways_token');
+            const res = await fetch(window.location.origin + '/blog/posts/' + encodeURIComponent(slug), {
+                headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            post = await res.json();
+        } catch (e) {
+            alert('Could not load post: ' + e.message);
+            return;
+        }
+
+        // Build modal
+        const existing = document.getElementById('blog-post-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'blog-post-modal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;';
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+        const date = post.created_at ? new Date(post.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '';
+        const tags = (post.tags || []).map(t => `<span style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid rgba(124,58,237,.3);padding:.2rem .7rem;border-radius:9999px;font-size:.75rem;">${t}</span>`).join('');
+
+        modal.innerHTML = \`
+        <div style="background:#111827;border-radius:1rem;width:100%;max-width:760px;border:1px solid #374151;overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid #1f2937;position:sticky;top:0;background:#111827;z-index:1;">
+                <span style="color:#9ca3af;font-size:.85rem;"><i class="fas fa-newspaper mr-2 text-purple-400"></i>\${post.category || 'General'}</span>
+                <button onclick="document.getElementById('blog-post-modal').remove()"
+                        style="background:none;border:none;color:#9ca3af;font-size:1.5rem;cursor:pointer;line-height:1;">×</button>
+            </div>
+            \${post.featured_image
+                ? \`<img src="\${post.featured_image}" style="width:100%;height:300px;object-fit:cover;" onerror="this.style.display='none'">\`
+                : ''}
+            <div style="padding:2rem;">
+                <h1 style="font-size:1.6rem;font-weight:800;color:white;line-height:1.3;margin-bottom:1rem;">\${post.title}</h1>
+                <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin-bottom:1.5rem;color:#6b7280;font-size:.8rem;">
+                    \${date ? \`<span><i class="fas fa-calendar mr-1"></i>\${date}</span>\` : ''}
+                    \${post.read_time ? \`<span><i class="fas fa-clock mr-1"></i>\${post.read_time}</span>\` : ''}
+                    \${post.views != null ? \`<span><i class="fas fa-eye mr-1"></i>\${post.views} views</span>\` : ''}
+                </div>
+                <div style="color:#d1d5db;line-height:1.8;font-size:.95rem;white-space:pre-wrap;">\${post.content || ''}</div>
+                \${tags ? \`<div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:2rem;padding-top:1.5rem;border-top:1px solid #1f2937;">\${tags}</div>\` : ''}
+            </div>
+        </div>\`;
+
+        document.body.appendChild(modal);
+    }
+
     // ── public API ────────────────────────────────────────────────────────────
-    return { signals, webinars, blog, courses };
+    return { signals, webinars, blog, courses, openPost };
 })();
 
 window.PublicPages = PublicPages;

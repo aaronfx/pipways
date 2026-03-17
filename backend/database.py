@@ -286,6 +286,22 @@ _COLUMN_MIGRATIONS = [
     ("courses", "instructor",          "VARCHAR(255)", "DEFAULT ''"),
     ("courses", "thumbnail_url",       "VARCHAR(500)", "DEFAULT ''"),
 
+
+    # ── course_modules ────────────────────────────────────────────────────────
+    # BUG FIX: The live table may have been created by an older migration that
+    # lacked these columns.  CREATE TABLE IF NOT EXISTS never patches existing
+    # tables, so every column that can be missing needs its own ADD COLUMN.
+    ("course_modules", "description", "TEXT",    "DEFAULT ''"),
+    ("course_modules", "order_index", "INTEGER", "DEFAULT 0"),
+    # ── lessons ───────────────────────────────────────────────────────────────
+    ("lessons", "content",          "TEXT",         "DEFAULT ''"),
+    ("lessons", "video_url",        "VARCHAR(500)", "DEFAULT ''"),
+    ("lessons", "attachment_url",   "VARCHAR(500)", "DEFAULT ''"),
+    ("lessons", "duration_minutes", "INTEGER",      "DEFAULT 0"),
+    ("lessons", "order_index",      "INTEGER",      "DEFAULT 0"),
+    ("lessons", "is_free_preview",  "BOOLEAN",      "DEFAULT FALSE"),
+    ("lessons", "is_active",        "BOOLEAN",      "DEFAULT TRUE"),
+
     # ── users ─────────────────────────────────────────────────────────────────
     ("users", "last_login",        "TIMESTAMP",   ""),
     # role / subscription_tier already exist in the ORM, guard anyway

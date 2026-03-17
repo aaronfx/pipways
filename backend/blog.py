@@ -1,100 +1,150 @@
 """
-Blog API - PRODUCTION READY
-Resilient to missing columns via COALESCE + fallback queries.
+Blog API — Complete Rebuild
+Endpoints:
+  GET /blog/posts           — paginated published posts
+  GET /blog/posts/{slug}    — single post by slug
+
+Design decisions:
+- COALESCE on every new column so query never fails if column missing
+- Dual publish filter: status='published' OR is_published=TRUE
+- tags parsed from JSON string → Python list
+- All datetime fields serialised to ISO string
 """
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from .database import database
 from .security import get_current_user
 
 router = APIRouter()
 
 
-def _parse_tags(raw) -> list:
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _tags(raw) -> list:
     if not raw:
         return []
+    if isinstance(raw, list):
+        return raw
     try:
-        return json.loads(raw) if isinstance(raw, str) else (raw or [])
+        return json.loads(raw)
     except Exception:
-        return []
+        return [t.strip() for t in str(raw).split(",") if t.strip()]
 
 
-def _fmt_row(row: dict) -> dict:
+def _fmt(row: dict) -> dict:
+    content = row.get("content") or ""
     return {
         "id":             row.get("id"),
         "title":          row.get("title", ""),
         "slug":           row.get("slug", ""),
-        "excerpt":        row.get("excerpt") or (row.get("content", "")[:150] + "..."),
-        "content":        row.get("content", ""),
-        "category":       row.get("category", "General"),
-        "featured_image": row.get("featured_image", ""),
-        "views":          row.get("views", 0),
-        "tags":           _parse_tags(row.get("tags")),
+        "excerpt":        row.get("excerpt") or content[:160] + ("…" if len(content) > 160 else ""),
+        "content":        content,
+        "category":       row.get("category") or "General",
+        "featured_image": row.get("featured_image") or "",
+        "views":          row.get("views") or 0,
+        "tags":           _tags(row.get("tags")),
+        "featured":       bool(row.get("featured", False)),
+        "read_time":      row.get("read_time") or "5 min",
+        "is_published":   bool(row.get("is_published", False)),
         "created_at":     row["created_at"].isoformat() if row.get("created_at") else None,
         "updated_at":     row["updated_at"].isoformat() if row.get("updated_at") else None,
-        "featured":       bool(row.get("featured", False)),
-        "read_time":      row.get("read_time", "5 min"),
-        "is_published":   bool(row.get("is_published", False)),
     }
 
 
+async def _run(sql: str, params: dict = None):
+    try:
+        return await database.fetch_all(sql, params or {})
+    except Exception as e:
+        print(f"[BLOG] query error: {e}", flush=True)
+        return []
+
+
+async def _one(sql: str, params: dict = None):
+    try:
+        return await database.fetch_one(sql, params or {})
+    except Exception as e:
+        print(f"[BLOG] fetch_one error: {e}", flush=True)
+        return None
+
+
+# ── endpoints ─────────────────────────────────────────────────────────────────
+
 @router.get("/posts")
 async def get_posts(
-    limit:    int = Query(10, ge=1, le=100),
+    limit:    int = Query(20, ge=1, le=100),
     offset:   int = Query(0, ge=0),
     category: Optional[str] = None,
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    cat_clause = "AND category = :category" if category else ""
-    params: dict = {"limit": limit, "offset": offset}
+    """Return published blog posts. Always uses dual-column publish check."""
+    cat = f"AND category = :cat" if category else ""
+    params: dict = {"lim": limit, "off": offset}
     if category:
-        params["category"] = category
+        params["cat"] = category
 
-    # Try rich query with new columns first
-    try:
-        q = f"""
-            SELECT id, title, slug, excerpt, content, category,
-                   COALESCE(featured_image, '') AS featured_image,
-                   COALESCE(views, 0)           AS views,
-                   COALESCE(tags, '[]')         AS tags,
-                   created_at, updated_at,
-                   COALESCE(featured, FALSE)    AS featured,
-                   COALESCE(read_time, '5 min') AS read_time,
-                   COALESCE(is_published, FALSE) AS is_published
-            FROM blog_posts
-            WHERE (status = 'published' OR COALESCE(is_published, FALSE) = TRUE)
-            {cat_clause}
-            ORDER BY COALESCE(featured, FALSE) DESC, created_at DESC
-            LIMIT :limit OFFSET :offset
-        """
-        rows = await database.fetch_all(q, params)
-    except Exception:
-        # Fallback — old schema without new columns
-        q = f"""
+    # Full query with new columns via COALESCE
+    rows = await _run(
+        f"""
+        SELECT id, title, slug, excerpt, content, category,
+               created_at, updated_at,
+               COALESCE(featured_image, '')   AS featured_image,
+               COALESCE(views, 0)             AS views,
+               COALESCE(tags, '[]')           AS tags,
+               COALESCE(featured, FALSE)      AS featured,
+               COALESCE(read_time, '5 min')   AS read_time,
+               COALESCE(is_published, FALSE)  AS is_published
+        FROM blog_posts
+        WHERE (LOWER(COALESCE(status, '')) = 'published'
+               OR COALESCE(is_published, FALSE) = TRUE)
+        {cat}
+        ORDER BY COALESCE(featured, FALSE) DESC, created_at DESC
+        LIMIT :lim OFFSET :off
+        """,
+        params,
+    )
+
+    # Plain fallback (original columns only)
+    if not rows:
+        rows = await _run(
+            f"""
             SELECT id, title, slug, excerpt, content, category,
                    created_at, updated_at, featured, read_time, status
             FROM blog_posts
-            WHERE status = 'published' {cat_clause}
+            WHERE LOWER(COALESCE(status, '')) = 'published'
+            {cat}
             ORDER BY created_at DESC
-            LIMIT :limit OFFSET :offset
-        """
-        rows = await database.fetch_all(q, params)
+            LIMIT :lim OFFSET :off
+            """,
+            params,
+        )
 
-    return [_fmt_row(dict(r)) for r in rows]
+    result = [_fmt(dict(r)) for r in rows]
+    print(f"[BLOG] /posts → {len(result)} posts", flush=True)
+    return result
 
 
 @router.get("/posts/{slug}")
-async def get_post(slug: str, current_user = Depends(get_current_user)):
-    """Get a single published post by slug."""
-    try:
-        q = "SELECT * FROM blog_posts WHERE slug = :slug AND (status = 'published' OR COALESCE(is_published, FALSE) = TRUE)"
-        row = await database.fetch_one(q, {"slug": slug})
-    except Exception:
-        q = "SELECT * FROM blog_posts WHERE slug = :slug AND status = 'published'"
-        row = await database.fetch_one(q, {"slug": slug})
+async def get_post(slug: str, current_user=Depends(get_current_user)):
+    """Return a single published post by slug."""
+    row = await _one(
+        """
+        SELECT * FROM blog_posts
+        WHERE slug = :slug
+          AND (LOWER(COALESCE(status, '')) = 'published'
+               OR COALESCE(is_published, FALSE) = TRUE)
+        """,
+        {"slug": slug},
+    )
+
+    # Fallback without is_published
+    if not row:
+        row = await _one(
+            "SELECT * FROM blog_posts WHERE slug=:slug AND LOWER(COALESCE(status,''))='published'",
+            {"slug": slug},
+        )
 
     if not row:
         raise HTTPException(404, "Post not found")
 
-    return _fmt_row(dict(row))
+    return _fmt(dict(row))

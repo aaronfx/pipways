@@ -122,6 +122,47 @@ const CoursesPage = {
         }
     },
 
+    _courseMetaHTML(c, modules, loose) {
+        const allLessons   = modules.flatMap(m => m.lessons || []).concat(loose);
+        const totalLessons = allLessons.length;
+        const doneLessons  = allLessons.filter(l => l.completed).length;
+        const totalMins    = allLessons.reduce((a, l) => a + (l.duration_minutes || 0), 0);
+        const durStr       = totalMins >= 60
+            ? ('~' + Math.round(totalMins / 60) + 'h ' + (totalMins % 60 ? (totalMins % 60) + 'm' : '')).trim()
+            : totalMins > 0 ? '~' + totalMins + 'm' : '';
+        const pct = totalLessons > 0 ? Math.round(doneLessons / totalLessons * 100) : 0;
+
+        const metaParts = [];
+        if (totalLessons > 0) metaParts.push('<span class="text-xs text-gray-500"><i class="fas fa-book-open mr-1"></i>' + doneLessons + '/' + totalLessons + ' lessons</span>');
+        if (durStr)           metaParts.push('<span class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i>' + durStr + '</span>');
+        if (pct > 0)          metaParts.push('<span class="text-xs font-semibold" style="color:#a78bfa;">' + pct + '% complete</span>');
+
+        const nextLesson = allLessons.find(l => !l.completed);
+        const ctaBtn = nextLesson
+            ? '<div class="mt-4 pt-4 border-t border-gray-700">'
+              + '<button onclick="CoursesPage.openLesson(' + nextLesson.id + ')" '
+              + 'class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all" '
+              + 'style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
+              + '<i class="fas fa-play-circle"></i> Continue: '
+              + this._e(nextLesson.title.length > 40 ? nextLesson.title.slice(0, 40) + '…' : nextLesson.title)
+              + '</button></div>'
+            : '';
+
+        return '<div class="bg-gray-800 rounded-xl p-6 mb-6 border border-gray-700">'
+            + '<div class="flex items-start justify-between gap-4">'
+            + '<div class="flex-1 min-w-0">'
+            + '<span class="text-xs text-purple-400 font-semibold uppercase tracking-wide">' + this._e(c.level || 'Beginner') + '</span>'
+            + '<h2 class="text-2xl font-bold text-white mt-1">' + this._e(c.title || '') + '</h2>'
+            + (c.instructor ? '<p class="text-sm text-gray-400 mt-1">By ' + this._e(c.instructor) + '</p>' : '')
+            + '<p class="text-gray-400 text-sm mt-2">' + this._e(c.description || '') + '</p>'
+            + (metaParts.length ? '<div class="flex flex-wrap items-center gap-3 mt-3">' + metaParts.join('') + '</div>' : '')
+            + '</div>'
+            + (c.thumbnail_url ? '<img src="' + c.thumbnail_url + '" class="w-28 h-20 object-cover rounded-lg flex-shrink-0">' : '')
+            + '</div>'
+            + ctaBtn
+            + '</div>';
+    },
+
     _curriculumHTML(data) {
         const c       = data.course || {};
         const modules = data.modules || [];
@@ -171,21 +212,7 @@ const CoursesPage = {
                     hover:text-white text-sm mb-5 transition-colors">
                 <i class="fas fa-arrow-left"></i> Back to Courses
             </button>
-            <div class="bg-gray-800 rounded-xl p-6 mb-6 border border-gray-700">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <span class="text-xs text-purple-400 font-semibold uppercase tracking-wide">
-                            ${this._e(c.level || 'Beginner')}
-                        </span>
-                        <h2 class="text-2xl font-bold text-white mt-1">${this._e(c.title || '')}</h2>
-                        ${c.instructor ? `<p class="text-sm text-gray-400 mt-1">By ${this._e(c.instructor)}</p>` : ''}
-                        <p class="text-gray-400 text-sm mt-2">${this._e(c.description || '')}</p>
-                    </div>
-                    ${c.thumbnail_url
-                        ? `<img src="${c.thumbnail_url}" class="w-28 h-20 object-cover rounded-lg flex-shrink-0">`
-                        : ''}
-                </div>
-            </div>
+            ${this._courseMetaHTML(c, modules, loose)}
             ${previewVideoHTML}
             <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Curriculum</h3>
             ${modulesHTML}${looseHTML}
@@ -197,20 +224,25 @@ const CoursesPage = {
         const icon = l.video_url
             ? 'fa-play-circle text-purple-400'
             : 'fa-file-alt text-gray-500';
-        const done = l.completed
-            ? '<i class="fas fa-check-circle text-green-400 text-sm"></i>'
+        // REC: completed lessons have visual distinction — green tick + muted text
+        const doneClass = l.completed ? 'lesson-row-done' : '';
+        const titleClass = l.completed ? 'lesson-title text-gray-500 line-through' : 'lesson-title text-gray-300';
+        const completedBadge = l.completed
+            ? '<i class="fas fa-check-circle text-green-400 text-sm flex-shrink-0"></i>'
             : '';
+        // REC: duration estimate shown so learners can plan their time
+        const dur = l.duration_minutes ? `<span class="text-xs text-gray-600 flex-shrink-0">${l.duration_minutes}m</span>` : '';
         return `
         <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-700/40 cursor-pointer
-                    border-b border-gray-700/50 last:border-0 transition-colors"
+                    border-b border-gray-700/50 last:border-0 transition-colors ${doneClass}"
              onclick="CoursesPage.openLesson(${l.id})">
-            <i class="fas ${icon} w-4 flex-shrink-0"></i>
-            <span class="flex-1 text-sm text-gray-300 hover:text-white transition-colors">
+            <i class="fas ${icon} w-4 flex-shrink-0 ${l.completed ? 'opacity-40' : ''}"></i>
+            <span class="flex-1 text-sm transition-colors ${titleClass}">
                 ${this._e(l.title)}
             </span>
-            ${l.duration_minutes ? `<span class="text-xs text-gray-600">${l.duration_minutes}m</span>` : ''}
+            ${dur}
             ${l.is_free_preview ? '<span class="text-xs text-green-500 font-semibold">Free</span>' : ''}
-            ${done}
+            ${completedBadge}
         </div>`;
     },
 

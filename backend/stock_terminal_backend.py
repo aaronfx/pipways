@@ -107,6 +107,16 @@ class CompareRequest(BaseModel):
     symbols: list[str] = Field(min_length=2, max_length=5)
 
 
+class NgxAnalyzeRequest(BaseModel):
+    ticker:        str = Field(min_length=1, max_length=20)
+    analysis_type: str = Field(default="full", pattern="^(fundamental|technical|full)$")
+
+
+class NgxPicksRequest(BaseModel):
+    sector:        str = Field(default="all sectors")
+    signal_filter: str = Field(default="BUY", pattern="^(BUY|all)$")
+
+
 # ── Claude AI helper ──────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
@@ -671,6 +681,123 @@ Provide exactly one object per symbol. Rank 1 = best overall pick.
 """
         data = await claude_json(prompt, max_tokens=900)
         return OkResponse(data=data)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+
+# ── NGX Routes (Nigerian Exchange Group) ─────────────────────────────────────
+
+NGX_SYSTEM = (
+    "You are a professional Nigerian stock market analyst specializing in NGX "
+    "(Nigerian Exchange Group) listed stocks. Always respond with valid JSON only — "
+    "no markdown, no preamble, no explanation."
+)
+
+
+async def ngx_claude_json(prompt: str, max_tokens: int = 1000) -> dict:
+    """Claude call using NGX-specific system prompt."""
+    _require_clients()
+    try:
+        message = await _anthropic.messages.create(
+            model      = "claude-sonnet-4-6",
+            max_tokens = max_tokens,
+            system     = NGX_SYSTEM,
+            messages   = [{"role": "user", "content": prompt}],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
+
+    raw   = "".join(b.text for b in message.content if hasattr(b, "text"))
+    clean = raw.strip()
+    if clean.startswith("```"):
+        clean = clean.split("\n", 1)[-1]
+    if clean.endswith("```"):
+        clean = clean.rsplit("```", 1)[0].strip()
+    try:
+        return json.loads(clean)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Claude returned invalid JSON: {exc}. Raw: {raw[:300]}",
+        ) from exc
+
+
+@router.post("/ngx/analyze", response_model=OkResponse, summary="Analyze an NGX-listed stock")
+async def ngx_analyze(body: NgxAnalyzeRequest) -> OkResponse:
+    ticker = body.ticker.strip().upper()
+    cache_key = f"ngx:{ticker}:{body.analysis_type}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return OkResponse(cached=True, data=cached)
+
+    try:
+        prompt = f"""Analyze {ticker} listed on the Nigerian Exchange (NGX).
+Analysis type: {body.analysis_type}
+
+Return exactly this JSON structure:
+{{
+  "ticker": "{ticker}",
+  "company": "<full company name>",
+  "sector": "<NGX sector>",
+  "signal": "BUY" | "HOLD" | "SELL",
+  "currentPrice": "<₦XX.XX — use realistic NGX price>",
+  "targetPrice": "<₦XX.XX — 12-month analyst target>",
+  "upside": "<+XX% or -XX%>",
+  "marketCap": "<₦XXXbn>",
+  "peRatio": "<XX.X or N/A>",
+  "dividendYield": "<X.X% or N/A>",
+  "summary": "<2-3 sentence investment analysis>",
+  "catalysts": ["<catalyst 1>", "<catalyst 2>", "<catalyst 3>"],
+  "risks": ["<risk 1>", "<risk 2>"]
+}}
+Use realistic NGX data based on your training knowledge. Mark any estimates clearly in the summary."""
+        data = await ngx_claude_json(prompt)
+        await cache_set(cache_key, data)
+        return OkResponse(data=data)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/ngx/picks", response_model=OkResponse, summary="AI top picks for an NGX sector")
+async def ngx_picks(body: NgxPicksRequest) -> OkResponse:
+    cache_key = f"ngx:picks:{body.sector}:{body.signal_filter}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return OkResponse(cached=True, data=cached)
+
+    try:
+        signal_instruction = (
+            "Include only BUY signals." if body.signal_filter == "BUY"
+            else "Include BUY and HOLD signals."
+        )
+        prompt = f"""Generate top NGX stock picks for {body.sector} sector today.
+{signal_instruction}
+
+Return a JSON array of exactly 5 stocks:
+[
+  {{
+    "ticker": "<NGX ticker>",
+    "company": "<full company name>",
+    "sector": "<sector>",
+    "signal": "BUY" | "HOLD",
+    "currentPrice": "<₦XX.XX>",
+    "targetPrice": "<₦XX.XX>",
+    "upside": "<+XX%>",
+    "reason": "<one clear sentence explaining the investment case>"
+  }}
+]
+Use realistic NGX-listed companies with genuine investment rationale."""
+        data = await ngx_claude_json(prompt, max_tokens=1000)
+        picks = data if isinstance(data, list) else data.get("picks", [])
+        await cache_set(cache_key, picks)
+        return OkResponse(data=picks)
 
     except HTTPException:
         raise

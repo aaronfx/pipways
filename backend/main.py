@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from .database import database, init_database, metadata, run_migrations, run_unique_index_migrations
+from .database import database, init_database, metadata, run_migrations
 from sqlalchemy import create_engine
 
 # Import all routers
@@ -26,6 +26,7 @@ from . import ai_services
 from . import chart_analysis
 from . import performance
 from . import ai_mentor
+from . import ai_insights   # Proactive AI Insight Engine
 from . import cms
 try:
     from .lms_init import init_lms_tables
@@ -79,12 +80,6 @@ async def lifespan(app: FastAPI):
         # ── Run column migrations (ADD COLUMN IF NOT EXISTS — fully idempotent) ─
         try:
             await run_migrations()
-        except Exception as e:
-            print(f"[DB MIGRATION] Error: {e}", flush=True)
-
-        # ── Run UNIQUE index migrations (ON CONFLICT support) ──────────────
-        try:
-            await run_unique_index_migrations()
         except Exception as e:
             print(f"[DB MIGRATION] Error: {e}", flush=True)
 
@@ -186,7 +181,8 @@ async def health_check():
             "ocr_extraction",
             "psychology_profile",
             "ai_stock_research",
-            "chart_analysis_caching"
+            "chart_analysis_caching",
+            "proactive_ai_insights"
         ]
     }
 
@@ -205,6 +201,7 @@ app.include_router(courses_enhanced.router, prefix="/courses",        tags=["Cou
 app.include_router(ai_services.router,      prefix="/ai",             tags=["AI Services"])
 app.include_router(chart_analysis.router,   prefix="/ai/chart",       tags=["Chart Analysis"])
 app.include_router(performance.router,      prefix="/ai/performance", tags=["Performance Analytics"])
+app.include_router(ai_insights.router,      prefix="/ai/mentor",      tags=["AI Insights Engine"])
 app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI Mentor v3.0"])
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
 

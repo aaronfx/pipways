@@ -1,127 +1,210 @@
 """
-Trading signals management - PRODUCTION READY
-Returns array format expected by frontend
+Trading Signals API — Complete Rebuild
+Endpoints:
+  GET  /signals/active        — public list (auth required)
+  POST /signals/create        — admin create
+  PUT  /signals/{id}          — admin update
+  DELETE /signals/{id}        — admin delete
+  POST /signals/{id}/close    — admin close
+
+All status comparisons are case-insensitive.
+is_published is checked as fallback publish path.
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Optional
+import json
 from datetime import datetime
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
 
-from .database import database, users
-from .security import get_current_user
-
-def _is_admin(user) -> bool:
-    """Inline admin check — works regardless of security.py version."""
-    if hasattr(user, '_mapping'):
-        return bool(user._mapping.get('is_admin')) or user._mapping.get('role') == 'admin'
-    if isinstance(user, dict):
-        return bool(user.get('is_admin')) or user.get('role') == 'admin'
-    return bool(getattr(user, 'is_admin', False)) or getattr(user, 'role', None) == 'admin'
+from .database import database
+from .security import get_current_user, is_admin_user
 
 router = APIRouter()
 
-# Production: Real signals from database
-# For demo/initial setup, returns empty array or real data if available
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+async def _q(sql: str, params: dict = None):
+    try:
+        return await database.fetch_all(sql, params or {})
+    except Exception as e:
+        print(f"[SIGNALS] query error: {e}", flush=True)
+        return []
+
+
+async def _one(sql: str, params: dict = None):
+    try:
+        return await database.fetch_one(sql, params or {})
+    except Exception as e:
+        print(f"[SIGNALS] fetch_one error: {e}", flush=True)
+        return None
+
+
+async def _run(sql: str, params: dict = None):
+    try:
+        return await database.execute(sql, params or {})
+    except Exception as e:
+        print(f"[SIGNALS] execute error: {e}", flush=True)
+        raise HTTPException(500, f"Database error: {e}")
+
+
+def _fmt_signal(row: dict) -> dict:
+    return {
+        "id":            row.get("id"),
+        "symbol":        row.get("symbol") or "—",
+        "direction":     (row.get("direction") or "—").upper(),
+        "entry_price":   float(row["entry_price"]) if row.get("entry_price") is not None else 0,
+        "stop_loss":     float(row["stop_loss"])   if row.get("stop_loss")   is not None else 0,
+        "take_profit":   float(row["take_profit"]) if row.get("take_profit") is not None else 0,
+        "timeframe":     row.get("timeframe") or "1H",
+        "status":        row.get("status") or "active",
+        "ai_confidence": float(row["ai_confidence"]) if row.get("ai_confidence") is not None else None,
+        "analysis":      row.get("analysis") or "",
+        "created_at":    row["created_at"].isoformat() if row.get("created_at") else None,
+        "outcome":       row.get("outcome") or "",
+    }
+
+
+# ── public endpoints ──────────────────────────────────────────────────────────
 
 @router.get("/active")
 async def get_active_signals(
-    limit: int = 50,
-    current_user = Depends(get_current_user)
+    limit: int = 100,
+    current_user=Depends(get_current_user),
 ):
     """
-    Get all active trading signals.
-    PRODUCTION: Queries real database table
+    Return all active signals.
+    Uses LOWER(status) = 'active' so 'Active', 'ACTIVE', 'active' all match.
+    Falls back to simple query if is_published column doesn't exist yet.
     """
-    try:
-        # BUG FIX 1: Also check is_published — CMS sets is_published=TRUE when publishing.
-        # BUG FIX 2: Try with COALESCE on is_published first; fall back if column missing.
-        try:
-            rows = await database.fetch_all(
-                """
-                SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
-                       timeframe, created_at, ai_confidence, status,
-                       COALESCE(is_published, FALSE) as is_published
-                FROM signals
-                WHERE status = 'active' OR COALESCE(is_published, FALSE) = TRUE
-                ORDER BY created_at DESC
-                LIMIT :limit
-                """,
-                {"limit": limit}
-            )
-        except Exception:
-            # Fallback: is_published column may not exist yet
-            rows = await database.fetch_all(
-                """
-                SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
-                       timeframe, created_at, ai_confidence, status
-                FROM signals
-                WHERE status = 'active'
-                ORDER BY created_at DESC
-                LIMIT :limit
-                """,
-                {"limit": limit}
-            )
+    # Try with is_published column
+    rows = await _q(
+        """
+        SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
+               timeframe, status, ai_confidence, analysis, created_at, outcome
+        FROM signals
+        WHERE LOWER(status) = 'active'
+           OR COALESCE(is_published, FALSE) = TRUE
+        ORDER BY created_at DESC
+        LIMIT :lim
+        """,
+        {"lim": limit},
+    )
 
-        signals = []
-        for row in rows:
-            signals.append({
-                "id":           row["id"],
-                "symbol":       row["symbol"] or "—",
-                "direction":    row["direction"] or "—",
-                "entry_price":  float(row["entry_price"]) if row["entry_price"] else 0,
-                "stop_loss":    float(row["stop_loss"])   if row["stop_loss"]   else 0,
-                "take_profit":  float(row["take_profit"]) if row["take_profit"] else 0,
-                "timeframe":    row.get("timeframe", "1H") or "1H",
-                "created_at":   row["created_at"].isoformat() if row["created_at"] else None,
-                "ai_confidence": float(row["ai_confidence"]) if row.get("ai_confidence") else None,
-                "status":       row["status"],
-            })
+    # If that failed (empty because column missing), try without is_published
+    if not rows:
+        rows = await _q(
+            """
+            SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
+                   timeframe, status, ai_confidence, analysis, created_at, outcome
+            FROM signals
+            WHERE LOWER(status) = 'active'
+            ORDER BY created_at DESC
+            LIMIT :lim
+            """,
+            {"lim": limit},
+        )
 
-        print(f"[SIGNALS] Returning {len(signals)} active signals", flush=True)
-        return signals
+    result = [_fmt_signal(dict(r)) for r in rows]
+    print(f"[SIGNALS] /active → {len(result)} signals", flush=True)
+    return result
 
-    except Exception as e:
-        print(f"[ERROR] Failed to fetch signals: {e}", flush=True)
-        return []
+
+# ── admin endpoints ───────────────────────────────────────────────────────────
 
 @router.post("/create")
-async def create_signal(
-    signal: dict,
-    current_user = Depends(get_current_user)
-):
-    """Create new trading signal (admin only)"""
-    try:
-        # Use inline admin check — compatible with all security.py versions
-        if not _is_admin(current_user):
-            raise HTTPException(403, "Admin access required")
+async def create_signal(signal: dict, current_user=Depends(get_current_user)):
+    if not is_admin_user(current_user):
+        raise HTTPException(403, "Admin access required")
 
-        
-        # Insert into database
-        query = """
-            INSERT INTO signals (symbol, direction, entry_price, stop_loss, take_profit, 
-                               timeframe, created_at, status, ai_confidence)
-            VALUES (:symbol, :direction, :entry_price, :stop_loss, :take_profit,
-                    :timeframe, NOW(), 'active', :ai_confidence)
-            RETURNING id
+    # Validate required fields
+    for field in ("symbol", "direction", "entry_price", "stop_loss", "take_profit"):
+        if signal.get(field) is None:
+            raise HTTPException(422, f"Missing required field: {field}")
+
+    sid = await _run(
         """
-        
-        signal_id = await database.execute(query, {
-            "symbol": signal.get("symbol"),
-            "direction": signal.get("direction"),
-            "entry_price": signal.get("entry_price"),
-            "stop_loss": signal.get("stop_loss"),
-            "take_profit": signal.get("take_profit"),
-            "timeframe": signal.get("timeframe", "1H"),
-            "ai_confidence": signal.get("ai_confidence", 0.8)
-        })
-        
-        return {
-            "status": "created",
-            "id": signal_id,
-            "signal": signal
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[ERROR] Failed to create signal: {e}", flush=True)
-        raise HTTPException(500, f"Database error: {str(e)}")
+        INSERT INTO signals
+            (symbol, direction, entry_price, stop_loss, take_profit,
+             timeframe, analysis, ai_confidence, status, created_at)
+        VALUES
+            (:sym, :dir, :entry, :sl, :tp,
+             :tf, :anal, :conf, 'active', NOW())
+        RETURNING id
+        """,
+        {
+            "sym":   signal["symbol"].upper(),
+            "dir":   signal["direction"].upper(),
+            "entry": float(signal["entry_price"]),
+            "sl":    float(signal["stop_loss"]),
+            "tp":    float(signal["take_profit"]),
+            "tf":    signal.get("timeframe") or "1H",
+            "anal":  signal.get("analysis") or "",
+            "conf":  signal.get("ai_confidence"),
+        },
+    )
+
+    # Backfill legacy pair column if it exists
+    try:
+        await database.execute(
+            "UPDATE signals SET pair=:p WHERE id=:id",
+            {"p": signal["symbol"].upper(), "id": sid},
+        )
+    except Exception:
+        pass
+
+    return {"status": "created", "id": sid}
+
+
+@router.put("/{signal_id}")
+async def update_signal(signal_id: int, signal: dict, current_user=Depends(get_current_user)):
+    if not is_admin_user(current_user):
+        raise HTTPException(403, "Admin access required")
+
+    if not await _one("SELECT id FROM signals WHERE id=:id", {"id": signal_id}):
+        raise HTTPException(404, "Signal not found")
+
+    await _run(
+        """
+        UPDATE signals
+        SET symbol=:sym, direction=:dir, entry_price=:entry,
+            stop_loss=:sl, take_profit=:tp, timeframe=:tf,
+            analysis=:anal, ai_confidence=:conf, status=:status
+        WHERE id=:id
+        """,
+        {
+            "sym":    signal.get("symbol", "").upper(),
+            "dir":    signal.get("direction", "BUY").upper(),
+            "entry":  float(signal.get("entry_price", 0)),
+            "sl":     float(signal.get("stop_loss", 0)),
+            "tp":     float(signal.get("take_profit", 0)),
+            "tf":     signal.get("timeframe") or "1H",
+            "anal":   signal.get("analysis") or "",
+            "conf":   signal.get("ai_confidence"),
+            "status": signal.get("status") or "active",
+            "id":     signal_id,
+        },
+    )
+    return {"message": "Signal updated"}
+
+
+@router.delete("/{signal_id}")
+async def delete_signal(signal_id: int, current_user=Depends(get_current_user)):
+    if not is_admin_user(current_user):
+        raise HTTPException(403, "Admin access required")
+    await _run("DELETE FROM signals WHERE id=:id", {"id": signal_id})
+    return {"message": "Signal deleted"}
+
+
+@router.post("/{signal_id}/close")
+async def close_signal(
+    signal_id: int,
+    outcome: Optional[str] = "closed",
+    current_user=Depends(get_current_user),
+):
+    if not is_admin_user(current_user):
+        raise HTTPException(403, "Admin access required")
+    await _run(
+        "UPDATE signals SET status='closed', outcome=:outcome WHERE id=:id",
+        {"outcome": outcome, "id": signal_id},
+    )
+    return {"message": f"Signal closed ({outcome})"}

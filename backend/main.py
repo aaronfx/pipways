@@ -28,6 +28,7 @@ from . import performance
 from . import ai_mentor
 from . import ai_insights   # Proactive AI Insight Engine
 from . import cms
+from . import learning              # ← Trading Academy LMS
 try:
     from .lms_init import init_lms_tables
     _HAS_LMS_INIT = True
@@ -182,7 +183,8 @@ async def health_check():
             "psychology_profile",
             "ai_stock_research",
             "chart_analysis_caching",
-            "proactive_ai_insights"
+            "proactive_ai_insights",
+            "trading_academy_lms"
         ]
     }
 
@@ -204,6 +206,7 @@ app.include_router(performance.router,      prefix="/ai/performance", tags=["Per
 app.include_router(ai_insights.router,      prefix="/ai/mentor",      tags=["AI Insights Engine"])
 app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI Mentor v3.0"])
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
+app.include_router(learning.router,         prefix="/learning",       tags=["Learning"])    # ← Trading Academy LMS
 
 # Stock Terminal — uses the corrected single-import router reference
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
@@ -263,7 +266,7 @@ async def serve_dashboard():
 async def serve_spa(full_path: str):
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/",
-        "blog/", "ai/", "admin/", "cms/", "health", "docs", "openapi.json",
+        "blog/", "ai/", "admin/", "cms/", "learning/", "health", "docs", "openapi.json",
         "static/", "js/", "api/",
     )
     if full_path.startswith(api_prefixes):

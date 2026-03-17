@@ -60,7 +60,8 @@ async def _rows(q, v=None):
         rs = await database.fetch_all(q, v or {})
         return [dict(r) for r in rs] if rs else []
     except Exception as e:
-        print(f"[CMS] rows: {e}", flush=True); return []
+        print(f"[CMS] _rows ERROR: {e} | query: {str(q)[:120]}", flush=True)
+        return []
 
 async def _exec(q, v=None):
     try:
@@ -485,7 +486,7 @@ class QuestionIn(BaseModel):
 
 @router.get("/courses")
 async def cms_list_courses(_=Depends(get_admin_user)):
-    # Try full query with JOINs first (works after migration)
+    rows = []
     try:
         rows = await _rows(
             "SELECT c.id,c.title,c.description,c.level,c.price,c.thumbnail,c.preview_video,"
@@ -497,18 +498,24 @@ async def cms_list_courses(_=Depends(get_admin_user)):
             "LEFT JOIN lessons l ON l.course_id=c.id "
             "GROUP BY c.id ORDER BY c.created_at DESC"
         )
-    except Exception:
-        # Fallback: simple query if new tables don't exist yet
-        rows = await _rows(
-            "SELECT id,title,description,level,is_published,created_at "
-            "FROM courses ORDER BY created_at DESC"
-        )
-        for r in rows:
-            r.setdefault("price", 0)
-            r.setdefault("thumbnail", "")
-            r.setdefault("preview_video", "")
-            r.setdefault("certificate_enabled", False)
-            r.setdefault("pass_percentage", 70)
+        print(f"[CMS] listCourses (full join): {len(rows)} rows", flush=True)
+    except Exception as e1:
+        print(f"[CMS] listCourses full join failed ({e1}), using simple query", flush=True)
+        try:
+            rows = await _rows(
+                "SELECT id,title,description,level,is_published,created_at "
+                "FROM courses ORDER BY created_at DESC"
+            )
+            for r in rows:
+                r.setdefault("price", 0)
+                r.setdefault("thumbnail", "")
+                r.setdefault("preview_video", "")
+                r.setdefault("certificate_enabled", False)
+                r.setdefault("pass_percentage", 70)
+            print(f"[CMS] listCourses (simple): {len(rows)} rows", flush=True)
+        except Exception as e2:
+            print(f"[CMS] listCourses simple query also failed: {e2}", flush=True)
+            return []
     for r in rows:
         r["created_at"]   = _fmt(r.get("created_at"))
         r["module_count"] = r.get("module_count") or 0
@@ -517,8 +524,9 @@ async def cms_list_courses(_=Depends(get_admin_user)):
 
 @router.post("/courses", status_code=201)
 async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
+    print(f"[CMS] Creating course: title={data.title!r} published={data.is_published}", flush=True)
+    cid = None
     try:
-        # Full INSERT including is_active — RETURNING id gives us the real integer PK
         cid = await _exec(
             "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
             "is_published,is_active,certificate_enabled,pass_percentage,created_at) "
@@ -530,19 +538,27 @@ async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
              "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
              "now":datetime.utcnow()}
         )
-    except Exception:
-        # Fallback: is_active column not yet added
-        cid = await _exec(
-            "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
-            "is_published,certificate_enabled,pass_percentage,created_at) "
-            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)"
-            " RETURNING id",
-            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-             "pub":data.is_published,
-             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
-             "now":datetime.utcnow()}
-        )
+        print(f"[CMS] Course created with id={cid} (full insert)", flush=True)
+    except Exception as e1:
+        print(f"[CMS] Full insert failed ({e1}), trying fallback insert", flush=True)
+        try:
+            cid = await _exec(
+                "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
+                "is_published,certificate_enabled,pass_percentage,created_at) "
+                "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)"
+                " RETURNING id",
+                {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
+                 "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
+                 "pub":data.is_published,
+                 "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
+                 "now":datetime.utcnow()}
+            )
+            print(f"[CMS] Course created with id={cid} (fallback insert)", flush=True)
+        except Exception as e2:
+            print(f"[CMS] Fallback insert also failed: {e2}", flush=True)
+            raise HTTPException(500, f"Could not create course: {e2}")
+    if not cid:
+        raise HTTPException(500, "Course insert returned no ID")
     return {"id": cid, "message": "Course created"}
 
 @router.put("/courses/{cid}")

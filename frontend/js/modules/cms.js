@@ -6,75 +6,92 @@
  * Depends on: window.dashboard, window.API
  */
 
+// ── Standalone fetch helper — no dependency on dashboard object ──────────────
+function _cmsReq(endpoint, opts) {
+    opts = opts || {};
+    var token = localStorage.getItem('pipways_token');
+    var headers = Object.assign({'Content-Type': 'application/json'}, opts.headers || {});
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    if (opts.body instanceof FormData) delete headers['Content-Type'];
+    return fetch(window.location.origin + endpoint, Object.assign({}, opts, {headers: headers}))
+        .then(function(res) {
+            if (res.status === 401) { localStorage.removeItem('pipways_token'); location.reload(); throw new Error('Session expired'); }
+            return res.json().then(function(body) {
+                if (!res.ok) throw new Error(body.detail || body.message || 'HTTP ' + res.status);
+                return body;
+            });
+        });
+}
+
 // ── API extension ─────────────────────────────────────────────────────────────
 API.cms = {
     // Media
     uploadMedia:     (fd)        => { const t=localStorage.getItem('pipways_token'); return fetch(`${location.origin}/cms/media/upload`,{method:'POST',headers:{Authorization:`Bearer ${t}`},body:fd}).then(r=>r.ok?r.json():r.json().then(e=>{throw new Error(e.detail||'Upload failed')})); },
-    listMedia:       (folder)    => dashboard.apiRequest(`/cms/media${folder?`?folder=${folder}`:''}`),
-    deleteMedia:     (fn)        => dashboard.apiRequest(`/cms/media?filename=${encodeURIComponent(fn)}`,{method:'DELETE'}),
+    listMedia:       (folder)    => _cmsReq(`/cms/media${folder?`?folder=${folder}`:''}`),
+    deleteMedia:     (fn)        => _cmsReq(`/cms/media?filename=${encodeURIComponent(fn)}`,{method:'DELETE'}),
     // Blog
-    listPosts:       ()          => dashboard.apiRequest('/cms/blog'),
-    getPost:         (id)        => dashboard.apiRequest(`/cms/blog/${id}`),
-    createPost:      (d)         => dashboard.apiRequest('/cms/blog',{method:'POST',body:JSON.stringify(d)}),
-    updatePost:      (id,d)      => dashboard.apiRequest(`/cms/blog/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deletePost:      (id)        => dashboard.apiRequest(`/cms/blog/${id}`,{method:'DELETE'}),
-    togglePost:      (id)        => dashboard.apiRequest(`/cms/blog/${id}/toggle-publish`,{method:'POST'}),
-    seoScore:        (d)         => dashboard.apiRequest('/cms/blog/seo-score',{method:'POST',body:JSON.stringify(d)}),
+    listPosts:       ()          => _cmsReq('/cms/blog'),
+    getPost:         (id)        => _cmsReq(`/cms/blog/${id}`),
+    createPost:      (d)         => _cmsReq('/cms/blog',{method:'POST',body:JSON.stringify(d)}),
+    updatePost:      (id,d)      => _cmsReq(`/cms/blog/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deletePost:      (id)        => _cmsReq(`/cms/blog/${id}`,{method:'DELETE'}),
+    togglePost:      (id)        => _cmsReq(`/cms/blog/${id}/toggle-publish`,{method:'POST'}),
+    seoScore:        (d)         => _cmsReq('/cms/blog/seo-score',{method:'POST',body:JSON.stringify(d)}),
     // Courses
-    listCourses:     ()          => dashboard.apiRequest('/cms/courses'),
-    createCourse:    (d)         => dashboard.apiRequest('/cms/courses',{method:'POST',body:JSON.stringify(d)}),
-    updateCourse:    (id,d)      => dashboard.apiRequest(`/cms/courses/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteCourse:    (id)        => dashboard.apiRequest(`/cms/courses/${id}`,{method:'DELETE'}),
-    toggleCourse:    (id)        => dashboard.apiRequest(`/cms/courses/${id}/toggle-publish`,{method:'POST'}),
+    listCourses:     ()          => _cmsReq('/cms/courses'),
+    createCourse:    (d)         => _cmsReq('/cms/courses',{method:'POST',body:JSON.stringify(d)}),
+    updateCourse:    (id,d)      => _cmsReq(`/cms/courses/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteCourse:    (id)        => _cmsReq(`/cms/courses/${id}`,{method:'DELETE'}),
+    toggleCourse:    (id)        => _cmsReq(`/cms/courses/${id}/toggle-publish`,{method:'POST'}),
     // Modules
-    listModules:     (cid)       => dashboard.apiRequest(`/cms/courses/${cid}/modules`),
-    createModule:    (d)         => dashboard.apiRequest('/cms/modules',{method:'POST',body:JSON.stringify(d)}),
-    updateModule:    (id,d)      => dashboard.apiRequest(`/cms/modules/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteModule:    (id)        => dashboard.apiRequest(`/cms/modules/${id}`,{method:'DELETE'}),
+    listModules:     (cid)       => _cmsReq(`/cms/courses/${cid}/modules`),
+    createModule:    (d)         => _cmsReq('/cms/modules',{method:'POST',body:JSON.stringify(d)}),
+    updateModule:    (id,d)      => _cmsReq(`/cms/modules/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteModule:    (id)        => _cmsReq(`/cms/modules/${id}`,{method:'DELETE'}),
     // Lessons
-    listLessons:     (mid)       => dashboard.apiRequest(`/cms/modules/${mid}/lessons`),
-    createLesson:    (d)         => dashboard.apiRequest('/cms/lessons',{method:'POST',body:JSON.stringify(d)}),
-    updateLesson:    (id,d)      => dashboard.apiRequest(`/cms/lessons/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteLesson:    (id)        => dashboard.apiRequest(`/cms/lessons/${id}`,{method:'DELETE'}),
+    listLessons:     (mid)       => _cmsReq(`/cms/modules/${mid}/lessons`),
+    createLesson:    (d)         => _cmsReq('/cms/lessons',{method:'POST',body:JSON.stringify(d)}),
+    updateLesson:    (id,d)      => _cmsReq(`/cms/lessons/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteLesson:    (id)        => _cmsReq(`/cms/lessons/${id}`,{method:'DELETE'}),
     // Quizzes
-    getQuiz:         (mid)       => dashboard.apiRequest(`/cms/modules/${mid}/quiz`),
-    createQuiz:      (d)         => dashboard.apiRequest('/cms/quizzes',{method:'POST',body:JSON.stringify(d)}),
-    updateQuiz:      (id,d)      => dashboard.apiRequest(`/cms/quizzes/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteQuiz:      (id)        => dashboard.apiRequest(`/cms/quizzes/${id}`,{method:'DELETE'}),
-    createQuestion:  (d)         => dashboard.apiRequest('/cms/quiz-questions',{method:'POST',body:JSON.stringify(d)}),
-    updateQuestion:  (id,d)      => dashboard.apiRequest(`/cms/quiz-questions/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteQuestion:  (id)        => dashboard.apiRequest(`/cms/quiz-questions/${id}`,{method:'DELETE'}),
+    getQuiz:         (mid)       => _cmsReq(`/cms/modules/${mid}/quiz`),
+    createQuiz:      (d)         => _cmsReq('/cms/quizzes',{method:'POST',body:JSON.stringify(d)}),
+    updateQuiz:      (id,d)      => _cmsReq(`/cms/quizzes/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteQuiz:      (id)        => _cmsReq(`/cms/quizzes/${id}`,{method:'DELETE'}),
+    createQuestion:  (d)         => _cmsReq('/cms/quiz-questions',{method:'POST',body:JSON.stringify(d)}),
+    updateQuestion:  (id,d)      => _cmsReq(`/cms/quiz-questions/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteQuestion:  (id)        => _cmsReq(`/cms/quiz-questions/${id}`,{method:'DELETE'}),
     // Signals
-    listSignals:     ()          => dashboard.apiRequest('/cms/signals'),
-    createSignal:    (d)         => dashboard.apiRequest('/cms/signals',{method:'POST',body:JSON.stringify(d)}),
-    updateSignal:    (id,d)      => dashboard.apiRequest(`/cms/signals/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteSignal:    (id)        => dashboard.apiRequest(`/cms/signals/${id}`,{method:'DELETE'}),
-    closeSignal:     (id,o)      => dashboard.apiRequest(`/cms/signals/${id}/close?outcome=${o}`,{method:'POST'}),
+    listSignals:     ()          => _cmsReq('/cms/signals'),
+    createSignal:    (d)         => _cmsReq('/cms/signals',{method:'POST',body:JSON.stringify(d)}),
+    updateSignal:    (id,d)      => _cmsReq(`/cms/signals/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteSignal:    (id)        => _cmsReq(`/cms/signals/${id}`,{method:'DELETE'}),
+    closeSignal:     (id,o)      => _cmsReq(`/cms/signals/${id}/close?outcome=${o}`,{method:'POST'}),
     // Webinars
-    listWebinars:    ()          => dashboard.apiRequest('/cms/webinars'),
-    createWebinar:   (d)         => dashboard.apiRequest('/cms/webinars',{method:'POST',body:JSON.stringify(d)}),
-    updateWebinar:   (id,d)      => dashboard.apiRequest(`/cms/webinars/${id}`,{method:'PUT',body:JSON.stringify(d)}),
-    deleteWebinar:   (id)        => dashboard.apiRequest(`/cms/webinars/${id}`,{method:'DELETE'}),
-    toggleWebinar:   (id)        => dashboard.apiRequest(`/cms/webinars/${id}/toggle-publish`,{method:'POST'}),
+    listWebinars:    ()          => _cmsReq('/cms/webinars'),
+    createWebinar:   (d)         => _cmsReq('/cms/webinars',{method:'POST',body:JSON.stringify(d)}),
+    updateWebinar:   (id,d)      => _cmsReq(`/cms/webinars/${id}`,{method:'PUT',body:JSON.stringify(d)}),
+    deleteWebinar:   (id)        => _cmsReq(`/cms/webinars/${id}`,{method:'DELETE'}),
+    toggleWebinar:   (id)        => _cmsReq(`/cms/webinars/${id}/toggle-publish`,{method:'POST'}),
     // Users
-    listUsers:       (p,s,r,t)   => dashboard.apiRequest(`/cms/users?page=${p||1}&per_page=25${s?`&search=${encodeURIComponent(s)}`:''}`),
-    setUserRole:     (id,role)   => dashboard.apiRequest(`/cms/users/${id}/role`,{method:'POST',body:JSON.stringify({role})}),
-    setUserSub:      (id,tier)   => dashboard.apiRequest(`/cms/users/${id}/subscription`,{method:'POST',body:JSON.stringify({subscription_tier:tier})}),
-    toggleUser:      (id)        => dashboard.apiRequest(`/cms/users/${id}/toggle-active`,{method:'POST'}),
-    getUserActivity: (id)        => dashboard.apiRequest(`/cms/users/${id}/activity`),
+    listUsers:       (p,s,r,t)   => _cmsReq(`/cms/users?page=${p||1}&per_page=25${s?`&search=${encodeURIComponent(s)}`:''}`),
+    setUserRole:     (id,role)   => _cmsReq(`/cms/users/${id}/role`,{method:'POST',body:JSON.stringify({role})}),
+    setUserSub:      (id,tier)   => _cmsReq(`/cms/users/${id}/subscription`,{method:'POST',body:JSON.stringify({subscription_tier:tier})}),
+    toggleUser:      (id)        => _cmsReq(`/cms/users/${id}/toggle-active`,{method:'POST'}),
+    getUserActivity: (id)        => _cmsReq(`/cms/users/${id}/activity`),
     // Announcements
-    listAnnouncements:  ()       => dashboard.apiRequest('/cms/announcements'),
-    createAnnouncement: (d)      => dashboard.apiRequest('/cms/announcements',{method:'POST',body:JSON.stringify(d)}),
-    deleteAnnouncement: (id)     => dashboard.apiRequest(`/cms/announcements/${id}`,{method:'DELETE'}),
-    toggleAnnouncement: (id)     => dashboard.apiRequest(`/cms/announcements/${id}/toggle`,{method:'POST'}),
+    listAnnouncements:  ()       => _cmsReq('/cms/announcements'),
+    createAnnouncement: (d)      => _cmsReq('/cms/announcements',{method:'POST',body:JSON.stringify(d)}),
+    deleteAnnouncement: (id)     => _cmsReq(`/cms/announcements/${id}`,{method:'DELETE'}),
+    toggleAnnouncement: (id)     => _cmsReq(`/cms/announcements/${id}/toggle`,{method:'POST'}),
     // Coupons
-    listCoupons:     ()          => dashboard.apiRequest('/cms/coupons'),
-    createCoupon:    (d)         => dashboard.apiRequest('/cms/coupons',{method:'POST',body:JSON.stringify(d)}),
-    deleteCoupon:    (id)        => dashboard.apiRequest(`/cms/coupons/${id}`,{method:'DELETE'}),
-    toggleCoupon:    (id)        => dashboard.apiRequest(`/cms/coupons/${id}/toggle`,{method:'POST'}),
+    listCoupons:     ()          => _cmsReq('/cms/coupons'),
+    createCoupon:    (d)         => _cmsReq('/cms/coupons',{method:'POST',body:JSON.stringify(d)}),
+    deleteCoupon:    (id)        => _cmsReq(`/cms/coupons/${id}`,{method:'DELETE'}),
+    toggleCoupon:    (id)        => _cmsReq(`/cms/coupons/${id}/toggle`,{method:'POST'}),
     // Settings
-    getSettings:     ()          => dashboard.apiRequest('/cms/settings'),
-    saveSettings:    (d)         => dashboard.apiRequest('/cms/settings',{method:'PUT',body:JSON.stringify(d)}),
+    getSettings:     ()          => _cmsReq('/cms/settings'),
+    saveSettings:    (d)         => _cmsReq('/cms/settings',{method:'PUT',body:JSON.stringify(d)}),
 };
 
 // ── CMSPage ───────────────────────────────────────────────────────────────────
@@ -235,7 +252,7 @@ const CMSPage = {
     // ═════════════════════════════════════════════════════════════════════════
     async _blog(){
         const pane=document.getElementById('cms-pane-blog'); if(!pane) return;
-        let posts=[]; try{posts=await API.cms.listPosts();}catch(_){}
+        let posts=[]; try{posts=await API.cms.listPosts();}catch(e){console.error('[CMS] listPosts failed:',e); this._toast('Failed to load blog posts: '+e.message,'error');}
         pane.innerHTML=`
         <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2">
@@ -504,7 +521,7 @@ const CMSPage = {
     // ═════════════════════════════════════════════════════════════════════════
     async _lms(){
         const pane=document.getElementById('cms-pane-lms'); if(!pane) return;
-        let courses=[]; try{courses=await API.cms.listCourses();}catch(_){}
+        let courses=[]; try{courses=await API.cms.listCourses();}catch(e){console.error('[CMS] listCourses failed:',e); this._toast('Failed to load courses: '+e.message,'error');}
         pane.innerHTML=`
         <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2">
@@ -920,7 +937,7 @@ const CMSPage = {
     // ═════════════════════════════════════════════════════════════════════════
     async _signals(){
         const pane=document.getElementById('cms-pane-signals'); if(!pane) return;
-        let sigs=[]; try{sigs=await API.cms.listSignals();}catch(_){}
+        let sigs=[]; try{sigs=await API.cms.listSignals();}catch(e){console.error('[CMS] listSignals failed:',e); this._toast('Failed to load signals: '+e.message,'error');}
         pane.innerHTML=`
         <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2">
@@ -1001,7 +1018,7 @@ const CMSPage = {
     // ═════════════════════════════════════════════════════════════════════════
     async _webinars(){
         const pane=document.getElementById('cms-pane-webinars'); if(!pane) return;
-        let ws=[]; try{ws=await API.cms.listWebinars();}catch(_){}
+        let ws=[]; try{ws=await API.cms.listWebinars();}catch(e){console.error('[CMS] listWebinars failed:',e); this._toast('Failed to load webinars: '+e.message,'error');}
         pane.innerHTML=`
         <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-video text-pink-400"></i> Webinars <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${ws.length}</span></h3>

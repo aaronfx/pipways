@@ -251,7 +251,8 @@ async def cms_create_post(data: BlogPostIn, _=Depends(get_admin_user)):
         pid = await _exec(
             "INSERT INTO blog_posts (title,slug,excerpt,content,category,tags,featured_image,"
             "seo_title,seo_description,focus_keyword,is_published,status,views,created_at,updated_at) "
-            "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,:status,0,:now,:now)",
+            "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,:status,0,:now,:now)"
+            " RETURNING id",
             {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
              "cat":data.category or "General","tags":_tags_str(data.tags),"img":data.featured_image or "",
              "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
@@ -517,11 +518,12 @@ async def cms_list_courses(_=Depends(get_admin_user)):
 @router.post("/courses", status_code=201)
 async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
     try:
-        # Full INSERT including is_active (works after migration runs)
+        # Full INSERT including is_active — RETURNING id gives us the real integer PK
         cid = await _exec(
             "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
             "is_published,is_active,certificate_enabled,pass_percentage,created_at) "
-            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:active,:cert,:pass,:now)",
+            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:active,:cert,:pass,:now)"
+            " RETURNING id",
             {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
              "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
              "pub":data.is_published,"active":data.is_published,
@@ -529,11 +531,12 @@ async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
              "now":datetime.utcnow()}
         )
     except Exception:
-        # Fallback: is_active column not yet added — insert without it
+        # Fallback: is_active column not yet added
         cid = await _exec(
             "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
             "is_published,certificate_enabled,pass_percentage,created_at) "
-            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)",
+            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)"
+            " RETURNING id",
             {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
              "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
              "pub":data.is_published,
@@ -620,7 +623,7 @@ async def cms_list_modules(cid: int, _=Depends(get_admin_user)):
 @router.post("/modules", status_code=201)
 async def cms_create_module(data: ModuleIn, _=Depends(get_admin_user)):
     mid = await _exec(
-        "INSERT INTO course_modules (course_id,title,description,order_index) VALUES (:cid,:title,:desc,:ord)",
+        "INSERT INTO course_modules (course_id,title,description,order_index) VALUES (:cid,:title,:desc,:ord) RETURNING id",
         {"cid":data.course_id,"title":data.title,"desc":data.description or "","ord":data.order_index or 0}
     )
     return {"id": mid, "message": "Module created"}
@@ -658,7 +661,7 @@ async def cms_create_lesson(data: LessonIn, _=Depends(get_admin_user)):
     lid = await _exec(
         "INSERT INTO lessons (module_id,course_id,title,content,video_url,attachment_url,"
         "duration_minutes,order_index,is_free_preview,created_at) "
-        "VALUES (:mid,:cid,:title,:content,:video,:attach,:dur,:ord,:preview,:now)",
+        "VALUES (:mid,:cid,:title,:content,:video,:attach,:dur,:ord,:preview,:now) RETURNING id",
         {"mid":data.module_id,"cid":data.course_id,"title":data.title,"content":data.content or "",
          "video":data.video_url or "","attach":data.attachment_url or "",
          "dur":data.duration_minutes or 0,"ord":data.order_index or 0,
@@ -701,7 +704,7 @@ async def cms_get_quiz(mid: int, _=Depends(get_admin_user)):
 async def cms_create_quiz(data: QuizIn, _=Depends(get_admin_user)):
     qid = await _exec(
         "INSERT INTO quizzes (module_id,title,pass_percentage,max_attempts,created_at) "
-        "VALUES (:mid,:title,:pass,:attempts,:now)",
+        "VALUES (:mid,:title,:pass,:attempts,:now) RETURNING id",
         {"mid":data.module_id,"title":data.title,"pass":data.pass_percentage or 70,
          "attempts":data.max_attempts or 3,"now":datetime.utcnow()}
     )
@@ -726,7 +729,7 @@ async def cms_create_question(data: QuestionIn, _=Depends(get_admin_user)):
     qid = await _exec(
         "INSERT INTO quiz_questions (quiz_id,question,option_a,option_b,option_c,option_d,"
         "correct_option,explanation,order_index) "
-        "VALUES (:qid,:q,:a,:b,:c,:d,:correct,:expl,:ord)",
+        "VALUES (:qid,:q,:a,:b,:c,:d,:correct,:expl,:ord) RETURNING id",
         {"qid":data.quiz_id,"q":data.question,"a":data.option_a,"b":data.option_b,
          "c":data.option_c or "","d":data.option_d or "","correct":data.correct_option.lower(),
          "expl":data.explanation or "","ord":data.order_index or 0}
@@ -780,7 +783,7 @@ async def cms_create_signal(data: SignalIn, _=Depends(get_admin_user)):
     sid = await _exec(
         "INSERT INTO signals (symbol,direction,entry_price,stop_loss,take_profit,"
         "timeframe,analysis,ai_confidence,status,created_at) "
-        "VALUES (:sym,:dir,:entry,:sl,:tp,:tf,:anal,:conf,:status,:now)",
+        "VALUES (:sym,:dir,:entry,:sl,:tp,:tf,:anal,:conf,:status,:now) RETURNING id",
         {"sym":data.symbol.upper(),"dir":data.direction.upper(),
          "entry":data.entry_price,"sl":data.stop_loss,"tp":data.take_profit,
          "tf":data.timeframe or "1H","anal":data.analysis or "",
@@ -855,7 +858,7 @@ async def cms_create_webinar(data: WebinarIn, _=Depends(get_admin_user)):
     wid = await _exec(
         "INSERT INTO webinars (title,description,presenter,scheduled_at,duration_minutes,"
         "meeting_link,recording_url,thumbnail,max_attendees,is_published,status,created_at) "
-        "VALUES (:title,:desc,:presenter,:sched,:dur,:link,:rec,:thumb,:max,:pub,:status,:now)",
+        "VALUES (:title,:desc,:presenter,:sched,:dur,:link,:rec,:thumb,:max,:pub,:status,:now) RETURNING id",
         {"title":data.title,"desc":data.description or "","presenter":data.presenter or "",
          "sched":sched,"dur":data.duration_minutes or 60,"link":data.meeting_link or "",
          "rec":data.recording_url or "","thumb":data.thumbnail or "",
@@ -1030,7 +1033,7 @@ async def cms_create_announcement(data: AnnouncementIn, _=Depends(get_admin_user
         except: pass
     aid = await _exec(
         "INSERT INTO announcements (message,type,is_active,expires_at,created_at) "
-        "VALUES (:msg,:type,:active,:exp,:now)",
+        "VALUES (:msg,:type,:active,:exp,:now) RETURNING id",
         {"msg":data.message,"type":data.type or "info","active":data.is_active,
          "exp":exp,"now":datetime.utcnow()}
     )
@@ -1080,7 +1083,7 @@ async def cms_create_coupon(data: CouponIn, _=Depends(get_admin_user)):
         except: pass
     cid = await _exec(
         "INSERT INTO coupons (code,discount_type,discount_value,max_uses,uses,expires_at,is_active,created_at) "
-        "VALUES (:code,:type,:val,:max,0,:exp,:active,:now)",
+        "VALUES (:code,:type,:val,:max,0,:exp,:active,:now) RETURNING id",
         {"code":data.code.upper(),"type":data.discount_type,"val":data.discount_value,
          "max":data.max_uses or 100,"exp":exp,"active":data.is_active,"now":datetime.utcnow()}
     )

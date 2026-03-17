@@ -1576,55 +1576,59 @@ const DashboardController = class {
             } else {
                 // Has in-progress or completed courses — show named progress widget
                 const items = [...inProgress.slice(0, 3), ...completed.slice(0, 1)];
-                // Find the next in-progress course to highlight as "resume" target
                 const nextUp = inProgress[0];
-                learningEl.innerHTML = `
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <span class="text-xs text-gray-500">Your Learning Progress</span>
-                        <div class="flex items-center gap-2 mt-0.5">
-                            <div class="pw-progress-bar" style="width:80px;">
-                                <div class="pw-progress-fill" style="width:${overall}%;"></div>
-                            </div>
-                            <span class="text-xs font-bold" style="color:#a78bfa;">${overall}% overall</span>
-                        </div>
-                    </div>
-                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">${completed.length} completed</span>
-                </div>
-                <div class="space-y-3 mb-4">
-                ${items.map((c,i) => {
+
+                // Build course rows without nested template literals (avoids backslash-backtick syntax errors)
+                const courseRows = items.map(function(c, i) {
                     const pct     = c.progress_percent || 0;
                     const isDone  = c.is_completed;
-                    const barCol  = isDone ? '#34d399' : i===0 ? '#a78bfa' : '#6d28d9';
+                    const barCol  = isDone ? '#34d399' : i === 0 ? '#a78bfa' : '#6d28d9';
                     const bgCol   = isDone ? 'rgba(16,185,129,.1)' : 'rgba(124,58,237,.08)';
+                    const border  = isDone ? 'rgba(16,185,129,.2)' : 'rgba(124,58,237,.2)';
                     const lessons = c.total_lessons || 0;
                     const done    = c.completed_lessons || 0;
-                    return \`
-                    <div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90"
-                         style="background:${bgCol};border:1px solid ${isDone?'rgba(16,185,129,.2)':'rgba(124,58,237,.2)'};"
-                         onclick="dashboard.navigate('courses')">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-semibold text-white truncate pr-2">${_e(c.title)}</span>
-                            <span class="text-xs flex-shrink-0 font-bold" style="color:${barCol};">${isDone ? '✓ Done' : pct+'%'}</span>
-                        </div>
-                        <div class="pw-progress-bar mb-1">
-                            <div class="pw-progress-fill" style="width:${pct}%;background:${barCol};transition:width .6s ease ${i*.12}s;"></div>
-                        </div>
-                        <div class="text-xs text-gray-600">${lessons > 0 ? done+' / '+lessons+' lessons' : (isDone ? 'Completed' : 'In progress')}</div>
-                    \`;
-                }).join('')}
-                </div>
-                ${nextUp ? \`
-                <button onclick="dashboard._toast('Resuming: ${_e(nextUp.title)}','info'); setTimeout(()=>dashboard.navigate('courses'),400);"
-                    class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all"
-                    style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
-                    <i class="fas fa-play-circle mr-2"></i>Resume: ${_e(nextUp.title.length>28?nextUp.title.slice(0,28)+'…':nextUp.title)}
-                </button>\` : \`
-                <button onclick="dashboard.navigate('courses')"
-                    class="w-full py-2 rounded-lg text-sm font-semibold transition-all"
-                    style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">
-                    View All Courses →
-                </button>\`}`;
+                    const pctLabel = isDone ? '&#10003; Done' : pct + '%';
+                    const lessonLabel = lessons > 0 ? (done + ' / ' + lessons + ' lessons') : (isDone ? 'Completed' : 'In progress');
+                    return '<div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90" '
+                         + 'style="background:' + bgCol + ';border:1px solid ' + border + ';" '
+                         + 'onclick="dashboard.navigate('courses')">'
+                         + '<div class="flex items-center justify-between mb-2">'
+                         + '<span class="text-xs font-semibold text-white truncate pr-2">' + _e(c.title) + '</span>'
+                         + '<span class="text-xs flex-shrink-0 font-bold" style="color:' + barCol + ';">' + pctLabel + '</span>'
+                         + '</div>'
+                         + '<div class="pw-progress-bar mb-1">'
+                         + '<div class="pw-progress-fill" style="width:' + pct + '%;background:' + barCol + ';transition:width .6s ease ' + (i * 0.12) + 's;"></div>'
+                         + '</div>'
+                         + '<div class="text-xs text-gray-600">' + lessonLabel + '</div>'
+                         + '</div>';
+                }).join('');
+
+                const resumeBtn = nextUp
+                    ? '<button onclick="dashboard._toast('Resuming course','info'); setTimeout(function(){dashboard.navigate('courses');},400);" '
+                    + 'class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all" '
+                    + 'style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
+                    + '<i class="fas fa-play-circle mr-2"></i>Resume: ' + _e(nextUp.title.length > 28 ? nextUp.title.slice(0, 28) + '…' : nextUp.title)
+                    + '</button>'
+                    : '<button onclick="dashboard.navigate('courses')" '
+                    + 'class="w-full py-2 rounded-lg text-sm font-semibold transition-all" '
+                    + 'style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">'
+                    + 'View All Courses →</button>';
+
+                learningEl.innerHTML =
+                    '<div class="flex items-center justify-between mb-3">'
+                    + '<div>'
+                    + '<span class="text-xs text-gray-500">Your Learning Progress</span>'
+                    + '<div class="flex items-center gap-2 mt-0.5">'
+                    + '<div class="pw-progress-bar" style="width:80px;">'
+                    + '<div class="pw-progress-fill" style="width:' + overall + '%;"></div>'
+                    + '</div>'
+                    + '<span class="text-xs font-bold" style="color:#a78bfa;">' + overall + '% overall</span>'
+                    + '</div>'
+                    + '</div>'
+                    + '<span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">' + completed.length + ' completed</span>'
+                    + '</div>'
+                    + '<div class="space-y-3 mb-4">' + courseRows + '</div>'
+                    + resumeBtn;
             }
 
         // ── Card 5: Latest Courses ────────────────────────────────────────

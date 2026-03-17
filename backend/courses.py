@@ -55,38 +55,67 @@ async def _run(sql: str, params: dict = None):
 async def list_courses(current_user=Depends(get_current_user)):
     user_id = get_user_id(current_user)
 
-    rows = await _all(
-        """
-        SELECT c.id, c.title, c.description, c.level,
-               COALESCE(c.lesson_count, 0)            AS lesson_count,
-               COALESCE(c.thumbnail_url, c.thumbnail, '') AS thumbnail_url,
-               COALESCE(c.instructor, '')             AS instructor,
-               COALESCE(up.progress_percent, 0)       AS progress,
-               COALESCE(up.completed_lessons, 0)      AS completed_lessons
-        FROM courses c
-        LEFT JOIN user_progress up
-               ON c.id = up.course_id AND up.user_id = :uid
-        WHERE COALESCE(c.is_active, TRUE)     = TRUE
-           OR COALESCE(c.is_published, FALSE) = TRUE
-        ORDER BY c.created_at DESC
-        """,
-        {"uid": user_id},
-    )
-
-    # Fallback if user_progress doesn't exist
-    if not rows:
-        rows = await _all(
+    # ── FIX: Use database.fetch_all() directly (not _all()) so that a query
+    # failure CAN propagate to the except block.  Previously _all() caught ALL
+    # exceptions internally and returned [], making the except fallback
+    # unreachable — the same silent-failure bug that hit cms_list_courses.
+    # ─────────────────────────────────────────────────────────────────────────
+    rows = []
+    try:
+        raw = await database.fetch_all(
             """
-            SELECT id, title, description, level,
-                   COALESCE(lesson_count, 0)            AS lesson_count,
-                   COALESCE(thumbnail_url, '')          AS thumbnail_url,
-                   COALESCE(instructor, '')             AS instructor
-            FROM courses
-            WHERE COALESCE(is_active, TRUE)     = TRUE
-               OR COALESCE(is_published, FALSE) = TRUE
-            ORDER BY created_at DESC
-            """
+            SELECT c.id, c.title, c.description, c.level,
+                   -- FIX 9: Live COUNT instead of stale lesson_count column.
+                   -- The column is never auto-updated when lessons are added via
+                   -- the CMS, so it always reads 0.  A LEFT JOIN COUNT is the
+                   -- only reliable source of truth.
+                   COUNT(DISTINCT l.id)                        AS lesson_count,
+                   COALESCE(c.thumbnail_url, c.thumbnail, '') AS thumbnail_url,
+                   COALESCE(c.instructor, '')                  AS instructor,
+                   COALESCE(up.progress_percent, 0)            AS progress,
+                   COALESCE(up.completed_lessons, 0)           AS completed_lessons
+            FROM courses c
+            LEFT JOIN lessons l
+                   ON l.course_id = c.id AND COALESCE(l.is_active, TRUE) = TRUE
+            LEFT JOIN user_progress up
+                   ON c.id = up.course_id AND up.user_id = :uid
+            WHERE COALESCE(c.is_active, TRUE)     = TRUE
+               OR COALESCE(c.is_published, FALSE) = TRUE
+            GROUP BY c.id, c.title, c.description, c.level,
+                     c.thumbnail_url, c.thumbnail, c.instructor,
+                     up.progress_percent, up.completed_lessons
+            ORDER BY c.created_at DESC
+            """,
+            {"uid": user_id},
         )
+        rows = [dict(r) for r in raw] if raw else []
+        print(f"[COURSES] list_courses (full): {len(rows)} rows", flush=True)
+    except Exception as e:
+        # Fallback: user_progress table / extra columns may not exist yet
+        print(f"[COURSES] list_courses JOIN failed ({e}), using minimal fallback", flush=True)
+        try:
+            raw = await database.fetch_all(
+                """
+                SELECT id, title, description, level, created_at
+                FROM courses
+                WHERE COALESCE(is_active, TRUE)     = TRUE
+                   OR COALESCE(is_published, FALSE) = TRUE
+                ORDER BY created_at DESC
+                """
+            )
+            # Inject defaults for columns that may not exist on older schemas
+            rows = []
+            for r in (raw or []):
+                d = dict(r)
+                d.setdefault("lesson_count", 0)
+                d.setdefault("thumbnail_url", "")
+                d.setdefault("instructor", "")
+                d.setdefault("progress", 0)
+                d.setdefault("completed_lessons", 0)
+                rows.append(d)
+            print(f"[COURSES] list_courses (minimal fallback): {len(rows)} rows", flush=True)
+        except Exception as e2:
+            print(f"[COURSES] list_courses CRITICAL: {e2}", flush=True)
 
     return [
         {

@@ -83,14 +83,15 @@ async def get_posts(
     if category:
         params["cat"] = category
 
-    # Full query with new columns via COALESCE
+    # Full query — exclude tags from COALESCE (TEXT[] vs TEXT conflict)
+    # tags are read raw and handled in Python by _tags()
     rows = await _run(
         f"""
         SELECT id, title, slug, excerpt, content, category,
                created_at, updated_at,
                COALESCE(featured_image, '')   AS featured_image,
                COALESCE(views, 0)             AS views,
-               COALESCE(tags, '[]')           AS tags,
+               tags,
                COALESCE(featured, FALSE)      AS featured,
                COALESCE(read_time, '5 min')   AS read_time,
                COALESCE(is_published, FALSE)  AS is_published
@@ -104,7 +105,7 @@ async def get_posts(
         params,
     )
 
-    # Plain fallback (original columns only)
+    # Fallback: try without any new columns if query failed
     if not rows:
         rows = await _run(
             f"""
@@ -127,17 +128,17 @@ async def get_posts(
 @router.get("/posts/{slug}")
 async def get_post(slug: str, current_user=Depends(get_current_user)):
     """Return a single published post by slug."""
+    # Note: no COALESCE on is_published in WHERE — use separate fallback instead
     row = await _one(
         """
         SELECT * FROM blog_posts
         WHERE slug = :slug
           AND (LOWER(COALESCE(status, '')) = 'published'
-               OR COALESCE(is_published, FALSE) = TRUE)
+               OR is_published = TRUE)
         """,
         {"slug": slug},
     )
 
-    # Fallback without is_published
     if not row:
         row = await _one(
             "SELECT * FROM blog_posts WHERE slug=:slug AND LOWER(COALESCE(status,''))='published'",

@@ -168,7 +168,7 @@ user_lesson_progress = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
-    Column("lesson_id", Integer, nullable=False)  # FIX: was FK to course_lessons (old table); plain Integer avoids FK ordering issues,
+    Column("lesson_id", Integer, nullable=False),  # FIX: was FK to course_lessons (old table); plain Integer avoids FK ordering issues
     Column("completed_at", DateTime, default=datetime.utcnow),
     Column("time_spent_seconds", Integer, default=0)
 )

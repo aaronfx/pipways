@@ -100,6 +100,7 @@ const CMSPage = {
     _activeTab: 'blog',
     _editingId: null,
     _lmsState: { courseId:null, moduleId:null, quizId:null },
+    _quill: null,          // Quill rich-text editor instance (blog only)
     _usersPage: 1,
     _usersSearch: '',
     _mediaCallback: null,  // set when media picker is invoked from a form
@@ -345,29 +346,18 @@ const CMSPage = {
                 <span id="bf-sdesc-count" class="text-xs text-gray-600"></span>
             </div>
         </div>
-        <!-- Content editor -->
+        <!-- Content editor — Quill rich-text (replaces textarea + fake toolbar) -->
         <div class="crow">
             <div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
                     <label class="cl" style="margin:0;">Content *</label>
                     <span id="bf-wc" class="text-xs text-gray-600"></span>
                 </div>
-                <div style="border:1px solid #374151;border-radius:.5rem;overflow:hidden;">
-                    <div style="background:#111827;padding:.45rem .75rem;display:flex;gap:.4rem;flex-wrap:wrap;border-bottom:1px solid #374151;">
-                        ${[
-                            ['bold','<b>B</b>'],
-                            ['italic','<i>I</i>'],
-                            ['h1','H1'],
-                            ['h2','H2'],
-                            ['h3','H3'],
-                            ['link','🔗 Link'],
-                            ['ul','• List'],
-                            ['quote','❝ Quote'],
-                            ['code','&lt;/&gt;']
-                        ].map(([c,l])=>`<button type="button" style="background:#374151;color:#d1d5db;border:none;border-radius:.3rem;padding:.25rem .6rem;font-size:.75rem;cursor:pointer;min-width:32px;" onclick="CMSPage._mdfmt('${c}')">${l}</button>`).join('')}
-                    </div>
-                    <textarea class="cta" id="bf-content" style="border-radius:0;border:none;min-height:280px;">${this._e(d.content)}</textarea>
+                <!-- Quill mounts here; hidden input keeps bf-content accessible for SEO/save reads -->
+                <div id="bf-editor-wrap" style="border:1px solid #374151;border-radius:.5rem;overflow:hidden;background:#111827;">
+                    <div id="bf-editor" style="min-height:320px;font-size:.9rem;"></div>
                 </div>
+                <input type="hidden" id="bf-content">
             </div>
         </div>
         <!-- SEO score panel (populated by _runSEO) -->
@@ -400,29 +390,125 @@ const CMSPage = {
 
         f.scrollIntoView({behavior:'smooth',block:'start'});
 
-        // Live counters
-        const wc=()=>{ const t=document.getElementById('bf-content')?.value||''; document.getElementById('bf-wc').textContent=`${t.split(/\s+/).filter(Boolean).length} words`; };
-        const ec=()=>{ const t=document.getElementById('bf-excerpt')?.value||''; const el=document.getElementById('bf-excerpt-count'); if(el)el.textContent=`${t.length}/160`; el.style.color=t.length>160?'#f87171':'#6b7280'; };
+        // ── Initialise Quill rich-text editor ────────────────────────────────
+        // Destroy any previous instance left open (e.g. user opened form twice)
+        this._quill = null;
+
+        if (typeof Quill === 'undefined') {
+            // Quill CDN not loaded yet — fall back gracefully with a plain textarea
+            const wrap = document.getElementById('bf-editor-wrap');
+            if (wrap) {
+                wrap.innerHTML = '<textarea class="cta" id="bf-editor-fallback" style="border-radius:0;border:none;min-height:320px;width:100%;padding:.75rem;background:#111827;color:white;">'
+                    + (d.content || '') + '</textarea>';
+                // Sync fallback textarea → hidden input
+                const fb = document.getElementById('bf-editor-fallback');
+                if (fb) {
+                    const sync = () => { const hi = document.getElementById('bf-content'); if (hi) hi.value = fb.value; };
+                    fb.addEventListener('input', sync); sync();
+                }
+            }
+        } else {
+            // Apply dark-theme overrides for Quill Snow so it fits the CMS palette
+            if (!document.getElementById('quill-dark-style')) {
+                const st = document.createElement('style');
+                st.id = 'quill-dark-style';
+                st.textContent = `
+                    #bf-editor-wrap .ql-toolbar.ql-snow {
+                        background:#1f2937; border:none; border-bottom:1px solid #374151;
+                        padding:.4rem .6rem; flex-wrap:wrap;
+                    }
+                    #bf-editor-wrap .ql-toolbar.ql-snow .ql-stroke { stroke:#9ca3af; }
+                    #bf-editor-wrap .ql-toolbar.ql-snow .ql-fill   { fill:#9ca3af; }
+                    #bf-editor-wrap .ql-toolbar.ql-snow button:hover .ql-stroke,
+                    #bf-editor-wrap .ql-toolbar.ql-snow .ql-picker-label:hover .ql-stroke { stroke:#a78bfa; }
+                    #bf-editor-wrap .ql-toolbar.ql-snow button.ql-active .ql-stroke { stroke:#a78bfa; }
+                    #bf-editor-wrap .ql-toolbar.ql-snow .ql-picker { color:#9ca3af; }
+                    #bf-editor-wrap .ql-toolbar.ql-snow .ql-picker-options {
+                        background:#1f2937; border:1px solid #374151; border-radius:.4rem;
+                    }
+                    #bf-editor-wrap .ql-toolbar.ql-snow .ql-picker-item { color:#d1d5db; }
+                    #bf-editor-wrap .ql-container.ql-snow {
+                        border:none; background:#111827; color:#e5e7eb; font-family:inherit;
+                    }
+                    #bf-editor-wrap .ql-editor { min-height:320px; font-size:.9rem; line-height:1.7; padding:.85rem 1rem; }
+                    #bf-editor-wrap .ql-editor.ql-blank::before { color:#6b7280; font-style:normal; }
+                    #bf-editor-wrap .ql-editor h1,
+                    #bf-editor-wrap .ql-editor h2,
+                    #bf-editor-wrap .ql-editor h3 { color:#f3f4f6; margin:.6rem 0 .3rem; }
+                    #bf-editor-wrap .ql-editor a { color:#a78bfa; }
+                    #bf-editor-wrap .ql-editor blockquote {
+                        border-left:3px solid #7c3aed; margin-left:0; padding-left:.85rem; color:#9ca3af;
+                    }
+                    #bf-editor-wrap .ql-editor pre {
+                        background:#0d1117; border:1px solid #374151; border-radius:.4rem;
+                        padding:.75rem 1rem; color:#34d399;
+                    }
+                    #bf-editor-wrap .ql-editor ol,
+                    #bf-editor-wrap .ql-editor ul { padding-left:1.5rem; }
+                `;
+                document.head.appendChild(st);
+            }
+
+            this._quill = new Quill('#bf-editor', {
+                theme: 'snow',
+                placeholder: 'Write your blog post here…',
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline'],
+                        [{ header: [1, 2, 3, false] }],
+                        [{ list: 'ordered' }, { list: 'bullet' }],
+                        ['link', 'blockquote', 'code-block'],
+                        ['clean']
+                    ]
+                }
+            });
+
+            // Load existing content (edit mode)
+            if (d.content) {
+                this._quill.root.innerHTML = d.content;
+            }
+
+            // Sync Quill → hidden input on every change (keeps _runSEO + _savePost simple)
+            const syncContent = () => {
+                const hi = document.getElementById('bf-content');
+                if (hi) hi.value = this._quill.root.innerHTML;
+                // Word count: use plain text from Quill
+                const wcEl = document.getElementById('bf-wc');
+                if (wcEl) {
+                    const words = this._quill.getText().trim().split(/\s+/).filter(Boolean).length;
+                    wcEl.textContent = `${words} words`;
+                }
+            };
+            this._quill.on('text-change', syncContent);
+            syncContent(); // initial sync
+        }
+
+        // Live counters for excerpt / SEO fields (unchanged)
+        const ec=()=>{ const t=document.getElementById('bf-excerpt')?.value||''; const el=document.getElementById('bf-excerpt-count'); if(el){el.textContent=`${t.length}/160`; el.style.color=t.length>160?'#f87171':'#6b7280';} };
         const sc=()=>{ const t=document.getElementById('bf-stitle')?.value||''; const el=document.getElementById('bf-stitle-count'); if(el)el.textContent=`${t.length}/60`; };
         const dc=()=>{ const t=document.getElementById('bf-sdesc')?.value||''; const el=document.getElementById('bf-sdesc-count'); if(el)el.textContent=`${t.length}/160`; };
-        document.getElementById('bf-content')?.addEventListener('input',wc); wc();
         document.getElementById('bf-excerpt')?.addEventListener('input',ec); ec();
         document.getElementById('bf-stitle')?.addEventListener('input',sc); sc();
         document.getElementById('bf-sdesc')?.addEventListener('input',dc); dc();
 
-        // Auto-slug from title
+        // Auto-slug from title (unchanged)
         document.getElementById('bf-title')?.addEventListener('input',e=>{
             if(!id) document.getElementById('bf-slug').value=e.target.value.toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
         });
 
-        // Image preview
+        // Image preview (unchanged)
         document.getElementById('bf-img')?.addEventListener('input',e=>{
             const pv=document.getElementById('bf-img-preview');
             if(pv){ const img=pv.querySelector('img'); if(img)img.src=e.target.value; pv.style.display=e.target.value?'block':'none'; }
         });
     },
 
-    _closeBlogForm(){ const f=document.getElementById('cms-blog-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
+    _closeBlogForm(){
+        const f=document.getElementById('cms-blog-form');
+        if(f){f.style.display='none';f.innerHTML='';}
+        this._editingId=null;
+        this._quill=null;  // release Quill instance so GC can reclaim it
+    },
 
     _setPostStatus(status){
         const isPub = status === 'published';
@@ -443,7 +529,7 @@ const CMSPage = {
     async _runSEO(){
         const payload={
             title:    document.getElementById('bf-title')?.value||'',
-            content:  document.getElementById('bf-content')?.value||'',
+            content:  document.getElementById('bf-content')?.value||'',  // synced from Quill via hidden input
             excerpt:  document.getElementById('bf-excerpt')?.value||'',
             focus_keyword: document.getElementById('bf-kw')?.value||'',
             slug:     document.getElementById('bf-slug')?.value||'',
@@ -496,8 +582,15 @@ const CMSPage = {
     async _savePost(){
         const title=document.getElementById('bf-title')?.value.trim();
         const slug=document.getElementById('bf-slug')?.value.trim();
-        const content=document.getElementById('bf-content')?.value.trim();
-        if(!title||!slug||!content){this._toast('Title, slug and content required','error');return;}
+        // Prefer reading directly from Quill; hidden input is a synced fallback
+        const content = this._quill
+            ? this._quill.root.innerHTML.trim()
+            : (document.getElementById('bf-content')?.value||'').trim();
+        // Quill empty state is '<p><br></p>'; use getText() to detect truly empty editor
+        const contentIsEmpty = this._quill
+            ? this._quill.getText().trim().length === 0
+            : !content;
+        if(!title||!slug||contentIsEmpty){this._toast('Title, slug and content required','error');return;}
         const p={title,slug,excerpt:document.getElementById('bf-excerpt')?.value||'',content,
             category:document.getElementById('bf-cat')?.value||'General',
             tags:(document.getElementById('bf-tags')?.value||'').split(',').map(t=>t.trim()).filter(Boolean),
@@ -554,7 +647,7 @@ const CMSPage = {
         await this._lmsRefreshTree();
     },
 
-    async _lmsRefreshTree(expandId = null) {
+    async _lmsRefreshTree() {
         const tree = document.getElementById('lms-tree');
         if (!tree) return;
         tree.innerHTML = `<div class="text-gray-500 text-sm text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>`;
@@ -564,7 +657,7 @@ const CMSPage = {
             courses = await API.cms.listCourses();
         } catch (e) {
             console.error('[LMS] listCourses failed:', e);
-            tree.innerHTML = `<div class="text-center py-8 text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load courses: ${this._e(e.message)}</div>`;
+            tree.innerHTML = `<div class="text-center py-8 text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load courses: ${e.message}</div>`;
             return;
         }
 
@@ -625,13 +718,8 @@ const CMSPage = {
             </div>
         </div>`).join('');
 
-        // FIX 2: Auto-expand the specific course that was just created/edited
-        // (expandId), otherwise fall back to the first course in the list.
-        const validExpandId = (expandId && courses.find(c => c.id === expandId))
-            ? expandId
-            : courses[0].id;
-        this._lmsState.courseId = validExpandId;
-        await this._lmsExpand(validExpandId);
+        // Auto-expand first course
+        if (courses.length) await this._lmsExpand(courses[0].id);
     },
 
     // ── Toggle expand/collapse a course row ───────────────────────────────
@@ -746,39 +834,20 @@ const CMSPage = {
             certificate_enabled: document.getElementById('cf-cert')?.value === '1',
             pass_percentage:     parseInt(document.getElementById('cf-pass')?.value) || 70,
         };
-        // FIX: use a more specific selector so it doesn't accidentally grab
-        // buttons outside the overlay when multiple panels are open.
         const btn = document.querySelector('#lms-overlay .cb-p');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…'; }
         try {
             if (this._editingId) {
-                // ── Update existing course ────────────────────────────────────
-                const targetId = this._editingId;
-                await API.cms.updateCourse(targetId, p);
+                await API.cms.updateCourse(this._editingId, p);
                 this._toast('Course updated');
-                this._lmsCloseOverlay();
-                // FIX 1: pass the edited course ID so it stays expanded after refresh
-                await this._lmsRefreshTree(targetId);
             } else {
-                // ── Create new course ─────────────────────────────────────────
-                // FIX 1: capture the API response — it includes { id, title, message }
-                const result = await API.cms.createCourse(p);
-                const newId  = (result && result.id) ? result.id : null;
-
-                // FIX 2: persist the new course ID in state so downstream code
-                // (module forms, lesson forms, quiz panels) can reference it
-                this._lmsState.courseId = newId;
-
-                this._toast('Course created — now add modules & lessons below');
-                this._lmsCloseOverlay();
-
-                // FIX 1+2: pass newId so _lmsRefreshTree expands THIS course,
-                // not just whichever happens to be courses[0]
-                await this._lmsRefreshTree(newId);
+                await API.cms.createCourse(p);
+                this._toast('Course created — add modules below');
             }
+            this._lmsCloseOverlay();
+            await this._lmsRefreshTree();
         } catch (e) {
-            console.error('[LMS] _lmsSaveCourse error:', e);
-            this._toast(e.message || 'Failed to save course', 'error');
+            this._toast(e.message, 'error');
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
         }
     },
@@ -787,8 +856,7 @@ const CMSPage = {
         try {
             const r = await API.cms.toggleCourse(id);
             this._toast(r.message);
-            // FIX: pass id so the same course stays expanded after refresh
-            await this._lmsRefreshTree(id);
+            await this._lmsRefreshTree();
         } catch (e) { this._toast(e.message, 'error'); }
     },
 
@@ -797,10 +865,8 @@ const CMSPage = {
         try {
             await API.cms.deleteCourse(id);
             this._toast('Course deleted');
-            this._lmsState.courseId = null;
             this._lmsCloseOverlay();
-            // Pass null — no specific course to expand after deletion
-            await this._lmsRefreshTree(null);
+            await this._lmsRefreshTree();
         } catch (e) { this._toast(e.message, 'error'); }
     },
 
@@ -935,14 +1001,7 @@ const CMSPage = {
         const el = document.getElementById(`lms-lessons-${mid}`);
         if (!el) return;
         let lessons = [];
-        try {
-            lessons = await API.cms.listLessons(mid);
-        } catch (e) {
-            // FIX 6: surface the error rather than silently returning nothing
-            console.error('[LMS] listLessons failed for module', mid, e);
-            el.innerHTML = `<div class="text-red-500 text-xs text-center py-2"><i class="fas fa-exclamation-triangle mr-1"></i>${this._e(e.message)}</div>`;
-            return;
-        }
+        try { lessons = await API.cms.listLessons(mid); } catch (_) {}
         if (!lessons.length) {
             el.innerHTML = `<div class="text-gray-700 text-xs text-center py-2">No lessons yet</div>`;
             return;

@@ -553,15 +553,15 @@ const CMSPage = {
             </div>
         </div>`).join('');
 
-        // Auto-expand first course so user sees the module UI immediately
-        if(courses.length) this._lmsToggleCourse(courses[0].id);
+        // Auto-expand first (newest) course so user sees the module UI immediately
+        if(courses.length) this._lmsToggleCourse(courses[0].id, true);
     },
 
-    async _lmsToggleCourse(cid){
+    async _lmsToggleCourse(cid, forceOpen=false){
         const body=document.getElementById(`lms-body-${cid}`);
         const arr =document.getElementById(`lms-arr-${cid}`);
         if(!body) return;
-        const open = body.style.display==='none';
+        const open = forceOpen || body.style.display==='none' || body.style.display==='';
         body.style.display = open ? 'block' : 'none';
         if(arr) arr.style.transform = open ? 'rotate(90deg)' : '';
         if(open) await this._loadModules(cid);
@@ -699,10 +699,7 @@ const CMSPage = {
                 this._toast('Course created — now add modules & lessons below');
                 this._closeLMSForm();
                 await this._lms();
-                // Auto-expand the new course so user can immediately add modules
-                if(result && result.id){
-                    setTimeout(()=>this._lmsToggleCourse(result.id), 300);
-                }
+                // _lms() already auto-expands the first course (newest) — no extra toggle needed
             }
         }catch(e){this._toast(e.message,'error');}
     },

@@ -231,6 +231,9 @@
             <a href="#" data-section="courses" class="nav-link">
                 <i class="fas fa-graduation-cap nav-icon" style="color:#a78bfa;"></i><span>Courses</span>
             </a>
+            <a href="#" data-section="academy" class="nav-link">
+                <i class="fas fa-book-open nav-icon" style="color:#34d399;"></i><span>Trading Academy</span>
+            </a>
             <a href="#" data-section="webinars" class="nav-link">
                 <i class="fas fa-video nav-icon" style="color:#fbbf24;"></i><span>Webinars</span>
             </a>
@@ -375,6 +378,8 @@
                     <div class="flex items-center gap-2">
                         <span id="dash-market-dot" class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
                         <span id="dash-market-text" class="text-xs text-gray-500">Markets Open</span>
+                        <span class="text-gray-700 mx-1">·</span>
+                        <a href="#" onclick="dashboard.navigate('academy')" class="text-xs text-green-400 hover:text-green-300 transition-colors font-medium">Trading Academy →</a>
                         <span class="text-gray-700 mx-1">·</span>
                         <a href="#" onclick="dashboard.navigate('mentor')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">Ask AI Mentor →</a>
                     </div>
@@ -579,10 +584,10 @@
                             </div>
                             <span class="font-semibold text-white text-sm">Research Workspace</span>
                         </div>
-                        <span class="pw-section-label">3 Tools Available</span>
+                        <span class="pw-section-label">4 Tools Available</span>
                     </div>
                     <div class="pw-card-body">
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                             <!-- Tool 1: Chart Analysis -->
                             <button onclick="dashboard.navigate('analysis')" class="group text-left rounded-xl p-4 transition-all duration-200"
                                     style="background:#0d1321;border:1px solid #1f2937;"
@@ -637,6 +642,25 @@
                                     <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(249,115,22,.12);color:#fdba74;">MT4</span>
                                     <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(249,115,22,.12);color:#fdba74;">MT5</span>
                                     <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(249,115,22,.12);color:#fdba74;">CSV</span>
+                                </div>
+                            </button>
+                            <!-- Tool 4: Trading Academy -->
+                            <button onclick="dashboard.navigate('academy')" class="group text-left rounded-xl p-4 transition-all duration-200"
+                                    style="background:#0d1321;border:1px solid #1f2937;"
+                                    onmouseover="this.style.borderColor='#a78bfa';this.style.background='rgba(124,58,237,.06)'"
+                                    onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(124,58,237,.15);">
+                                        <i class="fas fa-book-open" style="color:#a78bfa;font-size:1rem;"></i>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
+                                </div>
+                                <div class="text-sm font-semibold text-white mb-1">Trading Academy</div>
+                                <div class="text-xs text-gray-500 leading-relaxed">Structured lessons from beginner to advanced with AI explanations, quizzes and adaptive learning.</div>
+                                <div class="mt-3 flex flex-wrap gap-1">
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(124,58,237,.12);color:#c4b5fd;">AI Mentor</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(124,58,237,.12);color:#c4b5fd;">Quizzes</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(124,58,237,.12);color:#c4b5fd;">Adaptive</span>
                                 </div>
                             </button>
                         </div>
@@ -762,6 +786,18 @@
                 </div>
 
             </section>
+            </section>
+
+            <!-- TRADING ACADEMY -->
+            <section id="section-academy" class="section hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Trading Academy</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">Structured AI-powered forex education</p>
+                    </div>
+                </div>
+                <nav id="academy-breadcrumb" class="pw-breadcrumb mb-4" style="font-size:.8rem;"></nav>
+                <div id="academy-content"></div>
             </section>
 
             <!-- SIGNALS -->
@@ -1457,6 +1493,7 @@ const DashboardController = class {
             'signals':   { title: 'Market Signals',     sub: 'Active trading opportunities' },
             'journal':   { title: 'Performance Analytics', sub: 'Import trades, track performance and get AI coaching' },
             'mentor':    { title: 'AI Mentor',          sub: '24/7 personal trading coach' },
+            'academy':   { title: 'Trading Academy',    sub: 'Structured AI-powered forex education' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
             'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
         };
@@ -1505,6 +1542,10 @@ const DashboardController = class {
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
+                case 'academy':
+                    if (typeof AcademyPage !== 'undefined') { await AcademyPage.render(); }
+                    else { const c = document.getElementById('academy-content'); if(c) c.innerHTML = '<div class="alert alert-error">Academy module failed to load. Please refresh.</div>'; }
+                    break;
 
                 case 'admin': {
                     const container = document.getElementById('admin-container');
@@ -2818,6 +2859,7 @@ window.API = API;
     <script src="/js/modules/public_pages.js"></script>
     <script src="/js/modules/courses.js"></script>
     <script src="/js/modules/quiz.js"></script>
+    <script src="/js/modules/academy.js"></script>
 
 </body>
 </html>

@@ -27,7 +27,13 @@ from . import chart_analysis
 from . import performance
 from . import ai_mentor
 from . import cms
-from .lms_init import init_lms_tables
+try:
+    from .lms_init import init_lms_tables
+    _HAS_LMS_INIT = True
+except ImportError:
+    _HAS_LMS_INIT = False
+    async def init_lms_tables():
+        print("[LMS INIT] lms_init.py not found — skipping LMS table setup", flush=True)
 
 # ── FIX 1 (CRITICAL): Use a SINGLE relative import for stock_terminal_backend.
 #
@@ -254,7 +260,7 @@ async def serve_dashboard():
 async def serve_spa(full_path: str):
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/",
-        "blog/", "ai/", "admin/", "health", "docs", "openapi.json",
+        "blog/", "ai/", "admin/", "cms/", "health", "docs", "openapi.json",
         "static/", "js/", "api/",
     )
     if full_path.startswith(api_prefixes):

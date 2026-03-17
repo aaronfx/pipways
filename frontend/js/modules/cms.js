@@ -329,7 +329,7 @@ const CMSPage = {
                     <button class="cb cb-g" style="white-space:nowrap;" onclick="CMSPage._pickMedia('bf-img')"><i class="fas fa-images"></i></button>
                 </div>
                 <div id="bf-img-preview" style="margin-top:.5rem;${d.featured_image?'':'display:none;'}">
-                    <img src="${this._e(d.featured_image)}" style="max-height:80px;border-radius:.4rem;border:1px solid #374151;">
+                    <img src="${this._e(d.featured_image)}" style="max-height:200px;width:100%;object-fit:cover;border-radius:.5rem;border:1px solid #374151;">
                 </div>
             </div>
             <div><label class="cl">Focus Keyword</label>
@@ -351,7 +351,11 @@ const CMSPage = {
             <div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
                     <label class="cl" style="margin:0;">Content *</label>
-                    <span id="bf-wc" class="text-xs text-gray-600"></span>
+                    <span class="flex items-center gap-2">
+                        <span id="bf-wc" class="text-xs text-gray-600"></span>
+                        <span style="color:#374151;">·</span>
+                        <span id="bf-cc" class="text-xs text-gray-600"></span>
+                    </span>
                 </div>
                 <!-- Quill mounts here; hidden input keeps bf-content accessible for SEO/save reads -->
                 <div id="bf-editor-wrap" style="border:1px solid #374151;border-radius:.5rem;overflow:hidden;background:#111827;">
@@ -416,7 +420,10 @@ const CMSPage = {
                     #bf-editor-wrap .ql-toolbar.ql-snow {
                         background:#1f2937; border:none; border-bottom:1px solid #374151;
                         padding:.4rem .6rem; flex-wrap:wrap;
+                        border-radius:.5rem .5rem 0 0;
                     }
+                    #bf-editor-wrap .ql-container.ql-snow,
+                    #bf-editor-wrap .ql-editor { border-radius:0 0 .5rem .5rem; }
                     #bf-editor-wrap .ql-toolbar.ql-snow .ql-stroke { stroke:#9ca3af; }
                     #bf-editor-wrap .ql-toolbar.ql-snow .ql-fill   { fill:#9ca3af; }
                     #bf-editor-wrap .ql-toolbar.ql-snow button:hover .ql-stroke,
@@ -471,16 +478,64 @@ const CMSPage = {
             // Sync Quill → hidden input on every change (keeps _runSEO + _savePost simple)
             const syncContent = () => {
                 const hi = document.getElementById('bf-content');
+                const plainText = this._quill.getText();
                 if (hi) hi.value = this._quill.root.innerHTML;
-                // Word count: use plain text from Quill
+                // Word count
                 const wcEl = document.getElementById('bf-wc');
                 if (wcEl) {
-                    const words = this._quill.getText().trim().split(/\s+/).filter(Boolean).length;
-                    wcEl.textContent = `${words} words`;
+                    const words = plainText.trim().split(/\s+/).filter(Boolean).length;
+                    wcEl.textContent = words + ' words';
+                }
+                // Character count (REC: more useful than word count for SEO purposes)
+                const ccEl = document.getElementById('bf-cc');
+                if (ccEl) {
+                    const chars = plainText.replace(/\n$/, '').length;
+                    ccEl.textContent = chars + ' chars';
                 }
             };
             this._quill.on('text-change', syncContent);
             syncContent(); // initial sync
+
+            // REC: autosave draft to localStorage every 30 seconds
+            const draftKey = 'pw_blog_draft_' + (id || 'new');
+            const autosaveDraft = () => {
+                try {
+                    const draft = {
+                        content:   this._quill.root.innerHTML,
+                        title:     document.getElementById('bf-title')?.value || '',
+                        excerpt:   document.getElementById('bf-excerpt')?.value || '',
+                        savedAt:   new Date().toISOString(),
+                    };
+                    localStorage.setItem(draftKey, JSON.stringify(draft));
+                } catch (_) {}
+            };
+            if (this._autosaveTimer) clearInterval(this._autosaveTimer);
+            this._autosaveTimer = setInterval(autosaveDraft, 30000);
+
+            // Restore draft prompt for new posts only (don't overwrite existing saved content)
+            if (!id) {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(draftKey) || 'null');
+                    if (saved && saved.content && saved.content !== '<p><br></p>') {
+                        const mins = Math.round((Date.now() - new Date(saved.savedAt)) / 60000);
+                        const timeAgo = mins < 2 ? 'just now' : mins + 'm ago';
+                        // Show restore banner inside the editor wrap
+                        const wrap = document.getElementById('bf-editor-wrap');
+                        if (wrap) {
+                            const banner = document.createElement('div');
+                            banner.style.cssText = 'background:#1e293b;border-bottom:1px solid #374151;padding:.5rem 1rem;display:flex;align-items:center;justify-content:space-between;font-size:.78rem;';
+                            const restoreKey = draftKey;
+                            banner.innerHTML = '<span style="color:#94a3b8;"><i class="fas fa-history mr-1.5" style="color:#a78bfa;"></i>Unsaved draft from ' + timeAgo + '</span>'
+                                + '<div style="display:flex;gap:.5rem;">'
+                                + '<button onclick="this.parentElement.parentElement.remove()" style="color:#6b7280;background:none;border:none;cursor:pointer;font-size:.75rem;padding:.2rem .5rem;">Dismiss</button>'
+                                + '<button style="background:#7c3aed;color:white;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem;padding:.2rem .6rem;" '
+                                + 'onclick="CMSPage._restoreDraft(this);" data-key="' + draftKey + '">Restore</button>'
+                                + '</div>';
+                            wrap.parentNode.insertBefore(banner, wrap);
+                        }
+                    }
+                } catch (_) {}
+            }
         }
 
         // Live counters for excerpt / SEO fields (unchanged)
@@ -508,6 +563,7 @@ const CMSPage = {
         if(f){f.style.display='none';f.innerHTML='';}
         this._editingId=null;
         this._quill=null;  // release Quill instance so GC can reclaim it
+        if(this._autosaveTimer){ clearInterval(this._autosaveTimer); this._autosaveTimer=null; }
     },
 
     _setPostStatus(status){
@@ -601,7 +657,12 @@ const CMSPage = {
             is_published:document.getElementById('bf-pub')?.value==='1'};
         try{
             if(this._editingId){await API.cms.updatePost(this._editingId,p);this._toast('Post updated');}
-            else{await API.cms.createPost(p);this._toast('Post created');}
+            else{
+                await API.cms.createPost(p);
+                this._toast('Post created');
+                // Clear autosave draft after successful creation
+                try{ localStorage.removeItem('pw_blog_draft_new'); }catch(_){}
+            }
             this._closeBlogForm(); await this._blog();
         }catch(e){this._toast(e.message,'error');}
     },

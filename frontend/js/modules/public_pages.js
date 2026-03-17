@@ -220,7 +220,8 @@ const PublicPages = (() => {
 
 
     // ── BLOG ─────────────────────────────────────────────────────────────────
-    async function blog(containerId = 'blog-container', ctrl = null) {
+    async function blog(containerId, ctrl) {
+        if (containerId === undefined) containerId = 'blog-container';
         spinner(containerId);
         try {
             const data = await req('/blog/posts', ctrl);
@@ -232,75 +233,76 @@ const PublicPages = (() => {
                 return;
             }
 
-            c.innerHTML = list.map((p, i) => {
-                const big = i === 0;  // first post gets hero treatment
-                const cat = p.category || 'General';
-                const date = p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '';
+            // Build HTML — NO onclick in strings to avoid quote-nesting bugs.
+            // We use data-slug attributes and attach listeners after innerHTML.
+            c.innerHTML = list.map(function(p, i) {
+                var big = (i === 0);
+                var cat = p.category || 'General';
+                var date = p.created_at
+                    ? new Date(p.created_at).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})
+                    : '';
+                var slug = (p.slug || '').replace(/"/g, '');   // safe for data attr
+
+                var imgHero = p.featured_image
+                    ? '<img src="' + p.featured_image + '" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display=\'none\'">'
+                    : '<div class="h-56 lg:h-full bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-6xl text-white/10"></i></div>';
+
+                var imgSmall = p.featured_image
+                    ? '<div class="overflow-hidden h-44"><img src="' + p.featured_image + '" class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display=\'none\'"></div>'
+                    : '<div class="h-44 bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center"><i class="fas fa-newspaper text-4xl text-gray-600"></i></div>';
+
+                var featBadge = p.featured ? '<span class="text-xs text-yellow-400">&#11088; Featured</span>' : '';
+
+                var dateParts = '';
+                if (date) dateParts += '<span><i class="fas fa-calendar mr-1"></i>' + date + '</span>';
+                if (p.read_time) dateParts += '<span><i class="fas fa-clock mr-1"></i>' + p.read_time + '</span>';
+                if (p.views) dateParts += '<span><i class="fas fa-eye mr-1"></i>' + p.views + '</span>';
 
                 if (big) {
-                    return `
-                    <article class="col-span-full bg-gray-800/80 rounded-xl border border-gray-700
-                                    hover:border-blue-600/40 transition-all cursor-pointer group overflow-hidden
-                                    grid grid-cols-1 lg:grid-cols-2"
-                         onclick="PublicPages.openPost(${JSON.stringify(p.slug)}, event)">
-                        <div class="relative overflow-hidden ${p.featured_image ? '' : 'h-56 lg:h-auto'}">
-                            ${p.featured_image
-                                ? `<img src="${p.featured_image}" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                        onerror="this.parentElement.classList.add('fallback-bg')">`
-                                : `<div class="h-56 lg:h-full bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center">
-                                       <i class="fas fa-newspaper text-6xl text-white/10"></i>
-                                   </div>`}
-                        </div>
-                        <div class="p-6 lg:p-8 flex flex-col justify-center">
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="text-xs font-bold text-blue-400 bg-blue-900/40 border border-blue-700/50 px-2.5 py-0.5 rounded-full uppercase tracking-wide">${cat}</span>
-                                ${p.featured ? '<span class="text-xs text-yellow-400">⭐ Featured</span>' : ''}
-                            </div>
-                            <h3 class="text-xl lg:text-2xl font-bold text-white leading-snug mb-3 group-hover:text-blue-300 transition-colors">${p.title}</h3>
-                            <p class="text-gray-400 text-sm leading-relaxed mb-5 line-clamp-3">${p.excerpt || ''}</p>
-                            <div class="flex items-center justify-between text-xs text-gray-500">
-                                <div class="flex items-center gap-3">
-                                    ${date ? `<span><i class="fas fa-calendar mr-1"></i>${date}</span>` : ''}
-                                    ${p.read_time ? `<span><i class="fas fa-clock mr-1"></i>${p.read_time}</span>` : ''}
-                                    ${p.views ? `<span><i class="fas fa-eye mr-1"></i>${p.views}</span>` : ''}
-                                </div>
-                                <span class="text-blue-400 font-semibold group-hover:text-blue-300">Read →</span>
-                            </div>
-                        </div>
-                    </article>`;
+                    return '<article class="col-span-full bg-gray-800/80 rounded-xl border border-gray-700 hover:border-blue-600/40 transition-all cursor-pointer group overflow-hidden grid grid-cols-1 lg:grid-cols-2 blog-card" data-slug="' + slug + '">'
+                        + '<div class="relative overflow-hidden">' + imgHero + '</div>'
+                        + '<div class="p-6 lg:p-8 flex flex-col justify-center">'
+                        +   '<div class="flex items-center gap-2 mb-3">'
+                        +     '<span class="text-xs font-bold text-blue-400 bg-blue-900/40 border border-blue-700/50 px-2.5 py-0.5 rounded-full uppercase tracking-wide">' + cat + '</span>'
+                        +     featBadge
+                        +   '</div>'
+                        +   '<h3 class="text-xl lg:text-2xl font-bold text-white leading-snug mb-3 group-hover:text-blue-300 transition-colors">' + (p.title || '') + '</h3>'
+                        +   '<p class="text-gray-400 text-sm leading-relaxed mb-5 line-clamp-3">' + (p.excerpt || '') + '</p>'
+                        +   '<div class="flex items-center justify-between text-xs text-gray-500">'
+                        +     '<div class="flex items-center gap-3">' + dateParts + '</div>'
+                        +     '<span class="text-blue-400 font-semibold group-hover:text-blue-300">Read &#8594;</span>'
+                        +   '</div>'
+                        + '</div>'
+                        + '</article>';
                 }
 
-                return `
-                <article class="bg-gray-800/80 rounded-xl border border-gray-700 hover:border-blue-600/40
-                                transition-all cursor-pointer group overflow-hidden hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-900/10"
-                         onclick="PublicPages.openPost(${JSON.stringify(p.slug)}, event)">
-                    ${p.featured_image
-                        ? `<div class="overflow-hidden h-44">
-                               <img src="${p.featured_image}" class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500"
-                                    onerror="this.parentElement.outerHTML='<div class=\\'h-44 bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center\\'><i class=\\'fas fa-newspaper text-3xl text-gray-600\\'></i></div>'">`
-                        + `</div>`
-                        : `<div class="h-44 bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
-                               <i class="fas fa-newspaper text-4xl text-gray-600 group-hover:text-gray-500 transition-colors"></i>
-                           </div>`}
-                    <div class="p-5">
-                        <div class="flex items-center gap-1.5 mb-2">
-                            <span class="text-xs font-semibold text-purple-400 uppercase tracking-wide">${cat}</span>
-                        </div>
-                        <h4 class="font-bold text-white mb-2 leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">${p.title}</h4>
-                        <p class="text-sm text-gray-400 line-clamp-2 mb-4">${p.excerpt || ''}</p>
-                        <div class="flex justify-between items-center text-xs text-gray-600">
-                            <div class="flex items-center gap-2">
-                                ${date ? `<span>${date}</span>` : ''}
-                                ${p.read_time ? `<span>· ${p.read_time}</span>` : ''}
-                            </div>
-                            <span class="text-purple-400 group-hover:text-purple-300 font-medium">Read more →</span>
-                        </div>
-                    </div>
-                </article>`;
+                return '<article class="bg-gray-800/80 rounded-xl border border-gray-700 hover:border-blue-600/40 transition-all cursor-pointer group overflow-hidden hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-900/10 blog-card" data-slug="' + slug + '">'
+                    + imgSmall
+                    + '<div class="p-5">'
+                    +   '<div class="flex items-center gap-1.5 mb-2"><span class="text-xs font-semibold text-purple-400 uppercase tracking-wide">' + cat + '</span></div>'
+                    +   '<h4 class="font-bold text-white mb-2 leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">' + (p.title || '') + '</h4>'
+                    +   '<p class="text-sm text-gray-400 line-clamp-2 mb-4">' + (p.excerpt || '') + '</p>'
+                    +   '<div class="flex justify-between items-center text-xs text-gray-600">'
+                    +     '<div class="flex items-center gap-2">'
+                    +       (date ? '<span>' + date + '</span>' : '')
+                    +       (p.read_time ? '<span>&#183; ' + p.read_time + '</span>' : '')
+                    +     '</div>'
+                    +     '<span class="text-purple-400 group-hover:text-purple-300 font-medium">Read more &#8594;</span>'
+                    +   '</div>'
+                    + '</div>'
+                    + '</article>';
             }).join('');
 
+            // Attach click listeners AFTER innerHTML — avoids all quote-nesting issues
+            c.querySelectorAll('.blog-card').forEach(function(card) {
+                card.addEventListener('click', function() {
+                    var slug = card.getAttribute('data-slug');
+                    if (slug) openPost(slug);
+                });
+            });
+
         } catch (e) {
-            errBox(containerId, `Could not load articles: ${e.message}`);
+            errBox(containerId, 'Could not load articles: ' + e.message);
         }
     }
 
@@ -372,72 +374,134 @@ const PublicPages = (() => {
 
     // ── Blog post viewer ─────────────────────────────────────────────────────
     async function openPost(slug) {
+        const MODAL_ID = 'blog-post-modal';
+
+        // Fetch the post
         let post;
         try {
             const token = localStorage.getItem('pipways_token');
-            const res = await fetch(window.location.origin + '/blog/posts/' + encodeURIComponent(slug), {
-                headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
-            });
+            const res = await fetch(
+                window.location.origin + '/blog/posts/' + encodeURIComponent(slug),
+                { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } }
+            );
             if (!res.ok) throw new Error('HTTP ' + res.status);
             post = await res.json();
-        } catch (e) {
-            alert('Could not load post: ' + e.message);
+        } catch (err) {
+            alert('Could not load post: ' + err.message);
             return;
         }
 
-        document.getElementById('blog-post-modal')?.remove();
+        // Remove existing modal
+        var existing = document.getElementById(MODAL_ID);
+        if (existing) existing.parentNode.removeChild(existing);
 
-        const modal = document.createElement('div');
-        modal.id = 'blog-post-modal';
-        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;';
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        // Build modal using DOM API — no string quotes to nest
+        var overlay = document.createElement('div');
+        overlay.id = MODAL_ID;
+        overlay.style.cssText = [
+            'position:fixed', 'inset:0', 'background:rgba(0,0,0,.88)',
+            'z-index:9999', 'display:flex', 'align-items:flex-start',
+            'justify-content:center', 'padding:2rem 1rem', 'overflow-y:auto'
+        ].join(';');
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) overlay.parentNode.removeChild(overlay);
+        });
 
-        const date = post.created_at
-            ? new Date(post.created_at).toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'})
-            : '';
-        const tags = (post.tags || []).map(function(t) {
-            return '<span style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid rgba(124,58,237,.3);padding:.2rem .7rem;border-radius:9999px;font-size:.75rem;">' + t + '</span>';
-        }).join(' ');
+        // Inner card
+        var card = document.createElement('div');
+        card.style.cssText = [
+            'background:#111827', 'border-radius:1rem', 'width:100%',
+            'max-width:760px', 'border:1px solid #374151', 'overflow:hidden',
+            'margin-top:1rem'
+        ].join(';');
 
-        const imgHtml = post.featured_image
-            ? '<img src="' + post.featured_image + '" style="width:100%;height:300px;object-fit:cover;" onerror="this.style.display=&quot;none&quot;">'
-            : '';
+        // ── header ──
+        var header = document.createElement('div');
+        header.style.cssText = [
+            'display:flex', 'justify-content:space-between', 'align-items:center',
+            'padding:1rem 1.5rem', 'border-bottom:1px solid #1f2937',
+            'position:sticky', 'top:0', 'background:#111827', 'z-index:1'
+        ].join(';');
 
-        const dateMeta = date
-            ? '<span><i class="fas fa-calendar" style="margin-right:.3rem;"></i>' + date + '</span>'
-            : '';
-        const timeMeta = post.read_time
-            ? '<span><i class="fas fa-clock" style="margin-right:.3rem;"></i>' + post.read_time + '</span>'
-            : '';
-        const viewsMeta = post.views != null
-            ? '<span><i class="fas fa-eye" style="margin-right:.3rem;"></i>' + post.views + ' views</span>'
-            : '';
+        var catSpan = document.createElement('span');
+        catSpan.style.cssText = 'color:#a78bfa;font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;';
+        catSpan.textContent = (post.category || 'General');
 
-        modal.innerHTML =
-            '<div style="background:#111827;border-radius:1rem;width:100%;max-width:760px;border:1px solid #374151;overflow:hidden;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid #1f2937;position:sticky;top:0;background:#111827;z-index:1;">' +
-                    '<span style="color:#a78bfa;font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">' +
-                        '<i class="fas fa-newspaper" style="margin-right:.5rem;"></i>' + (post.category || 'General') +
-                    '</span>' +
-                    '<button onclick="document.getElementById('blog-post-modal').remove()" ' +
-                            'style="background:none;border:none;color:#9ca3af;font-size:1.5rem;cursor:pointer;line-height:1;">&#x00D7;</button>' +
-                '</div>' +
-                imgHtml +
-                '<div style="padding:2rem;">' +
-                    '<h1 style="font-size:1.6rem;font-weight:800;color:white;line-height:1.3;margin-bottom:1rem;">' + post.title + '</h1>' +
-                    '<div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;color:#6b7280;font-size:.8rem;">' +
-                        dateMeta + timeMeta + viewsMeta +
-                    '</div>' +
-                    '<div style="color:#d1d5db;line-height:1.8;font-size:.95rem;white-space:pre-wrap;">' + (post.content || '') + '</div>' +
-                    (tags ? '<div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:2rem;padding-top:1.5rem;border-top:1px solid #1f2937;">' + tags + '</div>' : '') +
-                '</div>' +
-            '</div>';
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'background:none;border:none;color:#9ca3af;font-size:1.75rem;cursor:pointer;line-height:1;padding:0;';
+        closeBtn.onclick = function() { overlay.parentNode.removeChild(overlay); };
 
-        document.body.appendChild(modal);
+        header.appendChild(catSpan);
+        header.appendChild(closeBtn);
+        card.appendChild(header);
+
+        // ── featured image ──
+        if (post.featured_image) {
+            var img = document.createElement('img');
+            img.src = post.featured_image;
+            img.style.cssText = 'width:100%;height:300px;object-fit:cover;display:block;';
+            img.onerror = function() { this.style.display = 'none'; };
+            card.appendChild(img);
+        }
+
+        // ── body ──
+        var body = document.createElement('div');
+        body.style.cssText = 'padding:2rem;';
+
+        var h1 = document.createElement('h1');
+        h1.style.cssText = 'font-size:1.6rem;font-weight:800;color:white;line-height:1.3;margin:0 0 1rem;';
+        h1.textContent = post.title || '';
+        body.appendChild(h1);
+
+        // meta row
+        var meta = document.createElement('div');
+        meta.style.cssText = 'display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;color:#6b7280;font-size:.8rem;';
+        if (post.created_at) {
+            var dateEl = document.createElement('span');
+            dateEl.textContent = new Date(post.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+            meta.appendChild(dateEl);
+        }
+        if (post.read_time) {
+            var rtEl = document.createElement('span');
+            rtEl.textContent = post.read_time;
+            meta.appendChild(rtEl);
+        }
+        if (post.views != null) {
+            var vEl = document.createElement('span');
+            vEl.textContent = post.views + ' views';
+            meta.appendChild(vEl);
+        }
+        body.appendChild(meta);
+
+        // content
+        var contentEl = document.createElement('div');
+        contentEl.style.cssText = 'color:#d1d5db;line-height:1.8;font-size:.95rem;white-space:pre-wrap;';
+        contentEl.textContent = post.content || '';
+        body.appendChild(contentEl);
+
+        // tags
+        var tags = post.tags || [];
+        if (tags.length) {
+            var tagRow = document.createElement('div');
+            tagRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:.5rem;margin-top:2rem;padding-top:1.5rem;border-top:1px solid #1f2937;';
+            tags.forEach(function(t) {
+                var tag = document.createElement('span');
+                tag.style.cssText = 'background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid rgba(124,58,237,.3);padding:.2rem .7rem;border-radius:9999px;font-size:.75rem;';
+                tag.textContent = t;
+                tagRow.appendChild(tag);
+            });
+            body.appendChild(tagRow);
+        }
+
+        card.appendChild(body);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
     }
 
     // ── public API ────────────────────────────────────────────────────────────
     return { signals, webinars, blog, courses, openPost };
+
 })();
 
 window.PublicPages = PublicPages;

@@ -234,6 +234,8 @@ _COLUMN_MIGRATIONS = [
     # ── blog_posts ────────────────────────────────────────────────────────────
     # The live table was created with status/featured only; CMS v2 needs these:
     ("blog_posts", "is_published",    "BOOLEAN",      "DEFAULT FALSE"),
+    ("blog_posts", "featured",        "BOOLEAN",      "DEFAULT FALSE"),  # was missing — caused all queries to fail
+    ("blog_posts", "read_time",       "VARCHAR(20)",  "DEFAULT '5 min'"),  # was missing
     ("blog_posts", "tags",            "TEXT",         "DEFAULT '[]'"),
     ("blog_posts", "featured_image",  "VARCHAR(500)", "DEFAULT ''"),
     ("blog_posts", "views",           "INTEGER",      "DEFAULT 0"),

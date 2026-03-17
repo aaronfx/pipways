@@ -400,7 +400,7 @@ const PublicPages = (() => {
         }).join(' ');
 
         const imgHtml = post.featured_image
-            ? '<img src="' + post.featured_image + '" style="width:100%;height:300px;object-fit:cover;" onerror="this.style.display='none'">'
+            ? '<img src="' + post.featured_image + '" style="width:100%;height:300px;object-fit:cover;" onerror="this.style.display=&quot;none&quot;">'
             : '';
 
         const dateMeta = date

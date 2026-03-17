@@ -28,13 +28,18 @@ const CoursesPage = {
                 root.innerHTML = this._empty('No courses published yet', 'fa-graduation-cap');
                 return;
             }
+            // FIX: courses-container is already a CSS grid in dashboard.html.
+            // Wrapping everything in col-span-full keeps CoursesPage's own inner
+            // grid from being broken across the outer grid's columns.
             root.innerHTML = `
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-white">Trading Academy</h3>
-                    <div id="lms-progress-badge" class="text-xs text-gray-400"></div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="lms-course-grid">
-                    ${courses.map(c => this._courseCard(c)).join('')}
+                <div class="col-span-full">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-white">Trading Academy</h3>
+                        <div id="lms-progress-badge" class="text-xs text-gray-400"></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="lms-course-grid">
+                        ${courses.map(c => this._courseCard(c)).join('')}
+                    </div>
                 </div>`;
             this._loadProgressBadge();
         } catch (e) {
@@ -98,7 +103,7 @@ const CoursesPage = {
         const root = document.getElementById('courses-container')
                   || document.getElementById('section-courses')
                   || document.body;
-        root.innerHTML = `<div class="text-center py-12 text-gray-500">
+        root.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
             <i class="fas fa-spinner fa-spin text-2xl"></i>
             <p class="mt-2">Loading curriculum…</p></div>`;
 
@@ -151,7 +156,16 @@ const CoursesPage = {
             ${loose.map(l => this._lessonRow(l)).join('')}
         </div>` : '';
 
+        // FIX: col-span-full wrapper so the curriculum view owns the full row
+        // inside the outer grid of courses-container.
+        // Also: render the course preview_video (entered at creation time) directly
+        // below the info card — it was stored in the DB but never displayed.
+        const previewVideoHTML = c.preview_video
+            ? `<div class="mb-6">${this._videoPlayer(c.preview_video)}</div>`
+            : '';
+
         return `
+        <div class="col-span-full">
         <div class="max-w-3xl mx-auto">
             <button onclick="CoursesPage.render()" class="flex items-center gap-2 text-gray-400
                     hover:text-white text-sm mb-5 transition-colors">
@@ -172,8 +186,10 @@ const CoursesPage = {
                         : ''}
                 </div>
             </div>
+            ${previewVideoHTML}
             <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Curriculum</h3>
             ${modulesHTML}${looseHTML}
+        </div>
         </div>`;
     },
 
@@ -438,14 +454,15 @@ const CoursesPage = {
     },
 
     _empty(msg, icon = 'fa-inbox') {
-        return `<div class="text-center py-16 text-gray-500">
+        // col-span-full so this single div doesn't appear as one grid cell
+        return `<div class="col-span-full text-center py-16 text-gray-500">
             <i class="fas ${icon} text-5xl mb-4 block opacity-30"></i>
             <p class="font-medium">${msg}</p>
         </div>`;
     },
 
     _error(title, detail = '') {
-        return `<div class="text-center py-12 text-gray-500">
+        return `<div class="col-span-full text-center py-12 text-gray-500">
             <i class="fas fa-exclamation-triangle text-3xl mb-3 block text-red-500/50"></i>
             <p class="font-medium text-red-400">${title}</p>
             ${detail ? `<p class="text-xs mt-1 text-gray-600">${detail}</p>` : ''}

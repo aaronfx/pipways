@@ -147,4 +147,54 @@ async def init_lms_tables() -> None:
             warn += 1
             print(f"[LMS INIT] table warn: {e}", flush=True)
 
+    # ── Step 3: Ensure lesson_count column stays correct via a DB function ──
+    # lesson_count on `courses` is a denormalised cache column. Since no trigger
+    # keeps it up-to-date, the CMS lesson create/delete endpoints must call
+    # _sync_lesson_count(course_id) after every mutation.  This step installs
+    # a PostgreSQL function that can be called from Python when needed.
+    _sync_fn = """
+    CREATE OR REPLACE FUNCTION sync_course_lesson_count(p_course_id INTEGER)
+    RETURNS VOID LANGUAGE plpgsql AS $$
+    BEGIN
+        UPDATE courses
+        SET    lesson_count = (
+            SELECT COUNT(*) FROM lessons
+            WHERE  course_id = p_course_id
+              AND  COALESCE(is_active, TRUE) = TRUE
+        )
+        WHERE  id = p_course_id;
+    END;
+    $$
+    """
+    try:
+        await database.execute(_sync_fn.strip())
+        ok += 1
+    except Exception as e:
+        warn += 1
+        print(f"[LMS INIT] sync function warn: {e}", flush=True)
+
     print(f"[LMS INIT] Done — {ok} ok, {warn} warnings", flush=True)
+
+
+async def sync_lesson_count(course_id: int) -> None:
+    """
+    Recompute and persist lesson_count for a course.
+    Call after every lesson CREATE or DELETE in the CMS.
+    Safe to call even if the function doesn't exist (falls back to a plain UPDATE).
+    """
+    try:
+        await database.execute(
+            "SELECT sync_course_lesson_count(:cid)", {"cid": course_id}
+        )
+    except Exception:
+        # Fallback: direct UPDATE in case the PL/pgSQL function isn't installed
+        try:
+            await database.execute(
+                "UPDATE courses SET lesson_count = ("
+                "  SELECT COUNT(*) FROM lessons"
+                "  WHERE course_id = :cid AND COALESCE(is_active, TRUE) = TRUE"
+                ") WHERE id = :cid",
+                {"cid": course_id}
+            )
+        except Exception as e2:
+            print(f"[LMS] sync_lesson_count fallback error: {e2}", flush=True)

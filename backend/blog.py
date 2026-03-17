@@ -1,14 +1,13 @@
 """
-Blog API — Complete Rebuild
+Blog API — Bulletproof Rebuild
 Endpoints:
   GET /blog/posts           — paginated published posts
   GET /blog/posts/{slug}    — single post by slug
 
-Design decisions:
-- COALESCE on every new column so query never fails if column missing
-- Dual publish filter: status='published' OR is_published=TRUE
-- tags parsed from JSON string → Python list
-- All datetime fields serialised to ISO string
+Root cause of empty blog: `featured` and `read_time` columns did not exist
+on the live DB. Any query referencing them fails silently → empty [].
+Fix: 3-stage waterfall queries — full → partial → minimum.
+database.py now adds the missing columns via migration.
 """
 import json
 from typing import Optional
@@ -19,26 +18,26 @@ from .security import get_current_user
 router = APIRouter()
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
-
 def _tags(raw) -> list:
     if not raw:
         return []
     if isinstance(raw, list):
         return raw
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
     except Exception:
         return [t.strip() for t in str(raw).split(",") if t.strip()]
 
 
 def _fmt(row: dict) -> dict:
     content = row.get("content") or ""
+    excerpt = row.get("excerpt") or ""
     return {
         "id":             row.get("id"),
         "title":          row.get("title", ""),
         "slug":           row.get("slug", ""),
-        "excerpt":        row.get("excerpt") or content[:160] + ("…" if len(content) > 160 else ""),
+        "excerpt":        excerpt or (content[:160] + ("..." if len(content) > 160 else "")),
         "content":        content,
         "category":       row.get("category") or "General",
         "featured_image": row.get("featured_image") or "",
@@ -52,23 +51,23 @@ def _fmt(row: dict) -> dict:
     }
 
 
-async def _run(sql: str, params: dict = None):
+async def _fetch(sql: str, params: dict = None) -> list:
     try:
-        return await database.fetch_all(sql, params or {})
+        rows = await database.fetch_all(sql, params or {})
+        return [dict(r) for r in rows] if rows else []
     except Exception as e:
-        print(f"[BLOG] query error: {e}", flush=True)
+        print(f"[BLOG] query failed: {e}", flush=True)
         return []
 
 
-async def _one(sql: str, params: dict = None):
+async def _fetch_one(sql: str, params: dict = None):
     try:
-        return await database.fetch_one(sql, params or {})
+        row = await database.fetch_one(sql, params or {})
+        return dict(row) if row else None
     except Exception as e:
-        print(f"[BLOG] fetch_one error: {e}", flush=True)
+        print(f"[BLOG] fetch_one failed: {e}", flush=True)
         return None
 
-
-# ── endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/posts")
 async def get_posts(
@@ -77,75 +76,73 @@ async def get_posts(
     category: Optional[str] = None,
     current_user=Depends(get_current_user),
 ):
-    """Return published blog posts. Always uses dual-column publish check."""
-    cat = f"AND category = :cat" if category else ""
+    cat_sql = "AND category = :cat" if category else ""
     params: dict = {"lim": limit, "off": offset}
     if category:
         params["cat"] = category
 
-    # Full query — exclude tags from COALESCE (TEXT[] vs TEXT conflict)
-    # tags are read raw and handled in Python by _tags()
-    rows = await _run(
+    # Stage 1: all columns (works after migration adds featured + read_time)
+    rows = await _fetch(
         f"""
         SELECT id, title, slug, excerpt, content, category,
-               created_at, updated_at,
-               COALESCE(featured_image, '')   AS featured_image,
-               COALESCE(views, 0)             AS views,
-               tags,
-               COALESCE(featured, FALSE)      AS featured,
-               COALESCE(read_time, '5 min')   AS read_time,
-               COALESCE(is_published, FALSE)  AS is_published
+               created_at, updated_at, status,
+               featured_image, views, tags,
+               featured, read_time, is_published
         FROM blog_posts
-        WHERE (LOWER(COALESCE(status, '')) = 'published'
-               OR COALESCE(is_published, FALSE) = TRUE)
-        {cat}
-        ORDER BY COALESCE(featured, FALSE) DESC, created_at DESC
+        WHERE (LOWER(status) = 'published' OR is_published = TRUE)
+        {cat_sql}
+        ORDER BY featured DESC NULLS LAST, created_at DESC
         LIMIT :lim OFFSET :off
-        """,
-        params,
+        """, params,
     )
 
-    # Fallback: try without any new columns if query failed
+    # Stage 2: without featured + read_time (before migration runs)
     if not rows:
-        rows = await _run(
+        rows = await _fetch(
             f"""
             SELECT id, title, slug, excerpt, content, category,
-                   created_at, updated_at, featured, read_time, status
+                   created_at, updated_at, status,
+                   featured_image, views, tags, is_published
             FROM blog_posts
-            WHERE LOWER(COALESCE(status, '')) = 'published'
-            {cat}
+            WHERE (LOWER(status) = 'published' OR is_published = TRUE)
+            {cat_sql}
             ORDER BY created_at DESC
             LIMIT :lim OFFSET :off
-            """,
-            params,
+            """, params,
         )
 
-    result = [_fmt(dict(r)) for r in rows]
-    print(f"[BLOG] /posts → {len(result)} posts", flush=True)
+    # Stage 3: absolute minimum — original schema only
+    if not rows:
+        rows = await _fetch(
+            f"""
+            SELECT id, title, slug, excerpt, content, category,
+                   created_at, updated_at, status
+            FROM blog_posts
+            WHERE LOWER(status) = 'published'
+            {cat_sql}
+            ORDER BY created_at DESC
+            LIMIT :lim OFFSET :off
+            """, params,
+        )
+
+    result = [_fmt(r) for r in rows]
+    print(f"[BLOG] /posts -> {len(result)} posts", flush=True)
     return result
 
 
 @router.get("/posts/{slug}")
 async def get_post(slug: str, current_user=Depends(get_current_user)):
-    """Return a single published post by slug."""
-    # Note: no COALESCE on is_published in WHERE — use separate fallback instead
-    row = await _one(
-        """
-        SELECT * FROM blog_posts
-        WHERE slug = :slug
-          AND (LOWER(COALESCE(status, '')) = 'published'
-               OR is_published = TRUE)
-        """,
+    # Try with is_published
+    row = await _fetch_one(
+        "SELECT * FROM blog_posts WHERE slug = :slug AND (LOWER(status) = 'published' OR is_published = TRUE)",
         {"slug": slug},
     )
-
+    # Fallback without is_published
     if not row:
-        row = await _one(
-            "SELECT * FROM blog_posts WHERE slug=:slug AND LOWER(COALESCE(status,''))='published'",
+        row = await _fetch_one(
+            "SELECT * FROM blog_posts WHERE slug = :slug AND LOWER(status) = 'published'",
             {"slug": slug},
         )
-
     if not row:
         raise HTTPException(404, "Post not found")
-
-    return _fmt(dict(row))
+    return _fmt(row)

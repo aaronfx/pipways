@@ -411,45 +411,50 @@ const PublicPages = (() => {
                 }).join('');
             }
 
-            // Render filter bar + grid wrapper
-            c.innerHTML = '';
+            // ── blog-container IS already the grid (grid-cols-3 in dashboard.html)
+            // The category bar must be a SIBLING before it, not a child inside it.
+            // Articles are written directly into blog-container via innerHTML.
 
-            // Category filter bar (only if more than one category)
+            // Remove any existing filter bar (re-render safe)
+            var oldBar = document.getElementById('blog-cat-bar');
+            if (oldBar) oldBar.parentNode.removeChild(oldBar);
+
+            // Build and insert category filter bar BEFORE the container
             if (cats.length > 2) {
                 var bar = document.createElement('div');
-                bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.25rem;';
                 bar.id = 'blog-cat-bar';
+                bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.25rem;';
                 cats.forEach(function(cat) {
                     var btn = document.createElement('button');
                     var isActive = cat === 'All';
                     btn.textContent = cat;
                     btn.style.cssText = 'padding:.3rem .85rem;border-radius:9999px;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid '
-                        + (isActive ? '#7c3aed;background:rgba(124,58,237,.25);color:#c4b5fd;' : '#374151;background:transparent;color:#6b7280;');
+                        + (isActive ? '#7c3aed;background:rgba(124,58,237,.25);color:#c4b5fd;'
+                                    : '#374151;background:transparent;color:#6b7280;');
                     btn.setAttribute('data-cat', cat);
                     btn.onclick = function() {
-                        activeCat = cat;
+                        // Update pill styles
                         bar.querySelectorAll('button').forEach(function(b) {
                             var active = b.getAttribute('data-cat') === cat;
-                            b.style.border   = '1px solid ' + (active ? '#7c3aed' : '#374151');
+                            b.style.border     = '1px solid ' + (active ? '#7c3aed' : '#374151');
                             b.style.background = active ? 'rgba(124,58,237,.25)' : 'transparent';
-                            b.style.color    = active ? '#c4b5fd' : '#6b7280';
+                            b.style.color      = active ? '#c4b5fd' : '#6b7280';
                         });
-                        grid.innerHTML = renderGrid(cat);
+                        // Write filtered articles directly into the grid container
+                        c.innerHTML = renderGrid(cat);
                         attachClicks();
                     };
                     bar.appendChild(btn);
                 });
-                c.appendChild(bar);
+                // Insert bar as sibling BEFORE the grid container — not inside it
+                c.parentNode.insertBefore(bar, c);
             }
 
-            // Grid
-            var grid = document.createElement('div');
-            grid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
-            grid.innerHTML = renderGrid('All');
-            c.appendChild(grid);
+            // Write articles directly into blog-container (which is the grid)
+            c.innerHTML = renderGrid('All');
 
             function attachClicks() {
-                grid.querySelectorAll('.blog-card').forEach(function(card) {
+                c.querySelectorAll('.blog-card').forEach(function(card) {
                     card.addEventListener('click', function() {
                         var slug = card.getAttribute('data-slug');
                         if (slug) openPost(slug);
@@ -460,6 +465,71 @@ const PublicPages = (() => {
 
         } catch (e) {
             errBox(containerId, 'Could not load articles: ' + e.message);
+        }
+    }
+
+
+    // ── COURSES ───────────────────────────────────────────────────────────────
+    async function courses(containerId = 'courses-container', ctrl = null) {
+        // Prefer the full CoursesPage LMS module if loaded
+        if (typeof window.CoursesPage !== 'undefined') {
+            await window.CoursesPage.render(containerId);
+            return;
+        }
+
+        // Fallback: simple grid
+        spinner(containerId);
+        try {
+            const data = await req('/courses/list', ctrl);
+            const list = Array.isArray(data) ? data : (data.courses || []);
+            const c = el(containerId); if (!c) return;
+
+            if (!list.length) {
+                empty(containerId, 'fa-graduation-cap', 'No courses available yet');
+                return;
+            }
+
+            c.innerHTML = list.map(course => {
+                const pct = course.progress || 0;
+                return `
+                <div class="bg-gray-800/80 rounded-xl border border-gray-700 overflow-hidden
+                            hover:border-purple-600/40 transition-all cursor-pointer group hover:-translate-y-0.5"
+                     onclick="window.CoursesPage ? window.CoursesPage.openCourse(${course.id}) : null">
+                    ${course.thumbnail_url
+                        ? `<div class="overflow-hidden h-44">
+                               <img src="${course.thumbnail_url}" class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500"
+                                    onerror="this.parentElement.innerHTML='<div class=\\'h-44 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center\\'><i class=\\'fas fa-graduation-cap text-5xl text-white/10\\'></i></div>'">`
+                           + `</div>`
+                        : `<div class="h-44 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
+                               <i class="fas fa-graduation-cap text-5xl text-white/10 group-hover:text-white/20 transition-colors"></i>
+                           </div>`}
+                    <div class="p-5">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-semibold text-purple-400 uppercase tracking-wide">${course.level || 'Beginner'}</span>
+                            ${course.instructor ? `<span class="text-xs text-gray-500">${course.instructor}</span>` : ''}
+                        </div>
+                        <h4 class="font-bold text-white mb-2 group-hover:text-purple-300 transition-colors line-clamp-2">${course.title}</h4>
+                        <p class="text-sm text-gray-400 line-clamp-2 mb-4">${course.description || ''}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-500 mb-3">
+                            <span><i class="fas fa-book-open mr-1.5"></i>${course.lesson_count || 0} lessons</span>
+                            ${pct > 0 ? `<span class="text-green-400 font-semibold">${pct}% done</span>` : ''}
+                        </div>
+                        ${pct > 0 ? `
+                        <div class="h-1.5 bg-gray-700 rounded-full overflow-hidden mb-3">
+                            <div class="h-full bg-gradient-to-r from-purple-600 to-blue-500 rounded-full transition-all"
+                                 style="width:${pct}%"></div>
+                        </div>` : ''}
+                        <button class="w-full py-2 rounded-lg text-sm font-semibold text-white transition-all
+                                       hover:brightness-110 active:scale-95"
+                                style="background:rgba(124,58,237,.3);border:1px solid rgba(124,58,237,.4);">
+                            ${pct > 0 ? `Continue (${pct}%) →` : 'Start Learning →'}
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+
+        } catch (e) {
+            errBox(containerId, `Could not load courses: ${e.message}`);
         }
     }
 

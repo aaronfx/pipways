@@ -75,6 +75,24 @@ const AcademyPage = {
                 {icon:'fa-chart-line',color:'#60a5fa', bg:'rgba(96,165,250,.15)'},
                 {icon:'fa-trophy',    color:'#f59e0b', bg:'rgba(245,158,11,.15)'},
             ];
+            if (!levels || !levels.length) {
+                main.innerHTML = `
+                <div class="pw-empty" style="padding:4rem 1rem;">
+                    <div class="pw-empty-icon" style="width:56px;height:56px;">
+                        <i class="fas fa-book-open" style="color:#4b5563;font-size:1.2rem;"></i>
+                    </div>
+                    <p class="pw-empty-title">Academy not set up yet</p>
+                    <p class="pw-empty-sub">The learning curriculum hasn't been loaded yet.<br>
+                       Make sure <code style="background:#1f2937;padding:.1rem .35rem;border-radius:.25rem;font-size:.8em;color:#a78bfa;">lms_init.py</code> is wired in
+                       <code style="background:#1f2937;padding:.1rem .35rem;border-radius:.25rem;font-size:.8em;color:#a78bfa;">main.py</code>
+                       and the app has been restarted.</p>
+                    <button onclick="AcademyPage._showLevelSelector()"
+                            class="btn btn-primary mt-4" style="font-size:.8rem;padding:.45rem 1rem;">
+                        <i class="fas fa-refresh mr-1"></i> Retry
+                    </button>
+                </div>`;
+                return;
+            }
             main.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             ${levels.map((lv,i)=>{
                 const c=cfg[i%3], s=sm[lv.id], pct=s?s.percent:0, done=s?s.completed:0, tot=s?s.total:0;
@@ -96,7 +114,12 @@ const AcademyPage = {
                 </div>`;
             }).join('')}
             </div>`;
-        } catch(e) { main.innerHTML = this._error('Could not load levels', e.message); }
+        } catch(e) {
+            main.innerHTML = this._error(
+                'Could not load Academy levels',
+                e.message + ' — check that <code style="background:#111;padding:.1rem .3rem;border-radius:.2rem;">learning.py</code> is mounted in <code style="background:#111;padding:.1rem .3rem;border-radius:.2rem;">main.py</code>'
+            );
+        }
     },
 
     /* ── Module List ────────────────────────────────────────────────────── */

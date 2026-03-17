@@ -70,9 +70,37 @@ async def _exec(q, v=None):
         raise HTTPException(500, f"Database error: {str(e)}")
 
 def _tags_str(t):
-    if isinstance(t, list): return json.dumps(t)
-    try: json.loads(t); return t
-    except: return json.dumps([x.strip() for x in str(t).split(",") if x.strip()])
+    """
+    Return tags in the correct format for asyncpg.
+    The DB column may be TEXT (store as JSON string) or TEXT[] (store as list).
+    We always return a JSON string for TEXT columns — asyncpg handles TEXT fine.
+    For TEXT[] columns asyncpg needs a Python list.
+    We detect by trying JSON string first; if that causes 'sized iterable' errors
+    the fallback in cms_create_post/update handles it.
+    """
+    if isinstance(t, list):
+        return json.dumps(t)          # TEXT column: store as JSON string
+    if not t:
+        return '[]'
+    try:
+        parsed = json.loads(t)
+        return json.dumps(parsed) if isinstance(parsed, list) else json.dumps([])
+    except Exception:
+        items = [x.strip() for x in str(t).split(",") if x.strip()]
+        return json.dumps(items)
+
+
+def _tags_list_val(t):
+    """Return tags as a Python list (for TEXT[] columns)."""
+    if isinstance(t, list):
+        return t
+    if not t:
+        return []
+    try:
+        parsed = json.loads(t)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return [x.strip() for x in str(t).split(",") if x.strip()]
 
 def _tags_list(r):
     if not r: return []
@@ -217,31 +245,53 @@ async def cms_create_post(data: BlogPostIn, _=Depends(get_admin_user)):
     if await _row("SELECT id FROM blog_posts WHERE slug=:s", {"s": data.slug}):
         raise HTTPException(400, f"Slug '{data.slug}' already exists")
     now = datetime.utcnow()
-    pid = await _exec(
-        "INSERT INTO blog_posts (title,slug,excerpt,content,category,tags,featured_image,"
-        "seo_title,seo_description,focus_keyword,is_published,status,views,created_at,updated_at) "
-        "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,:status,0,:now,:now)",
-        {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
-         "cat":data.category or "General","tags":_tags_str(data.tags),"img":data.featured_image or "",
-         "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
-         "pub":data.is_published,"status":"published" if data.is_published else "draft","now":now}
-    )
+
+    # Try with tags as JSON string (TEXT column)
+    try:
+        pid = await _exec(
+            "INSERT INTO blog_posts (title,slug,excerpt,content,category,tags,featured_image,"
+            "seo_title,seo_description,focus_keyword,is_published,status,views,created_at,updated_at) "
+            "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,:status,0,:now,:now)",
+            {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
+             "cat":data.category or "General","tags":_tags_str(data.tags),"img":data.featured_image or "",
+             "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
+             "pub":data.is_published,"status":"published" if data.is_published else "draft","now":now}
+        )
+    except Exception as e:
+        if "iterable" in str(e).lower() or "array" in str(e).lower() or "sized" in str(e).lower():
+            # tags column is TEXT[] — pass as Python list
+            pid = await _exec(
+                "INSERT INTO blog_posts (title,slug,excerpt,content,category,tags,featured_image,"
+                "seo_title,seo_description,focus_keyword,is_published,status,views,created_at,updated_at) "
+                "VALUES (:title,:slug,:excerpt,:content,:cat,:tags,:img,:stitle,:sdesc,:kw,:pub,:status,0,:now,:now)",
+                {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
+                 "cat":data.category or "General","tags":_tags_list_val(data.tags),"img":data.featured_image or "",
+                 "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
+                 "pub":data.is_published,"status":"published" if data.is_published else "draft","now":now}
+            )
+        else:
+            raise
     return {"id": pid, "message": "Post created"}
 
 @router.put("/blog/{post_id}")
 async def cms_update_post(post_id: int, data: BlogPostIn, _=Depends(get_admin_user)):
     if not await _row("SELECT id FROM blog_posts WHERE id=:id", {"id": post_id}):
         raise HTTPException(404, "Post not found")
-    await _exec(
-        "UPDATE blog_posts SET title=:title,slug=:slug,excerpt=:excerpt,content=:content,"
-        "category=:cat,tags=:tags,featured_image=:img,seo_title=:stitle,seo_description=:sdesc,"
-        "focus_keyword=:kw,is_published=:pub,status=:status,updated_at=:now WHERE id=:id",
-        {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
-         "cat":data.category or "General","tags":_tags_str(data.tags),"img":data.featured_image or "",
-         "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
-         "pub":data.is_published,"status":"published" if data.is_published else "draft",
-         "now":datetime.utcnow(),"id":post_id}
-    )
+    sql = ("UPDATE blog_posts SET title=:title,slug=:slug,excerpt=:excerpt,content=:content,"
+           "category=:cat,tags=:tags,featured_image=:img,seo_title=:stitle,seo_description=:sdesc,"
+           "focus_keyword=:kw,is_published=:pub,status=:status,updated_at=:now WHERE id=:id")
+    base = {"title":data.title,"slug":data.slug,"excerpt":data.excerpt or "","content":data.content,
+            "cat":data.category or "General","img":data.featured_image or "",
+            "stitle":data.seo_title or "","sdesc":data.seo_description or "","kw":data.focus_keyword or "",
+            "pub":data.is_published,"status":"published" if data.is_published else "draft",
+            "now":datetime.utcnow(),"id":post_id}
+    try:
+        await _exec(sql, {**base, "tags": _tags_str(data.tags)})
+    except Exception as e:
+        if "iterable" in str(e).lower() or "array" in str(e).lower() or "sized" in str(e).lower():
+            await _exec(sql, {**base, "tags": _tags_list_val(data.tags)})
+        else:
+            raise
     return {"message": "Post updated"}
 
 @router.delete("/blog/{post_id}")

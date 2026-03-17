@@ -486,149 +486,179 @@ class QuestionIn(BaseModel):
 
 @router.get("/courses")
 async def cms_list_courses(_=Depends(get_admin_user)):
-    rows = []
+    # Try full query with JOIN counts
     try:
         rows = await _rows(
-            "SELECT c.id,c.title,c.description,c.level,c.price,c.thumbnail,c.preview_video,"
-            "c.is_published,c.certificate_enabled,c.pass_percentage,c.created_at,"
-            "COUNT(DISTINCT m.id) AS module_count,"
-            "COUNT(DISTINCT l.id) AS lesson_count "
-            "FROM courses c "
-            "LEFT JOIN course_modules m ON m.course_id=c.id "
-            "LEFT JOIN lessons l ON l.course_id=c.id "
-            "GROUP BY c.id ORDER BY c.created_at DESC"
+            "SELECT c.id, c.title, c.description, c.level, c.created_at,"
+            " COALESCE(c.price, 0) AS price,"
+            " COALESCE(c.thumbnail, '') AS thumbnail,"
+            " COALESCE(c.preview_video, '') AS preview_video,"
+            " COALESCE(c.is_published, FALSE) AS is_published,"
+            " COALESCE(c.certificate_enabled, FALSE) AS certificate_enabled,"
+            " COALESCE(c.pass_percentage, 70) AS pass_percentage,"
+            " COUNT(DISTINCT m.id) AS module_count,"
+            " COUNT(DISTINCT l.id) AS lesson_count"
+            " FROM courses c"
+            " LEFT JOIN course_modules m ON m.course_id = c.id"
+            " LEFT JOIN lessons l ON l.course_id = c.id"
+            " GROUP BY c.id ORDER BY c.created_at DESC"
         )
-        print(f"[CMS] listCourses (full join): {len(rows)} rows", flush=True)
+        print(f"[CMS] listCourses: {len(rows)} rows", flush=True)
     except Exception as e1:
-        print(f"[CMS] listCourses full join failed ({e1}), using simple query", flush=True)
-        try:
-            rows = await _rows(
-                "SELECT id,title,description,level,is_published,created_at "
-                "FROM courses ORDER BY created_at DESC"
-            )
-            for r in rows:
-                r.setdefault("price", 0)
-                r.setdefault("thumbnail", "")
-                r.setdefault("preview_video", "")
-                r.setdefault("certificate_enabled", False)
-                r.setdefault("pass_percentage", 70)
-            print(f"[CMS] listCourses (simple): {len(rows)} rows", flush=True)
-        except Exception as e2:
-            print(f"[CMS] listCourses simple query also failed: {e2}", flush=True)
-            return []
+        print(f"[CMS] listCourses join failed ({e1}), using minimal query", flush=True)
+        # Absolute minimum — only guaranteed original columns
+        rows = await _rows(
+            "SELECT id, title, description, level, created_at"
+            " FROM courses ORDER BY created_at DESC"
+        )
+        for r in rows:
+            r.setdefault("price", 0)
+            r.setdefault("thumbnail", "")
+            r.setdefault("preview_video", "")
+            r.setdefault("is_published", False)
+            r.setdefault("certificate_enabled", False)
+            r.setdefault("pass_percentage", 70)
+            r.setdefault("module_count", 0)
+            r.setdefault("lesson_count", 0)
     for r in rows:
         r["created_at"]   = _fmt(r.get("created_at"))
         r["module_count"] = r.get("module_count") or 0
         r["lesson_count"] = r.get("lesson_count") or 0
     return rows
 
+
 @router.post("/courses", status_code=201)
 async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
-    print(f"[CMS] Creating course: title={data.title!r} published={data.is_published}", flush=True)
-    cid = None
+    print(f"[CMS] CREATE COURSE title={data.title!r}", flush=True)
+
+    # Step 1 — guaranteed-safe INSERT using only original schema columns
     try:
-        cid = await _exec(
-            "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
-            "is_published,is_active,certificate_enabled,pass_percentage,created_at) "
-            "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:active,:cert,:pass,:now)"
-            " RETURNING id",
-            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-             "pub":data.is_published,"active":data.is_published,
-             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
-             "now":datetime.utcnow()}
+        cid = await database.execute(
+            "INSERT INTO courses (title, description, level, created_at)"
+            " VALUES (:title, :desc, :level, :now) RETURNING id",
+            {"title": data.title,
+             "desc":  data.description or "",
+             "level": data.level or "Beginner",
+             "now":   datetime.utcnow()}
         )
-        print(f"[CMS] Course created with id={cid} (full insert)", flush=True)
-    except Exception as e1:
-        print(f"[CMS] Full insert failed ({e1}), trying fallback insert", flush=True)
-        try:
-            cid = await _exec(
-                "INSERT INTO courses (title,description,level,price,thumbnail,preview_video,"
-                "is_published,certificate_enabled,pass_percentage,created_at) "
-                "VALUES (:title,:desc,:level,:price,:thumb,:preview,:pub,:cert,:pass,:now)"
-                " RETURNING id",
-                {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-                 "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-                 "pub":data.is_published,
-                 "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,
-                 "now":datetime.utcnow()}
-            )
-            print(f"[CMS] Course created with id={cid} (fallback insert)", flush=True)
-        except Exception as e2:
-            print(f"[CMS] Fallback insert also failed: {e2}", flush=True)
-            raise HTTPException(500, f"Could not create course: {e2}")
+        print(f"[CMS] Base insert OK, id={cid}", flush=True)
+    except Exception as e:
+        print(f"[CMS] Base insert FAILED: {e}", flush=True)
+        raise HTTPException(500, f"Could not create course: {e}")
+
     if not cid:
-        raise HTTPException(500, "Course insert returned no ID")
+        raise HTTPException(500, "Insert returned no ID")
+
+    # Step 2 — patch in the extra columns individually; skip any that don't exist yet
+    extras = {
+        "price":               data.price or 0,
+        "thumbnail":           data.thumbnail or "",
+        "preview_video":       data.preview_video or "",
+        "is_published":        data.is_published,
+        "is_active":           data.is_published,
+        "certificate_enabled": data.certificate_enabled,
+        "pass_percentage":     data.pass_percentage or 70,
+    }
+    for col, val in extras.items():
+        try:
+            await database.execute(
+                f"UPDATE courses SET {col} = :val WHERE id = :id",
+                {"val": val, "id": cid}
+            )
+        except Exception as e:
+            print(f"[CMS] Skipping column {col} (not yet migrated): {e}", flush=True)
+
+    print(f"[CMS] Course {cid} ready", flush=True)
     return {"id": cid, "message": "Course created"}
+
 
 @router.put("/courses/{cid}")
 async def cms_update_course(cid: int, data: CourseIn, _=Depends(get_admin_user)):
     if not await _row("SELECT id FROM courses WHERE id=:id", {"id": cid}):
         raise HTTPException(404, "Course not found")
-    try:
-        await _exec(
-            "UPDATE courses SET title=:title,description=:desc,level=:level,price=:price,"
-            "thumbnail=:thumb,preview_video=:preview,is_published=:pub,is_active=:active,"
-            "certificate_enabled=:cert,pass_percentage=:pass WHERE id=:id",
-            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-             "pub":data.is_published,"active":data.is_published,
-             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
-        )
-    except Exception:
-        # Fallback: is_active column not yet added
-        await _exec(
-            "UPDATE courses SET title=:title,description=:desc,level=:level,price=:price,"
-            "thumbnail=:thumb,preview_video=:preview,is_published=:pub,"
-            "certificate_enabled=:cert,pass_percentage=:pass WHERE id=:id",
-            {"title":data.title,"desc":data.description or "","level":data.level or "Beginner",
-             "price":data.price or 0,"thumb":data.thumbnail or "","preview":data.preview_video or "",
-             "pub":data.is_published,
-             "cert":data.certificate_enabled,"pass":data.pass_percentage or 70,"id":cid}
-        )
+
+    # Always safe: only touch columns that definitely exist after migration
+    update_map = {
+        "title":               data.title,
+        "description":         data.description or "",
+        "level":               data.level or "Beginner",
+        "price":               data.price or 0,
+        "thumbnail":           data.thumbnail or "",
+        "preview_video":       data.preview_video or "",
+        "is_published":        data.is_published,
+        "is_active":           data.is_published,
+        "certificate_enabled": data.certificate_enabled,
+        "pass_percentage":     data.pass_percentage or 70,
+    }
+    for col, val in update_map.items():
+        try:
+            await database.execute(
+                f"UPDATE courses SET {col} = :val WHERE id = :id",
+                {"val": val, "id": cid}
+            )
+        except Exception as e:
+            print(f"[CMS] update_course skip {col}: {e}", flush=True)
+
     return {"message": "Course updated"}
+
 
 @router.delete("/courses/{cid}")
 async def cms_delete_course(cid: int, _=Depends(get_admin_user)):
-    await _exec("DELETE FROM quiz_questions WHERE quiz_id IN (SELECT id FROM quizzes WHERE module_id IN (SELECT id FROM course_modules WHERE course_id=:id))", {"id": cid})
-    await _exec("DELETE FROM quizzes WHERE module_id IN (SELECT id FROM course_modules WHERE course_id=:id)", {"id": cid})
-    await _exec("DELETE FROM lessons WHERE course_id=:id", {"id": cid})
-    await _exec("DELETE FROM course_modules WHERE course_id=:id", {"id": cid})
-    await _exec("DELETE FROM courses WHERE id=:id", {"id": cid})
-    return {"message": "Course and all content deleted"}
+    # Delete child records first (cascade-safe order)
+    for sql, params in [
+        ("DELETE FROM quiz_questions WHERE quiz_id IN "
+         "(SELECT id FROM quizzes WHERE module_id IN "
+         "(SELECT id FROM course_modules WHERE course_id=:id))", {"id": cid}),
+        ("DELETE FROM quizzes WHERE module_id IN "
+         "(SELECT id FROM course_modules WHERE course_id=:id)", {"id": cid}),
+        ("DELETE FROM lessons WHERE course_id=:id", {"id": cid}),
+        ("DELETE FROM course_modules WHERE course_id=:id", {"id": cid}),
+        ("DELETE FROM courses WHERE id=:id", {"id": cid}),
+    ]:
+        try:
+            await database.execute(sql, params)
+        except Exception as e:
+            print(f"[CMS] delete_course step warn: {e}", flush=True)
+    return {"message": "Course deleted"}
+
 
 @router.post("/courses/{cid}/toggle-publish")
 async def cms_toggle_course(cid: int, _=Depends(get_admin_user)):
-    r = await _row("SELECT id,is_published FROM courses WHERE id=:id", {"id": cid})
-    if not r: raise HTTPException(404, "Course not found")
-    ns = not bool(r["is_published"])
-    # Sync both is_published and is_active so public /courses/list sees it
-    try:
-        await _exec("UPDATE courses SET is_published=:pub,is_active=:pub WHERE id=:id",
-                    {"pub": ns, "id": cid})
-    except Exception:
-        await _exec("UPDATE courses SET is_published=:pub WHERE id=:id",
-                    {"pub": ns, "id": cid})
+    r = await _row("SELECT id, is_published FROM courses WHERE id=:id", {"id": cid})
+    if not r:
+        raise HTTPException(404, "Course not found")
+    ns = not bool(r.get("is_published", False))
+    for col in ("is_published", "is_active"):
+        try:
+            await database.execute(
+                f"UPDATE courses SET {col}=:val WHERE id=:id",
+                {"val": ns, "id": cid}
+            )
+        except Exception as e:
+            print(f"[CMS] toggle_course skip {col}: {e}", flush=True)
     return {"is_published": ns, "message": "Published" if ns else "Unpublished"}
 
-# ── Modules ──────────────────────────────────────────────────────────────────
+
+# ── Modules ───────────────────────────────────────────────────────────────────
 
 @router.get("/courses/{cid}/modules")
 async def cms_list_modules(cid: int, _=Depends(get_admin_user)):
     try:
         mods = await _rows(
-            "SELECT m.id,m.title,m.description,m.order_index,"
-            "COUNT(l.id) AS lesson_count,"
-            "(SELECT COUNT(*) FROM quizzes q WHERE q.module_id=m.id) AS quiz_count "
-            "FROM course_modules m LEFT JOIN lessons l ON l.module_id=m.id "
-            "WHERE m.course_id=:cid GROUP BY m.id ORDER BY m.order_index,m.id",
+            "SELECT m.id, m.title, m.description, m.order_index,"
+            " COUNT(DISTINCT l.id) AS lesson_count,"
+            " (SELECT COUNT(*) FROM quizzes q WHERE q.module_id=m.id) AS quiz_count"
+            " FROM course_modules m"
+            " LEFT JOIN lessons l ON l.module_id = m.id"
+            " WHERE m.course_id = :cid"
+            " GROUP BY m.id ORDER BY m.order_index, m.id",
             {"cid": cid}
         )
-    except Exception:
-        # Fallback: no JOIN if new tables not yet created
+    except Exception as e:
+        print(f"[CMS] list_modules fallback: {e}", flush=True)
         mods = await _rows(
-            "SELECT id,title,description,order_index FROM course_modules "
-            "WHERE course_id=:cid ORDER BY order_index,id",
+            "SELECT id, title, description, order_index"
+            " FROM course_modules WHERE course_id=:cid ORDER BY order_index, id",
             {"cid": cid}
         )
     for m in mods:
@@ -636,73 +666,90 @@ async def cms_list_modules(cid: int, _=Depends(get_admin_user)):
         m["quiz_count"]   = m.get("quiz_count")   or 0
     return mods
 
+
 @router.post("/modules", status_code=201)
 async def cms_create_module(data: ModuleIn, _=Depends(get_admin_user)):
     mid = await _exec(
-        "INSERT INTO course_modules (course_id,title,description,order_index) VALUES (:cid,:title,:desc,:ord) RETURNING id",
-        {"cid":data.course_id,"title":data.title,"desc":data.description or "","ord":data.order_index or 0}
+        "INSERT INTO course_modules (course_id, title, description, order_index)"
+        " VALUES (:cid, :title, :desc, :ord) RETURNING id",
+        {"cid": data.course_id, "title": data.title,
+         "desc": data.description or "", "ord": data.order_index or 0}
     )
     return {"id": mid, "message": "Module created"}
+
 
 @router.put("/modules/{mid}")
 async def cms_update_module(mid: int, data: ModuleIn, _=Depends(get_admin_user)):
     await _exec(
-        "UPDATE course_modules SET title=:title,description=:desc,order_index=:ord WHERE id=:id",
-        {"title":data.title,"desc":data.description or "","ord":data.order_index or 0,"id":mid}
+        "UPDATE course_modules SET title=:title, description=:desc, order_index=:ord"
+        " WHERE id=:id",
+        {"title": data.title, "desc": data.description or "",
+         "ord": data.order_index or 0, "id": mid}
     )
     return {"message": "Module updated"}
 
+
 @router.delete("/modules/{mid}")
 async def cms_delete_module(mid: int, _=Depends(get_admin_user)):
-    await _exec("DELETE FROM quiz_questions WHERE quiz_id IN (SELECT id FROM quizzes WHERE module_id=:id)", {"id": mid})
+    await _exec("DELETE FROM quiz_questions WHERE quiz_id IN"
+                " (SELECT id FROM quizzes WHERE module_id=:id)", {"id": mid})
     await _exec("DELETE FROM quizzes WHERE module_id=:id", {"id": mid})
     await _exec("DELETE FROM lessons WHERE module_id=:id", {"id": mid})
     await _exec("DELETE FROM course_modules WHERE id=:id", {"id": mid})
-    return {"message": "Module and its lessons/quiz deleted"}
+    return {"message": "Module deleted"}
 
-# ── Lessons ──────────────────────────────────────────────────────────────────
+
+# ── Lessons ───────────────────────────────────────────────────────────────────
 
 @router.get("/modules/{mid}/lessons")
 async def cms_list_lessons(mid: int, _=Depends(get_admin_user)):
     rows = await _rows(
-        "SELECT * FROM lessons WHERE module_id=:mid ORDER BY order_index,id",
+        "SELECT * FROM lessons WHERE module_id=:mid ORDER BY order_index, id",
         {"mid": mid}
     )
     for r in rows:
         r["created_at"] = _fmt(r.get("created_at"))
     return rows
 
+
 @router.post("/lessons", status_code=201)
 async def cms_create_lesson(data: LessonIn, _=Depends(get_admin_user)):
     lid = await _exec(
-        "INSERT INTO lessons (module_id,course_id,title,content,video_url,attachment_url,"
-        "duration_minutes,order_index,is_free_preview,created_at) "
-        "VALUES (:mid,:cid,:title,:content,:video,:attach,:dur,:ord,:preview,:now) RETURNING id",
-        {"mid":data.module_id,"cid":data.course_id,"title":data.title,"content":data.content or "",
-         "video":data.video_url or "","attach":data.attachment_url or "",
-         "dur":data.duration_minutes or 0,"ord":data.order_index or 0,
-         "preview":data.is_free_preview,"now":datetime.utcnow()}
+        "INSERT INTO lessons"
+        " (module_id, course_id, title, content, video_url, attachment_url,"
+        "  duration_minutes, order_index, is_free_preview, created_at)"
+        " VALUES (:mid, :cid, :title, :content, :video, :attach,"
+        "         :dur, :ord, :preview, :now) RETURNING id",
+        {"mid": data.module_id, "cid": data.course_id, "title": data.title,
+         "content": data.content or "", "video": data.video_url or "",
+         "attach": data.attachment_url or "", "dur": data.duration_minutes or 0,
+         "ord": data.order_index or 0, "preview": data.is_free_preview,
+         "now": datetime.utcnow()}
     )
     return {"id": lid, "message": "Lesson created"}
+
 
 @router.put("/lessons/{lid}")
 async def cms_update_lesson(lid: int, data: LessonIn, _=Depends(get_admin_user)):
     await _exec(
-        "UPDATE lessons SET title=:title,content=:content,video_url=:video,"
-        "attachment_url=:attach,duration_minutes=:dur,order_index=:ord,"
-        "is_free_preview=:preview WHERE id=:id",
-        {"title":data.title,"content":data.content or "","video":data.video_url or "",
-         "attach":data.attachment_url or "","dur":data.duration_minutes or 0,
-         "ord":data.order_index or 0,"preview":data.is_free_preview,"id":lid}
+        "UPDATE lessons SET title=:title, content=:content, video_url=:video,"
+        " attachment_url=:attach, duration_minutes=:dur, order_index=:ord,"
+        " is_free_preview=:preview WHERE id=:id",
+        {"title": data.title, "content": data.content or "",
+         "video": data.video_url or "", "attach": data.attachment_url or "",
+         "dur": data.duration_minutes or 0, "ord": data.order_index or 0,
+         "preview": data.is_free_preview, "id": lid}
     )
     return {"message": "Lesson updated"}
+
 
 @router.delete("/lessons/{lid}")
 async def cms_delete_lesson(lid: int, _=Depends(get_admin_user)):
     await _exec("DELETE FROM lessons WHERE id=:id", {"id": lid})
     return {"message": "Lesson deleted"}
 
-# ── Quizzes ──────────────────────────────────────────────────────────────────
+
+# ── Quizzes ───────────────────────────────────────────────────────────────────
 
 @router.get("/modules/{mid}/quiz")
 async def cms_get_quiz(mid: int, _=Depends(get_admin_user)):
@@ -710,63 +757,79 @@ async def cms_get_quiz(mid: int, _=Depends(get_admin_user)):
     if not quiz:
         return None
     questions = await _rows(
-        "SELECT * FROM quiz_questions WHERE quiz_id=:qid ORDER BY order_index,id",
+        "SELECT * FROM quiz_questions WHERE quiz_id=:qid ORDER BY order_index, id",
         {"qid": quiz["id"]}
     )
     quiz["questions"] = questions
     return quiz
 
+
 @router.post("/quizzes", status_code=201)
 async def cms_create_quiz(data: QuizIn, _=Depends(get_admin_user)):
     qid = await _exec(
-        "INSERT INTO quizzes (module_id,title,pass_percentage,max_attempts,created_at) "
-        "VALUES (:mid,:title,:pass,:attempts,:now) RETURNING id",
-        {"mid":data.module_id,"title":data.title,"pass":data.pass_percentage or 70,
-         "attempts":data.max_attempts or 3,"now":datetime.utcnow()}
+        "INSERT INTO quizzes (module_id, title, pass_percentage, max_attempts, created_at)"
+        " VALUES (:mid, :title, :pass, :attempts, :now) RETURNING id",
+        {"mid": data.module_id, "title": data.title,
+         "pass": data.pass_percentage or 70,
+         "attempts": data.max_attempts or 3,
+         "now": datetime.utcnow()}
     )
     return {"id": qid, "message": "Quiz created"}
+
 
 @router.put("/quizzes/{qid}")
 async def cms_update_quiz(qid: int, data: QuizIn, _=Depends(get_admin_user)):
     await _exec(
-        "UPDATE quizzes SET title=:title,pass_percentage=:pass,max_attempts=:attempts WHERE id=:id",
-        {"title":data.title,"pass":data.pass_percentage or 70,"attempts":data.max_attempts or 3,"id":qid}
+        "UPDATE quizzes SET title=:title, pass_percentage=:pass,"
+        " max_attempts=:attempts WHERE id=:id",
+        {"title": data.title, "pass": data.pass_percentage or 70,
+         "attempts": data.max_attempts or 3, "id": qid}
     )
     return {"message": "Quiz updated"}
+
 
 @router.delete("/quizzes/{qid}")
 async def cms_delete_quiz(qid: int, _=Depends(get_admin_user)):
     await _exec("DELETE FROM quiz_questions WHERE quiz_id=:id", {"id": qid})
     await _exec("DELETE FROM quizzes WHERE id=:id", {"id": qid})
-    return {"message": "Quiz and questions deleted"}
+    return {"message": "Quiz deleted"}
+
 
 @router.post("/quiz-questions", status_code=201)
 async def cms_create_question(data: QuestionIn, _=Depends(get_admin_user)):
     qid = await _exec(
-        "INSERT INTO quiz_questions (quiz_id,question,option_a,option_b,option_c,option_d,"
-        "correct_option,explanation,order_index) "
-        "VALUES (:qid,:q,:a,:b,:c,:d,:correct,:expl,:ord) RETURNING id",
-        {"qid":data.quiz_id,"q":data.question,"a":data.option_a,"b":data.option_b,
-         "c":data.option_c or "","d":data.option_d or "","correct":data.correct_option.lower(),
-         "expl":data.explanation or "","ord":data.order_index or 0}
+        "INSERT INTO quiz_questions"
+        " (quiz_id, question, option_a, option_b, option_c, option_d,"
+        "  correct_option, explanation, order_index)"
+        " VALUES (:qid, :q, :a, :b, :c, :d, :correct, :expl, :ord) RETURNING id",
+        {"qid": data.quiz_id, "q": data.question,
+         "a": data.option_a, "b": data.option_b,
+         "c": data.option_c or "", "d": data.option_d or "",
+         "correct": data.correct_option.lower(),
+         "expl": data.explanation or "", "ord": data.order_index or 0}
     )
     return {"id": qid, "message": "Question added"}
+
 
 @router.put("/quiz-questions/{qid}")
 async def cms_update_question(qid: int, data: QuestionIn, _=Depends(get_admin_user)):
     await _exec(
-        "UPDATE quiz_questions SET question=:q,option_a=:a,option_b=:b,option_c=:c,"
-        "option_d=:d,correct_option=:correct,explanation=:expl,order_index=:ord WHERE id=:id",
-        {"q":data.question,"a":data.option_a,"b":data.option_b,"c":data.option_c or "",
-         "d":data.option_d or "","correct":data.correct_option.lower(),
-         "expl":data.explanation or "","ord":data.order_index or 0,"id":qid}
+        "UPDATE quiz_questions SET question=:q, option_a=:a, option_b=:b,"
+        " option_c=:c, option_d=:d, correct_option=:correct,"
+        " explanation=:expl, order_index=:ord WHERE id=:id",
+        {"q": data.question, "a": data.option_a, "b": data.option_b,
+         "c": data.option_c or "", "d": data.option_d or "",
+         "correct": data.correct_option.lower(),
+         "expl": data.explanation or "", "ord": data.order_index or 0, "id": qid}
     )
     return {"message": "Question updated"}
+
 
 @router.delete("/quiz-questions/{qid}")
 async def cms_delete_question(qid: int, _=Depends(get_admin_user)):
     await _exec("DELETE FROM quiz_questions WHERE id=:id", {"id": qid})
     return {"message": "Question deleted"}
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════

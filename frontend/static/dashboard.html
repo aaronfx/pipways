@@ -1591,7 +1591,7 @@ const DashboardController = class {
                     const lessonLabel = lessons > 0 ? (done + ' / ' + lessons + ' lessons') : (isDone ? 'Completed' : 'In progress');
                     return '<div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90" '
                          + 'style="background:' + bgCol + ';border:1px solid ' + border + ';" '
-                         + 'onclick="dashboard.navigate('courses')">'
+                         + 'onclick="dashboard.navigate(\'courses\')">'
                          + '<div class="flex items-center justify-between mb-2">'
                          + '<span class="text-xs font-semibold text-white truncate pr-2">' + _e(c.title) + '</span>'
                          + '<span class="text-xs flex-shrink-0 font-bold" style="color:' + barCol + ';">' + pctLabel + '</span>'
@@ -1604,12 +1604,12 @@ const DashboardController = class {
                 }).join('');
 
                 const resumeBtn = nextUp
-                    ? '<button onclick="dashboard._toast('Resuming course','info'); setTimeout(function(){dashboard.navigate('courses');},400);" '
+                    ? '<button onclick="dashboard._toast(\'Resuming course\',\'info\'); setTimeout(function(){dashboard.navigate(\'courses\');},400);" '
                     + 'class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all" '
                     + 'style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
                     + '<i class="fas fa-play-circle mr-2"></i>Resume: ' + _e(nextUp.title.length > 28 ? nextUp.title.slice(0, 28) + '…' : nextUp.title)
                     + '</button>'
-                    : '<button onclick="dashboard.navigate('courses')" '
+                    : '<button onclick="dashboard.navigate(\'courses\')" '
                     + 'class="w-full py-2 rounded-lg text-sm font-semibold transition-all" '
                     + 'style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">'
                     + 'View All Courses →</button>';
@@ -1630,6 +1630,7 @@ const DashboardController = class {
                     + '<div class="space-y-3 mb-4">' + courseRows + '</div>'
                     + resumeBtn;
             }
+        }  // end: if (learningEl) — was missing, caused dashboard to be undefined
 
         // ── Card 5: Latest Courses ────────────────────────────────────────
         const coursesEl = document.getElementById('dash-courses-body');

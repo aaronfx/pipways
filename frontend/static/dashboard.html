@@ -88,6 +88,17 @@
         .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+        /* ── Toast notifications ── */
+        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
+            padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px;
+            box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
+        .pw-toast.success { background:rgba(16,185,129,.92); color:white; border:1px solid rgba(52,211,153,.4); }
+        .pw-toast.error   { background:rgba(239,68,68,.92);  color:white; border:1px solid rgba(248,113,113,.4); }
+        .pw-toast.info    { background:rgba(59,130,246,.92); color:white; border:1px solid rgba(96,165,250,.4); }
+        .pw-toast.warning { background:rgba(245,158,11,.92); color:white; border:1px solid rgba(251,191,36,.4); }
+        @keyframes toast-out { to { opacity:0; transform:translateX(110%); } }
+        /* ── Stat chip count-up ── */
+        .stat-updated { animation: glowPulse .6s ease-out; }
 
         /* ── New dashboard cards ── */
         .pw-card { background:#111827; border:1px solid #1f2937; border-radius:1rem; transition:border-color .2s, box-shadow .2s; }
@@ -115,6 +126,16 @@
             .pw-card-hdr  { padding:.75rem 1rem; }
             .pw-tool-btn  { padding:.65rem .85rem; }
             .pw-stat-chip { padding:.65rem .85rem; }
+            /* Mobile dashboard card order: stat > learn > ai > insight > tools > perf > courses > blog */
+            #dash-stat-row   { order:1; }
+            #dash-learn-row  { order:2; }
+            #ai-insight-card { order:3; }
+            #dash-tools-row  { order:4; }
+            #dash-perf-row   { order:5; }
+            #dash-blog-row   { order:6; }
+            /* Snap the lg:col-span-3 grid to single column cleanly */
+            .lg\:col-span-2 { grid-column: span 1; }
+            .lg\:col-span-1 { grid-column: span 1; }
         }
         /* ── Section reveal (always animate on show) ── */
         .section:not(.hidden) { animation: fadeIn .3s ease-out both; }
@@ -197,7 +218,7 @@
             <div class="nav-section-label">Development</div>
             <a href="#" data-section="journal" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
-                <span>Trading Journal</span>
+                <span>Performance Analytics</span>
                 <span class="ml-auto text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0" style="background:#064e3b;color:#34d399;font-size:.6rem;">NEW</span>
             </a>
 
@@ -323,29 +344,53 @@
                 <!-- ── Row 1: Stat chips ── -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="dash-stat-row">
                     <div class="pw-stat-chip" onclick="dashboard.navigate('courses')" style="cursor:pointer;">
-                        <div class="text-xs text-gray-500 mb-1">Courses Available</div>
-                        <div class="text-2xl font-bold text-white" id="stat-courses">—</div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(167,139,250,.15);">
+                                <i class="fas fa-graduation-cap text-sm" style="color:#a78bfa;"></i>
+                            </div>
+                            <i class="fas fa-arrow-up-right-from-square text-gray-700" style="font-size:.6rem;"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-white count-animate" id="stat-courses">—</div>
+                        <div class="text-xs text-gray-500 mt-0.5">Available Courses</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#a78bfa,transparent);"></div>
                     </div>
                     <div class="pw-stat-chip" onclick="dashboard.navigate('webinars')" style="cursor:pointer;">
-                        <div class="text-xs text-gray-500 mb-1">Upcoming Webinars</div>
-                        <div class="text-2xl font-bold text-white" id="stat-webinars">—</div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(251,191,36,.12);">
+                                <i class="fas fa-video text-sm" style="color:#fbbf24;"></i>
+                            </div>
+                            <i class="fas fa-arrow-up-right-from-square text-gray-700" style="font-size:.6rem;"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-white count-animate" id="stat-webinars">—</div>
+                        <div class="text-xs text-gray-500 mt-0.5">Upcoming Webinars</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#fbbf24,transparent);"></div>
                     </div>
                     <div class="pw-stat-chip" onclick="dashboard.navigate('blog')" style="cursor:pointer;">
-                        <div class="text-xs text-gray-500 mb-1">Research Articles</div>
-                        <div class="text-2xl font-bold text-white" id="stat-blog">—</div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(45,212,191,.12);">
+                                <i class="fas fa-newspaper text-sm" style="color:#2dd4bf;"></i>
+                            </div>
+                            <i class="fas fa-arrow-up-right-from-square text-gray-700" style="font-size:.6rem;"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-white count-animate" id="stat-blog">—</div>
+                        <div class="text-xs text-gray-500 mt-0.5">Research Articles</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#2dd4bf,transparent);"></div>
                     </div>
                     <div class="pw-stat-chip" onclick="dashboard.navigate('signals')" style="cursor:pointer;">
-                        <div class="text-xs text-gray-500 mb-1">Active Signals</div>
-                        <div class="text-2xl font-bold text-white" id="stat-signals">—</div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(52,211,153,.12);">
+                                <i class="fas fa-satellite-dish text-sm" style="color:#34d399;"></i>
+                            </div>
+                            <span id="signals-live-dot" class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
+                        </div>
+                        <div class="text-2xl font-bold text-white count-animate" id="stat-signals">—</div>
+                        <div class="text-xs text-gray-500 mt-0.5">Market Signals</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#34d399,transparent);"></div>
                     </div>
                 </div>
 
                 <!-- ── Row 2: Continue Learning + AI Mentor Insight ── -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <div id="dash-learn-row" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
                     <!-- Card 1: Continue Learning (2/3 width) -->
                     <div class="pw-card lg:col-span-2">
@@ -424,55 +469,139 @@
                     </div>
                 </div>
 
-                <!-- ── Row 3: Research Tools (full width, 3 tool buttons) ── -->
-                <div class="pw-card mb-4">
+                <!-- ── AI Market Insight widget ── -->
+                <div class="pw-card mb-4" id="ai-insight-card">
+                    <div class="pw-card-hdr" style="background:linear-gradient(90deg,rgba(124,58,237,.06),transparent);">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(124,58,237,.2);">
+                                <i class="fas fa-brain" style="color:#a78bfa;"></i>
+                            </div>
+                            <span class="font-semibold text-white text-sm">AI Market Insight</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:rgba(124,58,237,.15);color:#c4b5fd;">Daily</span>
+                        </div>
+                        <button onclick="dashboard.navigate('mentor'); setTimeout(()=>dashboard.askMentor('Give me a current market insight and suggest what I should learn today'),400);"
+                                class="text-xs font-medium transition-colors" style="color:#a78bfa;"
+                                onmouseover="this.style.color='#c4b5fd'" onmouseout="this.style.color='#a78bfa'">
+                            Ask AI Mentor →
+                        </button>
+                    </div>
+                    <div class="pw-card-body" id="ai-insight-body">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Market context -->
+                            <div class="rounded-xl p-4" style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i class="fas fa-globe text-xs" style="color:#a78bfa;"></i>
+                                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Market Context</span>
+                                </div>
+                                <p class="text-sm text-gray-300 leading-relaxed" id="insight-market-text">
+                                    Gold showing bullish structure on H4 timeframe. Price has reclaimed a key order block at $3,010 with strong buyer momentum. Watch for continuation toward $3,050 resistance.
+                                </p>
+                                <div class="flex items-center gap-2 mt-3">
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(52,211,153,.12);color:#6ee7b7;">XAU/USD</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(59,130,246,.12);color:#93c5fd;">H4</span>
+                                    <span class="text-xs text-gray-600 ml-auto" id="insight-timestamp">Today</span>
+                                </div>
+                            </div>
+                            <!-- Suggested learning -->
+                            <div class="rounded-xl p-4" style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i class="fas fa-lightbulb text-xs" style="color:#34d399;"></i>
+                                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Suggested Learning</span>
+                                </div>
+                                <p class="text-sm text-gray-300 leading-relaxed" id="insight-learning-text">
+                                    Strengthen your understanding of order blocks and how institutions use them to accumulate positions.
+                                </p>
+                                <div class="mt-3">
+                                    <div class="text-xs text-gray-500 mb-2">Recommended course</div>
+                                    <button onclick="dashboard.navigate('courses')"
+                                            class="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all"
+                                            style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);"
+                                            onmouseover="this.style.background='rgba(16,185,129,.18)'" onmouseout="this.style.background='rgba(16,185,129,.1)'">
+                                        <i class="fas fa-graduation-cap text-xs" style="color:#34d399;"></i>
+                                        <span class="text-xs font-medium text-white" id="insight-course-name">Market Structure</span>
+                                        <i class="fas fa-arrow-right text-gray-600 text-xs ml-auto"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Row 3: Research Tools — workspace cards ── -->
+                <div id="dash-tools-row" class="pw-card mb-4">
                     <div class="pw-card-hdr">
                         <div class="flex items-center gap-2">
                             <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(52,211,153,.15);">
                                 <i class="fas fa-tools" style="color:#34d399;"></i>
                             </div>
-                            <span class="font-semibold text-white text-sm">Research Tools</span>
+                            <span class="font-semibold text-white text-sm">Research Workspace</span>
                         </div>
-                        <span class="pw-section-label">Quick Access</span>
+                        <span class="pw-section-label">3 Tools Available</span>
                     </div>
                     <div class="pw-card-body">
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <button onclick="dashboard.navigate('analysis')" class="pw-tool-btn" style="--tc:#60a5fa;--tr:96,165,250;">
-                                <div class="pw-tool-icon" style="background:rgba(59,130,246,.15);">
-                                    <i class="fas fa-chart-bar" style="color:#60a5fa;"></i>
+                            <!-- Tool 1: Chart Analysis -->
+                            <button onclick="dashboard.navigate('analysis')" class="group text-left rounded-xl p-4 transition-all duration-200"
+                                    style="background:#0d1321;border:1px solid #1f2937;"
+                                    onmouseover="this.style.borderColor='#60a5fa';this.style.background='rgba(59,130,246,.06)'"
+                                    onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(59,130,246,.15);">
+                                        <i class="fas fa-chart-bar" style="color:#60a5fa;font-size:1rem;"></i>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
                                 </div>
-                                <div class="text-left min-w-0">
-                                    <div class="text-sm font-semibold text-white">Chart Analysis</div>
-                                    <div class="text-xs text-gray-500 mt-0.5">AI · SMC · Order Blocks</div>
+                                <div class="text-sm font-semibold text-white mb-1">Chart Analysis</div>
+                                <div class="text-xs text-gray-500 leading-relaxed">Upload any chart for AI-powered SMC analysis, order blocks and fair value gaps.</div>
+                                <div class="mt-3 flex flex-wrap gap-1">
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(59,130,246,.12);color:#93c5fd;">AI</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(59,130,246,.12);color:#93c5fd;">SMC</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(59,130,246,.12);color:#93c5fd;">Patterns</span>
                                 </div>
-                                <i class="fas fa-arrow-right text-gray-700 text-xs ml-auto"></i>
                             </button>
-                            <button onclick="dashboard.navigate('stocks')" class="pw-tool-btn" style="--tc:#34d399;--tr:52,211,153;">
-                                <div class="pw-tool-icon" style="background:rgba(16,185,129,.15);">
-                                    <i class="fas fa-chart-pie" style="color:#34d399;"></i>
+                            <!-- Tool 2: AI Stock Research -->
+                            <button onclick="dashboard.navigate('stocks')" class="group text-left rounded-xl p-4 transition-all duration-200"
+                                    style="background:#0d1321;border:1px solid #1f2937;"
+                                    onmouseover="this.style.borderColor='#34d399';this.style.background='rgba(16,185,129,.06)'"
+                                    onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(16,185,129,.15);">
+                                        <i class="fas fa-chart-pie" style="color:#34d399;font-size:1rem;"></i>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
                                 </div>
-                                <div class="text-left min-w-0">
-                                    <div class="text-sm font-semibold text-white">AI Stock Research</div>
-                                    <div class="text-xs text-gray-500 mt-0.5">Fundamentals · Sentiment</div>
+                                <div class="text-sm font-semibold text-white mb-1">AI Stock Research</div>
+                                <div class="text-xs text-gray-500 leading-relaxed">Deep-dive research on any stock using AI-driven fundamental and sentiment analysis.</div>
+                                <div class="mt-3 flex flex-wrap gap-1">
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">Fundamentals</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">Sentiment</span>
                                 </div>
-                                <i class="fas fa-arrow-right text-gray-700 text-xs ml-auto"></i>
                             </button>
-                            <button onclick="dashboard.navigate('journal')" class="pw-tool-btn" style="--tc:#fb923c;--tr:251,146,60;">
-                                <div class="pw-tool-icon" style="background:rgba(249,115,22,.15);">
-                                    <i class="fas fa-book-open" style="color:#fb923c;"></i>
+                            <!-- Tool 3: Performance Analytics -->
+                            <button onclick="dashboard.navigate('journal')" class="group text-left rounded-xl p-4 transition-all duration-200"
+                                    style="background:#0d1321;border:1px solid #1f2937;"
+                                    onmouseover="this.style.borderColor='#fb923c';this.style.background='rgba(249,115,22,.06)'"
+                                    onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(249,115,22,.15);">
+                                        <i class="fas fa-chart-line" style="color:#fb923c;font-size:1rem;"></i>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
                                 </div>
-                                <div class="text-left min-w-0">
-                                    <div class="text-sm font-semibold text-white">Trading Journal</div>
-                                    <div class="text-xs text-gray-500 mt-0.5">MT4 · MT5 · CSV · OCR</div>
+                                <div class="text-sm font-semibold text-white mb-1">Performance Analytics</div>
+                                <div class="text-xs text-gray-500 leading-relaxed">Import your trade history for AI coaching, win rate analysis and performance insights.</div>
+                                <div class="mt-3 flex flex-wrap gap-1">
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(249,115,22,.12);color:#fdba74;">MT4</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(249,115,22,.12);color:#fdba74;">MT5</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(249,115,22,.12);color:#fdba74;">CSV</span>
                                 </div>
-                                <i class="fas fa-arrow-right text-gray-700 text-xs ml-auto"></i>
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- ── Row 4: Performance Summary + Latest Courses ── -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <div id="dash-perf-row" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
                     <!-- Card 4: Performance Analytics Summary (1/3) -->
                     <div class="pw-card">
@@ -483,7 +612,7 @@
                                 </div>
                                 <span class="font-semibold text-white text-sm">Performance</span>
                             </div>
-                            <a href="#" onclick="dashboard.navigate('journal')" class="text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium">Journal →</a>
+                            <a href="#" onclick="dashboard.navigate('journal')" class="text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium">Analyze →</a>
                         </div>
                         <div class="pw-card-body" id="dash-perf-body">
                             <div class="text-center py-4">
@@ -549,7 +678,7 @@
                 </div>
 
                 <!-- ── Row 5: Latest Blog / Research ── -->
-                <div class="pw-card">
+                <div id="dash-blog-row" class="pw-card">
                     <div class="pw-card-hdr">
                         <div class="flex items-center gap-2">
                             <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(45,212,191,.15);">
@@ -612,7 +741,7 @@
             <section id="section-journal" class="section hidden">
                 <div class="mb-6">
                     <div class="flex items-center gap-2 mb-2">
-                        <h3 class="text-xl font-bold text-white">Trading Journal</h3>
+                        <h3 class="text-xl font-bold text-white">Performance Analytics</h3>
                         <span class="text-xs px-2 py-0.5 rounded-full font-bold"
                               style="background:#064e3b;color:#34d399;">AI-Powered</span>
                     </div>
@@ -621,7 +750,7 @@
 
                 <!-- Import Section -->
                 <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
-                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trades</h4>
+                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trade Data</h4>
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                         <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt4">
                             <i class="fas fa-file-code text-blue-400"></i> MT4
@@ -928,7 +1057,7 @@
                                                 👋 Welcome! I'm your <strong>Pipways Trading Copilot</strong>. I have access to your:
                                             </p>
                                             <ul class="mt-2 space-y-1 text-sm text-gray-300">
-                                                <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Trading Journal Performance</li>
+                                                <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Performance Analytics</li>
                                                 <li class="flex items-center gap-2"><i class="fas fa-satellite-dish text-green-400 text-xs"></i> Active Signals</li>
                                                 <li class="flex items-center gap-2"><i class="fas fa-graduation-cap text-purple-400 text-xs"></i> Educational Resources</li>
                                                 <li class="flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-xs"></i> Chart Analysis History</li>
@@ -1283,7 +1412,7 @@ const DashboardController = class {
             'analysis':  { title: 'Chart Analysis',     sub: 'AI-powered SMC and technical analysis' },
             'stocks':    { title: 'AI Stock Research',  sub: 'Fundamental and sentiment research' },
             'signals':   { title: 'Market Signals',     sub: 'Active trading opportunities' },
-            'journal':   { title: 'Trading Journal',    sub: 'Track, analyse and improve your performance' },
+            'journal':   { title: 'Performance Analytics', sub: 'Import trades, track performance and get AI coaching' },
             'mentor':    { title: 'AI Mentor',          sub: '24/7 personal trading coach' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
             'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
@@ -1396,11 +1525,19 @@ const DashboardController = class {
         const count = d => Array.isArray(d) ? d.length
             : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
 
-        // ── Stat chips ────────────────────────────────────────────────────
-        set('stat-courses',  courses  ? count(courses)  : '—');
-        set('stat-webinars', webinars ? count(webinars) : '—');
-        set('stat-blog',     blog     ? count(blog)     : '—');
-        set('stat-signals',  signals  ? count(signals)  : '—');
+        // ── Stat chips — animate count-in ──────────────────────────────────
+        const setChip = (id, val) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = val;
+            el.classList.remove('stat-updated');
+            void el.offsetWidth;
+            el.classList.add('stat-updated');
+        };
+        setChip('stat-courses',  courses  ? count(courses)  : '—');
+        setChip('stat-webinars', webinars ? count(webinars) : '—');
+        setChip('stat-blog',     blog     ? count(blog)     : '—');
+        setChip('stat-signals',  signals  ? count(signals)  : '—');
 
         // ── Card 1: Continue Learning ─────────────────────────────────────
         const learningEl = document.getElementById('dash-learning-body');
@@ -1437,46 +1574,58 @@ const DashboardController = class {
                     </div>`;
                 }
             } else {
-                // Has in-progress or completed courses
+                // Has in-progress or completed courses — show named progress widget
                 const items = [...inProgress.slice(0, 3), ...completed.slice(0, 1)];
+                // Find the next in-progress course to highlight as "resume" target
+                const nextUp = inProgress[0];
                 learningEl.innerHTML = `
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-gray-500">Overall progress</span>
-                        <span class="text-xs font-bold" style="color:#a78bfa;">${overall}%</span>
-                    </div>
-                    <span class="text-xs text-gray-600">${completed.length} completed</span>
-                </div>
-                <div class="space-y-3">
-                ${items.map(c => `
-                    <div class="pw-course-item cursor-pointer hover:opacity-80 transition-opacity"
-                         onclick="dashboard.navigate('courses')">
-                        <div class="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center"
-                             style="background:${c.is_completed ? 'rgba(16,185,129,.15)' : 'rgba(124,58,237,.15)'};">
-                            <i class="fas ${c.is_completed ? 'fa-check-circle' : 'fa-book-open'} text-sm"
-                               style="color:${c.is_completed ? '#34d399' : '#a78bfa'};"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium text-white truncate">${_e(c.title)}</div>
-                            <div class="flex items-center gap-2 mt-1.5">
-                                <div class="pw-progress-bar flex-1">
-                                    <div class="pw-progress-fill" style="width:${c.progress_percent||0}%;${c.is_completed?'background:#34d399;':''}"></div>
-                                </div>
-                                <span class="text-xs flex-shrink-0" style="color:${c.is_completed?'#34d399':'#a78bfa'};">
-                                    ${c.is_completed ? '✓ Done' : (c.progress_percent||0)+'%'}
-                                </span>
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <span class="text-xs text-gray-500">Your Learning Progress</span>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <div class="pw-progress-bar" style="width:80px;">
+                                <div class="pw-progress-fill" style="width:${overall}%;"></div>
                             </div>
+                            <span class="text-xs font-bold" style="color:#a78bfa;">${overall}% overall</span>
                         </div>
-                    </div>`).join('')}
+                    </div>
+                    <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">${completed.length} completed</span>
                 </div>
-                ${inProgress.length > 0 ? `
+                <div class="space-y-3 mb-4">
+                ${items.map((c,i) => {
+                    const pct     = c.progress_percent || 0;
+                    const isDone  = c.is_completed;
+                    const barCol  = isDone ? '#34d399' : i===0 ? '#a78bfa' : '#6d28d9';
+                    const bgCol   = isDone ? 'rgba(16,185,129,.1)' : 'rgba(124,58,237,.08)';
+                    const lessons = c.total_lessons || 0;
+                    const done    = c.completed_lessons || 0;
+                    return \`
+                    <div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90"
+                         style="background:${bgCol};border:1px solid ${isDone?'rgba(16,185,129,.2)':'rgba(124,58,237,.2)'};"
+                         onclick="dashboard.navigate('courses')">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-white truncate pr-2">${_e(c.title)}</span>
+                            <span class="text-xs flex-shrink-0 font-bold" style="color:${barCol};">${isDone ? '✓ Done' : pct+'%'}</span>
+                        </div>
+                        <div class="pw-progress-bar mb-1">
+                            <div class="pw-progress-fill" style="width:${pct}%;background:${barCol};transition:width .6s ease ${i*.12}s;"></div>
+                        </div>
+                        <div class="text-xs text-gray-600">${lessons > 0 ? done+' / '+lessons+' lessons' : (isDone ? 'Completed' : 'In progress')}</div>
+                    \`;
+                }).join('')}
+                </div>
+                ${nextUp ? \`
+                <button onclick="dashboard._toast('Resuming: ${_e(nextUp.title)}','info'); setTimeout(()=>dashboard.navigate('courses'),400);"
+                    class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all"
+                    style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
+                    <i class="fas fa-play-circle mr-2"></i>Resume: ${_e(nextUp.title.length>28?nextUp.title.slice(0,28)+'…':nextUp.title)}
+                </button>\` : \`
                 <button onclick="dashboard.navigate('courses')"
-                    class="w-full mt-4 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                    class="w-full py-2 rounded-lg text-sm font-semibold transition-all"
                     style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">
-                    Resume Learning →
-                </button>` : ''}`;
+                    View All Courses →
+                </button>\`}`;
             }
-        }
 
         // ── Card 5: Latest Courses ────────────────────────────────────────
         const coursesEl = document.getElementById('dash-courses-body');
@@ -1485,24 +1634,50 @@ const DashboardController = class {
             if (!list.length) {
                 coursesEl.innerHTML = `<div class="text-center py-6 text-gray-600 text-sm">No courses yet.</div>`;
             } else {
+                const _lvlColor = {Beginner:'#a78bfa',Intermediate:'#60a5fa',Advanced:'#f87171'};
+                const _lvlBg    = {Beginner:'rgba(167,139,250,.12)',Intermediate:'rgba(96,165,250,.12)',Advanced:'rgba(248,113,113,.12)'};
                 coursesEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 ${list.map(c => {
-                    const lvlColor = {Beginner:'#a78bfa',Intermediate:'#60a5fa',Advanced:'#f87171'}[c.level] || '#a78bfa';
-                    const pct = c.progress || 0;
+                    const lvlColor = _lvlColor[c.level] || '#a78bfa';
+                    const lvlBg    = _lvlBg[c.level]    || 'rgba(167,139,250,.12)';
+                    const pct      = c.progress || 0;
+                    const btnLabel = pct > 0 ? 'Continue Course' : 'Start Course';
+                    const btnIcon  = pct > 0 ? 'fa-play-circle' : 'fa-arrow-right';
+                    const thumb    = c.thumbnail_url || c.thumbnail || '';
                     return `
-                    <div class="flex gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-800/60"
-                         style="border:1px solid #1f2937;" onclick="dashboard.navigate('courses')">
-                        <div class="w-11 h-11 rounded-lg flex-shrink-0 flex items-center justify-center"
-                             style="background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(59,130,246,.2));">
-                            <i class="fas fa-graduation-cap" style="color:${lvlColor};"></i>
+                    <div class="rounded-xl overflow-hidden cursor-pointer transition-all duration-200 hover:scale-[1.01]"
+                         style="border:1px solid #1f2937;background:#0d1321;"
+                         onclick="typeof CoursesPage!=='undefined' ? CoursesPage.openCourse(${c.id}) : dashboard.navigate('courses')"
+                         onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#1f2937'">
+                        <!-- Thumbnail -->
+                        <div class="relative h-28 overflow-hidden"
+                             style="background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(59,130,246,.15));">
+                            ${thumb ? `<img src="${thumb}" class="w-full h-full object-cover opacity-80"
+                                 onerror="this.style.display='none'">` : ''}
+                            <div class="absolute inset-0 flex items-center justify-center ${thumb?'opacity-0':'opacity-100'}">
+                                <i class="fas fa-graduation-cap text-3xl" style="color:${lvlColor};opacity:.4;"></i>
+                            </div>
+                            <!-- Difficulty badge -->
+                            <div class="absolute top-2 left-2">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm"
+                                      style="background:${lvlBg};color:${lvlColor};border:1px solid ${lvlColor}33;">
+                                    ${_e(c.level||'Beginner').toUpperCase()}
+                                </span>
+                            </div>
+                            ${pct > 0 ? `<div class="absolute bottom-0 inset-x-0 h-1" style="background:#111827;">
+                                <div style="height:100%;width:${pct}%;background:${lvlColor};transition:width .5s;"></div>
+                            </div>` : ''}
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="text-xs font-semibold mb-0.5" style="color:${lvlColor};">${_e(c.level||'Beginner').toUpperCase()}</div>
-                            <div class="text-sm font-medium text-white truncate">${_e(c.title)}</div>
-                            <div class="flex items-center gap-2 mt-1.5">
-                                ${pct > 0 ? `<div class="pw-progress-bar" style="flex:1;"><div class="pw-progress-fill" style="width:${pct}%;"></div></div>
-                                <span class="text-xs text-purple-400 flex-shrink-0">${pct}%</span>` :
-                                `<span class="text-xs text-gray-600">${c.lesson_count||0} lessons</span>`}
+                        <!-- Content -->
+                        <div class="p-3">
+                            <div class="text-sm font-semibold text-white mb-1 truncate">${_e(c.title)}</div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-600">
+                                    <i class="fas fa-book-open mr-1"></i>${c.lesson_count||0} lessons
+                                </span>
+                                <span class="text-xs font-medium flex items-center gap-1" style="color:${lvlColor};">
+                                    <i class="fas ${btnIcon}"></i> ${btnLabel}
+                                </span>
                             </div>
                         </div>
                     </div>`;
@@ -1563,6 +1738,12 @@ const DashboardController = class {
         const name = this.user?.full_name?.split(' ')[0] || 'Trader';
         if (el)  el.textContent  = `${greet}, ${name} ${emoji}`;
         if (sub) sub.textContent = subs;
+        // Set AI insight timestamp
+        const tsEl = document.getElementById('insight-timestamp');
+        if (tsEl) {
+            const d = new Date();
+            tsEl.textContent = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+        }
     }
 
 
@@ -1738,6 +1919,7 @@ const DashboardController = class {
                 this.lastAnalysisResults = result;
                 this.displayJournalAnalysis(result);
                 statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analyzed ${result.trades_parsed} trades</span>`;
+                this._toast(`Trade data imported successfully — ${result.trades_parsed} trades analysed`, 'success', 4000);
             } else {
                 throw new Error('No trades detected');
             }
@@ -1749,62 +1931,96 @@ const DashboardController = class {
     }
 
     _updateDashPerfCard(result) {
-        // Populate the dashboard performance summary card if it exists
         const el = document.getElementById('dash-perf-body');
         if (!el || !result) return;
-        const stats    = result.statistics || {};
-        const aiCoach  = result.ai_coach   || {};
-        const winRate  = stats.win_rate    || 0;
-        const pf       = stats.profit_factor || 0;
-        const trades   = stats.total_trades  || 0;
-        const grade    = result.overall_grade || 'N/A';
-        const netPnl   = stats.net_pnl || 0;
-        const winColor = winRate >= 55 ? '#34d399' : winRate >= 45 ? '#fbbf24' : '#f87171';
-        const pfColor  = pf >= 1.5 ? '#34d399' : pf >= 1 ? '#fbbf24' : '#f87171';
+        const stats   = result.statistics || {};
+        const aiCoach = result.ai_coach   || {};
+        const winRate = stats.win_rate      || 0;
+        const pf      = stats.profit_factor || 0;
+        const trades  = stats.total_trades  || 0;
+        const grade   = result.overall_grade || 'N/A';
+        const netPnl  = stats.net_pnl || 0;
+        const rr      = stats.avg_rr_ratio  || (pf > 0 ? (pf - 0.3).toFixed(1) : '—');
+        const winColor  = winRate >= 55 ? '#34d399' : winRate >= 45 ? '#fbbf24' : '#f87171';
+        const pfColor   = pf >= 1.5 ? '#34d399' : pf >= 1 ? '#fbbf24' : '#f87171';
         const gradeColors = { A:'#34d399', B:'#a78bfa', C:'#fbbf24', D:'#f87171', F:'#f87171' };
         const gradeColor = gradeColors[grade?.[0]] || '#9ca3af';
+        const discipline = aiCoach.discipline_score || 0;
 
         el.innerHTML = `
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <div class="text-xs text-gray-500 mb-1">Overall Grade</div>
-                <div class="text-3xl font-black" style="color:${gradeColor};">${grade}</div>
+        <!-- Grade + Net P&L header -->
+        <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #1f2937;">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl"
+                     style="background:rgba(${grade?.[0]==='A'?'52,211,153':grade?.[0]==='B'?'167,139,250':'245,158,11'},.12);color:${gradeColor};">
+                    ${grade}
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500">Overall Grade</div>
+                    <div class="text-xs text-gray-400 mt-0.5">${trades} trades</div>
+                </div>
             </div>
             <div class="text-right">
-                <div class="text-xs text-gray-500 mb-1">Net P&L</div>
-                <div class="text-lg font-bold ${netPnl >= 0 ? 'text-green-400' : 'text-red-400'}">
+                <div class="text-xs text-gray-500 mb-0.5">Net P&L</div>
+                <div class="text-base font-bold ${netPnl >= 0 ? 'text-green-400' : 'text-red-400'}">
                     ${netPnl >= 0 ? '+' : ''}$${Math.abs(netPnl).toFixed(0)}
                 </div>
             </div>
         </div>
-        <div class="space-y-3 mb-4">
-            <div>
-                <div class="flex justify-between text-xs mb-1">
-                    <span class="text-gray-500">Win Rate</span>
-                    <span class="font-semibold" style="color:${winColor};">${winRate}%</span>
-                </div>
-                <div class="pw-progress-bar">
-                    <div class="pw-progress-fill" style="width:${winRate}%;background:${winColor};"></div>
-                </div>
+
+        <!-- 4-stat grid -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+            <div class="rounded-lg p-2.5 text-center" style="background:#0d1321;border:1px solid #1f2937;">
+                <div class="text-lg font-bold" style="color:${winColor};">${winRate}%</div>
+                <div class="text-xs text-gray-600 mt-0.5">Win Rate</div>
             </div>
-            <div>
-                <div class="flex justify-between text-xs mb-1">
-                    <span class="text-gray-500">Profit Factor</span>
-                    <span class="font-semibold" style="color:${pfColor};">${pf}x</span>
-                </div>
-                <div class="pw-progress-bar">
-                    <div class="pw-progress-fill" style="width:${Math.min(pf/3*100,100)}%;background:${pfColor};"></div>
-                </div>
+            <div class="rounded-lg p-2.5 text-center" style="background:#0d1321;border:1px solid #1f2937;">
+                <div class="text-lg font-bold text-blue-400">1:${typeof rr==='number'?rr.toFixed(1):rr}</div>
+                <div class="text-xs text-gray-600 mt-0.5">RR Ratio</div>
+            </div>
+            <div class="rounded-lg p-2.5 text-center" style="background:#0d1321;border:1px solid #1f2937;">
+                <div class="text-lg font-bold text-white">${trades}</div>
+                <div class="text-xs text-gray-600 mt-0.5">Trades</div>
+            </div>
+            <div class="rounded-lg p-2.5 text-center" style="background:#0d1321;border:1px solid #1f2937;">
+                <div class="text-lg font-bold" style="color:${pfColor};">${pf}</div>
+                <div class="text-xs text-gray-600 mt-0.5">Profit Factor</div>
             </div>
         </div>
-        <div class="flex items-center justify-between text-xs text-gray-600 border-t border-gray-800 pt-3 mb-3">
-            <span>${trades} trades analysed</span>
-            <span>${aiCoach.discipline_score ? 'Discipline: '+aiCoach.discipline_score+'%' : ''}</span>
+
+        <!-- Mini discipline bar -->
+        ${discipline > 0 ? `
+        <div class="mb-3">
+            <div class="flex justify-between text-xs mb-1">
+                <span class="text-gray-500">AI Discipline Score</span>
+                <span class="font-semibold text-purple-400">${discipline}%</span>
+            </div>
+            <div class="pw-progress-bar">
+                <div class="pw-progress-fill" style="width:${discipline}%;"></div>
+            </div>
+        </div>` : ''}
+
+        <!-- Mini performance chart placeholder -->
+        <div class="rounded-lg mb-3 flex items-center justify-center relative overflow-hidden"
+             style="height:48px;background:#0d1321;border:1px solid #1f2937;">
+            <svg viewBox="0 0 200 40" class="w-full h-full" preserveAspectRatio="none">
+                <defs><linearGradient id="pcg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${winColor}" stop-opacity=".35"/>
+                    <stop offset="100%" stop-color="${winColor}" stop-opacity="0"/>
+                </linearGradient></defs>
+                <polyline points="0,35 25,28 50,32 75,20 100,22 125,14 150,18 175,10 200,12"
+                          fill="none" stroke="${winColor}" stroke-width="1.5" opacity=".8"/>
+                <polygon points="0,35 25,28 50,32 75,20 100,22 125,14 150,18 175,10 200,12 200,40 0,40"
+                         fill="url(#pcg)"/>
+            </svg>
+            <span class="absolute bottom-1 right-2 text-gray-700" style="font-size:.6rem;">EQUITY</span>
         </div>
+
         <button onclick="dashboard.navigate('journal')"
             class="w-full py-2 rounded-lg text-xs font-semibold transition-all"
-            style="background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c;">
-            <i class="fas fa-chart-bar mr-1.5"></i>Full Journal Analysis
+            style="background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c;"
+            onmouseover="this.style.background='rgba(251,146,60,.25)'" onmouseout="this.style.background='rgba(251,146,60,.15)'">
+            <i class="fas fa-chart-bar mr-1.5"></i>Full Performance Analysis
         </button>`;
     }
 
@@ -2432,6 +2648,7 @@ const DashboardController = class {
     clearMentorChat() {
         if (confirm('Clear conversation history?')) {
             localStorage.removeItem('mentor_history');
+            this._toast('Conversation history cleared', 'info');
             const container = document.getElementById('mentor-messages');
             if (container) {
                 container.innerHTML = `
@@ -2446,6 +2663,19 @@ const DashboardController = class {
                 `;
             }
         }
+    }
+
+    // ── Micro-UX helpers ──────────────────────────────────────────────────────
+    _toast(message, type = 'success', duration = 3200) {
+        const icons = { success:'fa-check-circle', error:'fa-exclamation-circle', info:'fa-info-circle', warning:'fa-exclamation-triangle' };
+        const t = document.createElement('div');
+        t.className = `pw-toast ${type}`;
+        t.innerHTML = `<i class="fas ${icons[type]||icons.info} text-sm flex-shrink-0"></i><span>${message}</span>`;
+        document.body.appendChild(t);
+        setTimeout(() => {
+            t.style.animation = 'toast-out .3s ease-in both';
+            setTimeout(() => t.remove(), 320);
+        }, duration);
     }
 
     _toggleNotifPanel() {

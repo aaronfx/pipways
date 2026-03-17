@@ -168,7 +168,7 @@ user_lesson_progress = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
-    Column("lesson_id", Integer, ForeignKey("course_lessons.id"), nullable=False),
+    Column("lesson_id", Integer, nullable=False)  # FIX: was FK to course_lessons (old table); plain Integer avoids FK ordering issues,
     Column("completed_at", DateTime, default=datetime.utcnow),
     Column("time_spent_seconds", Integer, default=0)
 )
@@ -280,6 +280,11 @@ _COLUMN_MIGRATIONS = [
     ("courses", "is_published",        "BOOLEAN",      "DEFAULT FALSE"),
     ("courses", "certificate_enabled", "BOOLEAN",      "DEFAULT FALSE"),
     ("courses", "pass_percentage",     "INTEGER",      "DEFAULT 70"),
+    # BUG FIX: instructor & thumbnail_url are in the ORM courses_table definition
+    # but were missing from _COLUMN_MIGRATIONS, so older live DBs that pre-date
+    # the ORM column addition would not have them added on startup.
+    ("courses", "instructor",          "VARCHAR(255)", "DEFAULT ''"),
+    ("courses", "thumbnail_url",       "VARCHAR(500)", "DEFAULT ''"),
 
     # ── users ─────────────────────────────────────────────────────────────────
     ("users", "last_login",        "TIMESTAMP",   ""),
@@ -491,3 +496,51 @@ async def run_migrations():
     except Exception: pass
 
     print(f"[DB MIGRATION] Complete — {ok} statements ok, {warn} warnings", flush=True)
+
+# ── Phase 4: Ensure UNIQUE constraints that ON CONFLICT clauses depend on ────
+# BUG: `user_progress` was created by metadata.create_all() WITHOUT a UNIQUE
+# constraint on (user_id, course_id). The ON CONFLICT upsert in complete_lesson
+# (courses.py) requires this constraint — without it PostgreSQL raises:
+#   "there is no unique or exclusion constraint matching the ON CONFLICT specification"
+# CREATE UNIQUE INDEX IF NOT EXISTS is idempotent and safe on existing tables.
+
+# Also: `user_lesson_progress` needs UNIQUE(user_id, lesson_id) for its
+# ON CONFLICT DO NOTHING clause.
+
+# Also: `certificates` needs UNIQUE(user_id, course_id) for its
+# ON CONFLICT DO NOTHING clause.
+
+_UNIQUE_INDEX_MIGRATIONS = [
+    (
+        "idx_user_progress_user_course",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_user_course "
+        "ON user_progress (user_id, course_id)"
+    ),
+    (
+        "idx_user_lesson_progress_user_lesson",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_lesson_progress_user_lesson "
+        "ON user_lesson_progress (user_id, lesson_id)"
+    ),
+    (
+        "idx_certificates_user_course",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_user_course "
+        "ON certificates (user_id, course_id)"
+    ),
+]
+
+async def run_unique_index_migrations():
+    """
+    Add missing UNIQUE indexes that ON CONFLICT clauses depend on.
+    Called from main.py lifespan AFTER run_migrations().
+    Idempotent — safe to call on every deploy.
+    """
+    ok = warn = 0
+    for name, sql in _UNIQUE_INDEX_MIGRATIONS:
+        try:
+            await database.execute(sql)
+            ok += 1
+            print(f"[DB INDEX] {name}: ok", flush=True)
+        except Exception as e:
+            warn += 1
+            print(f"[DB INDEX] {name} warn: {e}", flush=True)
+    print(f"[DB INDEX] Done — {ok} ok, {warn} warnings", flush=True)

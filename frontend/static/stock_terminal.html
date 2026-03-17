@@ -370,9 +370,16 @@
                     <!-- Quick picks -->
                     <div class="flex gap-2 flex-wrap">
                         <span class="text-xs text-gray-500 self-center">Quick:</span>
-                        ${['DANGCEM','MTNN','GTCO','ZENITHBANK','AIRTELAFRI','SEPLAT','NB','BUAFOODS','NESTLE','OKOMUOIL'].map(t =>
-                            `<button onclick="ngxQuickSearch('${t}')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">${t}</button>`
-                        ).join('')}
+                        <button onclick="ngxQuickSearch('DANGCEM')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">DANGCEM</button>
+                        <button onclick="ngxQuickSearch('MTNN')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">MTNN</button>
+                        <button onclick="ngxQuickSearch('GTCO')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">GTCO</button>
+                        <button onclick="ngxQuickSearch('ZENITHBANK')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">ZENITHBANK</button>
+                        <button onclick="ngxQuickSearch('AIRTELAFRI')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">AIRTELAFRI</button>
+                        <button onclick="ngxQuickSearch('SEPLAT')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">SEPLAT</button>
+                        <button onclick="ngxQuickSearch('NB')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">NB</button>
+                        <button onclick="ngxQuickSearch('BUAFOODS')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">BUAFOODS</button>
+                        <button onclick="ngxQuickSearch('NESTLE')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">NESTLE</button>
+                        <button onclick="ngxQuickSearch('OKOMUOIL')" class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-green-900/40 border border-gray-700 hover:border-green-600 text-gray-300 hover:text-green-400 rounded-lg transition-all">OKOMUOIL</button>
                     </div>
                 </div>
 
@@ -498,12 +505,16 @@
                     <div class="mb-5">
                         <label class="block text-sm text-gray-400 mb-3">Select Stocks (up to 3)</label>
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2" id="ngx-card-selector">
-                            ${[['DANGCEM','Industrial'],['MTNN','Telecoms'],['GTCO','Banking'],['ZENITHBANK','Banking'],['AIRTELAFRI','Telecoms'],['SEPLAT','Oil & Gas'],['NB','Consumer'],['BUAFOODS','Consumer'],['OKOMUOIL','Agriculture'],['NESTLE','Consumer']].map(([t,s]) =>
-                                `<div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="${t}" data-sector="${s}" onclick="ngxToggleChip(this)">
-                                    <div class="font-semibold text-white text-sm">${t}</div>
-                                    <div class="text-xs text-gray-500 mt-0.5">${s}</div>
-                                </div>`
-                            ).join('')}
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="DANGCEM" data-sector="Industrial" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">DANGCEM</div><div class="text-xs text-gray-500 mt-0.5">Industrial</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="MTNN" data-sector="Telecoms" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">MTNN</div><div class="text-xs text-gray-500 mt-0.5">Telecoms</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="GTCO" data-sector="Banking" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">GTCO</div><div class="text-xs text-gray-500 mt-0.5">Banking</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="ZENITHBANK" data-sector="Banking" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">ZENITHBANK</div><div class="text-xs text-gray-500 mt-0.5">Banking</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="AIRTELAFRI" data-sector="Telecoms" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">AIRTELAFRI</div><div class="text-xs text-gray-500 mt-0.5">Telecoms</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="SEPLAT" data-sector="Oil &amp; Gas" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">SEPLAT</div><div class="text-xs text-gray-500 mt-0.5">Oil &amp; Gas</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="NB" data-sector="Consumer" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">NB</div><div class="text-xs text-gray-500 mt-0.5">Consumer</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="BUAFOODS" data-sector="Consumer" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">BUAFOODS</div><div class="text-xs text-gray-500 mt-0.5">Consumer</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="OKOMUOIL" data-sector="Agriculture" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">OKOMUOIL</div><div class="text-xs text-gray-500 mt-0.5">Agriculture</div></div>
+                            <div class="ngx-chip cursor-pointer border border-gray-700 hover:border-green-600 rounded-lg p-3 text-center transition-all" data-ticker="NESTLE" data-sector="Consumer" onclick="ngxToggleChip(this)"><div class="font-semibold text-white text-sm">NESTLE</div><div class="text-xs text-gray-500 mt-0.5">Consumer</div></div>
                         </div>
                     </div>
 

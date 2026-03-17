@@ -270,15 +270,7 @@ const PublicPages = (() => {
         }
     }
 
-    // Notify-me handler — stores interest in localStorage and confirms
-    PublicPages._webinarNotify = function(btn) {
-        try { localStorage.setItem('pw_webinar_notify', '1'); } catch(_) {}
-        btn.textContent = '\u2713 You\'ll be notified';
-        btn.style.background = 'rgba(16,185,129,.15)';
-        btn.style.color = '#34d399';
-        btn.style.borderColor = 'rgba(16,185,129,.3)';
-        btn.disabled = true;
-    };
+
 
     // Live countdown tick — updates every minute for cards within 48 hrs
     function _startCountdownTickers(container) {
@@ -751,3 +743,13 @@ const PublicPages = (() => {
 })();
 
 window.PublicPages = PublicPages;
+
+// Notify-me handler — attached after export so it can reference window.PublicPages
+window.PublicPages._webinarNotify = function(btn) {
+    try { localStorage.setItem('pw_webinar_notify', '1'); } catch(_) {}
+    btn.textContent = "\u2713 You'll be notified";
+    btn.style.background = 'rgba(16,185,129,.15)';
+    btn.style.color = '#34d399';
+    btn.style.borderColor = 'rgba(16,185,129,.3)';
+    btn.disabled = true;
+};

@@ -19,6 +19,11 @@ import json, os, uuid, mimetypes, httpx
 
 from .admin import get_admin_user
 from .database import database
+# FIX 10: import lesson-count sync helper
+try:
+    from .lms_init import sync_lesson_count as _sync_lc
+except ImportError:
+    async def _sync_lc(cid): pass  # graceful no-op if lms_init unavailable
 
 router = APIRouter()
 
@@ -486,9 +491,18 @@ class QuestionIn(BaseModel):
 
 @router.get("/courses")
 async def cms_list_courses(_=Depends(get_admin_user)):
-    # Try full query with JOIN counts
+    # ── ROOT-CAUSE FIX ────────────────────────────────────────────────────────
+    # Previously this code used _rows() inside the try block.  _rows() catches
+    # ALL exceptions and returns [] silently, so the except-fallback was DEAD
+    # CODE — it could never be reached.  When course_modules / lessons tables
+    # don't yet exist the JOIN query would fail, _rows() would return [], and
+    # the frontend would show "No courses yet" even though courses existed.
+    #
+    # Fix: call database.fetch_all() directly so the exception CAN propagate
+    # to the except block, which then falls back to the minimal safe query.
+    # ─────────────────────────────────────────────────────────────────────────
     try:
-        rows = await _rows(
+        raw = await database.fetch_all(
             "SELECT c.id, c.title, c.description, c.level, c.created_at,"
             " COALESCE(c.price, 0) AS price,"
             " COALESCE(c.thumbnail, '') AS thumbnail,"
@@ -503,10 +517,11 @@ async def cms_list_courses(_=Depends(get_admin_user)):
             " LEFT JOIN lessons l ON l.course_id = c.id"
             " GROUP BY c.id ORDER BY c.created_at DESC"
         )
-        print(f"[CMS] listCourses: {len(rows)} rows", flush=True)
+        rows = [dict(r) for r in raw] if raw else []
+        print(f"[CMS] listCourses (full): {len(rows)} rows", flush=True)
     except Exception as e1:
-        print(f"[CMS] listCourses join failed ({e1}), using minimal query", flush=True)
-        # Absolute minimum — only guaranteed original columns
+        # LMS tables don't exist yet — use the guaranteed-safe minimal query
+        print(f"[CMS] listCourses JOIN failed ({e1}), falling back to minimal query", flush=True)
         rows = await _rows(
             "SELECT id, title, description, level, created_at"
             " FROM courses ORDER BY created_at DESC"
@@ -520,6 +535,7 @@ async def cms_list_courses(_=Depends(get_admin_user)):
             r.setdefault("pass_percentage", 70)
             r.setdefault("module_count", 0)
             r.setdefault("lesson_count", 0)
+        print(f"[CMS] listCourses (minimal fallback): {len(rows)} rows", flush=True)
     for r in rows:
         r["created_at"]   = _fmt(r.get("created_at"))
         r["module_count"] = r.get("module_count") or 0
@@ -569,7 +585,7 @@ async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
             print(f"[CMS] Skipping column {col} (not yet migrated): {e}", flush=True)
 
     print(f"[CMS] Course {cid} ready", flush=True)
-    return {"id": cid, "message": "Course created"}
+    return {"id": cid, "title": data.title, "message": "Course created"}
 
 
 @router.put("/courses/{cid}")
@@ -726,6 +742,9 @@ async def cms_create_lesson(data: LessonIn, _=Depends(get_admin_user)):
          "ord": data.order_index or 0, "preview": data.is_free_preview,
          "now": datetime.utcnow()}
     )
+    # FIX 10: keep denormalised lesson_count in sync so public /courses/list
+    # shows the correct count without needing a live JOIN.
+    await _sync_lc(data.course_id)
     return {"id": lid, "message": "Lesson created"}
 
 
@@ -745,7 +764,11 @@ async def cms_update_lesson(lid: int, data: LessonIn, _=Depends(get_admin_user))
 
 @router.delete("/lessons/{lid}")
 async def cms_delete_lesson(lid: int, _=Depends(get_admin_user)):
+    # FIX 10: fetch course_id BEFORE deleting so we can sync lesson_count
+    row = await _row("SELECT course_id FROM lessons WHERE id=:id", {"id": lid})
     await _exec("DELETE FROM lessons WHERE id=:id", {"id": lid})
+    if row:
+        await _sync_lc(row["course_id"])
     return {"message": "Lesson deleted"}
 
 

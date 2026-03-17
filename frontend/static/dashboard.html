@@ -1616,6 +1616,10 @@ const DashboardController = class {
     }
 
     async loadSignals() {
+        if (typeof PublicPages !== 'undefined') {
+            await PublicPages.signals('signals-container', this);
+            return;
+        }
         const container = document.getElementById('signals-container');
         if (!container) return;
         container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading signals…</div>';
@@ -1654,6 +1658,10 @@ const DashboardController = class {
     }
 
     async loadCourses() {
+        if (typeof PublicPages !== 'undefined') {
+            await PublicPages.courses('courses-container', this);
+            return;
+        }
         const container = document.getElementById('courses-container');
         if (!container) return;
         if (typeof CoursesPage !== 'undefined') {
@@ -1691,6 +1699,10 @@ const DashboardController = class {
     }
 
     async loadWebinars() {
+        if (typeof PublicPages !== 'undefined') {
+            await PublicPages.webinars('webinars-container', this);
+            return;
+        }
         const container = document.getElementById('webinars-container');
         if (!container) return;
         container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading webinars…</div>';
@@ -1734,6 +1746,10 @@ const DashboardController = class {
     }
 
     async loadBlog() {
+        if (typeof PublicPages !== 'undefined') {
+            await PublicPages.blog('blog-container', this);
+            return;
+        }
         const container = document.getElementById('blog-container');
         if (!container) return;
         container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading articles…</div>';
@@ -2073,6 +2089,7 @@ window.API = API;
     <script src="/js/modules/chart_analysis.js"></script>
     <script src="/js/modules/admin.js"></script>
     <script src="/js/modules/cms.js"></script>
+    <script src="/js/modules/public_pages.js"></script>
     <script src="/js/modules/courses.js"></script>
     <script src="/js/modules/quiz.js"></script>
 

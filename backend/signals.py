@@ -7,7 +7,15 @@ from typing import List, Optional
 from datetime import datetime
 
 from .database import database, users
-from .security import get_current_user, is_admin_user
+from .security import get_current_user
+
+def _is_admin(user) -> bool:
+    """Inline admin check — works regardless of security.py version."""
+    if hasattr(user, '_mapping'):
+        return bool(user._mapping.get('is_admin')) or user._mapping.get('role') == 'admin'
+    if isinstance(user, dict):
+        return bool(user.get('is_admin')) or user.get('role') == 'admin'
+    return bool(getattr(user, 'is_admin', False)) or getattr(user, 'role', None) == 'admin'
 
 router = APIRouter()
 
@@ -24,40 +32,55 @@ async def get_active_signals(
     PRODUCTION: Queries real database table
     """
     try:
-        # Query active signals from database
-        # Assuming you have a signals table - adjust column names as needed
-        query = """
-            SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
-                   timeframe, created_at, ai_confidence, status
-            FROM signals
-            WHERE status = 'active'
-            ORDER BY created_at DESC
-            LIMIT :limit
-        """
-        
-        rows = await database.fetch_all(query, {"limit": limit})
-        
-        # Convert to list of dicts for JSON serialization
+        # BUG FIX 1: Also check is_published — CMS sets is_published=TRUE when publishing.
+        # BUG FIX 2: Try with COALESCE on is_published first; fall back if column missing.
+        try:
+            rows = await database.fetch_all(
+                """
+                SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
+                       timeframe, created_at, ai_confidence, status,
+                       COALESCE(is_published, FALSE) as is_published
+                FROM signals
+                WHERE status = 'active' OR COALESCE(is_published, FALSE) = TRUE
+                ORDER BY created_at DESC
+                LIMIT :limit
+                """,
+                {"limit": limit}
+            )
+        except Exception:
+            # Fallback: is_published column may not exist yet
+            rows = await database.fetch_all(
+                """
+                SELECT id, symbol, direction, entry_price, stop_loss, take_profit,
+                       timeframe, created_at, ai_confidence, status
+                FROM signals
+                WHERE status = 'active'
+                ORDER BY created_at DESC
+                LIMIT :limit
+                """,
+                {"limit": limit}
+            )
+
         signals = []
         for row in rows:
             signals.append({
-                "id": row["id"],
-                "symbol": row["symbol"],
-                "direction": row["direction"],
-                "entry_price": float(row["entry_price"]),
-                "stop_loss": float(row["stop_loss"]),
-                "take_profit": float(row["take_profit"]),
-                "timeframe": row.get("timeframe", "1H"),
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "ai_confidence": float(row["ai_confidence"]) if row["ai_confidence"] else None,
-                "status": row["status"]
+                "id":           row["id"],
+                "symbol":       row["symbol"] or "—",
+                "direction":    row["direction"] or "—",
+                "entry_price":  float(row["entry_price"]) if row["entry_price"] else 0,
+                "stop_loss":    float(row["stop_loss"])   if row["stop_loss"]   else 0,
+                "take_profit":  float(row["take_profit"]) if row["take_profit"] else 0,
+                "timeframe":    row.get("timeframe", "1H") or "1H",
+                "created_at":   row["created_at"].isoformat() if row["created_at"] else None,
+                "ai_confidence": float(row["ai_confidence"]) if row.get("ai_confidence") else None,
+                "status":       row["status"],
             })
-        
-        return signals  # Returns array directly, not {signals: []}
-        
+
+        print(f"[SIGNALS] Returning {len(signals)} active signals", flush=True)
+        return signals
+
     except Exception as e:
         print(f"[ERROR] Failed to fetch signals: {e}", flush=True)
-        # Return empty array on error - frontend handles empty state
         return []
 
 @router.post("/create")
@@ -67,8 +90,8 @@ async def create_signal(
 ):
     """Create new trading signal (admin only)"""
     try:
-        # Use shared helper — handles SQLAlchemy Row, dict, and ORM models
-        if not is_admin_user(current_user):
+        # Use inline admin check — compatible with all security.py versions
+        if not _is_admin(current_user):
             raise HTTPException(403, "Admin access required")
 
         

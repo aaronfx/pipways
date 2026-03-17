@@ -256,20 +256,15 @@ async def serve_dashboard():
     raise HTTPException(404, "dashboard.html not found")
 
 
-@app.api_route("/{full_path:path}", methods=["GET","POST","PUT","DELETE","PATCH","OPTIONS","HEAD"])
-async def serve_spa(full_path: str, request: "Request"):
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/",
         "blog/", "ai/", "admin/", "cms/", "health", "docs", "openapi.json",
         "static/", "js/", "api/",
     )
-    # API paths: only GET passthrough is allowed (for docs/health); everything else → let router handle it
     if full_path.startswith(api_prefixes):
-        raise HTTPException(405, "Method Not Allowed")
-
-    # Non-API paths: only serve for GET requests
-    if request.method not in ("GET", "HEAD", "OPTIONS"):
-        raise HTTPException(405, "Method Not Allowed")
+        raise HTTPException(404, "Not found")
 
     file_path = os.path.join(STATIC_DIR, full_path)
     if os.path.exists(file_path) and os.path.isfile(file_path):

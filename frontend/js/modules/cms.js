@@ -554,7 +554,7 @@ const CMSPage = {
         await this._lmsRefreshTree();
     },
 
-    async _lmsRefreshTree() {
+    async _lmsRefreshTree(expandId = null) {
         const tree = document.getElementById('lms-tree');
         if (!tree) return;
         tree.innerHTML = `<div class="text-gray-500 text-sm text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>`;
@@ -564,7 +564,7 @@ const CMSPage = {
             courses = await API.cms.listCourses();
         } catch (e) {
             console.error('[LMS] listCourses failed:', e);
-            tree.innerHTML = `<div class="text-center py-8 text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load courses: ${e.message}</div>`;
+            tree.innerHTML = `<div class="text-center py-8 text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Failed to load courses: ${this._e(e.message)}</div>`;
             return;
         }
 
@@ -625,8 +625,13 @@ const CMSPage = {
             </div>
         </div>`).join('');
 
-        // Auto-expand first course
-        if (courses.length) await this._lmsExpand(courses[0].id);
+        // FIX 2: Auto-expand the specific course that was just created/edited
+        // (expandId), otherwise fall back to the first course in the list.
+        const validExpandId = (expandId && courses.find(c => c.id === expandId))
+            ? expandId
+            : courses[0].id;
+        this._lmsState.courseId = validExpandId;
+        await this._lmsExpand(validExpandId);
     },
 
     // ── Toggle expand/collapse a course row ───────────────────────────────
@@ -741,20 +746,39 @@ const CMSPage = {
             certificate_enabled: document.getElementById('cf-cert')?.value === '1',
             pass_percentage:     parseInt(document.getElementById('cf-pass')?.value) || 70,
         };
+        // FIX: use a more specific selector so it doesn't accidentally grab
+        // buttons outside the overlay when multiple panels are open.
         const btn = document.querySelector('#lms-overlay .cb-p');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…'; }
         try {
             if (this._editingId) {
-                await API.cms.updateCourse(this._editingId, p);
+                // ── Update existing course ────────────────────────────────────
+                const targetId = this._editingId;
+                await API.cms.updateCourse(targetId, p);
                 this._toast('Course updated');
+                this._lmsCloseOverlay();
+                // FIX 1: pass the edited course ID so it stays expanded after refresh
+                await this._lmsRefreshTree(targetId);
             } else {
-                await API.cms.createCourse(p);
-                this._toast('Course created — add modules below');
+                // ── Create new course ─────────────────────────────────────────
+                // FIX 1: capture the API response — it includes { id, title, message }
+                const result = await API.cms.createCourse(p);
+                const newId  = (result && result.id) ? result.id : null;
+
+                // FIX 2: persist the new course ID in state so downstream code
+                // (module forms, lesson forms, quiz panels) can reference it
+                this._lmsState.courseId = newId;
+
+                this._toast('Course created — now add modules & lessons below');
+                this._lmsCloseOverlay();
+
+                // FIX 1+2: pass newId so _lmsRefreshTree expands THIS course,
+                // not just whichever happens to be courses[0]
+                await this._lmsRefreshTree(newId);
             }
-            this._lmsCloseOverlay();
-            await this._lmsRefreshTree();
         } catch (e) {
-            this._toast(e.message, 'error');
+            console.error('[LMS] _lmsSaveCourse error:', e);
+            this._toast(e.message || 'Failed to save course', 'error');
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
         }
     },
@@ -763,7 +787,8 @@ const CMSPage = {
         try {
             const r = await API.cms.toggleCourse(id);
             this._toast(r.message);
-            await this._lmsRefreshTree();
+            // FIX: pass id so the same course stays expanded after refresh
+            await this._lmsRefreshTree(id);
         } catch (e) { this._toast(e.message, 'error'); }
     },
 
@@ -772,8 +797,10 @@ const CMSPage = {
         try {
             await API.cms.deleteCourse(id);
             this._toast('Course deleted');
+            this._lmsState.courseId = null;
             this._lmsCloseOverlay();
-            await this._lmsRefreshTree();
+            // Pass null — no specific course to expand after deletion
+            await this._lmsRefreshTree(null);
         } catch (e) { this._toast(e.message, 'error'); }
     },
 
@@ -908,7 +935,14 @@ const CMSPage = {
         const el = document.getElementById(`lms-lessons-${mid}`);
         if (!el) return;
         let lessons = [];
-        try { lessons = await API.cms.listLessons(mid); } catch (_) {}
+        try {
+            lessons = await API.cms.listLessons(mid);
+        } catch (e) {
+            // FIX 6: surface the error rather than silently returning nothing
+            console.error('[LMS] listLessons failed for module', mid, e);
+            el.innerHTML = `<div class="text-red-500 text-xs text-center py-2"><i class="fas fa-exclamation-triangle mr-1"></i>${this._e(e.message)}</div>`;
+            return;
+        }
         if (!lessons.length) {
             el.innerHTML = `<div class="text-gray-700 text-xs text-center py-2">No lessons yet</div>`;
             return;

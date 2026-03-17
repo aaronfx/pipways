@@ -521,12 +521,16 @@ async def mentor_chart_practice(
         raise HTTPException(404, "Lesson not found")
 
     system = (
-        "You are a trading mentor creating a chart-reading exercise. "
-        "Generate a realistic scenario describing what is visible on a chart. "
-        "Format your response as valid JSON with exactly these keys: "
-        '{"scenario": "...", "question": "...", "options": ["A: ...", "B: ...", "C: ...", "D: ..."], '
-        '"correct": "A", "explanation": "..."}. '
-        "Use a real currency pair. Keep scenario under 80 words. No extra text outside the JSON."
+        "You are a trading mentor creating a chart-reading exercise with a live TradingView chart. "
+        "Format your response as valid JSON with EXACTLY these keys and no extra text outside the JSON: "
+        '{"tv_symbol":"FX:EURUSD","tv_interval":"240","drawing_task":"Mark the resistance at 1.1000",'
+        '"scenario":"...","question":"...","options":["A: ...","B: ...","C: ...","D: ..."],'
+        '"correct":"A","explanation":"..."}. '
+        "Rules: tv_symbol must be TradingView format like FX:EURUSD, OANDA:GBPUSD, TVC:GOLD. "
+        "tv_interval must be one of: 1,5,15,30,60,240,D,W. "
+        "drawing_task is a 1-sentence instruction telling what to mark/identify on the live chart. "
+        "scenario describes price action visible on the chart (under 80 words). "
+        "Vary the currency pair each call. No text outside the JSON."
     )
     level = lesson["level_name"].lower()
     complexity = {
@@ -542,11 +546,14 @@ async def mentor_chart_practice(
         data  = json.loads(clean)
     except Exception:
         data = {
-            "scenario":    f"EUR/USD H4 chart. Price has been in an uptrend and is pulling back to a key level.",
-            "question":    f"Based on the uptrend context, what would you expect at this level?",
-            "options":     ["A: Buy the bounce (trend continuation)", "B: Sell into the pullback", "C: Wait for more data", "D: No trade"],
-            "correct":     "A",
-            "explanation": "In an uptrend, pullbacks to support offer high-probability long entries with the trend.",
+            "tv_symbol":    "FX:EURUSD",
+            "tv_interval":  "240",
+            "drawing_task": "Mark the nearest support level where price is pulling back.",
+            "scenario":     "EUR/USD H4 chart. Price has been in an uptrend forming higher highs and higher lows, and is now pulling back to a key support level at 1.0850.",
+            "question":     "Based on the uptrend context, what would you expect at the 1.0850 support?",
+            "options":      ["A: Buy the bounce (trend continuation)", "B: Sell into the pullback", "C: Wait for more confirmation", "D: No trade — trend is unclear"],
+            "correct":      "A",
+            "explanation":  "In an uptrend, pullbacks to support offer high-probability long entries with the trend. The uptrend structure (HH+HL) is still intact.",
         }
 
     return {
@@ -672,3 +679,68 @@ async def _quiz_feedback(
         f"Student scored {score}% on '{lesson_title}' and {status}. "
         f"Topics with wrong answers: {slugs}."
     )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN / DIAGNOSTIC ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/health")
+async def lms_health():
+    """
+    Public health check — no auth required.
+    Returns table existence and row counts so you can diagnose setup issues.
+    """
+    result = {}
+    tables = [
+        "learning_levels", "learning_modules", "learning_lessons",
+        "lesson_quizzes", "user_learning_progress",
+        "user_quiz_results", "user_learning_profile"
+    ]
+    for t in tables:
+        try:
+            n = await database.fetch_val(f"SELECT COUNT(*) FROM {t}")
+            result[t] = int(n)
+        except Exception as e:
+            result[t] = f"ERROR: {e}"
+    return {
+        "status": "ok" if result.get("learning_levels", 0) > 0 else "no_curriculum",
+        "tables": result,
+        "tip": (
+            "All tables present and curriculum seeded — ready to use."
+            if result.get("learning_levels", 0) > 0
+            else "Curriculum is empty. Call POST /learning/admin/seed (admin only) to seed it, "
+                 "or ensure lms_init.py is imported and called in main.py lifespan."
+        )
+    }
+
+
+@router.post("/admin/seed")
+async def admin_seed_curriculum(current_user=Depends(get_current_user)):
+    """
+    Admin-only endpoint to (re)seed the default curriculum.
+    Safe to call multiple times — checks if levels already exist first.
+    Use this if the app started before lms_init.py was wired up.
+    """
+    if not current_user.get("is_admin"):
+        raise HTTPException(403, "Admin access required")
+
+    try:
+        from .lms_init import _seed_curriculum, init_lms_tables
+        # Ensure tables exist first
+        await init_lms_tables()
+        count = await database.fetch_val("SELECT COUNT(*) FROM learning_levels")
+        if count > 0:
+            return {
+                "status": "already_seeded",
+                "levels": int(count),
+                "message": "Curriculum already exists. Delete levels manually to re-seed."
+            }
+        await _seed_curriculum()
+        final = await database.fetch_val("SELECT COUNT(*) FROM learning_levels")
+        return {
+            "status": "seeded",
+            "levels": int(final),
+            "message": f"Default curriculum seeded successfully — {final} levels created."
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Seed failed: {e}")

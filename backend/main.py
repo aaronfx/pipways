@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from .database import database, init_database, metadata, run_migrations
+from .database import database, init_database, metadata, run_migrations, run_unique_index_migrations
 from sqlalchemy import create_engine
 
 # Import all routers
@@ -79,6 +79,12 @@ async def lifespan(app: FastAPI):
         # ── Run column migrations (ADD COLUMN IF NOT EXISTS — fully idempotent) ─
         try:
             await run_migrations()
+        except Exception as e:
+            print(f"[DB MIGRATION] Error: {e}", flush=True)
+
+        # ── Run UNIQUE index migrations (ON CONFLICT support) ──────────────
+        try:
+            await run_unique_index_migrations()
         except Exception as e:
             print(f"[DB MIGRATION] Error: {e}", flush=True)
 

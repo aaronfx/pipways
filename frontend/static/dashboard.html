@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways Trading Dashboard</title>
+    <title>Pipways — Trading Education & Research</title>
     <!-- Silence Tailwind CDN development warning (safe in production) -->
     <script>
     (function() {
@@ -31,6 +31,11 @@
         @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.4;} }
         @keyframes countUp { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
         @keyframes glowPulse { 0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,0);} 50%{box-shadow:0 0 12px 2px rgba(124,58,237,0.25);} }
+        @keyframes shimmer { 0%{background-position:-400px 0;} 100%{background-position:400px 0;} }
+        .shimmer-line { height:12px; border-radius:6px; background:linear-gradient(90deg,#1f2937 25%,#374151 50%,#1f2937 75%); background-size:800px 100%; animation:shimmer 1.4s ease-in-out infinite; }
+        .shimmer-line-sm { height:8px; border-radius:4px; background:linear-gradient(90deg,#1f2937 25%,#374151 50%,#1f2937 75%); background-size:800px 100%; animation:shimmer 1.4s ease-in-out infinite; }
+        /* ── Touch: pause ticker ── */
+        .ticker-track { touch-action: none; }
         .animate-fade-in { animation: fadeIn 0.45s ease-out both; }
         .count-animate    { animation: countUp 0.4s ease-out both; }
 
@@ -47,39 +52,7 @@
         .ticker-up   { color:#34d399; font-weight:600; }
         .ticker-dn   { color:#f87171; font-weight:600; }
 
-        /* ── Stat cards ── */
-        .stat-card { transition:transform .2s,box-shadow .2s; cursor:default; position:relative; overflow:hidden; }
-        .stat-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px -6px rgba(0,0,0,.5); }
-        .stat-card::before { content:''; position:absolute; inset:0; border-radius:0.75rem; opacity:0; transition:opacity .3s; background:radial-gradient(ellipse at 30% 0%,rgba(124,58,237,.12),transparent 70%); }
-        .stat-card:hover::before { opacity:1; }
-        .sparkline { display:block; }
-
-        /* ── Quick actions ── */
-        .qa-btn { display:inline-flex; align-items:center; gap:0.5rem; padding:0.55rem 1.1rem; border-radius:0.6rem; font-size:0.82rem; font-weight:600; border:1px solid transparent; cursor:pointer; transition:all .18s; white-space:nowrap; }
-        .qa-btn:hover { transform:translateY(-1px); }
-
-        /* ── Signals table ── */
-        .sig-row:hover { background:rgba(124,58,237,.07); }
-        .sig-row td { padding:.6rem .75rem; font-size:.82rem; border-bottom:1px solid #1f2937; }
-        .pill { display:inline-block; padding:.2rem .65rem; border-radius:9999px; font-size:.7rem; font-weight:700; letter-spacing:.04em; }
-        .pill-buy  { background:rgba(16,185,129,.15); color:#34d399; border:1px solid rgba(16,185,129,.3); }
-        .pill-sell { background:rgba(239,68,68,.15);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
-
-        /* ── Market overview card ── */
-        .mkt-row { display:flex; justify-content:space-between; align-items:center; padding:.55rem 0; border-bottom:1px solid #1f2937; font-size:.82rem; }
-        .mkt-row:last-child { border-bottom:none; }
-        .mkt-bar-track { width:80px; height:4px; background:#1f2937; border-radius:2px; overflow:hidden; }
-        .mkt-bar-fill  { height:100%; border-radius:2px; }
-
-        /* ── Activity feed ── */
-        .feed-item { display:flex; gap:.75rem; padding:.6rem 0; border-bottom:1px solid #1f2937; align-items:flex-start; }
-        .feed-item:last-child { border-bottom:none; }
-        .feed-dot  { width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
-
-        /* ── Sidebar polish ── */
-        .nav-link { position:relative; }
-        .nav-link.active { background:linear-gradient(90deg,#7c3aed,#6d28d9) !important; box-shadow:0 4px 14px rgba(124,58,237,.35); }
-        .nav-link:not(.active):hover { background:#1f2937; }
+        /* ── Sidebar polish (kept for compatibility) ── */
 
         /* ── Chart analysis ── */
         .upload-area { border:2px dashed #4b5563; border-radius:.75rem; padding:2rem; text-align:center; cursor:pointer; transition:all .2s; background:#111827; }
@@ -114,14 +87,52 @@
         .text-warning { color:#f59e0b; } .text-muted   { color:#6b7280; }
         .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+        /* ── New dashboard cards ── */
+        .pw-card { background:#111827; border:1px solid #1f2937; border-radius:1rem; transition:border-color .2s, box-shadow .2s; }
+        .pw-card:hover { border-color:#374151; box-shadow:0 8px 32px -8px rgba(0,0,0,.6); }
+        .pw-card-hdr { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #1f2937; }
+        .pw-card-body { padding:1.25rem; }
+        .pw-section-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#4b5563; }
+        .pw-progress-bar { height:6px; background:#1f2937; border-radius:3px; overflow:hidden; }
+        .pw-progress-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#7c3aed,#6d28d9); transition:width .4s ease; }
+        .pw-tool-btn { display:flex; align-items:center; gap:.75rem; padding:.85rem 1rem; background:#111827; border:1px solid #1f2937; border-radius:.75rem; cursor:pointer; transition:all .18s; text-decoration:none; }
+        .pw-tool-btn:hover { border-color:var(--tc); background:rgba(var(--tr),.08); transform:translateY(-2px); }
+        .pw-tool-icon { width:38px; height:38px; border-radius:.6rem; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1rem; }
+        .pw-stat-chip { background:#1f2937; border:1px solid #374151; border-radius:.65rem; padding:.75rem 1rem; text-align:center; transition:transform .18s; }
+        .pw-stat-chip:hover { transform:translateY(-2px); }
+        .pw-course-item { display:flex; align-items:flex-start; gap:.85rem; padding:.85rem 0; border-bottom:1px solid #1f2937; }
+        .pw-course-item:last-child { border-bottom:none; padding-bottom:0; }
+        .pw-blog-item { display:flex; gap:.75rem; padding:.75rem 0; border-bottom:1px solid #1f2937; align-items:flex-start; }
+        .pw-blog-item:last-child { border-bottom:none; padding-bottom:0; }
+        /* ── Nav sections ── */
+        .nav-section-label { font-size:.62rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#374151; padding:.6rem .75rem .25rem; margin-top:.5rem; }
+
+        /* ── Mobile improvements ── */
+        @media (max-width: 767px) {
+            .pw-card-body { padding:1rem; }
+            .pw-card-hdr  { padding:.75rem 1rem; }
+            .pw-tool-btn  { padding:.65rem .85rem; }
+            .pw-stat-chip { padding:.65rem .85rem; }
+        }
+        /* ── Section reveal (always animate on show) ── */
+        .section:not(.hidden) { animation: fadeIn .3s ease-out both; }
+        .nav-link { position:relative; display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; border-radius:.6rem; color:#6b7280; transition:all .15s; font-size:.83rem; font-weight:500; text-decoration:none; }
+        .nav-link:hover:not(.active) { background:#111827; color:#e5e7eb; }
+        .nav-link.active { background:linear-gradient(90deg,#7c3aed,#6d28d9) !important; color:white; box-shadow:0 4px 14px rgba(124,58,237,.35); }
+        .nav-link .nav-icon { width:16px; text-align:center; font-size:.8rem; flex-shrink:0; }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
 
     <!-- Mobile Menu Button -->
-    <div class="md:hidden fixed top-4 left-4 z-50">
-        <button id="mobile-menu-btn" class="bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-700 text-white">
-            <i class="fas fa-bars"></i>
+    <div class="md:hidden fixed top-3.5 left-4 z-50">
+        <button id="mobile-menu-btn"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl text-white text-sm font-medium transition-all"
+                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);">
+            <i class="fas fa-bars text-xs"></i>
+            <span class="text-xs font-semibold tracking-wide" style="letter-spacing:.04em;">PW</span>
         </button>
     </div>
 
@@ -129,75 +140,107 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 h-screen bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
-        <div class="p-6 border-b border-gray-800">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-chart-line text-white text-lg"></i>
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 h-screen bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+          style="box-shadow: 4px 0 24px rgba(0,0,0,.5);">
+        <div class="p-5 border-b border-gray-800">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-graduation-cap text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-base tracking-tight">Pipways</h1>
+                        <p class="text-xs text-gray-500">Learn · Research · Grow</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 class="font-bold text-xl tracking-tight">Pipways</h1>
-                    <p class="text-xs text-gray-500">Trading Analytics</p>
-                </div>
+                <!-- Mobile close button -->
+                <button id="sidebar-close-btn"
+                        class="md:hidden p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-all"
+                        onclick="document.getElementById('sidebar').classList.add('-translate-x-full');document.getElementById('sidebar-overlay').classList.add('hidden');">
+                    <i class="fas fa-times text-sm"></i>
+                </button>
             </div>
         </div>
 
-        <nav class="flex-1 overflow-y-auto p-3 space-y-0.5" style="scrollbar-width:none;">
-            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 px-3 mt-1">Main</div>
-            <a href="#" data-section="dashboard" class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-white transition-all">
-                <i class="fas fa-home w-4 text-sm"></i><span class="text-sm">Dashboard</span>
-            </a>
-            <a href="#" data-section="signals" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-satellite-dish w-4 text-sm"></i><span class="text-sm">Trading Signals</span>
-            </a>
-            <a href="#" data-section="journal" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-book w-4 text-sm"></i><span class="text-sm">Trading Journal</span>
-                <span class="ml-auto text-xs px-1.5 py-0.5 rounded-full font-bold" style="background:#065f46;color:#34d399;">New</span>
-            </a>
-            <a href="#" data-section="stocks" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-chart-pie w-4 text-sm"></i><span class="text-sm">AI Stock Research</span>
-            </a>
-            <a href="#" data-section="analysis" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-chart-line w-4 text-sm"></i><span class="text-sm">Chart Analysis</span>
-            </a>
-            <a href="#" data-section="mentor" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-robot w-4 text-sm"></i><span class="text-sm">AI Mentor</span>
+        <nav class="flex-1 overflow-y-auto py-3 px-2" style="scrollbar-width:none;">
+
+            <!-- Dashboard -->
+            <a href="#" data-section="dashboard" class="nav-link active">
+                <i class="fas fa-home nav-icon"></i><span>Dashboard</span>
             </a>
 
-            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mt-5 mb-2 px-3">Education</div>
-            <a href="#" data-section="courses" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-graduation-cap w-4 text-sm"></i><span class="text-sm">Courses</span>
+            <!-- LEARNING -->
+            <div class="nav-section-label">Learning</div>
+            <a href="#" data-section="courses" class="nav-link">
+                <i class="fas fa-graduation-cap nav-icon" style="color:#a78bfa;"></i><span>Courses</span>
             </a>
-            <a href="#" data-section="webinars" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-video w-4 text-sm"></i><span class="text-sm">Webinars</span>
+            <a href="#" data-section="webinars" class="nav-link">
+                <i class="fas fa-video nav-icon" style="color:#fbbf24;"></i><span>Webinars</span>
             </a>
-            <a href="#" data-section="blog" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all">
-                <i class="fas fa-newspaper w-4 text-sm"></i><span class="text-sm">Blog</span>
+            <a href="#" data-section="blog" class="nav-link">
+                <i class="fas fa-newspaper nav-icon" style="color:#2dd4bf;"></i><span>Blog</span>
             </a>
 
+            <!-- RESEARCH -->
+            <div class="nav-section-label">Research</div>
+            <a href="#" data-section="analysis" class="nav-link">
+                <i class="fas fa-chart-bar nav-icon" style="color:#60a5fa;"></i><span>Chart Analysis</span>
+            </a>
+            <a href="#" data-section="stocks" class="nav-link">
+                <i class="fas fa-chart-pie nav-icon" style="color:#34d399;"></i><span>AI Stock Research</span>
+            </a>
+            <a href="#" data-section="signals" class="nav-link">
+                <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
+            </a>
+
+            <!-- DEVELOPMENT -->
+            <div class="nav-section-label">Development</div>
+            <a href="#" data-section="journal" class="nav-link">
+                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
+                <span>Trading Journal</span>
+                <span class="ml-auto text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0" style="background:#064e3b;color:#34d399;font-size:.6rem;">NEW</span>
+            </a>
+
+            <!-- AI ASSISTANT -->
+            <div class="nav-section-label">AI Assistant</div>
+            <a href="#" data-section="mentor" class="nav-link">
+                <i class="fas fa-robot nav-icon" style="color:#e879f9;"></i><span>AI Mentor</span>
+            </a>
+
+            <!-- ADMIN (hidden until admin check) -->
             <div id="admin-menu-container" class="hidden">
-                <div class="text-xs font-semibold text-red-600 uppercase tracking-wider mt-5 mb-2 px-3">Admin</div>
-                <a href="#" data-section="admin" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all border-l-2 border-red-600">
-                    <i class="fas fa-shield-alt w-4 text-sm text-red-400"></i><span class="text-sm">Admin Panel</span>
+                <div class="nav-section-label" style="color:#7f1d1d;">Admin</div>
+                <a href="#" data-section="admin" class="nav-link" style="border-left:2px solid #dc2626;border-radius:.6rem 0 0 .6rem;">
+                    <i class="fas fa-shield-alt nav-icon" style="color:#f87171;"></i><span>Admin Panel</span>
                 </a>
-                <a href="#" data-section="cms" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 transition-all border-l-2 border-purple-600">
-                    <i class="fas fa-layer-group w-4 text-sm text-purple-400"></i><span class="text-sm">CMS</span>
+                <a href="#" data-section="cms" class="nav-link" style="border-left:2px solid #7c3aed;border-radius:.6rem 0 0 .6rem;">
+                    <i class="fas fa-layer-group nav-icon" style="color:#a78bfa;"></i><span>CMS</span>
                 </a>
             </div>
         </nav>
 
         <div class="p-4 border-t border-gray-800">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <i class="fas fa-user text-sm"></i>
+            <!-- User profile -->
+            <div class="flex items-center gap-2.5 mb-3 p-2.5 rounded-xl" style="background:#111827;border:1px solid #1f2937;">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-user text-xs"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p id="user-name" class="font-medium text-sm truncate">Loading...</p>
-                    <p id="user-email" class="text-xs text-gray-500 truncate">...</p>
+                    <p id="user-name" class="font-semibold text-sm text-white truncate">Loading…</p>
+                    <p id="user-email" class="text-xs text-gray-600 truncate">…</p>
                 </div>
+                <button onclick="dashboard.navigate('courses')" title="My learning progress"
+                        class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                        style="background:rgba(124,58,237,.15);">
+                    <i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i>
+                </button>
             </div>
-            <button onclick="dashboard.logout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-all text-sm">
-                <i class="fas fa-sign-out-alt"></i> Logout
+            <button onclick="dashboard.logout()"
+                    class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                    style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2);"
+                    onmouseover="this.style.background='rgba(239,68,68,.2)'"
+                    onmouseout="this.style.background='rgba(239,68,68,.1)'">
+                <i class="fas fa-sign-out-alt text-xs"></i> Sign out
             </button>
         </div>
     </aside>
@@ -212,147 +255,355 @@
         </div>
 
         <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-3 flex justify-between items-center">
-            <div class="md:hidden w-8"></div>
+            <div class="md:hidden" style="width:60px;"></div>
             <div>
                 <h2 id="page-title" class="text-xl font-bold text-white leading-tight">Dashboard</h2>
-                <p class="text-xs text-gray-500">Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">Trader</span></p>
+                <p class="text-xs text-gray-500" id="header-subtitle">Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">Trader</span></p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400">
-                    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" style="animation:pulse-dot 2s infinite;"></span>
-                    <span id="live-clock">--:--:--</span>
-                    <span class="text-gray-600">|</span>
-                    <span class="text-green-400 font-medium">Markets Open</span>
+                    <span id="market-status-dot" class="w-2 h-2 rounded-full bg-green-400 inline-block flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
+                    <span id="live-clock" class="font-mono">--:--:--</span>
+                    <span class="text-gray-700">|</span>
+                    <span id="market-status-text" class="text-green-400 font-medium">Markets Open</span>
                 </div>
-                <button class="relative p-2 text-gray-400 hover:text-white transition-colors">
-                    <i class="fas fa-bell text-lg"></i>
-                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </button>
+                <!-- Notification bell with dropdown -->
+                <div class="relative" id="notif-wrapper">
+                    <button id="notif-btn"
+                            onclick="dashboard._toggleNotifPanel()"
+                            class="relative p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800">
+                        <i class="fas fa-bell text-lg"></i>
+                        <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+                    <div id="notif-panel"
+                         class="hidden absolute right-0 mt-2 w-72 rounded-xl border overflow-hidden z-50"
+                         style="background:#111827;border-color:#1f2937;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);">
+                        <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color:#1f2937;">
+                            <span class="text-sm font-semibold text-white">Notifications</span>
+                            <button onclick="dashboard._toggleNotifPanel()" class="text-gray-600 hover:text-white text-xs transition-colors">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="notif-list" class="max-h-64 overflow-y-auto">
+                            <div class="px-4 py-8 text-center">
+                                <i class="fas fa-bell-slash text-gray-700 text-2xl mb-2 block"></i>
+                                <p class="text-xs text-gray-600">No new notifications</p>
+                            </div>
+                        </div>
+                        <div class="px-4 py-2.5 border-t text-center" style="border-color:#1f2937;">
+                            <button onclick="dashboard._toggleNotifPanel(); dashboard.navigate('courses')"
+                                    class="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                                View all activity →
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <div class="p-6 max-w-7xl mx-auto">
+        <div class="p-4 md:p-6 max-w-7xl mx-auto">
 
-            <!-- ══════════════════════════════════════════════════════════
-                 DASHBOARD — redesigned
-            ═══════════════════════════════════════════════════════════ -->
+            <!-- DASHBOARD — Learning & Research Command Center -->
             <section id="section-dashboard" class="section animate-fade-in">
 
-                <style>
-                    .dash-feature-pill { display:flex; align-items:center; gap:.65rem; padding:.85rem 1rem;
-                        background:#1f2937; border:1px solid #374151; border-radius:.75rem;
-                        cursor:pointer; transition:all .18s; text-decoration:none; }
-                    .dash-feature-pill:hover { border-color:var(--pill-color); background:rgba(var(--pill-rgb),.07);
-                        transform:translateY(-2px); box-shadow:0 8px 20px -4px rgba(0,0,0,.4); }
-                    .dash-feature-pill .pill-icon { width:36px; height:36px; border-radius:.5rem; flex-shrink:0;
-                        display:flex; align-items:center; justify-content:center; font-size:.95rem; }
-                    .dash-feature-pill .pill-label { font-size:.85rem; font-weight:600; color:#e5e7eb; }
-                    .dash-feature-pill .pill-sub { font-size:.72rem; color:#6b7280; margin-top:.1rem; }
-                    .dash-stat { background:#1f2937; border:1px solid #374151; border-radius:.75rem;
-                        padding:1rem 1.1rem; cursor:pointer; transition:transform .18s; }
-                    .dash-stat:hover { transform:translateY(-2px); }
-                </style>
-
-                <!-- Greeting row -->
-                <div class="flex items-center justify-between mb-6">
+                <!-- Greeting bar -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                     <div>
-                        <h2 id="greeting-text" class="text-xl font-bold text-white">Good morning 👋</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">Welcome to your trading platform</p>
+                        <h2 id="greeting-text" class="text-2xl font-bold text-white">Good morning 👋</h2>
+                        <p class="text-sm text-gray-500 mt-0.5" id="greeting-sub">Your learning and research hub</p>
                     </div>
-                    <div class="hidden md:flex items-center gap-2 text-xs text-gray-500">
-                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" style="animation:pulse-dot 2s infinite;"></span>
-                        Markets Open
+                    <div class="flex items-center gap-2">
+                        <span id="dash-market-dot" class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
+                        <span id="dash-market-text" class="text-xs text-gray-500">Markets Open</span>
+                        <span class="text-gray-700 mx-1">·</span>
+                        <a href="#" onclick="dashboard.navigate('mentor')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">Ask AI Mentor →</a>
                     </div>
                 </div>
 
-                <!-- Stat strip: 4 key numbers -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    <div class="dash-stat" onclick="dashboard.navigate('courses')">
-                        <p class="text-xs text-gray-500 mb-1">Courses</p>
-                        <p class="text-2xl font-bold text-white" id="stat-courses">--</p>
+                <!-- ── Row 1: Stat chips ── -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="dash-stat-row">
+                    <div class="pw-stat-chip" onclick="dashboard.navigate('courses')" style="cursor:pointer;">
+                        <div class="text-xs text-gray-500 mb-1">Courses Available</div>
+                        <div class="text-2xl font-bold text-white" id="stat-courses">—</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#a78bfa,transparent);"></div>
                     </div>
-                    <div class="dash-stat" onclick="dashboard.navigate('webinars')">
-                        <p class="text-xs text-gray-500 mb-1">Upcoming Webinars</p>
-                        <p class="text-2xl font-bold text-white" id="stat-webinars">--</p>
+                    <div class="pw-stat-chip" onclick="dashboard.navigate('webinars')" style="cursor:pointer;">
+                        <div class="text-xs text-gray-500 mb-1">Upcoming Webinars</div>
+                        <div class="text-2xl font-bold text-white" id="stat-webinars">—</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#fbbf24,transparent);"></div>
                     </div>
-                    <div class="dash-stat" onclick="dashboard.navigate('blog')">
-                        <p class="text-xs text-gray-500 mb-1">Articles</p>
-                        <p class="text-2xl font-bold text-white" id="stat-blog">--</p>
-                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#60a5fa,transparent);"></div>
+                    <div class="pw-stat-chip" onclick="dashboard.navigate('blog')" style="cursor:pointer;">
+                        <div class="text-xs text-gray-500 mb-1">Research Articles</div>
+                        <div class="text-2xl font-bold text-white" id="stat-blog">—</div>
+                        <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#2dd4bf,transparent);"></div>
                     </div>
-                    <div class="dash-stat" onclick="dashboard.navigate('signals')">
-                        <p class="text-xs text-gray-500 mb-1">Active Signals</p>
-                        <p class="text-2xl font-bold text-white" id="stat-signals">--</p>
+                    <div class="pw-stat-chip" onclick="dashboard.navigate('signals')" style="cursor:pointer;">
+                        <div class="text-xs text-gray-500 mb-1">Active Signals</div>
+                        <div class="text-2xl font-bold text-white" id="stat-signals">—</div>
                         <div class="mt-2 h-0.5 rounded" style="background:linear-gradient(90deg,#34d399,transparent);"></div>
                     </div>
                 </div>
 
-                <!-- Feature carousel (the visual anchor) -->
-                <div class="mb-6">
-                    <div class="flex items-center justify-between mb-3">
-                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Platform Features</p>
-                        <div class="flex items-center gap-1.5">
-                            <div id="fc-dots" class="flex gap-1.5 mr-1"></div>
-                            <button onclick="dashboard._fcMove(-1)" style="width:26px;height:26px;border-radius:50%;background:#1f2937;border:1px solid #374151;color:#9ca3af;cursor:pointer;font-size:.65rem;"><i class="fas fa-chevron-left"></i></button>
-                            <button onclick="dashboard._fcMove(1)"  style="width:26px;height:26px;border-radius:50%;background:#1f2937;border:1px solid #374151;color:#9ca3af;cursor:pointer;font-size:.65rem;"><i class="fas fa-chevron-right"></i></button>
+                <!-- ── Row 2: Continue Learning + AI Mentor Insight ── -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+                    <!-- Card 1: Continue Learning (2/3 width) -->
+                    <div class="pw-card lg:col-span-2">
+                        <div class="pw-card-hdr">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(124,58,237,.2);">
+                                    <i class="fas fa-graduation-cap" style="color:#a78bfa;"></i>
+                                </div>
+                                <span class="font-semibold text-white text-sm">Continue Learning</span>
+                            </div>
+                            <a href="#" onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">View all →</a>
+                        </div>
+                        <div class="pw-card-body" id="dash-learning-body">
+                            <div class="space-y-4 py-2">
+                                <div class="flex gap-3 items-center">
+                                    <div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div>
+                                    <div class="flex-1 space-y-2">
+                                        <div class="shimmer-line w-3/4"></div>
+                                        <div class="shimmer-line-sm w-1/2"></div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3 items-center">
+                                    <div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div>
+                                    <div class="flex-1 space-y-2">
+                                        <div class="shimmer-line w-2/3"></div>
+                                        <div class="shimmer-line-sm w-2/5"></div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3 items-center">
+                                    <div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div>
+                                    <div class="flex-1 space-y-2">
+                                        <div class="shimmer-line w-4/5"></div>
+                                        <div class="shimmer-line-sm w-1/3"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div style="overflow:hidden;border-radius:.875rem;">
-                        <div id="fc-track" style="display:flex;gap:.875rem;transition:transform .45s cubic-bezier(.4,0,.2,1);"></div>
+
+                    <!-- Card 2: AI Mentor Insight (1/3 width) -->
+                    <div class="pw-card" style="background:linear-gradient(145deg,#0f0a1f,#1a0a2e);">
+                        <div class="pw-card-hdr" style="border-bottom-color:#2d1060;">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(219,39,119,.2);">
+                                    <i class="fas fa-robot" style="color:#f472b6;"></i>
+                                </div>
+                                <span class="font-semibold text-white text-sm">AI Mentor</span>
+                            </div>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(219,39,119,.2);color:#f9a8d4;">Online</span>
+                        </div>
+                        <div class="pw-card-body">
+                            <p class="text-gray-400 text-xs leading-relaxed mb-4">Your personal AI trading coach is ready. Ask about strategy, risk, trade review, or market psychology.</p>
+                            <div class="space-y-2 mb-4">
+                                <button onclick="dashboard.navigate('mentor'); setTimeout(()=>dashboard.askMentor('Review my trading approach and suggest improvements'),400);"
+                                    class="w-full text-left px-3 py-2 rounded-lg text-xs transition-all"
+                                    style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.25);color:#c4b5fd;">
+                                    <i class="fas fa-chart-line mr-2 text-purple-400"></i>Review my trading approach
+                                </button>
+                                <button onclick="dashboard.navigate('mentor'); setTimeout(()=>dashboard.askMentor('What should I focus on learning next?'),400);"
+                                    class="w-full text-left px-3 py-2 rounded-lg text-xs transition-all"
+                                    style="background:rgba(219,39,119,.1);border:1px solid rgba(219,39,119,.2);color:#fbcfe8;">
+                                    <i class="fas fa-lightbulb mr-2 text-pink-400"></i>What should I learn next?
+                                </button>
+                                <button onclick="dashboard.navigate('mentor'); setTimeout(()=>dashboard.askMentor('Explain Smart Money Concepts for a beginner'),400);"
+                                    class="w-full text-left px-3 py-2 rounded-lg text-xs transition-all"
+                                    style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);color:#bfdbfe;">
+                                    <i class="fas fa-graduation-cap mr-2 text-blue-400"></i>Explain Smart Money Concepts
+                                </button>
+                            </div>
+                            <button onclick="dashboard.navigate('mentor')"
+                                class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all"
+                                style="background:linear-gradient(90deg,#7c3aed,#db2777);color:white;">
+                                Open AI Mentor →
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Bottom: features nav + market snapshot -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-                    <!-- Feature nav pills (2/3) -->
-                    <div class="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-2.5">
-
-                        <a class="dash-feature-pill" style="--pill-color:#a78bfa;--pill-rgb:167,139,250;" onclick="dashboard.navigate('analysis')">
-                            <div class="pill-icon" style="background:rgba(124,58,237,.18);color:#a78bfa;"><i class="fas fa-chart-bar"></i></div>
-                            <div><div class="pill-label">Chart Analysis</div><div class="pill-sub">AI · SMC · Patterns</div></div>
-                        </a>
-                        <a class="dash-feature-pill" style="--pill-color:#34d399;--pill-rgb:52,211,153;" onclick="dashboard.navigate('journal')">
-                            <div class="pill-icon" style="background:rgba(16,185,129,.18);color:#34d399;"><i class="fas fa-book-open"></i></div>
-                            <div><div class="pill-label">Trading Journal</div><div class="pill-sub">MT4 · MT5 · CSV</div></div>
-                        </a>
-                        <a class="dash-feature-pill" style="--pill-color:#f472b6;--pill-rgb:244,114,182;" onclick="dashboard.navigate('mentor')">
-                            <div class="pill-icon" style="background:rgba(236,72,153,.18);color:#f472b6;"><i class="fas fa-robot"></i></div>
-                            <div><div class="pill-label">AI Mentor</div><div class="pill-sub">24/7 trading coach</div></div>
-                        </a>
-                        <a class="dash-feature-pill" style="--pill-color:#60a5fa;--pill-rgb:96,165,250;" onclick="dashboard.navigate('courses')">
-                            <div class="pill-icon" style="background:rgba(59,130,246,.18);color:#60a5fa;"><i class="fas fa-graduation-cap"></i></div>
-                            <div><div class="pill-label">Academy</div><div class="pill-sub">Courses · Quizzes</div></div>
-                        </a>
-                        <a class="dash-feature-pill" style="--pill-color:#fbbf24;--pill-rgb:251,191,36;" onclick="dashboard.navigate('webinars')">
-                            <div class="pill-icon" style="background:rgba(245,158,11,.18);color:#fbbf24;"><i class="fas fa-video"></i></div>
-                            <div><div class="pill-label">Live Webinars</div><div class="pill-sub">Expert sessions</div></div>
-                        </a>
-                        <a class="dash-feature-pill" style="--pill-color:#2dd4bf;--pill-rgb:45,212,191;" onclick="dashboard.navigate('blog')">
-                            <div class="pill-icon" style="background:rgba(20,184,166,.18);color:#2dd4bf;"><i class="fas fa-newspaper"></i></div>
-                            <div><div class="pill-label">Market Blog</div><div class="pill-sub">Analysis · Research</div></div>
-                        </a>
-                    </div>
-
-                    <!-- Market snapshot (1/3) -->
-                    <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-                            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Markets</span>
-                            <i class="fas fa-globe-americas text-blue-400 text-xs"></i>
+                <!-- ── Row 3: Research Tools (full width, 3 tool buttons) ── -->
+                <div class="pw-card mb-4">
+                    <div class="pw-card-hdr">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(52,211,153,.15);">
+                                <i class="fas fa-tools" style="color:#34d399;"></i>
+                            </div>
+                            <span class="font-semibold text-white text-sm">Research Tools</span>
                         </div>
-                        <div class="px-4 py-2" id="market-overview-list"></div>
+                        <span class="pw-section-label">Quick Access</span>
                     </div>
-
+                    <div class="pw-card-body">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <button onclick="dashboard.navigate('analysis')" class="pw-tool-btn" style="--tc:#60a5fa;--tr:96,165,250;">
+                                <div class="pw-tool-icon" style="background:rgba(59,130,246,.15);">
+                                    <i class="fas fa-chart-bar" style="color:#60a5fa;"></i>
+                                </div>
+                                <div class="text-left min-w-0">
+                                    <div class="text-sm font-semibold text-white">Chart Analysis</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">AI · SMC · Order Blocks</div>
+                                </div>
+                                <i class="fas fa-arrow-right text-gray-700 text-xs ml-auto"></i>
+                            </button>
+                            <button onclick="dashboard.navigate('stocks')" class="pw-tool-btn" style="--tc:#34d399;--tr:52,211,153;">
+                                <div class="pw-tool-icon" style="background:rgba(16,185,129,.15);">
+                                    <i class="fas fa-chart-pie" style="color:#34d399;"></i>
+                                </div>
+                                <div class="text-left min-w-0">
+                                    <div class="text-sm font-semibold text-white">AI Stock Research</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">Fundamentals · Sentiment</div>
+                                </div>
+                                <i class="fas fa-arrow-right text-gray-700 text-xs ml-auto"></i>
+                            </button>
+                            <button onclick="dashboard.navigate('journal')" class="pw-tool-btn" style="--tc:#fb923c;--tr:251,146,60;">
+                                <div class="pw-tool-icon" style="background:rgba(249,115,22,.15);">
+                                    <i class="fas fa-book-open" style="color:#fb923c;"></i>
+                                </div>
+                                <div class="text-left min-w-0">
+                                    <div class="text-sm font-semibold text-white">Trading Journal</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">MT4 · MT5 · CSV · OCR</div>
+                                </div>
+                                <i class="fas fa-arrow-right text-gray-700 text-xs ml-auto"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- ── Row 4: Performance Summary + Latest Courses ── -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+                    <!-- Card 4: Performance Analytics Summary (1/3) -->
+                    <div class="pw-card">
+                        <div class="pw-card-hdr">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(251,146,60,.15);">
+                                    <i class="fas fa-chart-line" style="color:#fb923c;"></i>
+                                </div>
+                                <span class="font-semibold text-white text-sm">Performance</span>
+                            </div>
+                            <a href="#" onclick="dashboard.navigate('journal')" class="text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium">Journal →</a>
+                        </div>
+                        <div class="pw-card-body" id="dash-perf-body">
+                            <div class="text-center py-4">
+                                <div class="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3"
+                                     style="background:rgba(251,146,60,.1);border:2px dashed rgba(251,146,60,.25);">
+                                    <i class="fas fa-upload text-orange-400"></i>
+                                </div>
+                                <p class="text-sm text-gray-400 font-medium">No trades analysed yet</p>
+                                <p class="text-xs text-gray-600 mt-1 mb-4">Upload your MT4 / MT5 / CSV statement to see your win rate, profit factor and AI coaching.</p>
+                                <button onclick="dashboard.navigate('journal')"
+                                    class="w-full py-2 rounded-lg text-xs font-semibold transition-all"
+                                    style="background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c;">
+                                    <i class="fas fa-file-import mr-1.5"></i>Import Trades
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 5: Latest Courses (2/3) -->
+                    <div class="pw-card lg:col-span-2">
+                        <div class="pw-card-hdr">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(167,139,250,.15);">
+                                    <i class="fas fa-play-circle" style="color:#a78bfa;"></i>
+                                </div>
+                                <span class="font-semibold text-white text-sm">Latest Courses</span>
+                            </div>
+                            <a href="#" onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">Browse all →</a>
+                        </div>
+                        <div class="pw-card-body" id="dash-courses-body">
+                            <div class="space-y-3 py-2">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                        <div class="w-9 h-9 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                        <div class="shimmer-line w-1/3 mb-2"></div>
+                                        <div class="shimmer-line w-full mb-1"></div>
+                                        <div class="shimmer-line-sm w-1/2"></div>
+                                    </div>
+                                    <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                        <div class="w-9 h-9 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                        <div class="shimmer-line w-2/5 mb-2"></div>
+                                        <div class="shimmer-line w-3/4 mb-1"></div>
+                                        <div class="shimmer-line-sm w-1/3"></div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                        <div class="w-9 h-9 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                        <div class="shimmer-line w-1/4 mb-2"></div>
+                                        <div class="shimmer-line w-full mb-1"></div>
+                                        <div class="shimmer-line-sm w-2/5"></div>
+                                    </div>
+                                    <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                        <div class="w-9 h-9 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                        <div class="shimmer-line w-1/3 mb-2"></div>
+                                        <div class="shimmer-line w-2/3 mb-1"></div>
+                                        <div class="shimmer-line-sm w-1/4"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Row 5: Latest Blog / Research ── -->
+                <div class="pw-card">
+                    <div class="pw-card-hdr">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(45,212,191,.15);">
+                                <i class="fas fa-newspaper" style="color:#2dd4bf;"></i>
+                            </div>
+                            <span class="font-semibold text-white text-sm">Latest Research & Blog</span>
+                        </div>
+                        <a href="#" onclick="dashboard.navigate('blog')" class="text-xs text-teal-400 hover:text-teal-300 transition-colors font-medium">View all →</a>
+                    </div>
+                    <div class="pw-card-body" id="dash-blog-body">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-2">
+                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-24 rounded-lg mb-3" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-1/3 mb-2"></div>
+                                <div class="shimmer-line w-full mb-1"></div>
+                                <div class="shimmer-line-sm w-2/3"></div>
+                            </div>
+                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-24 rounded-lg mb-3" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-2/5 mb-2"></div>
+                                <div class="shimmer-line w-3/4 mb-1"></div>
+                                <div class="shimmer-line-sm w-1/2"></div>
+                            </div>
+                            <div class="hidden sm:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-24 rounded-lg mb-3" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-1/4 mb-2"></div>
+                                <div class="shimmer-line w-full mb-1"></div>
+                                <div class="shimmer-line-sm w-2/5"></div>
+                            </div>
+                            <div class="hidden lg:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-24 rounded-lg mb-3" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-1/3 mb-2"></div>
+                                <div class="shimmer-line w-2/3 mb-1"></div>
+                                <div class="shimmer-line-sm w-1/3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
             </section>
 
             <!-- SIGNALS -->
             <section id="section-signals" class="section hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold text-white">Trading Signals</h3>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Market Signals</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">Active trading opportunities from our analysts</p>
+                    </div>
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-400"
+                         style="background:#111827;border:1px solid #1f2937;">
+                        <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
+                        Live signals
+                    </div>
                 </div>
                 <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
             </section>
@@ -360,8 +611,12 @@
             <!-- TRADING JOURNAL -->
             <section id="section-journal" class="section hidden">
                 <div class="mb-6">
-                    <h3 class="text-2xl font-bold text-white mb-2">Trading Journal</h3>
-                    <p class="text-gray-400">AI-powered analytics and trading performance insights</p>
+                    <div class="flex items-center gap-2 mb-2">
+                        <h3 class="text-xl font-bold text-white">Trading Journal</h3>
+                        <span class="text-xs px-2 py-0.5 rounded-full font-bold"
+                              style="background:#064e3b;color:#34d399;">AI-Powered</span>
+                    </div>
+                    <p class="text-sm text-gray-500">Import statements from MT4, MT5, CSV or Excel — get instant AI coaching and performance analysis</p>
                 </div>
 
                 <!-- Import Section -->
@@ -600,21 +855,30 @@
 
             <!-- COURSES -->
             <section id="section-courses" class="section hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold text-white">Trading Courses</h3>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Trading Academy</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">Structured courses to build your trading knowledge</p>
+                    </div>
                 </div>
                 <div id="courses-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </section>
 
             <!-- WEBINARS -->
             <section id="section-webinars" class="section hidden">
-                <h3 class="text-xl font-bold text-white mb-6">Upcoming Webinars</h3>
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-white">Live Webinars</h3>
+                    <p class="text-sm text-gray-500 mt-0.5">Expert-led sessions, market walkthroughs and Q&amp;A</p>
+                </div>
                 <div id="webinars-container" class="space-y-4"></div>
             </section>
 
             <!-- BLOG -->
             <section id="section-blog" class="section hidden">
-                <h3 class="text-xl font-bold text-white mb-6">Trading Blog</h3>
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-white">Research &amp; Blog</h3>
+                    <p class="text-sm text-gray-500 mt-0.5">Market analysis, trading insights and educational content</p>
+                </div>
                 <div id="blog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </section>
 
@@ -900,9 +1164,15 @@ const DashboardController = class {
 
     updateUserDisplay() {
         const user = this.user || {};
-        document.getElementById('user-name').textContent = user.full_name || user.email || 'User';
-        document.getElementById('user-email').textContent = user.email || '';
-        document.getElementById('header-user-name').textContent = user.full_name || user.email || 'Trader';
+        const name = user.full_name || user.email || 'User';
+        // Sidebar profile
+        const nameEl  = document.getElementById('user-name');
+        const emailEl = document.getElementById('user-email');
+        if (nameEl)  nameEl.textContent  = name;
+        if (emailEl) emailEl.textContent = user.email || '';
+        // Header subtitle — only update the name span, preserve surrounding text
+        const nameSpan = document.getElementById('header-user-name');
+        if (nameSpan) nameSpan.textContent = user.full_name?.split(' ')[0] || user.email || 'Trader';
     }
 
     renderAdminMenu() {
@@ -963,49 +1233,80 @@ const DashboardController = class {
     }
 
     setupMobileMenu() {
-        const btn = document.getElementById('mobile-menu-btn');
+        const btn     = document.getElementById('mobile-menu-btn');
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebar-overlay');
 
-        if (btn && sidebar) {
-            btn.addEventListener('click', () => {
-                sidebar.classList.toggle('-translate-x-full');
-                overlay?.classList.toggle('hidden');
-            });
-        }
-        if (overlay) {
-            overlay.addEventListener('click', () => {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
-            });
-        }
+        const openSidebar  = () => { sidebar?.classList.remove('-translate-x-full'); overlay?.classList.remove('hidden'); };
+        const closeSidebar = () => { sidebar?.classList.add('-translate-x-full');    overlay?.classList.add('hidden'); };
+
+        if (btn) btn.addEventListener('click', () => {
+            sidebar?.classList.contains('-translate-x-full') ? openSidebar() : closeSidebar();
+        });
+
+        overlay?.addEventListener('click', closeSidebar);
+
+        // Escape key closes mobile sidebar
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && sidebar && !sidebar.classList.contains('-translate-x-full')) {
+                closeSidebar();
+            }
+        });
     }
 
     navigate(section) {
-        document.querySelectorAll('.nav-link').forEach(el => {
-            el.classList.remove('active', 'text-white');
-            el.classList.add('text-gray-400');
-        });
+        // ── Update nav active state ───────────────────────────────────────
+        // Reset all nav links
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        // Activate the target link
         const activeLink = document.querySelector(`[data-section="${section}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active', 'text-white');
-            activeLink.classList.remove('text-gray-400');
-        }
+        if (activeLink) activeLink.classList.add('active');
+
+        // ── Hide all sections, reveal target with fade ────────────────────
         document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
         const target = document.getElementById(`section-${section}`);
         if (target) {
             target.classList.remove('hidden');
+            // Trigger CSS fade-in on every navigation, not just first load
+            target.style.animation = 'none';
+            target.offsetHeight; // reflow
+            target.style.animation = 'fadeIn 0.35s ease-out both';
             this.loadSectionData(section);
         }
-        const titles = {
-            'dashboard': 'Dashboard', 'signals': 'Trading Signals', 'journal': 'Trading Journal',
-            'stocks': 'AI Stock Research', 'courses': 'Trading Courses', 'webinars': 'Webinars',
-            'blog': 'Trading Blog', 'admin': 'Admin Dashboard', 'analysis': 'Chart Analysis',
-            'mentor': 'AI Mentor', 'cms': 'Content Management'
+
+        // ── Header title + subtitle ───────────────────────────────────────
+        const meta = {
+            'dashboard': { title: 'Dashboard',          sub: 'Your learning & research command centre' },
+            'courses':   { title: 'Trading Academy',    sub: 'Structured courses from beginner to advanced' },
+            'webinars':  { title: 'Live Webinars',      sub: 'Expert-led sessions and market walkthroughs' },
+            'blog':      { title: 'Research & Blog',    sub: 'Market analysis, insights and education' },
+            'analysis':  { title: 'Chart Analysis',     sub: 'AI-powered SMC and technical analysis' },
+            'stocks':    { title: 'AI Stock Research',  sub: 'Fundamental and sentiment research' },
+            'signals':   { title: 'Market Signals',     sub: 'Active trading opportunities' },
+            'journal':   { title: 'Trading Journal',    sub: 'Track, analyse and improve your performance' },
+            'mentor':    { title: 'AI Mentor',          sub: '24/7 personal trading coach' },
+            'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
+            'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
         };
-        document.getElementById('page-title').textContent = titles[section] || 'Dashboard';
+        const m = meta[section] || { title: 'Dashboard', sub: '' };
+        const titleEl = document.getElementById('page-title');
+        const subEl   = document.getElementById('header-subtitle');
+        if (titleEl) titleEl.textContent = m.title;
+        if (subEl) {
+            const firstName = this.user?.full_name?.split(' ')[0] || this.user?.email || 'Trader';
+            if (section === 'dashboard') {
+                subEl.innerHTML = `Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">${firstName}</span>`;
+            } else {
+                subEl.innerHTML = `<span class="text-gray-500">${m.sub}</span>`;
+            }
+        }
+
+        // ── Close mobile sidebar ──────────────────────────────────────────
         document.getElementById('sidebar')?.classList.add('-translate-x-full');
         document.getElementById('sidebar-overlay')?.classList.add('hidden');
+
+        // ── Scroll content area back to top ───────────────────────────────
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async loadSectionData(section) {
@@ -1074,189 +1375,226 @@ const DashboardController = class {
     async loadDashboardStats() {
         this._initClock();
         this._initTicker();
-        this._renderMarketOverview();
         this._setGreeting();
-        this._initFeatureCarousel();
+        await this._loadDashboardCards();
+    }
 
-        // Fetch 4 live stats in parallel
+    async _loadDashboardCards() {
         const safe = fn => fn.catch(() => null);
-        const [courses, webinars, blog, signals] = await Promise.all([
+        const set  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        const _e   = s => s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        // ── Fetch all data in parallel ────────────────────────────────────
+        const [courses, webinars, blog, signals, progress] = await Promise.all([
             safe(this.apiRequest('/courses/list')),
             safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
             safe(this.apiRequest('/blog/posts')),
             safe(this.apiRequest('/signals/active')),
+            safe(this.apiRequest('/courses/enhanced/progress')),
         ]);
 
-        const count = d => Array.isArray(d) ? d.length : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
-        const set   = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        const count = d => Array.isArray(d) ? d.length
+            : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
 
-        set('stat-courses',  count(courses));
-        set('stat-webinars', count(webinars));
-        set('stat-blog',     count(blog));
-        set('stat-signals',  count(signals));
+        // ── Stat chips ────────────────────────────────────────────────────
+        set('stat-courses',  courses  ? count(courses)  : '—');
+        set('stat-webinars', webinars ? count(webinars) : '—');
+        set('stat-blog',     blog     ? count(blog)     : '—');
+        set('stat-signals',  signals  ? count(signals)  : '—');
+
+        // ── Card 1: Continue Learning ─────────────────────────────────────
+        const learningEl = document.getElementById('dash-learning-body');
+        if (learningEl) {
+            const inProgress = progress?.in_progress || [];
+            const completed  = progress?.completed    || [];
+            const overall    = progress?.overall_progress || 0;
+            const name       = progress?.student_name || (this.user?.full_name?.split(' ')[0]) || 'Trader';
+
+            if (!progress || (inProgress.length === 0 && completed.length === 0)) {
+                const courseList = Array.isArray(courses) ? courses : [];
+                if (courseList.length > 0) {
+                    // Has courses, just hasn't started one
+                    const c = courseList[0];
+                    learningEl.innerHTML = `
+                    <div class="flex flex-col items-center text-center py-4">
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center mb-3"
+                             style="background:rgba(124,58,237,.12);border:2px dashed rgba(124,58,237,.3);">
+                            <i class="fas fa-graduation-cap text-2xl" style="color:#a78bfa;"></i>
+                        </div>
+                        <p class="font-semibold text-white mb-1">Ready to start learning, ${_e(name)}?</p>
+                        <p class="text-xs text-gray-500 mb-4">You have ${courseList.length} course${courseList.length>1?'s':''} waiting for you.</p>
+                        <button onclick="dashboard.navigate('courses')"
+                            class="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
+                            style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
+                            Browse Courses →
+                        </button>
+                    </div>`;
+                } else {
+                    learningEl.innerHTML = `
+                    <div class="text-center py-4">
+                        <p class="text-gray-500 text-sm">No courses available yet.</p>
+                        <a onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 cursor-pointer mt-2 block">Check back soon →</a>
+                    </div>`;
+                }
+            } else {
+                // Has in-progress or completed courses
+                const items = [...inProgress.slice(0, 3), ...completed.slice(0, 1)];
+                learningEl.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500">Overall progress</span>
+                        <span class="text-xs font-bold" style="color:#a78bfa;">${overall}%</span>
+                    </div>
+                    <span class="text-xs text-gray-600">${completed.length} completed</span>
+                </div>
+                <div class="space-y-3">
+                ${items.map(c => `
+                    <div class="pw-course-item cursor-pointer hover:opacity-80 transition-opacity"
+                         onclick="dashboard.navigate('courses')">
+                        <div class="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center"
+                             style="background:${c.is_completed ? 'rgba(16,185,129,.15)' : 'rgba(124,58,237,.15)'};">
+                            <i class="fas ${c.is_completed ? 'fa-check-circle' : 'fa-book-open'} text-sm"
+                               style="color:${c.is_completed ? '#34d399' : '#a78bfa'};"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-white truncate">${_e(c.title)}</div>
+                            <div class="flex items-center gap-2 mt-1.5">
+                                <div class="pw-progress-bar flex-1">
+                                    <div class="pw-progress-fill" style="width:${c.progress_percent||0}%;${c.is_completed?'background:#34d399;':''}"></div>
+                                </div>
+                                <span class="text-xs flex-shrink-0" style="color:${c.is_completed?'#34d399':'#a78bfa'};">
+                                    ${c.is_completed ? '✓ Done' : (c.progress_percent||0)+'%'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>`).join('')}
+                </div>
+                ${inProgress.length > 0 ? `
+                <button onclick="dashboard.navigate('courses')"
+                    class="w-full mt-4 py-2.5 rounded-lg text-sm font-semibold transition-all"
+                    style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">
+                    Resume Learning →
+                </button>` : ''}`;
+            }
+        }
+
+        // ── Card 5: Latest Courses ────────────────────────────────────────
+        const coursesEl = document.getElementById('dash-courses-body');
+        if (coursesEl) {
+            const list = Array.isArray(courses) ? courses.slice(0, 4) : [];
+            if (!list.length) {
+                coursesEl.innerHTML = `<div class="text-center py-6 text-gray-600 text-sm">No courses yet.</div>`;
+            } else {
+                coursesEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                ${list.map(c => {
+                    const lvlColor = {Beginner:'#a78bfa',Intermediate:'#60a5fa',Advanced:'#f87171'}[c.level] || '#a78bfa';
+                    const pct = c.progress || 0;
+                    return `
+                    <div class="flex gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-gray-800/60"
+                         style="border:1px solid #1f2937;" onclick="dashboard.navigate('courses')">
+                        <div class="w-11 h-11 rounded-lg flex-shrink-0 flex items-center justify-center"
+                             style="background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(59,130,246,.2));">
+                            <i class="fas fa-graduation-cap" style="color:${lvlColor};"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-semibold mb-0.5" style="color:${lvlColor};">${_e(c.level||'Beginner').toUpperCase()}</div>
+                            <div class="text-sm font-medium text-white truncate">${_e(c.title)}</div>
+                            <div class="flex items-center gap-2 mt-1.5">
+                                ${pct > 0 ? `<div class="pw-progress-bar" style="flex:1;"><div class="pw-progress-fill" style="width:${pct}%;"></div></div>
+                                <span class="text-xs text-purple-400 flex-shrink-0">${pct}%</span>` :
+                                `<span class="text-xs text-gray-600">${c.lesson_count||0} lessons</span>`}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('')}
+                </div>`;
+            }
+        }
+
+        // ── Perf card: restore from last journal upload if available ────────
+        if (this.lastAnalysisResults) {
+            this._updateDashPerfCard(this.lastAnalysisResults);
+        }
+
+        // ── Card 6: Latest Blog ───────────────────────────────────────────
+        const blogEl = document.getElementById('dash-blog-body');
+        if (blogEl) {
+            const posts = Array.isArray(blog) ? blog : (blog?.posts || []);
+            const list = posts.slice(0, 4);
+            if (!list.length) {
+                blogEl.innerHTML = `<div class="text-center py-6 text-gray-600 text-sm">No articles published yet.</div>`;
+            } else {
+                blogEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                ${list.map(p => {
+                    const catColors = {'Market Analysis':'#60a5fa','Strategy':'#a78bfa','Education':'#34d399','General':'#9ca3af'};
+                    const col = catColors[p.category] || '#9ca3af';
+                    const date = p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
+                    return `
+                    <div class="pw-blog-item flex-col p-3 rounded-xl cursor-pointer hover:bg-gray-800/60 transition-all"
+                         style="border:1px solid #1f2937; display:block !important; padding:0.85rem;">
+                        ${p.featured_image ? `<div class="h-28 rounded-lg overflow-hidden mb-3">
+                            <img src="${p.featured_image}" class="w-full h-full object-cover"
+                                 onerror="this.parentElement.style.display='none'">
+                        </div>` : `<div class="h-28 rounded-lg mb-3 flex items-center justify-center"
+                             style="background:linear-gradient(135deg,rgba(20,184,166,.15),rgba(59,130,246,.1));">
+                            <i class="fas fa-newspaper text-2xl" style="color:${col};opacity:.5;"></i>
+                        </div>`}
+                        <div class="text-xs font-semibold mb-1" style="color:${col};">${_e(p.category||'General').toUpperCase()}</div>
+                        <div class="text-sm font-medium text-white line-clamp-2 mb-2">${_e(p.title)}</div>
+                        <div class="text-xs text-gray-600">${date}</div>
+                    </div>`;
+                }).join('')}
+                </div>`;
+            }
+        }
     }
 
     _setGreeting() {
         const h = new Date().getHours();
         const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
         const emoji = h < 12 ? '☀️' : h < 17 ? '📈' : '🌙';
-        const el = document.getElementById('greeting-text');
+        const subs  = h < 12
+            ? 'Start your day with a lesson or research session.'
+            : h < 17
+            ? 'Great time to review signals and analyse charts.'
+            : 'Review your journal and plan for tomorrow.';
+        const el  = document.getElementById('greeting-text');
+        const sub = document.getElementById('greeting-sub');
         const name = this.user?.full_name?.split(' ')[0] || 'Trader';
-        if (el) el.textContent = `${greet}, ${name} ${emoji}`;
+        if (el)  el.textContent  = `${greet}, ${name} ${emoji}`;
+        if (sub) sub.textContent = subs;
     }
 
-    _initFeatureCarousel() {
-        const slides = [
-            { section:'analysis', bg:'linear-gradient(135deg,#1e1035 0%,#3b0764 50%,#1e1b4b 100%)',
-              tag:'🤖 AI-Powered', tagBg:'rgba(124,58,237,.45)', tagColor:'#e9d5ff',
-              title:'AI Chart Analysis', desc:'Upload any chart — get SMC analysis, order blocks, fair value gaps & a full trade setup in seconds.',
-              btn:'Analyse a chart',
-              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
-                <defs><linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".35"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></linearGradient></defs>
-                <polyline points="0,170 50,150 100,160 150,120 200,130 250,95 300,108 350,72 400,82" fill="none" stroke="#a78bfa" stroke-width="2.5" opacity=".85"/>
-                <polygon points="0,170 50,150 100,160 150,120 200,130 250,95 300,108 350,72 400,82 400,200 0,200" fill="url(#ag)"/>
-                <rect x="145" y="78" width="110" height="30" rx="5" fill="rgba(124,58,237,.4)" stroke="rgba(167,139,250,.5)" stroke-width="1"/>
-                <text x="200" y="97" text-anchor="middle" fill="#e9d5ff" font-size="11" font-family="monospace">SMC BULLISH ✓</text>
-                ${[80,160,240,320].map(x=>`<line x1="${x}" y1="20" x2="${x}" y2="200" stroke="rgba(167,139,250,.08)" stroke-width="1"/>`).join('')}
-              </svg>` },
-            { section:'courses', bg:'linear-gradient(135deg,#0c1a3a 0%,#1e3a8a 50%,#0c2461 100%)',
-              tag:'📚 Academy', tagBg:'rgba(37,99,235,.45)', tagColor:'#bfdbfe',
-              title:'Trading Academy', desc:'Structured courses from beginner to advanced. Video lessons, quizzes, certificates and live webinars.',
-              btn:'Browse courses',
-              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
-                ${[0,1,2,3,4].map(i=>`<rect x="${25+i*74}" y="${55+i*20}" width="60" height="${140-i*20}" rx="5" fill="rgba(59,130,246,${.12+i*.06})" stroke="rgba(96,165,250,.25)" stroke-width="1"/>
-                <rect x="${25+i*74}" y="${55+i*20}" width="60" height="${(140-i*20)*.65}" rx="5" fill="rgba(37,99,235,${.2+i*.05})"/>`).join('')}
-                <text x="200" y="190" text-anchor="middle" fill="rgba(96,165,250,.4)" font-size="9" font-family="sans-serif">BEGINNER → ADVANCED</text>
-              </svg>` },
-            { section:'mentor', bg:'linear-gradient(135deg,#1a0a2e 0%,#831843 60%,#1a0a2e 100%)',
-              tag:'🧠 AI Mentor', tagBg:'rgba(219,39,119,.45)', tagColor:'#fbcfe8',
-              title:'Personal AI Trading Coach', desc:'Ask any trading question 24/7. Strategy reviews, psychology insights, risk management guidance.',
-              btn:'Ask the mentor',
-              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
-                <circle cx="200" cy="100" r="65" fill="rgba(219,39,119,.1)" stroke="rgba(244,114,182,.2)" stroke-width="1.5"/>
-                <circle cx="200" cy="100" r="40" fill="rgba(219,39,119,.15)" stroke="rgba(244,114,182,.3)" stroke-width="1"/>
-                <circle cx="200" cy="100" r="20" fill="rgba(219,39,119,.3)"/>
-                <text x="200" y="108" text-anchor="middle" fill="white" font-size="18">🤖</text>
-                ${[[120,45,'SMC?'],[275,50,'Entry?'],[100,148,'Risk?'],[295,140,'Setup?']].map(([x,y,t])=>`
-                  <rect x="${x-22}" y="${y-10}" width="44" height="18" rx="9" fill="rgba(244,114,182,.15)" stroke="rgba(244,114,182,.3)" stroke-width=".8"/>
-                  <text x="${x}" y="${y+4}" text-anchor="middle" fill="rgba(251,207,232,.85)" font-size="8">${t}</text>`).join('')}
-              </svg>` },
-            { section:'webinars', bg:'linear-gradient(135deg,#1c0f00 0%,#78350f 50%,#1c1000 100%)',
-              tag:'🎥 Live Sessions', tagBg:'rgba(217,119,6,.45)', tagColor:'#fde68a',
-              title:'Live Webinars', desc:'Expert-led live trading sessions, real-time market walkthroughs and interactive Q&A.',
-              btn:'View schedule',
-              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
-                <rect x="55" y="30" width="290" height="150" rx="10" fill="rgba(245,158,11,.08)" stroke="rgba(251,191,36,.2)" stroke-width="1.5"/>
-                <circle cx="200" cy="105" r="30" fill="rgba(245,158,11,.2)" stroke="rgba(251,191,36,.35)" stroke-width="1.5"/>
-                <polygon points="193,94 193,117 217,105" fill="rgba(251,191,36,.85)"/>
-                <circle cx="100" cy="35" r="5" fill="#ef4444"/> <circle cx="116" cy="35" r="5" fill="#f59e0b"/> <circle cx="132" cy="35" r="5" fill="#10b981"/>
-                <rect x="70" y="165" width="260" height="4" rx="2" fill="rgba(245,158,11,.12)"/>
-                <rect x="70" y="165" width="155" height="4" rx="2" fill="rgba(251,191,36,.4)"/>
-                <text x="200" y="192" text-anchor="middle" fill="rgba(251,191,36,.45)" font-size="9">47 ATTENDING LIVE</text>
-              </svg>` },
-            { section:'journal', bg:'linear-gradient(135deg,#022c22 0%,#065f46 50%,#022c22 100%)',
-              tag:'📔 Journal', tagBg:'rgba(5,150,105,.45)', tagColor:'#a7f3d0',
-              title:'Trading Journal', desc:'Import MT4/MT5/CSV. Track equity curves, drawdown, win rate & identify psychology patterns.',
-              btn:'Open journal',
-              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
-                <defs><linearGradient id="jg" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#059669" stop-opacity=".4"/><stop offset="100%" stop-color="#059669" stop-opacity="0"/></linearGradient></defs>
-                <polyline points="20,170 60,155 100,162 140,138 180,142 220,110 260,118 300,88 340,94 380,68" fill="none" stroke="#34d399" stroke-width="2.2" opacity=".9"/>
-                <polygon points="20,170 60,155 100,162 140,138 180,142 220,110 260,118 300,88 340,94 380,68 380,200 20,200" fill="url(#jg)"/>
-                ${[70,140,210,280,350].map(x=>`<line x1="${x}" y1="40" x2="${x}" y2="190" stroke="rgba(52,211,153,.07)" stroke-width="1"/>`).join('')}
-                <rect x="15" y="45" width="105" height="22" rx="4" fill="rgba(5,150,105,.4)" stroke="rgba(52,211,153,.3)"/>
-                <text x="67" y="60" text-anchor="middle" fill="#a7f3d0" font-size="9">Win Rate: 68% ↑</text>
-              </svg>` },
-            { section:'blog', bg:'linear-gradient(135deg,#032420 0%,#134e4a 50%,#032420 100%)',
-              tag:'📰 Research', tagBg:'rgba(15,118,110,.45)', tagColor:'#99f6e4',
-              title:'Market Blog', desc:'Daily market analysis, SMC breakdowns, economic event coverage and trading insights.',
-              btn:'Read articles',
-              art:`<svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
-                ${[0,1,2].map(i=>`<rect x="25" y="${20+i*60}" width="170" height="50" rx="6" fill="rgba(20,184,166,.08)" stroke="rgba(45,212,191,.15)" stroke-width="1"/>
-                <rect x="38" y="${33+i*60}" width="65" height="8" rx="4" fill="rgba(45,212,191,.3)"/>
-                <rect x="38" y="${46+i*60}" width="144" height="5" rx="2.5" fill="rgba(45,212,191,.12)"/>
-                <rect x="38" y="${54+i*60}" width="110" height="5" rx="2.5" fill="rgba(45,212,191,.08)"/>`).join('')}
-                <rect x="215" y="20" width="165" height="160" rx="8" fill="rgba(20,184,166,.1)" stroke="rgba(45,212,191,.2)" stroke-width="1"/>
-                <text x="297" y="92" text-anchor="middle" fill="rgba(45,212,191,.4)" font-size="44">📈</text>
-                <rect x="228" y="150" width="139" height="8" rx="4" fill="rgba(45,212,191,.2)"/>
-                <rect x="228" y="163" width="90" height="8" rx="4" fill="rgba(45,212,191,.12)"/>
-              </svg>` },
-        ];
-
-        const track = document.getElementById('fc-track');
-        const dotsEl = document.getElementById('fc-dots');
-        if (!track || !dotsEl) return;
-
-        // Build slides
-        track.innerHTML = slides.map(s => `
-            <div onclick="dashboard.navigate('${s.section}')" style="flex:0 0 calc(33.333% - .6rem);min-width:0;border-radius:.875rem;overflow:hidden;cursor:pointer;position:relative;transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px -8px rgba(0,0,0,.6)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-                <div style="height:200px;display:flex;flex-direction:column;justify-content:flex-end;padding:1.1rem;position:relative;overflow:hidden;background:${s.bg};">
-                    <div style="position:absolute;inset:0;">${s.art}</div>
-                    <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 25%,rgba(0,0,0,.72) 100%);"></div>
-                    <div style="position:relative;z-index:2;">
-                        <span style="display:inline-block;padding:.18rem .6rem;border-radius:9999px;font-size:.68rem;font-weight:700;margin-bottom:.4rem;background:${s.tagBg};color:${s.tagColor};">${s.tag}</span>
-                        <div style="font-size:1rem;font-weight:800;color:white;line-height:1.2;margin-bottom:.25rem;">${s.title}</div>
-                        <div style="font-size:.73rem;color:rgba(255,255,255,.68);line-height:1.35;margin-bottom:.65rem;">${s.desc}</div>
-                        <span style="display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .85rem;border-radius:.4rem;font-size:.73rem;font-weight:700;background:rgba(255,255,255,.12);color:white;border:1px solid rgba(255,255,255,.18);">→ ${s.btn}</span>
-                    </div>
-                </div>
-            </div>`).join('');
-
-        // Dots
-        this._fcTotal = slides.length;
-        this._fcIndex = 0;
-        dotsEl.innerHTML = slides.map((_, i) =>
-            `<div onclick="dashboard._fcGoTo(${i})" style="width:6px;height:6px;border-radius:50%;cursor:pointer;transition:all .2s;background:${i===0?'white':'rgba(255,255,255,.3)'};${i===0?'transform:scale(1.3);':''}"></div>`).join('');
-
-        this._fcUpdateTrack();
-        if (this._fcTimer) clearInterval(this._fcTimer);
-        this._fcTimer = setInterval(() => this._fcMove(1), 4500);
-        track.addEventListener('mouseenter', () => clearInterval(this._fcTimer));
-        track.addEventListener('mouseleave', () => {
-            if (this._fcTimer) clearInterval(this._fcTimer);
-            this._fcTimer = setInterval(() => this._fcMove(1), 4500);
-        });
-        window.addEventListener('resize', () => this._fcUpdateTrack(), { passive: true });
-    }
-
-    _fcVisibleCount() {
-        const w = window.innerWidth;
-        return w < 600 ? 1 : w < 900 ? 2 : 3;
-    }
-
-    _fcMove(dir) {
-        const vis    = this._fcVisibleCount();
-        const maxIdx = Math.max(0, (this._fcTotal || 6) - vis);
-        this._fcIndex = this._fcIndex + dir;
-        if (this._fcIndex > maxIdx) this._fcIndex = 0;
-        if (this._fcIndex < 0)      this._fcIndex = maxIdx;
-        this._fcUpdateTrack();
-    }
-
-    _fcGoTo(i) { this._fcIndex = i; this._fcUpdateTrack(); }
-
-    _fcUpdateTrack() {
-        const track = document.getElementById('fc-track');
-        if (!track || !track.children.length) return;
-        const vis    = this._fcVisibleCount();
-        // Slide width = (container width - gaps) / visible count
-        const containerW = track.parentElement?.offsetWidth || track.offsetWidth || 900;
-        const gap  = 14;
-        const slideW = (containerW - gap * (vis - 1)) / vis;
-        Array.from(track.children).forEach(s => { s.style.flex = `0 0 ${slideW}px`; });
-        track.style.transform = `translateX(-${this._fcIndex * (slideW + gap)}px)`;
-        // Update dots
-        const dots = document.querySelectorAll('#fc-dots > div');
-        dots.forEach((d, i) => {
-            d.style.background = i === this._fcIndex ? 'white' : 'rgba(255,255,255,.3)';
-            d.style.transform  = i === this._fcIndex ? 'scale(1.3)' : '';
-        });
-    }
 
     _initClock() {
         const tick = () => {
-            const el = document.getElementById('live-clock');
-            if (!el) return;
-            el.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const now    = new Date();
+            const clockEl = document.getElementById('live-clock');
+            if (clockEl) clockEl.textContent = now.toLocaleTimeString('en-US', { hour12: false });
+
+            // ── Forex market hours: Sun 21:00 UTC – Fri 21:00 UTC ──────────
+            const day   = now.getUTCDay();   // 0=Sun … 6=Sat
+            const hours = now.getUTCHours();
+            const mins  = now.getUTCMinutes();
+            const timeInMins = hours * 60 + mins;
+            // Open: Sunday 21:00 UTC onward, close: Friday 21:00 UTC
+            const isOpen = !(day === 6 || (day === 5 && timeInMins >= 21*60) || (day === 0 && timeInMins < 21*60));
+
+            // Update header pill status text
+            const statusEl = document.getElementById('market-status-text');
+            const dotEl    = document.getElementById('market-status-dot');
+            if (statusEl) {
+                statusEl.textContent = isOpen ? 'Markets Open' : 'Markets Closed';
+                statusEl.className   = isOpen ? 'text-green-400 font-medium' : 'text-red-400 font-medium';
+            }
+            if (dotEl) {
+                dotEl.style.background = isOpen ? '#4ade80' : '#f87171';
+            }
+            // Update dashboard greeting indicator
+            const dashDot  = document.getElementById('dash-market-dot');
+            const dashText = document.getElementById('dash-market-text');
+            if (dashDot)  dashDot.style.background  = isOpen ? '#4ade80' : '#f87171';
+            if (dashText) dashText.textContent = isOpen ? 'Markets Open' : 'Markets Closed';
         };
         tick();
         this._clockTimer = setInterval(tick, 1000);
@@ -1287,30 +1625,6 @@ const DashboardController = class {
         if (track) track.innerHTML = html + html;
     }
 
-    _renderMarketOverview() {
-        const markets = [
-            { name: 'Gold (XAU)',  val: '3,024',   chg: '+0.27%', up: true,  pct: 72 },
-            { name: 'BTC/USD',     val: '83,412',  chg: '-1.47%', up: false, pct: 38 },
-            { name: 'EUR/USD',     val: '1.0847',  chg: '+0.11%', up: true,  pct: 58 },
-            { name: 'S&P 500',     val: '5,614',   chg: '+0.18%', up: true,  pct: 65 },
-            { name: 'DXY Index',   val: '103.42',  chg: '-0.09%', up: false, pct: 44 },
-        ];
-        const el = document.getElementById('market-overview-list');
-        if (!el) return;
-        el.innerHTML = markets.map(m => `
-            <div class="mkt-row">
-                <div>
-                    <div class="text-white text-xs font-medium">${m.name}</div>
-                    <div class="font-mono text-gray-400 text-xs">${m.val}</div>
-                </div>
-                <div class="flex flex-col items-end gap-1">
-                    <span class="text-xs font-bold ${m.up ? 'text-green-400' : 'text-red-400'}">${m.chg}</span>
-                    <div class="mkt-bar-track">
-                        <div class="mkt-bar-fill" style="width:${m.pct}%;background:${m.up ? '#34d399' : '#f87171'};"></div>
-                    </div>
-                </div>
-            </div>`).join('');
-    }
 
     async apiRequest(endpoint, options = {}) {
         const token = localStorage.getItem('pipways_token');
@@ -1434,12 +1748,75 @@ const DashboardController = class {
         }
     }
 
+    _updateDashPerfCard(result) {
+        // Populate the dashboard performance summary card if it exists
+        const el = document.getElementById('dash-perf-body');
+        if (!el || !result) return;
+        const stats    = result.statistics || {};
+        const aiCoach  = result.ai_coach   || {};
+        const winRate  = stats.win_rate    || 0;
+        const pf       = stats.profit_factor || 0;
+        const trades   = stats.total_trades  || 0;
+        const grade    = result.overall_grade || 'N/A';
+        const netPnl   = stats.net_pnl || 0;
+        const winColor = winRate >= 55 ? '#34d399' : winRate >= 45 ? '#fbbf24' : '#f87171';
+        const pfColor  = pf >= 1.5 ? '#34d399' : pf >= 1 ? '#fbbf24' : '#f87171';
+        const gradeColors = { A:'#34d399', B:'#a78bfa', C:'#fbbf24', D:'#f87171', F:'#f87171' };
+        const gradeColor = gradeColors[grade?.[0]] || '#9ca3af';
+
+        el.innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <div class="text-xs text-gray-500 mb-1">Overall Grade</div>
+                <div class="text-3xl font-black" style="color:${gradeColor};">${grade}</div>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-500 mb-1">Net P&L</div>
+                <div class="text-lg font-bold ${netPnl >= 0 ? 'text-green-400' : 'text-red-400'}">
+                    ${netPnl >= 0 ? '+' : ''}$${Math.abs(netPnl).toFixed(0)}
+                </div>
+            </div>
+        </div>
+        <div class="space-y-3 mb-4">
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-500">Win Rate</span>
+                    <span class="font-semibold" style="color:${winColor};">${winRate}%</span>
+                </div>
+                <div class="pw-progress-bar">
+                    <div class="pw-progress-fill" style="width:${winRate}%;background:${winColor};"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-500">Profit Factor</span>
+                    <span class="font-semibold" style="color:${pfColor};">${pf}x</span>
+                </div>
+                <div class="pw-progress-bar">
+                    <div class="pw-progress-fill" style="width:${Math.min(pf/3*100,100)}%;background:${pfColor};"></div>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center justify-between text-xs text-gray-600 border-t border-gray-800 pt-3 mb-3">
+            <span>${trades} trades analysed</span>
+            <span>${aiCoach.discipline_score ? 'Discipline: '+aiCoach.discipline_score+'%' : ''}</span>
+        </div>
+        <button onclick="dashboard.navigate('journal')"
+            class="w-full py-2 rounded-lg text-xs font-semibold transition-all"
+            style="background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c;">
+            <i class="fas fa-chart-bar mr-1.5"></i>Full Journal Analysis
+        </button>`;
+    }
+
     displayJournalAnalysis(result) {
         document.getElementById('performance-overview').classList.remove('hidden');
         document.getElementById('analytics-charts').classList.remove('hidden');
         document.getElementById('ai-coach-section').classList.remove('hidden');
         document.getElementById('trade-history').classList.remove('hidden');
         document.getElementById('strategy-detection').classList.remove('hidden');
+
+        // ── Also refresh the dashboard performance card if it's visible ──
+        this._updateDashPerfCard(result);
 
         const stats = result.statistics || {};
 
@@ -1627,10 +2004,13 @@ const DashboardController = class {
             const data = await this.apiRequest('/signals/active');
             const signals = Array.isArray(data) ? data : (data.signals || []);
             if (!signals.length) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
-                    <i class="fas fa-satellite-dish text-4xl mb-3 block opacity-30"></i>
-                    <p class="font-medium">No active signals at the moment</p>
-                    <p class="text-sm mt-1 text-gray-600">Check back soon for new trading opportunities</p>
+                container.innerHTML = `<div class="col-span-full text-center py-16 text-gray-600">
+                    <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4"
+                         style="background:#111827;border:2px dashed #374151;">
+                        <i class="fas fa-satellite-dish text-2xl" style="color:#4b5563;"></i>
+                    </div>
+                    <p class="font-medium text-gray-400 mb-1">No active signals right now</p>
+                    <p class="text-sm text-gray-600">New signals are posted regularly by our analysts. Check back soon.</p>
                 </div>`;
                 return;
             }
@@ -1710,10 +2090,13 @@ const DashboardController = class {
             const data = await this.apiRequest('/webinars/upcoming?upcoming=true');
             const webinars = Array.isArray(data) ? data : (data.webinars || []);
             if (!webinars.length) {
-                container.innerHTML = `<div class="text-center py-12 text-gray-500">
-                    <i class="fas fa-video text-4xl mb-3 block opacity-30"></i>
-                    <p class="font-medium">No upcoming webinars scheduled</p>
-                    <p class="text-sm mt-1 text-gray-600">Check back soon for live sessions</p>
+                container.innerHTML = `<div class="text-center py-16 text-gray-600">
+                    <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4"
+                         style="background:#111827;border:2px dashed #374151;">
+                        <i class="fas fa-video text-2xl" style="color:#4b5563;"></i>
+                    </div>
+                    <p class="font-medium text-gray-400 mb-1">No webinars scheduled yet</p>
+                    <p class="text-sm text-gray-600">Live sessions with expert traders are coming soon. Watch this space.</p>
                 </div>`;
                 return;
             }
@@ -1757,9 +2140,13 @@ const DashboardController = class {
             const data = await this.apiRequest('/blog/posts');
             const posts = Array.isArray(data) ? data : (data.posts || []);
             if (!posts.length) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
-                    <i class="fas fa-newspaper text-4xl mb-3 block opacity-30"></i>
-                    <p class="font-medium">No articles published yet</p>
+                container.innerHTML = `<div class="col-span-full text-center py-16 text-gray-600">
+                    <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4"
+                         style="background:#111827;border:2px dashed #374151;">
+                        <i class="fas fa-newspaper text-2xl" style="color:#4b5563;"></i>
+                    </div>
+                    <p class="font-medium text-gray-400 mb-1">No articles published yet</p>
+                    <p class="text-sm text-gray-600">Market analysis and educational content is coming soon.</p>
                 </div>`;
                 return;
             }
@@ -2060,6 +2447,27 @@ const DashboardController = class {
             }
         }
     }
+
+    _toggleNotifPanel() {
+        const panel = document.getElementById('notif-panel');
+        const dot   = document.getElementById('notif-dot');
+        if (!panel) return;
+        const isHidden = panel.classList.contains('hidden');
+        panel.classList.toggle('hidden');
+        // Dismiss red dot once opened
+        if (isHidden && dot) dot.style.display = 'none';
+        // Close on click outside
+        if (isHidden) {
+            const close = (e) => {
+                if (!document.getElementById('notif-wrapper')?.contains(e.target)) {
+                    panel.classList.add('hidden');
+                    document.removeEventListener('click', close);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', close), 50);
+        }
+    }
+
 
     logout() {
         localStorage.removeItem('pipways_token');

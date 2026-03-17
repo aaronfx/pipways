@@ -690,12 +690,24 @@ Provide exactly one object per symbol. Rank 1 = best overall pick.
 
 
 # ── NGX Routes (Nigerian Exchange Group) ─────────────────────────────────────
+#
+# Data flow:
+#   1. Try EODHD real-time quote  → real live NGX price (₦)
+#   2. Try EODHD fundamentals     → P/E, market cap, dividends etc.
+#   3. If EODHD fails             → Claude AI estimates (clearly flagged)
+#   4. Always pass market data    → Claude for investment analysis
+#
+# NGX stocks on EODHD use the ".LG" exchange suffix (Lagos Stock Exchange)
+# e.g. DANGCEM.LG, MTNN.LG, GTCO.LG, ZENITHBANK.LG
 
 NGX_SYSTEM = (
     "You are a professional Nigerian stock market analyst specializing in NGX "
     "(Nigerian Exchange Group) listed stocks. Always respond with valid JSON only — "
     "no markdown, no preamble, no explanation."
 )
+
+# Common NGX tickers → EODHD .LG codes (same ticker, different exchange suffix)
+_NGX_EXCHANGE = "LG"  # Lagos Stock Exchange code on EODHD
 
 
 async def ngx_claude_json(prompt: str, max_tokens: int = 1000) -> dict:
@@ -726,38 +738,267 @@ async def ngx_claude_json(prompt: str, max_tokens: int = 1000) -> dict:
         ) from exc
 
 
+async def ngx_fetch_market_data(ticker: str) -> dict:
+    """
+    Fetch live NGX market data from EODHD using the .LG exchange suffix.
+    Returns a normalised dict with ₦ prices and NGX-specific fields.
+    Raises HTTPException if EODHD quote fails entirely.
+    """
+    cache_key = f"ngx_eodhd:{ticker}"
+    if cached := await cache_get(cache_key):
+        return cached
+
+    full_sym = f"{ticker}.{_NGX_EXCHANGE}"
+
+    # ── Live quote (required) ─────────────────────────────────────────────
+    try:
+        quote_data = await _eodhd_get(f"real-time/{full_sym}")
+        print(f"[NGX] EODHD quote OK for {full_sym}", flush=True)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"EODHD live quote failed for {full_sym}: {exc}"
+        ) from exc
+
+    if isinstance(quote_data, list):
+        quote_data = quote_data[0] if quote_data else {}
+
+    price      = float(quote_data.get("close") or quote_data.get("previousClose") or 0)
+    prev_close = float(quote_data.get("previousClose") or 0)
+    change     = round(float(quote_data.get("change") or 0), 4)
+    change_pct = round(float(str(quote_data.get("change_p") or "0").replace("%", "")), 4)
+    volume     = int(float(quote_data.get("volume") or 0))
+
+    # ── Fundamentals (optional — may not be available on free tier) ───────
+    fund_data  = {}
+    try:
+        fund_data = await _eodhd_get(f"fundamentals/{full_sym}")
+        print(f"[NGX] EODHD fundamentals OK for {full_sym}", flush=True)
+    except Exception as exc:
+        print(f"[NGX] EODHD fundamentals unavailable for {full_sym}: {exc}", flush=True)
+
+    general    = fund_data.get("General", {})
+    highlights = fund_data.get("Highlights", {})
+    valuation  = fund_data.get("Valuation", {})
+    technicals = fund_data.get("Technicals", {})
+    analyst    = fund_data.get("AnalystRatings", {})
+    shares     = fund_data.get("SharesStats", {})
+
+    # Format price in Naira
+    def _ngx_price(val: any) -> str:
+        try:
+            n = float(val)
+            if n <= 0:
+                return "N/A"
+            return f"\u20a6{n:,.2f}"   # ₦ symbol
+        except Exception:
+            return "N/A"
+
+    result = {
+        # Identity
+        "ticker":       ticker,
+        "company":      _safe(general.get("Name"), ticker),
+        "sector":       _safe(general.get("Sector")),
+        "industry":     _safe(general.get("Industry")),
+        "exchange":     "NGX",
+        "currency":     "NGN",
+
+        # Live quote
+        "price":        price,
+        "price_fmt":    _ngx_price(price),
+        "change":       change,
+        "change_pct":   str(change_pct),
+        "prev_close":   prev_close,
+        "volume":       volume,
+        "high":         float(quote_data.get("high") or 0),
+        "low":          float(quote_data.get("low") or 0),
+        "open":         float(quote_data.get("open") or 0),
+
+        # Valuation
+        "market_cap":   _fmt_large(highlights.get("MarketCapitalization")),
+        "pe_ratio":     _safe(highlights.get("PERatio")),
+        "eps":          _safe(highlights.get("EarningsShare")),
+        "book_value":   _safe(highlights.get("BookValue")),
+        "price_to_book":_safe(valuation.get("PriceBookMRQ")),
+
+        # Range & technicals
+        "week52_high":  _ngx_price(technicals.get("52WeekHigh")),
+        "week52_low":   _ngx_price(technicals.get("52WeekLow")),
+        "ma50":         _ngx_price(technicals.get("50DayMA")),
+        "ma200":        _ngx_price(technicals.get("200DayMA")),
+        "beta":         _safe(technicals.get("Beta")),
+
+        # Dividends
+        "div_yield":    _fmt_pct(highlights.get("DividendYield")),
+        "div_per_share":_safe(highlights.get("DividendShare")),
+
+        # Financials
+        "profit_margin":    _fmt_pct(highlights.get("ProfitMargin")),
+        "operating_margin": _fmt_pct(highlights.get("OperatingMarginTTM")),
+        "return_on_equity": _fmt_pct(highlights.get("ReturnOnEquityTTM")),
+        "revenue_ttm":      _fmt_large(highlights.get("RevenueTTM")),
+        "ebitda":           _fmt_large(highlights.get("EBITDA")),
+        "debt_to_equity":   _safe(highlights.get("DebtEquityRatio")),
+
+        # Analyst
+        "analyst_target":   _ngx_price(highlights.get("AnalystTargetPrice")),
+        "analyst_rating":   _safe(analyst.get("Rating")),
+
+        "data_source": "eodhd_live",
+    }
+
+    await cache_set(cache_key, result)
+    return result
+
+
+async def ngx_enrich_with_claude(ticker: str) -> dict:
+    """
+    Fallback: ask Claude for NGX market data when EODHD is unavailable.
+    All prices are clearly marked as AI estimates.
+    """
+    prompt = f"""Provide realistic NGX (Nigerian Exchange Group) market data for {ticker}.
+Use your most recent training knowledge. Be conservative with estimates.
+
+Return ONLY this JSON:
+{{
+  "ticker": "{ticker}",
+  "company": "<full company name>",
+  "sector": "<NGX sector>",
+  "industry": "<industry>",
+  "exchange": "NGX",
+  "currency": "NGN",
+  "price": <number in Naira — no symbol>,
+  "price_fmt": "<\u20a6XX.XX>",
+  "change": <number>,
+  "change_pct": "<number as string>",
+  "prev_close": <number>,
+  "volume": <number>,
+  "market_cap": "<\u20a6XXXbn>",
+  "pe_ratio": "<XX.X or N/A>",
+  "eps": "<XX.XX or N/A>",
+  "week52_high": "<\u20a6XX.XX or N/A>",
+  "week52_low": "<\u20a6XX.XX or N/A>",
+  "ma50": "<\u20a6XX.XX or N/A>",
+  "ma200": "<\u20a6XX.XX or N/A>",
+  "beta": "<X.XX or N/A>",
+  "div_yield": "<X.X% or N/A>",
+  "div_per_share": "<XX.XX or N/A>",
+  "profit_margin": "<XX.X% or N/A>",
+  "operating_margin": "<XX.X% or N/A>",
+  "return_on_equity": "<XX.X% or N/A>",
+  "revenue_ttm": "<\u20a6XXXbn or N/A>",
+  "ebitda": "<\u20a6XXXbn or N/A>",
+  "debt_to_equity": "<X.XX or N/A>",
+  "analyst_target": "<\u20a6XX.XX or N/A>",
+  "analyst_rating": "<Buy|Hold|Sell or N/A>",
+  "data_source": "ai_estimate"
+}}"""
+    try:
+        data = await ngx_claude_json(prompt, max_tokens=700)
+        data["data_source"] = "ai_estimate"
+        data.setdefault("high", 0)
+        data.setdefault("low", 0)
+        data.setdefault("open", 0)
+        return data
+    except Exception as exc:
+        print(f"[NGX] enrich_with_claude failed for {ticker}: {exc}", flush=True)
+        return {
+            "ticker": ticker, "company": ticker, "sector": "N/A",
+            "industry": "N/A", "exchange": "NGX", "currency": "NGN",
+            "price": 0, "price_fmt": "N/A", "change": 0, "change_pct": "0",
+            "prev_close": 0, "volume": 0, "market_cap": "N/A",
+            "pe_ratio": "N/A", "eps": "N/A", "week52_high": "N/A",
+            "week52_low": "N/A", "ma50": "N/A", "ma200": "N/A",
+            "beta": "N/A", "div_yield": "N/A", "div_per_share": "N/A",
+            "profit_margin": "N/A", "operating_margin": "N/A",
+            "return_on_equity": "N/A", "revenue_ttm": "N/A",
+            "ebitda": "N/A", "debt_to_equity": "N/A",
+            "analyst_target": "N/A", "analyst_rating": "N/A",
+            "data_source": "ai_estimate",
+        }
+
+
 @router.post("/ngx/analyze", response_model=OkResponse, summary="Analyze an NGX-listed stock")
 async def ngx_analyze(body: NgxAnalyzeRequest) -> OkResponse:
     ticker = body.ticker.strip().upper()
-    cache_key = f"ngx:{ticker}:{body.analysis_type}"
+    cache_key = f"ngx:analyze:{ticker}:{body.analysis_type}"
     cached = await cache_get(cache_key)
     if cached:
         return OkResponse(cached=True, data=cached)
 
     try:
-        prompt = f"""Analyze {ticker} listed on the Nigerian Exchange (NGX).
+        # ── Step 1: Get real market data ──────────────────────────────────
+        eodhd_key = os.environ.get("EODHD_API_KEY", "")
+        if eodhd_key:
+            try:
+                market = await ngx_fetch_market_data(ticker)
+                data_source = "eodhd_live"
+            except Exception as exc:
+                print(f"[NGX] EODHD failed for {ticker}, falling back to AI: {exc}", flush=True)
+                market = await ngx_enrich_with_claude(ticker)
+                data_source = "ai_estimate"
+        else:
+            print(f"[NGX] No EODHD key — using AI estimate for {ticker}", flush=True)
+            market = await ngx_enrich_with_claude(ticker)
+            data_source = "ai_estimate"
+
+        # ── Step 2: Claude investment analysis using real data ────────────
+        prompt = f"""You are analysing {ticker} ({market.get("company", ticker)}) listed on the NGX.
 Analysis type: {body.analysis_type}
 
-Return exactly this JSON structure:
+LIVE MARKET DATA (use these exact figures in your response):
+Price         : {market.get("price_fmt", "N/A")}  ({data_source})
+Change        : {market.get("change")} ({market.get("change_pct")}%)
+52W High/Low  : {market.get("week52_high")} / {market.get("week52_low")}
+50-day MA     : {market.get("ma50")}
+200-day MA    : {market.get("ma200")}
+Market Cap    : {market.get("market_cap")}
+P/E Ratio     : {market.get("pe_ratio")}
+EPS           : {market.get("eps")}
+Dividend Yield: {market.get("div_yield")}
+Revenue TTM   : {market.get("revenue_ttm")}
+EBITDA        : {market.get("ebitda")}
+Profit Margin : {market.get("profit_margin")}
+Op. Margin    : {market.get("operating_margin")}
+ROE           : {market.get("return_on_equity")}
+Debt/Equity   : {market.get("debt_to_equity")}
+Sector        : {market.get("sector")}
+
+Using this data, provide a professional investment analysis. Return exactly this JSON:
 {{
-  "ticker": "{ticker}",
-  "company": "<full company name>",
-  "sector": "<NGX sector>",
   "signal": "BUY" | "HOLD" | "SELL",
-  "currentPrice": "<₦XX.XX — use realistic NGX price>",
-  "targetPrice": "<₦XX.XX — 12-month analyst target>",
-  "upside": "<+XX% or -XX%>",
-  "marketCap": "<₦XXXbn>",
-  "peRatio": "<XX.X or N/A>",
-  "dividendYield": "<X.X% or N/A>",
-  "summary": "<2-3 sentence investment analysis>",
+  "targetPrice": "<₦XX.XX — 12-month target>",
+  "upside": "<+XX% or -XX% vs current price>",
+  "summary": "<2-3 sentence investment analysis referencing the actual price data>",
   "catalysts": ["<catalyst 1>", "<catalyst 2>", "<catalyst 3>"],
-  "risks": ["<risk 1>", "<risk 2>"]
-}}
-Use realistic NGX data based on your training knowledge. Mark any estimates clearly in the summary."""
-        data = await ngx_claude_json(prompt)
-        await cache_set(cache_key, data)
-        return OkResponse(data=data)
+  "risks": ["<risk 1>", "<risk 2>"],
+  "trend": "Bullish" | "Bearish" | "Neutral",
+  "momentum": "Strong" | "Moderate" | "Weak",
+  "hold_period": "<e.g. Long Term (1-3 years)>",
+  "confidence": <integer 50-99>
+}}"""
+
+        ai = await ngx_claude_json(prompt, max_tokens=800)
+
+        result = {
+            # Pass through all live market data
+            **market,
+            # Add AI analysis fields
+            "signal":       ai.get("signal", "HOLD"),
+            "targetPrice":  ai.get("targetPrice", "N/A"),
+            "upside":       ai.get("upside", "N/A"),
+            "summary":      ai.get("summary", ""),
+            "catalysts":    ai.get("catalysts", []),
+            "risks":        ai.get("risks", []),
+            "trend":        ai.get("trend", "Neutral"),
+            "momentum":     ai.get("momentum", "Moderate"),
+            "hold_period":  ai.get("hold_period", "N/A"),
+            "confidence":   ai.get("confidence", 70),
+            "data_source":  data_source,
+        }
+
+        await cache_set(cache_key, result)
+        return OkResponse(data=result)
 
     except HTTPException:
         raise
@@ -767,6 +1008,8 @@ Use realistic NGX data based on your training knowledge. Mark any estimates clea
 
 @router.post("/ngx/picks", response_model=OkResponse, summary="AI top picks for an NGX sector")
 async def ngx_picks(body: NgxPicksRequest) -> OkResponse:
+    # Note: picks are AI-generated since we don't know which tickers to fetch upfront.
+    # Prices are from Claude training knowledge — treat as indicative, not live.
     cache_key = f"ngx:picks:{body.sector}:{body.signal_filter}"
     cached = await cache_get(cache_key)
     if cached:
@@ -777,7 +1020,7 @@ async def ngx_picks(body: NgxPicksRequest) -> OkResponse:
             "Include only BUY signals." if body.signal_filter == "BUY"
             else "Include BUY and HOLD signals."
         )
-        prompt = f"""Generate top NGX stock picks for {body.sector} sector today.
+        prompt = f"""Generate top NGX stock picks for {body.sector} sector.
 {signal_instruction}
 
 Return a JSON array of exactly 5 stocks:
@@ -787,15 +1030,18 @@ Return a JSON array of exactly 5 stocks:
     "company": "<full company name>",
     "sector": "<sector>",
     "signal": "BUY" | "HOLD",
-    "currentPrice": "<₦XX.XX>",
-    "targetPrice": "<₦XX.XX>",
+    "currentPrice": "<₦XX.XX — approximate from training knowledge>",
+    "targetPrice": "<₦XX.XX — 12-month target>",
     "upside": "<+XX%>",
-    "reason": "<one clear sentence explaining the investment case>"
+    "reason": "<one clear sentence with specific investment rationale>"
   }}
 ]
-Use realistic NGX-listed companies with genuine investment rationale."""
+Use real NGX-listed companies. Prices are estimates — note this is indicative data."""
         data = await ngx_claude_json(prompt, max_tokens=1000)
         picks = data if isinstance(data, list) else data.get("picks", [])
+        # Tag all picks as AI estimate so frontend can show disclaimer
+        for p in picks:
+            p["data_source"] = "ai_estimate"
         await cache_set(cache_key, picks)
         return OkResponse(data=picks)
 

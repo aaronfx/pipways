@@ -642,6 +642,7 @@
             this._level = this._module = this._lesson = null;
             this._bc(null, null, null);
             this._hideMobileBar();
+            document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
             const main = document.getElementById('ac-main');
             main.innerHTML = this._loading('Loading curriculum…');
             try {
@@ -699,6 +700,7 @@
             this._module = null;
             this._bc(levelName, null, null);
             this._hideMobileBar();
+            document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
             const main = document.getElementById('ac-main');
             main.innerHTML = this._loading('Loading modules…');
             try {
@@ -734,6 +736,7 @@
             this._lesson = null;
             this._bc(this._level?.name, moduleTitle, null);
             this._hideMobileBar();
+            document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
             const main = document.getElementById('ac-main');
             main.innerHTML = this._loading('Loading lessons…');
             try {
@@ -763,6 +766,7 @@
         async _openLesson(lessonId, lessonTitle) {
             this._lesson = { id: lessonId, name: lessonTitle };
             this._bc(this._level?.name, this._module?.name, lessonTitle);
+            document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
             const main = document.getElementById('ac-main');
             main.innerHTML = this._loading('Loading lesson…');
             try {
@@ -801,6 +805,7 @@
 
         /* ── Quiz Engine ── */
         async _startQuiz(lessonId) {
+            document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
             const main = document.getElementById('ac-main');
             main.innerHTML = this._loading('Loading quiz…');
             this._hideMobileBar();
@@ -1053,13 +1058,20 @@
         _bc(level, mod, lesson) {
             const el = document.getElementById('ac-breadcrumb');
             const hdr = document.getElementById('header-breadcrumb');
+            const hero = document.getElementById('ac-hero');
+            const banner = document.getElementById('ac-mentor-banner');
             if (!el) return;
             if (!level) {
                 el.style.display = 'none'; el.innerHTML = '';
                 if (hdr) { hdr.classList.add('hidden'); hdr.innerHTML=''; }
+                if (hero) hero.style.display = '';
+                if (banner) banner.style.display = '';
                 document.getElementById('page-title').textContent = 'Trading Academy';
                 return;
             }
+            // Drilling into a level/module/lesson — hide hero and banner
+            if (hero) hero.style.display = 'none';
+            if (banner) banner.style.display = 'none';
             const sep = `<span class="pw-breadcrumb-sep">›</span>`;
             const crumb = `<a href="#" onclick="AcademyPage._showLevelSelector();return false;" style="color:#a78bfa;">Academy</a>`
                 + (level  ? sep+`<a href="#" onclick="AcademyPage._selectLevel(${this._level?.id||0},'${_es(level)}');return false;" style="color:#a78bfa;">${_es(level)}</a>` : '')

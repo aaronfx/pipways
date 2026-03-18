@@ -22,6 +22,7 @@ from . import blog
 from . import admin
 from . import blog_enhanced
 from . import courses_enhanced
+from . import learning
 try:
     from . import academy_seed as _academy_seed
     _HAS_ACADEMY_SEED = True
@@ -203,6 +204,7 @@ app.include_router(blog_enhanced.router,    prefix="/blog",           tags=["Blo
 app.include_router(courses_enhanced.router, prefix="/courses",        tags=["Courses Enhanced"])
 if _HAS_ACADEMY_SEED:
     app.include_router(_academy_seed.router, prefix="/courses",       tags=["Academy Seed"])
+app.include_router(learning.router,            prefix="/learning",      tags=["Learning"])
 app.include_router(ai_services.router,      prefix="/ai",             tags=["AI Services"])
 app.include_router(chart_analysis.router,   prefix="/ai/chart",       tags=["Chart Analysis"])
 app.include_router(performance.router,      prefix="/ai/performance", tags=["Performance Analytics"])

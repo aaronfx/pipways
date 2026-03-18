@@ -36,14 +36,7 @@ try:
     _HAS_ACADEMY = True
     print("[IMPORT] Learning router loaded successfully", flush=True)
 except ImportError as e:
-    try:
-        from . import academy_routes
-        LEARNING_ROUTER = academy_routes.router
-        _HAS_ACADEMY = True
-        print("[IMPORT] Using academy_routes as fallback", flush=True)
-    except ImportError as e2:
-        _HAS_ACADEMY = False
-        LEARNING_ROUTER = None
+   
         print(f"[IMPORT] WARNING: No learning module available: {e}, {e2}", flush=True)
 
 # LMS Initialization

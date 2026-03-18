@@ -646,7 +646,7 @@
                             </button>
                             <!-- Tool 4: Trading Academy -->
                             <a href="/academy" class="group text-left rounded-xl p-4 transition-all duration-200"
-                                    style="background:#0d1321;border:1px solid #1f2937;text-decoration:none;display:block;"
+                                    style="background:#0d1321;border:1px solid #1f2937;display:block;text-decoration:none;"
                                     onmouseover="this.style.borderColor='#a78bfa';this.style.background='rgba(124,58,237,.06)'"
                                     onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
                                 <div class="flex items-start justify-between mb-3">
@@ -1418,8 +1418,13 @@ const DashboardController = class {
     setupNavigation() {
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
-                e.preventDefault();
                 const section = e.currentTarget.dataset.section;
+                const href = e.currentTarget.getAttribute('href');
+                // Allow real href links (not "#") to navigate normally
+                if (!section && href && href !== '#') {
+                    return;
+                }
+                e.preventDefault();
                 if (section) {
                     console.log('[Dashboard] Navigating to section:', section);
                     this.navigate(section);
@@ -1529,7 +1534,6 @@ const DashboardController = class {
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
-
                 case 'admin': {
                     const container = document.getElementById('admin-container');
                     if (!container) break;

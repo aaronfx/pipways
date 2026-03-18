@@ -1,6 +1,6 @@
 """
 Pipways Trading Academy — Learning Router v4.1 (Production - Defensive)
-Features: Trading Coach AI, Badge System, 5-Question Quizzes, Progress Tracking
+Features: Trading Coach, Badge System, 5-Question Quizzes, Progress Tracking
 Includes: Comprehensive error handling to prevent HTTP 500 crashes
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -43,7 +43,7 @@ class LessonCompleteRequest(BaseModel):
 
 async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
     if not OPENROUTER_API_KEY:
-        return "AI Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
+        return "Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             res = await client.post(
@@ -66,7 +66,7 @@ async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
             data = res.json()
             return data["choices"][0]["message"]["content"]
     except Exception as e:
-        print(f"[TRADING COACH AI] Error: {e}", flush=True)
+        print(f"[TRADING COACH] Error: {e}", flush=True)
         return "I'm having trouble connecting right now. Please try again shortly."
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -78,10 +78,10 @@ BADGE_DEFINITIONS = {
     "technical_analyst": {"name": "Technical Analyst", "icon": "fa-chart-line", "color": "#60a5fa", "desc": "Completed Intermediate level"},
     "strategy_builder": {"name": "Strategy Builder", "icon": "fa-chess-knight", "color": "#a78bfa", "desc": "Completed Advanced level"},
     "pipways_certified": {"name": "Pipways Certified", "icon": "fa-certificate", "color": "#f59e0b", "desc": "Completed entire Academy curriculum"},
-    "quiz_master": {"name": "Quiz Master", "icon": "fa-brain", "color": "#f472b6", "desc": "Passed 10 quizzes with 80%+"},
-    "perfect_score": {"name": "Perfect Score", "icon": "fa-star", "color": "#fbbf24", "desc": "Scored 100% on any quiz"},
+    "quiz_master": {"name": "Quiz Master", "icon": "fa-cogs", "color": "#f472b6", "desc": "Passed 10 quizzes with 80%+"},
+    "perfect_score": {"name": "Perfect Score", "icon": "fa-medal", "color": "#fbbf24", "desc": "Scored 100% on any quiz"},
     "risk_manager": {"name": "Risk Manager", "icon": "fa-shield-alt", "color": "#22d3ee", "desc": "Mastered Risk Management modules"},
-    "psychology_pro": {"name": "Psychology Pro", "icon": "fa-brain", "color": "#e879f9", "desc": "Completed Trading Psychology module"},
+    "psychology_pro": {"name": "Psychology Pro", "icon": "fa-cogs", "color": "#e879f9", "desc": "Completed Trading Psychology module"},
 }
 
 async def _award_badge(user_id: int, badge_type: str) -> bool:
@@ -107,7 +107,6 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
     newly_awarded = []
     
     try:
-        # Level completion badges
         level_counts = await database.fetch_all(
             """SELECT m.level_id, COUNT(*) as cnt 
                FROM user_learning_progress p
@@ -147,7 +146,6 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
                 if await _award_badge(user_id, "pipways_certified"):
                     newly_awarded.append("pipways_certified")
         
-        # Quiz badges
         if quiz_score is not None:
             if quiz_score == 100:
                 if await _award_badge(user_id, "perfect_score"):
@@ -164,7 +162,6 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
             except Exception as e:
                 print(f"[BADGE CHECK ERROR] Quiz master check failed: {e}", flush=True)
         
-        # Topic badges
         if lesson_id:
             try:
                 lesson = await database.fetch_one(
@@ -189,7 +186,7 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
     return newly_awarded
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# READ ENDPOINTS — All wrapped with try/except for safety
+# READ ENDPOINTS 
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/levels")
@@ -201,14 +198,14 @@ async def get_levels(current_user=Depends(get_current_user)):
         return [dict(r) for r in (rows or [])]
     except Exception as e:
         print(f"[API ERROR] get_levels: {e}", flush=True)
-        return []  # Return empty array instead of crashing
+        return []
 
 @router.get("/modules/{level_id}")
 async def get_modules(level_id: int, current_user=Depends(get_current_user)):
     try:
         level = await database.fetch_one("SELECT id FROM learning_levels WHERE id=:lid", {"lid": level_id})
         if not level:
-            return []  # Return empty rather than 404
+            return []
         
         modules = await database.fetch_all(
             """SELECT id, title, description, order_index 
@@ -323,7 +320,6 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
         
         user_id = current_user.get("id") if current_user else 0
         
-        # Get adjacent lessons
         adj = await database.fetch_all(
             """SELECT l.id, l.title, l.order_index,
                       EXISTS(SELECT 1 FROM user_learning_progress p 
@@ -366,7 +362,7 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
             raise HTTPException(404, "Lesson not found")
         
         questions = await database.fetch_all(
-            """SELECT id, question, option_a, option_b, option_c, option_d
+            """SELECT id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, topic_slug
                FROM lesson_quizzes 
                WHERE lesson_id=:lid ORDER BY id""",
             {"lid": lesson_id}
@@ -390,7 +386,6 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
         is_admin = current_user.get("is_admin") if current_user else False
         
         if caller != user_id and not is_admin:
-            # Return empty progress for unauthorized rather than 403
             return {
                 "user_id": user_id,
                 "total_lessons": 0,
@@ -459,7 +454,6 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
         }
     except Exception as e:
         print(f"[API ERROR] get_progress: {e}", flush=True)
-        # Return safe default on any error
         return {
             "user_id": user_id,
             "total_lessons": 0,
@@ -495,12 +489,9 @@ async def get_profile(user_id: int, current_user=Depends(get_current_user)):
             }
         
         def parse_json(val):
-            if not val:
-                return []
-            try:
-                return json.loads(val) if isinstance(val, str) else val
-            except:
-                return []
+            if not val: return []
+            try: return json.loads(val) if isinstance(val, str) else val
+            except: return []
         
         return {
             "user_id": user_id,
@@ -570,7 +561,7 @@ async def check_badges(current_user=Depends(get_current_user)):
         return {"newly_awarded": [], "count": 0}
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# WRITE ENDPOINTS — Wrapped for safety
+# WRITE ENDPOINTS 
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/quiz/submit")
@@ -615,7 +606,11 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
                 await database.execute(
                     """INSERT INTO user_quiz_results 
                        (user_id, lesson_id, question_id, selected_answer, is_correct, answered_at)
-                       VALUES (:uid, :lid, :qid, :ans, :ok, NOW())""",
+                       VALUES (:uid, :lid, :qid, :ans, :ok, NOW())
+                       ON CONFLICT (user_id, question_id) DO UPDATE SET
+                       selected_answer = EXCLUDED.selected_answer,
+                       is_correct = EXCLUDED.is_correct,
+                       answered_at = NOW()""",
                     {"uid": user_id, "lid": payload.lesson_id, "qid": q_id, "ans": selected, "ok": is_correct}
                 )
                 
@@ -703,7 +698,7 @@ async def mark_first_visit_complete(current_user=Depends(get_current_user)):
         raise HTTPException(500, "Failed to update profile")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI TRADING COACH ENDPOINTS — Wrapped for safety
+# AI TRADING COACH ENDPOINTS 
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/mentor/guide/{user_id}")
@@ -713,7 +708,6 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
         is_admin = current_user.get("is_admin") if current_user else False
         
         if caller != user_id and not is_admin:
-            # Return generic fallback for unauthorized
             return {
                 "type": "welcome",
                 "message": "Welcome to Pipways Trading Academy! Start your journey with the Beginner level.",
@@ -766,7 +760,6 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
                 "weak_topics": [],
             }
         
-        # Trading Coach recommendation mode
         ctx = (
             f"Completed lessons ({len(done)}): {', '.join(done[-5:]) if done else 'none yet'}. "
             f"Weak topics: {', '.join(weak) if weak else 'none'}. "
@@ -780,7 +773,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
             "Be warm, professional, and end with 'Continue Learning' energy."
         )
         
-        message = await _ai(system, f"Student progress:\n{ctx}")
+        message = await _ai(system, f"Copier progress:\n{ctx}")
         
         return {
             "type": "recommendation",
@@ -793,7 +786,6 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
     except Exception as e:
         print(f"[API ERROR] mentor_guide: {e}", flush=True)
         traceback.print_exc()
-        # Return safe fallback
         return {
             "type": "welcome",
             "message": "Continue learning the Beginner modules to unlock personalized recommendations.",
@@ -1044,7 +1036,6 @@ async def _update_learning_profile(user_id: int, wrong_slugs: list, correct_slug
         print(f"[HELPER ERROR] _update_learning_profile: {e}", flush=True)
 
 async def _quiz_feedback(score: float, passed: bool, lesson_title: str, wrong_slugs: list, level: str) -> str:
-    """Generate contextual AI feedback for quiz results"""
     try:
         if score == 100:
             return f"Perfect mastery! You've demonstrated complete understanding of {lesson_title}. Ready for the next challenge?"
@@ -1054,7 +1045,6 @@ async def _quiz_feedback(score: float, passed: bool, lesson_title: str, wrong_sl
                 return f"Strong performance on {lesson_title}! Just polish your understanding of {areas}, then continue forward."
             return f"Great work passing {lesson_title}! Your trading knowledge is building steadily. Proceed to the next lesson with confidence."
         else:
-            # Failed - provide targeted encouragement
             focus = ", ".join(wrong_slugs[:3]) if wrong_slugs else "the core concepts"
             advice = {
                 "beginner": "Every professional trader started here. Take time to review",

@@ -231,7 +231,7 @@
             <a href="#" data-section="courses" class="nav-link">
                 <i class="fas fa-graduation-cap nav-icon" style="color:#a78bfa;"></i><span>Courses</span>
             </a>
-            <a href="#" data-section="academy" class="nav-link">
+            <a href="/academy" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#34d399;"></i><span>Trading Academy</span>
             </a>
             <a href="#" data-section="webinars" class="nav-link">
@@ -379,7 +379,7 @@
                         <span id="dash-market-dot" class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
                         <span id="dash-market-text" class="text-xs text-gray-500">Markets Open</span>
                         <span class="text-gray-700 mx-1">·</span>
-                        <a href="#" onclick="dashboard.navigate('academy')" class="text-xs text-green-400 hover:text-green-300 transition-colors font-medium">Trading Academy →</a>
+                        <a href="/academy" class="text-xs text-green-400 hover:text-green-300 transition-colors font-medium">Trading Academy →</a>
                         <span class="text-gray-700 mx-1">·</span>
                         <a href="#" onclick="dashboard.navigate('mentor')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">Ask AI Mentor →</a>
                     </div>
@@ -645,8 +645,8 @@
                                 </div>
                             </button>
                             <!-- Tool 4: Trading Academy -->
-                            <button onclick="dashboard.navigate('academy')" class="group text-left rounded-xl p-4 transition-all duration-200"
-                                    style="background:#0d1321;border:1px solid #1f2937;"
+                            <a href="/academy" class="group text-left rounded-xl p-4 transition-all duration-200"
+                                    style="background:#0d1321;border:1px solid #1f2937;text-decoration:none;display:block;"
                                     onmouseover="this.style.borderColor='#a78bfa';this.style.background='rgba(124,58,237,.06)'"
                                     onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
                                 <div class="flex items-start justify-between mb-3">
@@ -662,7 +662,7 @@
                                     <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(124,58,237,.12);color:#c4b5fd;">Quizzes</span>
                                     <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(124,58,237,.12);color:#c4b5fd;">Adaptive</span>
                                 </div>
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -786,11 +786,6 @@
                 </div>
 
             </section>
-            </section>
-
-            <!-- TRADING ACADEMY -->
-            <section id="section-academy" class="section hidden">
-                <div id="academy-container"></div>
             </section>
 
             <!-- SIGNALS -->
@@ -1486,7 +1481,6 @@ const DashboardController = class {
             'signals':   { title: 'Market Signals',     sub: 'Active trading opportunities' },
             'journal':   { title: 'Performance Analytics', sub: 'Import trades, track performance and get AI coaching' },
             'mentor':    { title: 'AI Mentor',          sub: '24/7 personal trading coach' },
-            'academy':   { title: 'Trading Academy',    sub: 'Structured AI-powered forex education' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
             'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
         };
@@ -1535,10 +1529,6 @@ const DashboardController = class {
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
-                case 'academy':
-                    if (typeof AcademyPage !== 'undefined') { await AcademyPage.render(); }
-                    else { const c = document.getElementById('academy-content'); if(c) c.innerHTML = '<div class="alert alert-error">Academy module failed to load. Please refresh.</div>'; }
-                    break;
 
                 case 'admin': {
                     const container = document.getElementById('admin-container');
@@ -2852,7 +2842,6 @@ window.API = API;
     <script src="/js/modules/public_pages.js"></script>
     <script src="/js/modules/courses.js"></script>
     <script src="/js/modules/quiz.js"></script>
-    <script src="/js/modules/academy.js"></script>
 
 </body>
 </html>

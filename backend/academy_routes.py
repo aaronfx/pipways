@@ -12,7 +12,6 @@ import json
 
 router = APIRouter(prefix="/learning", tags=["learning"])
 
-# Pydantic models
 class QuizSubmission(BaseModel):
     user_id: int
     lesson_id: int
@@ -32,7 +31,6 @@ class MentorRequest(BaseModel):
     topic: str
     question: str
 
-# Dependency to ensure tables exist
 async def ensure_tables():
     await init_lms_tables()
 
@@ -58,7 +56,6 @@ async def get_levels():
     """
     rows = await database.fetch_all(query)
     
-    # Organize into hierarchical structure
     levels = {}
     for row in rows:
         level_id = row['level_id']
@@ -87,7 +84,6 @@ async def get_levels():
                 "order": row['lesson_order']
             })
     
-    # Convert to list
     return list(levels.values())
 
 @router.get("/modules/{level_id}")
@@ -110,20 +106,26 @@ async def get_lessons(module_id: int):
     """
     return await database.fetch_all(query, {"module_id": module_id})
 
-@router.get("/lesson/{lesson_id}/quizzes")
-async def get_lesson_quizzes(lesson_id: int):
-    """Get quizzes for a lesson"""
+@router.get("/quiz/{lesson_id}")
+async def get_quiz(lesson_id: int):
+    """Standardized endpoint to match frontend expectations"""
     query = """
-        SELECT * FROM lesson_quizzes 
+        SELECT id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, topic_slug
+        FROM lesson_quizzes 
         WHERE lesson_id = :lesson_id
+        ORDER BY id
     """
-    quizzes = await database.fetch_all(query, {"lesson_id": lesson_id})
-    return [dict(q) for q in quizzes]
+    questions = await database.fetch_all(query, {"lesson_id": lesson_id})
+    
+    return {
+        "lesson_id": lesson_id,
+        "question_count": len(questions) if questions else 0,
+        "questions": [dict(q) for q in (questions or [])]
+    }
 
 @router.post("/quiz/submit")
 async def submit_quiz(submission: QuizSubmission):
     """Submit a quiz answer"""
-    # Save result
     query = """
         INSERT INTO user_quiz_results 
         (user_id, lesson_id, question_id, selected_answer, is_correct)
@@ -135,7 +137,6 @@ async def submit_quiz(submission: QuizSubmission):
     """
     await database.execute(query, dict(submission))
     
-    # Check if all quizzes completed for lesson
     progress_query = """
         SELECT COUNT(*) as total,
                SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct
@@ -156,7 +157,6 @@ async def submit_quiz(submission: QuizSubmission):
 @router.get("/progress/{user_id}")
 async def get_user_progress(user_id: int):
     """Get user's learning progress"""
-    # Initialize profile if not exists
     profile_query = """
         INSERT INTO user_learning_profile (user_id, first_academy_visit)
         VALUES (:user_id, FALSE)
@@ -166,7 +166,6 @@ async def get_user_progress(user_id: int):
     """
     await database.fetch_one(profile_query, {"user_id": user_id})
     
-    # Get progress
     query = """
         SELECT 
             lls.id as lesson_id,
@@ -184,7 +183,6 @@ async def get_user_progress(user_id: int):
     """
     progress = await database.fetch_all(query, {"user_id": user_id})
     
-    # Calculate stats
     total_lessons = len(progress)
     completed_lessons = sum(1 for p in progress if p['completed'])
     completion_rate = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0
@@ -223,14 +221,13 @@ async def get_user_badges(user_id: int):
     """
     badges = await database.fetch_all(query, {"user_id": user_id})
     
-    # Define all available badges
     all_badges = [
         {"type": "first_lesson", "name": "First Steps", "description": "Complete your first lesson"},
         {"type": "first_quiz", "name": "Quiz Master", "description": "Pass your first quiz"},
         {"type": "beginner_complete", "name": "Beginner Graduate", "description": "Complete all Beginner lessons"},
         {"type": "intermediate_complete", "name": "Intermediate Graduate", "description": "Complete all Intermediate lessons"},
         {"type": "advanced_complete", "name": "Expert Trader", "description": "Complete all Advanced lessons"},
-        {"type": "perfect_quiz", "name": "Perfectionist", "description": "Get 100% on any quiz"},
+        {"type": "perfect_score", "name": "Perfectionist", "description": "Get 100% on any quiz"},
         {"type": "streak_7", "name": "Weekly Warrior", "description": "7 day learning streak"},
         {"type": "streak_30", "name": "Monthly Master", "description": "30 day learning streak"}
     ]
@@ -249,7 +246,6 @@ async def check_and_award_badges(user_id: int):
     """Check and award any new badges"""
     awarded = []
     
-    # Check first lesson badge
     first_lesson_query = """
         SELECT COUNT(*) as count FROM user_learning_progress
         WHERE user_id = :user_id AND completed = TRUE
@@ -260,7 +256,6 @@ async def check_and_award_badges(user_id: int):
         if badge:
             awarded.append(badge)
     
-    # Check beginner complete
     beginner_query = """
         SELECT COUNT(lls.id) as total,
                COUNT(ulp.lesson_id) as completed
@@ -299,7 +294,6 @@ async def award_badge(user_id: int, badge_type: str):
 @router.get("/mentor/guide/{level_id}")
 async def get_mentor_guide(level_id: int, user_id: int):
     """Get AI mentor guide for level"""
-    # Get user's weak topics from quiz results
     weak_topics_query = """
         SELECT topic_slug, COUNT(*) as error_count
         FROM user_quiz_results uqr
@@ -311,7 +305,6 @@ async def get_mentor_guide(level_id: int, user_id: int):
     """
     weak_topics = await database.fetch_all(weak_topics_query, {"user_id": user_id})
     
-    # Get level info
     level_query = "SELECT * FROM learning_levels WHERE id = :level_id"
     level = await database.fetch_one(level_query, {"level_id": level_id})
     
@@ -388,7 +381,6 @@ async def get_learning_profile(user_id: int):
     profile = await database.fetch_one(query, {"user_id": user_id})
     
     if not profile:
-        # Create profile
         insert_query = """
             INSERT INTO user_learning_profile (user_id, first_academy_visit)
             VALUES (:user_id, TRUE)

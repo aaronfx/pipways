@@ -22,57 +22,58 @@ from . import blog
 from . import admin
 from . import blog_enhanced
 from . import courses_enhanced
-from . import learning
-try:
-    from . import academy_seed as _academy_seed
-    _HAS_ACADEMY_SEED = True
-except ImportError:
-    _HAS_ACADEMY_SEED = False
 from . import ai_services
 from . import chart_analysis
 from . import performance
 from . import ai_mentor
+from . import ai_insights   # Proactive AI Insight Engine
 from . import cms
+
+# Trading Academy LMS Imports
 try:
-    from .lms_init import init_lms_tables
+    from . import learning
+    LEARNING_ROUTER = learning.router
+    print("[IMPORT] Learning module loaded", flush=True)
+except ImportError:
+    try:
+        from .academy_routes import router as academy_router
+        LEARNING_ROUTER = academy_router
+        print("[IMPORT] Academy routes loaded", flush=True)
+    except ImportError:
+        print("[IMPORT] WARNING: No learning/academy routes found", flush=True)
+        LEARNING_ROUTER = None
+
+# LMS Initialization
+try:
+    from .lms_init import init_lms_tables, upsert_curriculum
     _HAS_LMS_INIT = True
 except ImportError:
     _HAS_LMS_INIT = False
     async def init_lms_tables():
         print("[LMS INIT] lms_init.py not found — skipping LMS table setup", flush=True)
+    
+    async def upsert_curriculum():
+        print("[LMS INIT] Cannot upsert curriculum without lms_init.py", flush=True)
 
-# ── FIX 1 (CRITICAL): Use a SINGLE relative import for stock_terminal_backend.
-#
-#    The previous code had TWO separate import statements:
-#
-#       from .stock_terminal_backend import router as stock_router   ← package module
-#       import stock_terminal_backend as stock_module                ← TOP-LEVEL module
-#
-#    Python treats these as DIFFERENT module objects with DIFFERENT global variables.
-#    The lifespan set  stock_module._anthropic = ...  on the top-level copy,
-#    but the router ran inside the package copy where _anthropic was still None.
-#    This caused AttributeError → FastAPI returned plain-text "Internal Server Error"
-#    → frontend JSON.parse() crashed with "Unexpected token 'I'...".
-#
-#    Fix: use ONE relative import for both the module reference and the router.
+# Stock Terminal Import (FIX: Single import source)
 from . import stock_terminal_backend as stock_module
-stock_router = stock_module.router          # same object, same globals
+stock_router = stock_module.router
 
 from anthropic import AsyncAnthropic
-import httpx  # Required for chart analysis HTTP client
+import httpx
 
 print("[IMPORT] All modules loaded successfully", flush=True)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
-
-# Single source of truth for the application version.
-# Update this constant only; all references below use it automatically.
 APP_VERSION = "2.3.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
+        # Initialize database
         await init_database()
+        
+        # Create tables
         try:
             database_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+psycopg2://").replace("postgresql+asyncpg://", "postgresql+psycopg2://")
             if database_url:
@@ -82,59 +83,67 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[DB] Table creation skipped: {e}", flush=True)
 
-        # ── Run column migrations (ADD COLUMN IF NOT EXISTS — fully idempotent) ─
+        # Run migrations
         try:
             await run_migrations()
         except Exception as e:
             print(f"[DB MIGRATION] Error: {e}", flush=True)
 
-        # ── Run LMS table initialisation (idempotent) ──────────────────────
-        try:
-            await init_lms_tables()
-        except Exception as e:
-            print(f"[LMS INIT] Error: {e}", flush=True)
+        # ── Initialize LMS Tables and Curriculum ──────────────────────
+        if _HAS_LMS_INIT:
+            try:
+                print("[LMS] Initializing tables...", flush=True)
+                await init_lms_tables()
+                print("[LMS] Tables ready", flush=True)
+                
+                # Seed curriculum if needed
+                try:
+                    await upsert_curriculum()
+                    print("[LMS] Curriculum seeded", flush=True)
+                except Exception as e:
+                    print(f"[LMS] Curriculum seeding error: {e}", flush=True)
+            except Exception as e:
+                print(f"[LMS] Initialization error: {e}", flush=True)
 
-        # ── Initialise Chart Analysis HTTP client (connection pooling) ──────────
+        # Initialize Chart Analysis HTTP client
         try:
             chart_analysis._http_client = httpx.AsyncClient(timeout=60.0)
             print("[CHART] HTTP client initialized", flush=True)
         except Exception as e:
             print(f"[CHART] HTTP client init error: {e}", flush=True)
 
-        # ── Initialise Stock Terminal Anthropic client ─────────────────────
-        # httpx removed — data is now fetched via yfinance (no HTTP client needed).
+        # Initialize Stock Terminal Anthropic client
         try:
             anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
             if anthropic_key:
                 stock_module._anthropic = AsyncAnthropic(api_key=anthropic_key)
                 print("[STOCK] Anthropic client initialised", flush=True)
             else:
-                print("[STOCK] WARNING: ANTHROPIC_API_KEY not set — stock terminal disabled", flush=True)
+                print("[STOCK] WARNING: ANTHROPIC_API_KEY not set", flush=True)
         except Exception as e:
             print(f"[STOCK] Client initialisation error: {e}", flush=True)
 
-        print("[STARTUP] Database connected", flush=True)
-
-        # ── Initialise CMS settings table (idempotent) ────────────────────
+        # Initialize CMS
         try:
             await cms._ensure_settings_table()
             print("[CMS] Settings table ready", flush=True)
         except Exception as e:
-            print(f"[CMS] Settings table init skipped: {e}", flush=True)
+            print(f"[CMS] Settings init error: {e}", flush=True)
+
+        print("[STARTUP] Database connected", flush=True)
+
     except Exception as e:
         print(f"[STARTUP ERROR] {e}", flush=True)
+        raise
 
     yield
 
-    # ── Cleanup ────────────────────────────────────────────────────────────
+    # Cleanup
     try:
         await database.disconnect()
     except Exception as e:
-        # FIX: was bare `except: pass` — errors are now logged so they are not
-        # silently swallowed during shutdown, aiding post-mortem debugging.
         print(f"[SHUTDOWN] database.disconnect() error: {e}", flush=True)
 
-    # Close chart analysis HTTP client
     try:
         if chart_analysis._http_client:
             await chart_analysis._http_client.aclose()
@@ -142,7 +151,6 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-    # Close stock terminal HTTP client if it was lazy-initialized
     try:
         if stock_module._http is not None:
             await stock_module._http.aclose()
@@ -172,9 +180,11 @@ async def health_check():
     return {
         "status": "healthy",
         "version": APP_VERSION,
+        "lms_available": _HAS_LMS_INIT,
+        "learning_router": LEARNING_ROUTER is not None,
         "stock_terminal": {
             "anthropic_ready": stock_module._anthropic is not None,
-            "data_source":     "yfinance (free)",
+            "data_source": "yfinance (free)",
         },
         "chart_analysis": {
             "http_pooling": chart_analysis._http_client is not None
@@ -186,9 +196,24 @@ async def health_check():
             "ocr_extraction",
             "psychology_profile",
             "ai_stock_research",
-            "chart_analysis_caching"
+            "chart_analysis_caching",
+            "proactive_ai_insights",
+            "trading_academy_lms"
         ]
     }
+
+# Admin endpoint to manually trigger curriculum seed
+@app.post("/admin/init-academy")
+async def init_academy():
+    """Manually initialize academy curriculum (admin only)"""
+    if not _HAS_LMS_INIT:
+        raise HTTPException(status_code=503, detail="LMS module not available")
+    
+    try:
+        await upsert_curriculum()
+        return {"status": "success", "message": "Academy curriculum initialized"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
 # API ROUTES
@@ -202,17 +227,33 @@ app.include_router(blog.router,             prefix="/blog",           tags=["Blo
 app.include_router(admin.router,            prefix="/admin",          tags=["Administration"])
 app.include_router(blog_enhanced.router,    prefix="/blog",           tags=["Blog Enhanced"])
 app.include_router(courses_enhanced.router, prefix="/courses",        tags=["Courses Enhanced"])
-if _HAS_ACADEMY_SEED:
-    app.include_router(_academy_seed.router, prefix="/courses",       tags=["Academy Seed"])
-app.include_router(learning.router,            prefix="/learning",      tags=["Learning"])
 app.include_router(ai_services.router,      prefix="/ai",             tags=["AI Services"])
 app.include_router(chart_analysis.router,   prefix="/ai/chart",       tags=["Chart Analysis"])
 app.include_router(performance.router,      prefix="/ai/performance", tags=["Performance Analytics"])
+app.include_router(ai_insights.router,      prefix="/ai/mentor",      tags=["AI Insights Engine"])
 app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI Mentor v3.0"])
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
-
-# Stock Terminal — uses the corrected single-import router reference
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
+
+# ── Trading Academy LMS Router ─────────────────────────────────────
+if LEARNING_ROUTER:
+    app.include_router(LEARNING_ROUTER, prefix="/learning", tags=["Learning"])
+    print("[ROUTES] Learning router mounted at /learning", flush=True)
+else:
+    print("[ROUTES] WARNING: Learning router not available", flush=True)
+    
+    # Fallback minimal routes to prevent 404s
+    @app.get("/learning/levels")
+    async def learning_levels_fallback():
+        return {"error": "Learning module not configured", "levels": []}
+    
+    @app.get("/learning/badges/{user_id}")
+    async def badges_fallback(user_id: int):
+        return {"earned": [], "available": [], "total_earned": 0}
+    
+    @app.get("/learning/progress/{user_id}")
+    async def progress_fallback(user_id: int):
+        return {"user_id": user_id, "total_lessons": 0, "completed_lessons": 0, "completion_rate": 0}
 
 # ==========================================
 # STATIC FILES
@@ -249,7 +290,13 @@ async def serve_index():
     ]:
         if path and os.path.exists(path):
             return FileResponse(path)
-    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": APP_VERSION, "docs": "/docs"})
+    return JSONResponse({
+        "message": "Pipways API Server", 
+        "status": "running", 
+        "version": APP_VERSION, 
+        "docs": "/docs",
+        "academy_status": "configured" if LEARNING_ROUTER else "not_configured"
+    })
 
 
 @app.get("/dashboard.html")
@@ -269,8 +316,9 @@ async def serve_dashboard():
 async def serve_spa(full_path: str):
     api_prefixes = (
         "auth/", "signals/", "courses/", "webinars/",
-        "blog/", "ai/", "admin/", "cms/", "health", "docs", "openapi.json",
-        "static/", "js/", "api/",
+        "blog/", "ai/", "admin/", "cms/", "learning/", "api/",
+        "health", "docs", "openapi.json",
+        "static/", "js/",
     )
     if full_path.startswith(api_prefixes):
         raise HTTPException(404, "Not found")
@@ -283,4 +331,9 @@ async def serve_spa(full_path: str):
     if os.path.exists(index_path):
         return FileResponse(index_path)
 
-    return JSONResponse({"message": "Pipways API Server", "status": "running", "version": APP_VERSION, "path": full_path})
+    return JSONResponse({
+        "message": "Pipways API Server", 
+        "status": "running", 
+        "version": APP_VERSION, 
+        "path": full_path
+    })

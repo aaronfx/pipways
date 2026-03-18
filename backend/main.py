@@ -29,17 +29,22 @@ from . import ai_mentor
 from . import ai_insights   
 from . import cms
 
-# Trading Academy LMS Imports (MERGED ROUTERS)
+# Trading Academy LMS Imports - CORRECTED: Only ONE router ever mounted
 try:
     from . import learning
-    from . import academy_routes
-    LEARNING_ROUTER_MAIN = learning.router
-    LEARNING_ROUTER_FALLBACK = academy_routes.router
+    LEARNING_ROUTER = learning.router
     _HAS_ACADEMY = True
-    print("[IMPORT] Both Learning and Academy routes loaded successfully", flush=True)
+    print("[IMPORT] Learning router loaded successfully", flush=True)
 except ImportError as e:
-    _HAS_ACADEMY = False
-    print(f"[IMPORT] WARNING: Missing learning route files: {e}", flush=True)
+    try:
+        from . import academy_routes
+        LEARNING_ROUTER = academy_routes.router
+        _HAS_ACADEMY = True
+        print("[IMPORT] Using academy_routes as fallback", flush=True)
+    except ImportError as e2:
+        _HAS_ACADEMY = False
+        LEARNING_ROUTER = None
+        print(f"[IMPORT] WARNING: No learning module available: {e}, {e2}", flush=True)
 
 # LMS Initialization
 try:
@@ -216,13 +221,14 @@ app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI 
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
 
-if _HAS_ACADEMY:
-    app.include_router(LEARNING_ROUTER_MAIN, prefix="/learning", tags=["Learning"])
-    app.include_router(LEARNING_ROUTER_FALLBACK, prefix="/learning", tags=["Learning Fallback"])
-    print("[ROUTES] Learning and Academy routers mounted at /learning", flush=True)
+# CORRECTED: Mount ONLY ONE learning router - never both
+if _HAS_ACADEMY and LEARNING_ROUTER:
+    app.include_router(LEARNING_ROUTER, prefix="/learning", tags=["Learning"])
+    print("[ROUTES] Learning router mounted at /learning", flush=True)
 else:
-    print("[ROUTES] WARNING: Learning routers not available", flush=True)
+    print("[ROUTES] WARNING: Learning router not available - using fallback routes", flush=True)
     
+    # Manual fallback routes when no LMS module exists
     @app.get("/learning/levels")
     async def learning_levels_fallback():
         return {"error": "Learning module not configured", "levels": []}

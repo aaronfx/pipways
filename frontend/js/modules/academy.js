@@ -1,1326 +1,1106 @@
-/**
- * Pipways Trading Academy Frontend Module v4.0 (Production)
- * Fixes: HTML rendering, TradingView widgets, SVG diagrams, 5-question quizzes, mobile nav
- */
+"""
+Pipways Trading Academy — Learning Router v4.1 (Production - Defensive)
+Features: Trading Coach AI, Badge System, 5-Question Quizzes, Progress Tracking
+Includes: Comprehensive error handling to prevent HTTP 500 crashes
+"""
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+import json
+import os
+import httpx
+import traceback
 
-/* ── LMS API Extension ──────────────────────────────────────────────────── */
-(function extendAPI() {
-    const A = window.API;
-    if (!A || A._academyReady) return;
-    A._academyReady = true;
-    
-    A.lms = {
-        getLevels:          ()     => A.request('/learning/levels'),
-        getModules:         (lid)  => A.request(`/learning/modules/${lid}`),
-        getLessons:         (mid)  => A.request(`/learning/lessons/${mid}`),
-        getLesson:          (lid)  => A.request(`/learning/lesson/${lid}`),
-        getQuiz:            (lid)  => A.request(`/learning/quiz/${lid}`),
-        getProgress:        (uid)  => A.request(`/learning/progress/${uid}`),
-        getBadges:          (uid)  => A.request(`/learning/badges/${uid}`),
-        checkBadges:        ()     => A.request('/learning/badges/check', { method: 'POST' }),
-        getMentorGuide:     (uid)  => A.request(`/learning/mentor/guide/${uid}`),
-        getMentorTeach:     (lid)  => A.request(`/learning/mentor/teach?lesson_id=${lid}`, { method: 'POST' }),
-        getMentorPractice:  (lid)  => A.request(`/learning/mentor/practice?lesson_id=${lid}`, { method: 'POST' }),
-        getChartPractice:   (lid)  => A.request(`/learning/mentor/chart-practice?lesson_id=${lid}`, { method: 'POST' }),
-        markFirstVisit:     ()     => A.request('/learning/profile/first-visit-complete', { method: 'POST' }),
-        submitQuiz:         (lid, answers) => A.request('/learning/quiz/submit', { 
-            method: 'POST', 
-            body: JSON.stringify({ lesson_id: lid, answers }) 
-        }),
-        completeLesson:     (lid, score) => A.request('/learning/lesson/complete', { 
-            method: 'POST', 
-            body: JSON.stringify({ lesson_id: lid, quiz_score: score || 0 }) 
-        }),
-    };
-})();
+from .security import get_current_user
+from .database import database
 
-/* ── Marked.js Loader ───────────────────────────────────────────────────── */
-(function loadMarked() {
-    if (window.marked) return;
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
-    script.async = true;
-    document.head.appendChild(script);
-})();
+router = APIRouter()
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   ACADEMY PAGE CONTROLLER
-═══════════════════════════════════════════════════════════════════════════ */
-const AcademyPage = {
-    _level: null,
-    _module: null,
-    _lesson: null,
-    _quiz: null,
-    _uid: null,
-    _firstVisit: false,
-    _badges: [],
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-    async render() {
-        const u = this._getUser();
-        this._uid = u?.id ?? null;
-        const wrap = document.getElementById('academy-container');
-        if (!wrap) return;
-        
-        wrap.innerHTML = `
-            <div id="ac-breadcrumb" class="pw-breadcrumb mb-4" style="display:none;"></div>
-            <div id="ac-mentor-banner"></div>
-            <div id="ac-badge-toast" class="ac-badge-container"></div>
-            <div id="ac-main"></div>
-            <div id="ac-mobile-nav" class="ac-mobile-nav hidden md:hidden"></div>
-        `;
-        
-        if (this._uid) {
-            await this._loadBadges();
-            try {
-                const check = await API.lms.checkBadges();
-                if (check.newly_awarded?.length) {
-                    await this._showNewBadges(check.newly_awarded);
+# ═══════════════════════════════════════════════════════════════════════════════
+# PYDANTIC MODELS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class QuizAnswer(BaseModel):
+    question_id: int
+    selected_answer: str
+
+class QuizSubmission(BaseModel):
+    lesson_id: int
+    answers: List[QuizAnswer]
+
+class LessonCompleteRequest(BaseModel):
+    lesson_id: int
+    quiz_score: float = 0.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LLM HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
+    if not OPENROUTER_API_KEY:
+        return "AI Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways Trading Academy",
+                },
+                json={
+                    "model": OPENROUTER_MODEL,
+                    "max_tokens": max_tokens,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user_msg},
+                    ],
                 }
-            } catch(e) { console.error('Badge check failed:', e); }
-        }
-        
-        await this._showLevelSelector();
-    },
+            )
+            data = res.json()
+            return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"[TRADING COACH AI] Error: {e}", flush=True)
+        return "I'm having trouble connecting right now. Please try again shortly."
 
-    /* ── Level Selector ─────────────────────────────────────────────────── */
-    async _showLevelSelector() {
-        this._level = this._module = this._lesson = null;
-        this._bc(null, null, null);
-        this._hideMobileNav();
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Loading curriculum...');
-        
-        try {
-            const [levels, prog, guide] = await Promise.all([
-                API.lms.getLevels(),
-                this._uid ? API.lms.getProgress(this._uid).catch(() => null) : null,
-                this._uid ? API.lms.getMentorGuide(this._uid).catch(() => null) : null,
-            ]);
-            
-            if (guide?.first_visit !== undefined) {
-                this._firstVisit = guide.first_visit;
-            }
-            
-            const sm = {};
-            (prog?.summary || []).forEach(s => sm[s.level_id] = s);
-            
-            if (this._uid) this._loadMentorBanner(guide);
-            
-            const cfg = [
-                { icon: 'fa-seedling', color: '#34d399', bg: 'rgba(52,211,153,.15)' },
-                { icon: 'fa-chart-line', color: '#60a5fa', bg: 'rgba(96,165,250,.15)' },
-                { icon: 'fa-trophy', color: '#f59e0b', bg: 'rgba(245,158,11,.15)' },
-            ];
-            
-            if (!levels || !levels.length) {
-                main.innerHTML = this._emptyState('Academy not set up yet', 
-                    'The learning curriculum is being initialized. Please refresh in a moment.');
-                return;
-            }
-            
-            main.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 ac-level-grid">
-                ${levels.map((lv, i) => {
-                    const c = cfg[i % 3];
-                    const s = sm[lv.id];
-                    const pct = s ? s.percent : 0;
-                    const done = s ? s.completed : 0;
-                    const tot = s ? s.total : 0;
-                    const isComplete = pct >= 100;
-                    
-                    return `
-                    <div class="pw-card cursor-pointer ac-level-card ${isComplete ? 'ac-level-complete' : ''}" 
-                         onclick="AcademyPage._selectLevel(${lv.id}, '${_es(lv.name)}')"
-                         style="border-top:3px solid ${c.color}; position:relative;">
-                        <div class="pw-card-body" style="padding:1.5rem;">
-                            ${isComplete ? `<div class="ac-complete-badge"><i class="fas fa-check-circle"></i></div>` : ''}
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" 
-                                 style="background:${c.bg};">
-                                <i class="fas ${c.icon}" style="color:${c.color};"></i>
-                            </div>
-                            <div class="text-xs font-bold mb-1" style="color:${c.color}; letter-spacing:.06em;">
-                                ${_es(lv.name).toUpperCase()}
-                            </div>
-                            <h3 class="text-white font-bold text-base mb-1">${_es(lv.name)}</h3>
-                            <p class="text-gray-500 text-xs leading-relaxed mb-4">${_es(lv.description)}</p>
-                            
-                            <div class="flex justify-between text-xs text-gray-500 mb-1.5">
-                                <span>Progress</span>
-                                <span class="font-semibold" style="color:${c.color};">${pct}%</span>
-                            </div>
-                            <div class="pw-progress-bar">
-                                <div class="pw-progress-fill" style="width:${pct}%; background:${c.color};"></div>
-                            </div>
-                            <div class="text-xs text-gray-600 mt-2">${done} of ${tot} lessons done</div>
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>`;
-        } catch (e) {
-            main.innerHTML = this._error('Could not load Academy', e.message);
-        }
-    },
+# ═══════════════════════════════════════════════════════════════════════════════
+# BADGE SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    /* ── Module List ────────────────────────────────────────────────────── */
-    async _selectLevel(levelId, levelName) {
-        this._level = { id: levelId, name: levelName };
-        this._module = null;
-        this._bc(levelName, null, null);
-        this._hideMobileNav();
-        
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Loading modules...');
-        
-        try {
-            const modules = await API.lms.getModules(levelId);
-            
-            main.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 ac-module-grid">
-                ${modules.map(m => {
-                    const pct = m.lesson_count ? Math.round(m.completed_count / m.lesson_count * 100) : 0;
-                    const isComplete = m.is_complete;
-                    
-                    return `
-                    <div class="pw-card cursor-pointer ac-module-card ${isComplete ? 'ac-module-complete' : ''}" 
-                         onclick="AcademyPage._selectModule(${m.id}, '${_es(m.title)}')"
-                         onmouseover="this.style.borderColor='#374151'" 
-                         onmouseout="this.style.borderColor=''">
-                        <div class="pw-card-body">
-                            <div class="flex items-start justify-between mb-2">
-                                <div>
-                                    ${isComplete 
-                                        ? `<span class="badge badge-success text-xs mb-1"><i class="fas fa-check-circle mr-1"></i>Complete</span>`
-                                        : `<span class="text-xs text-gray-500 mb-1 block">${m.completed_count}/${m.lesson_count} lessons</span>`
-                                    }
-                                    <h3 class="text-white font-semibold">${_es(m.title)}</h3>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-700 text-xs mt-1"></i>
-                            </div>
-                            <p class="text-gray-500 text-xs leading-relaxed mb-3">${_es(m.description)}</p>
-                            <div class="pw-progress-bar">
-                                <div class="pw-progress-fill ${pct >= 80 && pct < 100 ? 'near-done' : ''}" 
-                                     style="width:${pct}%;"></div>
-                            </div>
-                            ${isComplete ? `<div class="ac-module-badge"><i class="fas fa-medal"></i> Module Complete</div>` : ''}
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>`;
-        } catch (e) {
-            main.innerHTML = this._error('Could not load modules', e.message);
-        }
-    },
-
-    /* ── Lesson List ────────────────────────────────────────────────────── */
-    async _selectModule(moduleId, moduleTitle) {
-        this._module = { id: moduleId, name: moduleTitle };
-        this._lesson = null;
-        this._bc(this._level?.name, moduleTitle, null);
-        this._hideMobileNav();
-        
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Loading lessons...');
-        
-        try {
-            const lessons = await API.lms.getLessons(moduleId);
-            
-            main.innerHTML = `<div class="space-y-2 max-w-2xl ac-lesson-list">
-                ${lessons.map((l, i) => {
-                    const locked = !l.unlocked;
-                    const done = l.completed;
-                    const icon = done ? 'fa-check-circle text-green-400' : 
-                                locked ? 'fa-lock text-gray-700' : 'fa-play-circle text-purple-400';
-                    const score = done && l.quiz_score !== null
-                        ? `<span class="text-xs font-semibold" style="color:#34d399;">${l.quiz_score}%</span>` 
-                        : '';
-                    
-                    return `
-                    <div class="pw-card ${locked ? 'opacity-50' : ''} ${!locked ? 'cursor-pointer' : ''} ac-lesson-item ${done ? 'ac-lesson-done' : ''}"
-                         ${!locked ? `onclick="AcademyPage._openLesson(${l.id}, '${_es(l.title)}')"` : ''}>
-                        <div class="pw-card-body" style="padding:.85rem 1.25rem;">
-                            <div class="flex items-center gap-3">
-                                <i class="fas ${icon} text-lg flex-shrink-0" style="width:20px; text-align:center;"></i>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-white font-medium text-sm truncate">
-                                            Lesson ${i + 1}: ${_es(l.title)}
-                                        </span>
-                                        ${score}
-                                    </div>
-                                    ${locked ? `<div class="text-xs text-gray-600 mt-0.5">Complete previous lesson to unlock</div>` : ''}
-                                </div>
-                                ${!locked ? `<i class="fas fa-chevron-right text-gray-700 text-xs flex-shrink-0"></i>` : ''}
-                            </div>
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>`;
-        } catch (e) {
-            main.innerHTML = this._error('Could not load lessons', e.message);
-        }
-    },
-
-    /* ── Lesson View ────────────────────────────────────────────────────── */
-    async _openLesson(lessonId, lessonTitle) {
-        this._lesson = { id: lessonId, name: lessonTitle };
-        this._bc(this._level?.name, this._module?.name, lessonTitle);
-        
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Loading lesson...');
-        
-        try {
-            const lesson = await API.lms.getLesson(lessonId);
-            
-            // Wait for marked.js if not loaded
-            if (typeof marked === 'undefined') {
-                await new Promise(resolve => {
-                    const check = setInterval(() => {
-                        if (typeof marked !== 'undefined') {
-                            clearInterval(check);
-                            resolve();
-                        }
-                    }, 100);
-                    setTimeout(() => { clearInterval(check); resolve(); }, 2000);
-                });
-            }
-            
-            const processedContent = this._processLessonContent(lesson.content);
-            this._renderMobileNav(lesson);
-            
-            main.innerHTML = `
-                <div class="max-w-3xl ac-lesson-container">
-                    <div class="pw-card mb-4">
-                        <div class="pw-card-hdr ac-lesson-header">
-                            <div>
-                                <div class="text-xs text-gray-500 mb-0.5">
-                                    ${_es(lesson.module_title)} · ${_es(lesson.level_name)}
-                                </div>
-                                <h2 class="card-title ac-lesson-title">${_es(lesson.title)}</h2>
-                            </div>
-                        </div>
-                        <div class="pw-card-body">
-                            <div class="ac-lesson-text">${processedContent}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex flex-wrap gap-2 mb-4 ac-action-buttons">
-                        <button class="btn btn-primary" onclick="AcademyPage._startQuiz(${lessonId})">
-                            <i class="fas fa-pencil-alt mr-2"></i>Take Quiz
-                        </button>
-                        <button id="ac-explain-btn" class="btn" style="background:#1f2937; border:1px solid #374151; color:#e5e7eb;"
-                                onclick="AcademyPage._showExplanation(${lessonId})">
-                            <i class="fas fa-chalkboard-teacher mr-2" style="color:#a78bfa;"></i>Trading Coach
-                        </button>
-                        <button id="ac-practice-btn" class="btn" style="background:#1f2937; border:1px solid #374151; color:#e5e7eb;"
-                                onclick="AcademyPage._showPractice(${lessonId})">
-                            <i class="fas fa-dumbbell mr-2" style="color:#fbbf24;"></i>Practice
-                        </button>
-                        <button id="ac-chart-btn" class="btn" style="background:#1f2937; border:1px solid #374151; color:#e5e7eb;"
-                                onclick="AcademyPage._showChartPractice(${lessonId})">
-                            <i class="fas fa-chart-bar mr-2" style="color:#60a5fa;"></i>Chart Exercise
-                        </button>
-                    </div>
-                    
-                    <!-- Desktop Navigation -->
-                    <div class="hidden md:flex justify-between items-center py-4 border-t border-gray-800">
-                        ${lesson.prev_lesson 
-                            ? `<button onclick="AcademyPage._openLesson(${lesson.prev_lesson.id}, '${_es(lesson.prev_lesson.title)}')" 
-                                       class="text-gray-400 hover:text-white text-sm flex items-center gap-2">
-                                 <i class="fas fa-arrow-left"></i> Previous: ${_es(lesson.prev_lesson.title)}
-                               </button>`
-                            : `<span></span>`
-                        }
-                        ${lesson.next_lesson
-                            ? `<button onclick="AcademyPage._openLesson(${lesson.next_lesson.id}, '${_es(lesson.next_lesson.title)}')" 
-                                       class="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-2">
-                                 Next: ${_es(lesson.next_lesson.title)} <i class="fas fa-arrow-right"></i>
-                               </button>`
-                            : `<span></span>`
-                        }
-                    </div>
-                    
-                    <div id="ac-ai-panel"></div>
-                </div>
-            `;
-            
-            // Initialize TradingView widgets after DOM insertion
-            setTimeout(() => this.initTradingViewWidgets(), 100);
-            
-        } catch (e) {
-            main.innerHTML = this._error('Could not load lesson', e.message);
-        }
-    },
-
-    /* ── Content Processing ─────────────────────────────────────────────── */
-    _processLessonContent(content) {
-        if (!content) return '';
-        
-        // Use marked.js if available, otherwise fallback
-        const parseMarkdown = (typeof marked !== 'undefined' && marked.parse) 
-            ? (text) => marked.parse(text, { breaks: true, gfm: true })
-            : (text) => {
-                // Fallback markdown parser
-                return text
-                    .replace(/^## (.*$)/gim, '<h3 class="ac-h3">$1</h3>')
-                    .replace(/^### (.*$)/gim, '<h4 class="ac-h4">$1</h4>')
-                    .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-                    .replace(/`([^`]+)`/gim, '<code class="ac-inline-code">$1</code>')
-                    .replace(/^- (.*$)/gim, '<li class="ac-li">$1</li>')
-                    .replace(/(<li[^>]*>[\s\S]*?<\/li>)/gim, '<ul class="ac-ul">$1</ul>')
-                    .replace(/\n\n/gim, '</p><p class="ac-p">')
-                    .replace(/\n/gim, '<br>');
-            };
-        
-        // Parse markdown - this preserves HTML tags in the content
-        let html = parseMarkdown(content);
-        
-        // Fix SVG marker order (ensure defs come first in any SVG)
-        html = html.replace(/<svg([^>]*)>([\s\S]*?)<\/svg>/g, (match, attrs, inner) => {
-            const defsMatch = inner.match(/<defs>[\s\S]*?<\/defs>/);
-            const defs = defsMatch ? defsMatch[0] : '';
-            const withoutDefs = inner.replace(/<defs>[\s\S]*?<\/defs>/, '');
-            return `<svg${attrs}>${defs}${withoutDefs}</svg>`;
-        });
-        
-        return html;
-    },
-
-    /* ── TradingView Widget Initialization ──────────────────────────────── */
-    initTradingViewWidgets() {
-        const widgets = document.querySelectorAll('.ac-tradingview-widget');
-        
-        widgets.forEach(el => {
-            const symbol = el.dataset.symbol || 'FX:EURUSD';
-            const id = el.id || 'tv-widget-' + Math.random().toString(36).substr(2, 9);
-            el.id = id;
-            
-            // Ensure container has height
-            el.style.height = '400px';
-            el.style.minHeight = '400px';
-            
-            if (window.TradingView) {
-                try {
-                    new TradingView.widget({
-                        container_id: id,
-                        symbol: symbol,
-                        interval: "60",
-                        timezone: "Etc/UTC",
-                        theme: "dark",
-                        style: "1",
-                        locale: "en",
-                        toolbar_bg: "#f1f3f6",
-                        enable_publishing: false,
-                        hide_top_toolbar: false,
-                        hide_legend: false,
-                        save_image: false,
-                        studies: [
-                            "MACD@tv-basicstudies",
-                            "MASimple@tv-basicstudies", 
-                            "RSI@tv-basicstudies"
-                        ],
-                        show_popup_button: true,
-                        popup_width: "1000",
-                        popup_height: "650",
-                        height: 400,
-                        width: "100%"
-                    });
-                } catch (err) {
-                    console.error('TradingView widget error:', err);
-                    el.innerHTML = '<div class="p-4 text-gray-500 text-sm">Chart loading failed. Please refresh.</div>';
-                }
-            } else {
-                // Load TradingView script if not present
-                el.innerHTML = '<div class="p-4 text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading chart...</div>';
-                
-                if (!window._tradingViewLoading) {
-                    window._tradingViewLoading = true;
-                    const script = document.createElement('script');
-                    script.src = "https://s3.tradingview.com/tv.js";
-                    script.onload = () => {
-                        window._tradingViewLoading = false;
-                        this.initTradingViewWidgets();
-                    };
-                    script.onerror = () => {
-                        el.innerHTML = '<div class="p-4 text-gray-500 text-sm">Failed to load chart library.</div>';
-                    };
-                    document.head.appendChild(script);
-                }
-            }
-        });
-    },
-
-    /* ── Mobile Navigation ─────────────────────────────────────────────── */
-    _renderMobileNav(lesson) {
-        const nav = document.getElementById('ac-mobile-nav');
-        if (!nav) return;
-        
-        nav.classList.remove('hidden');
-        nav.innerHTML = `
-            <div class="ac-mobile-nav-inner">
-                <button class="ac-nav-btn ${!lesson.prev_lesson ? 'disabled' : ''}" 
-                    onclick="${lesson.prev_lesson ? `AcademyPage._openLesson(${lesson.prev_lesson.id}, '${_es(lesson.prev_lesson.title)}')` : ''}">
-                    <i class="fas fa-arrow-left"></i> Prev
-                </button>
-                <button class="ac-nav-btn ac-nav-back" 
-                    onclick="AcademyPage._selectModule(${this._module?.id}, '${_es(this._module?.name || '')}')">
-                    <i class="fas fa-th-large"></i> Module
-                </button>
-                <button class="ac-nav-btn ${!lesson.next_lesson ? 'disabled' : ''}" 
-                    onclick="${lesson.next_lesson ? `AcademyPage._openLesson(${lesson.next_lesson.id}, '${_es(lesson.next_lesson.title)}')` : ''}">
-                    Next <i class="fas fa-arrow-right"></i>
-                </button>
-            </div>
-        `;
-    },
-
-    _hideMobileNav() {
-        const nav = document.getElementById('ac-mobile-nav');
-        if (nav) nav.classList.add('hidden');
-    },
-
-    /* ── Quiz Engine (5 Questions) ──────────────────────────────────────── */
-    async _startQuiz(lessonId) {
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Loading quiz...');
-        this._hideMobileNav();
-        
-        try {
-            const data = await API.lms.getQuiz(lessonId);
-            if (!data.questions || data.questions.length === 0) {
-                main.innerHTML = `
-                    <div class="alert" style="background:rgba(96,165,250,.1); border:1px solid rgba(96,165,250,.3); color:#60a5fa; padding:1rem; border-radius:.5rem;">
-                        <i class="fas fa-info-circle mr-2"></i>No quiz questions available for this lesson.
-                    </div>`;
-                return;
-            }
-            
-            this._quiz = {
-                lessonId,
-                questions: data.questions,
-                index: 0,
-                answers: [],
-                selected: null
-            };
-            
-            this._renderQ();
-        } catch (e) {
-            main.innerHTML = this._error('Could not load quiz', e.message);
-        }
-    },
-
-    _renderQ() {
-        const { questions, index } = this._quiz;
-        const q = questions[index];
-        const total = questions.length;
-        const progress = Math.round((index / total) * 100);
-        
-        const main = document.getElementById('ac-main');
-        main.innerHTML = `
-            <div class="max-w-xl ac-quiz-container">
-                <div class="flex items-center justify-between mb-2 text-xs text-gray-500">
-                    <span class="font-semibold">Question ${index + 1} of ${total}</span>
-                    <span>${_es(this._lesson?.name || 'Quiz')}</span>
-                </div>
-                <div class="pw-progress-bar mb-5">
-                    <div class="pw-progress-fill" style="width:${progress}%;"></div>
-                </div>
-                
-                <div class="pw-card mb-4">
-                    <div class="pw-card-body">
-                        <p class="text-white font-semibold text-base leading-relaxed mb-5">${_es(q.question)}</p>
-                        
-                        <div class="space-y-2.5" id="ac-quiz-opts">
-                            ${['A', 'B', 'C', 'D'].map(k => {
-                                const opt = q['option_' + k.toLowerCase()];
-                                if (!opt) return '';
-                                return `
-                                    <button id="ac-opt-${k}" onclick="AcademyPage._pick('${k}')"
-                                            class="w-full text-left px-4 py-3 rounded-xl text-sm transition-all ac-quiz-opt"
-                                            style="background:#111827; border:2px solid #1f2937; color:#d1d5db;">
-                                        <strong class="text-gray-400 mr-2">${k}.</strong> ${_es(opt)}
-                                    </button>`;
-                            }).join('')}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end">
-                    <button id="ac-quiz-next" disabled class="btn btn-primary opacity-50"
-                            onclick="AcademyPage._nextQ()">
-                        ${index < total - 1 ? 'Next Question →' : 'Submit Quiz'}
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        this._quiz.selected = null;
-    },
-
-    _pick(key) {
-        this._quiz.selected = key;
-        
-        document.querySelectorAll('.ac-quiz-opt').forEach(b => {
-            b.style.borderColor = '#1f2937';
-            b.style.background = '#111827';
-            b.style.color = '#d1d5db';
-        });
-        
-        const selected = document.getElementById('ac-opt-' + key);
-        if (selected) {
-            selected.style.borderColor = '#7c3aed';
-            selected.style.background = 'rgba(124,58,237,.12)';
-            selected.style.color = '#c4b5fd';
-        }
-        
-        const nextBtn = document.getElementById('ac-quiz-next');
-        if (nextBtn) {
-            nextBtn.disabled = false;
-            nextBtn.classList.remove('opacity-50');
-        }
-    },
-
-    _nextQ() {
-        const { selected, index, questions, answers } = this._quiz;
-        if (!selected) return;
-        
-        answers.push({
-            question_id: questions[index].id,
-            selected_answer: selected
-        });
-        
-        this._quiz.answers = answers;
-        this._quiz.index = index + 1;
-        
-        if (this._quiz.index < questions.length) {
-            this._renderQ();
-        } else {
-            this._doSubmit();
-        }
-    },
-
-    async _doSubmit() {
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Grading your quiz...');
-        
-        try {
-            const result = await API.lms.submitQuiz(this._quiz.lessonId, this._quiz.answers);
-            
-            if (result.new_badges?.length) {
-                await this._showNewBadges(result.new_badges);
-            }
-            
-            this._showResults(result);
-        } catch (e) {
-            main.innerHTML = this._error('Submit failed', e.message);
-        }
-    },
-
-    _showResults(result) {
-        const main = document.getElementById('ac-main');
-        const passed = result.passed;
-        const passColor = passed ? '#34d399' : '#f87171';
-        const passMsg = passed ? '🎉 Quiz Passed!' : 'Keep studying — review the lesson and try again.';
-        
-        const breakdown = result.results.map((r, i) => `
-            <div class="flex items-start gap-3 py-3 border-b ac-result-row" style="border-color:#1f2937;">
-                <i class="fas ${r.is_correct ? 'fa-check-circle text-green-400' : 'fa-times-circle text-red-400'} mt-0.5 flex-shrink-0"></i>
-                <div class="flex-1 text-sm">
-                    <span class="text-gray-400 font-medium">Question ${i + 1}</span>
-                    ${!r.is_correct ? `
-                        <div class="text-gray-500 text-xs mt-1">
-                            Correct: <strong class="text-gray-300">${_es(r.correct_answer)}</strong> — 
-                            ${_es(r.explanation)}
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `).join('');
-        
-        main.innerHTML = `
-            <div class="max-w-xl ac-results-container">
-                <div class="pw-card mb-4 ac-result-card" style="border-top:3px solid ${passColor};">
-                    <div class="pw-card-body text-center" style="padding:2rem;">
-                        <div class="text-5xl font-black mb-2 ac-score-display" style="color:${passColor};">
-                            ${result.score}%
-                        </div>
-                        <div class="font-semibold text-white text-lg">${passMsg}</div>
-                        <div class="text-gray-500 text-sm mt-1">
-                            ${result.correct} of ${result.total} questions correct
-                        </div>
-                        ${passed ? '<div class="mt-3 text-green-400 text-sm"><i class="fas fa-check-circle mr-1"></i> Lesson Complete!</div>' : ''}
-                    </div>
-                </div>
-                
-                ${result.mentor_feedback ? `
-                <div class="pw-card mb-4 ac-feedback-card" style="border-left:3px solid #a78bfa;">
-                    <div class="pw-card-body">
-                        <div class="flex items-center gap-2 mb-2">
-                            <i class="fas fa-robot" style="color:#a78bfa;"></i>
-                            <strong class="text-white text-sm">Trading Coach Feedback</strong>
-                        </div>
-                        <p class="text-gray-300 text-sm leading-relaxed">${_es(result.mentor_feedback)}</p>
-                    </div>
-                </div>
-                ` : ''}
-                
-                <div class="pw-card mb-4">
-                    <div class="pw-card-hdr">
-                        <h3 class="card-title">Answer Breakdown</h3>
-                    </div>
-                    <div class="pw-card-body" style="padding-top:0;">
-                        ${breakdown}
-                    </div>
-                </div>
-                
-                <div class="flex gap-2 flex-wrap ac-result-actions">
-                    ${passed
-                        ? `<button class="btn btn-primary" onclick="AcademyPage._selectModule(${this._module?.id}, '${_es(this._module?.name || '')}')">
-                             <i class="fas fa-arrow-left mr-2"></i>Back to Module
-                           </button>`
-                        : `<button class="btn btn-primary" onclick="AcademyPage._startQuiz(${this._quiz.lessonId})">
-                             <i class="fas fa-redo mr-2"></i>Retry Quiz
-                           </button>`
-                    }
-                    <button class="btn" style="background:#1f2937; border:1px solid #374151; color:#e5e7eb;"
-                            onclick="AcademyPage._openLesson(${this._lesson?.id}, '${_es(this._lesson?.name || '')}')">
-                        <i class="fas fa-book-open mr-2"></i>Review Lesson
-                    </button>
-                </div>
-            </div>
-        `;
-    },
-
-    /* ── AI Coach Interactions ──────────────────────────────────────────── */
-    async _showExplanation(lessonId) {
-        this._setBtn('ac-explain-btn', true, 'Loading...');
-        const panel = document.getElementById('ac-ai-panel');
-        panel.innerHTML = this._aiLoading('Trading Coach preparing explanation...');
-        
-        try {
-            const data = await API.lms.getMentorTeach(lessonId);
-            panel.innerHTML = `
-                <div class="pw-card ac-coach-card" style="border-left:3px solid #a78bfa;">
-                    <div class="pw-card-hdr">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-chalkboard-teacher" style="color:#a78bfa;"></i>
-                            <span class="card-title" style="font-size:.95rem;">
-                                Trading Coach · ${_es(data.lesson_title)}
-                            </span>
-                            <span class="badge badge-primary text-xs">${_es(data.level)}</span>
-                        </div>
-                    </div>
-                    <div class="pw-card-body">
-                        <div class="ac-lesson-text">${data.explanation}</div>
-                    </div>
-                </div>
-            `;
-        } catch (e) {
-            panel.innerHTML = this._error('Coach unavailable', e.message);
-        }
-        
-        this._setBtn('ac-explain-btn', false, 
-            '<i class="fas fa-chalkboard-teacher mr-2" style="color:#a78bfa;"></i>Trading Coach');
-    },
-
-    async _showPractice(lessonId) {
-        this._setBtn('ac-practice-btn', true, 'Loading...');
-        const panel = document.getElementById('ac-ai-panel');
-        panel.innerHTML = this._aiLoading('Generating practice exercise...');
-        
-        try {
-            const data = await API.lms.getMentorPractice(lessonId);
-            panel.innerHTML = `
-                <div class="pw-card ac-coach-card" style="border-left:3px solid #fbbf24;">
-                    <div class="pw-card-hdr">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-dumbbell" style="color:#fbbf24;"></i>
-                            <span class="card-title" style="font-size:.95rem;">Practice Exercise</span>
-                        </div>
-                    </div>
-                    <div class="pw-card-body">
-                        <div class="ac-lesson-text">${data.exercise}</div>
-                    </div>
-                </div>
-            `;
-        } catch (e) {
-            panel.innerHTML = this._error('Practice failed', e.message);
-        }
-        
-        this._setBtn('ac-practice-btn', false,
-            '<i class="fas fa-dumbbell mr-2" style="color:#fbbf24;"></i>Practice');
-    },
-
-    async _showChartPractice(lessonId) {
-        this._setBtn('ac-chart-btn', true, 'Loading...');
-        const panel = document.getElementById('ac-ai-panel');
-        panel.innerHTML = this._aiLoading('Building chart exercise...');
-        
-        try {
-            const data = await API.lms.getChartPractice(lessonId);
-            const cp = data.chart_practice;
-            
-            const options = (cp.options || []).map((opt, i) => `
-                <button class="ac-chart-opt w-full text-left px-4 py-3 rounded-lg transition-all text-sm"
-                        id="ac-chart-opt-${i}"
-                        style="background:#111827; border:1px solid #374151; color:#e5e7eb;"
-                        onclick="AcademyPage._answerChart(${i}, '${_es(cp.correct || '')}', '${_es(cp.explanation || '')}')">
-                    ${_es(opt)}
-                </button>
-            `).join('');
-            
-            const tvWidget = cp.tv_symbol 
-                ? `<div class="ac-tradingview-widget" data-symbol="${cp.tv_symbol}" id="tv-exercise"></div>` 
-                : '';
-            
-            panel.innerHTML = `
-                <div class="pw-card ac-coach-card" style="border-left:3px solid #60a5fa;">
-                    <div class="pw-card-hdr">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-chart-bar" style="color:#60a5fa;"></i>
-                            <span class="card-title" style="font-size:.95rem;">
-                                Chart Exercise · ${_es(data.level)}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="pw-card-body">
-                        ${tvWidget}
-                        <div class="rounded-xl p-4 mb-4 text-sm text-gray-300 leading-relaxed"
-                             style="background:rgba(96,165,250,.06); border:1px solid rgba(96,165,250,.15);">
-                            <div class="text-xs font-bold mb-2" style="color:#60a5fa;">CHART SCENARIO</div>
-                            ${_es(cp.scenario || '')}
-                        </div>
-                        <p class="text-white font-semibold mb-3 text-sm">${_es(cp.question || '')}</p>
-                        <div class="space-y-2" id="ac-chart-opts">${options}</div>
-                        <div id="ac-chart-result" class="mt-4 hidden"></div>
-                    </div>
-                </div>
-            `;
-            
-            if (cp.tv_symbol) {
-                setTimeout(() => this.initTradingViewWidgets(), 100);
-            }
-        } catch (e) {
-            panel.innerHTML = this._error('Chart exercise failed', e.message);
-        }
-        
-        this._setBtn('ac-chart-btn', false,
-            '<i class="fas fa-chart-bar mr-2" style="color:#60a5fa;"></i>Chart Exercise');
-    },
-
-    _answerChart(idx, correct, explanation) {
-        document.querySelectorAll('.ac-chart-opt').forEach((btn, i) => {
-            btn.disabled = true;
-            btn.style.cursor = 'default';
-            const letter = (btn.textContent.trim().charAt(0) || '').toUpperCase();
-            
-            if (letter === correct.toUpperCase()) {
-                btn.style.background = 'rgba(16,185,129,.15)';
-                btn.style.borderColor = '#34d399';
-                btn.style.color = '#34d399';
-            } else if (i === idx) {
-                btn.style.background = 'rgba(239,68,68,.1)';
-                btn.style.borderColor = '#f87171';
-                btn.style.color = '#f87171';
-            }
-        });
-        
-        const chosen = (document.getElementById('ac-chart-opt-' + idx)?.textContent?.trim()?.charAt(0) || '').toUpperCase();
-        const passed = chosen === correct.toUpperCase();
-        
-        const result = document.getElementById('ac-chart-result');
-        result.classList.remove('hidden');
-        result.innerHTML = `
-            <div class="rounded-xl p-4 ${passed ? 'bg-green-900/20 border border-green-800/40' : 'bg-red-900/20 border border-red-800/40'}">
-                <div class="flex items-center gap-2 mb-2">
-                    <i class="fas ${passed ? 'fa-check-circle text-green-400' : 'fa-times-circle text-red-400'}"></i>
-                    <strong class="${passed ? 'text-green-400' : 'text-red-400'}">
-                        ${passed ? 'Correct!' : 'Incorrect'}
-                    </strong>
-                </div>
-                <p class="text-gray-300 text-sm">${_es(explanation)}</p>
-            </div>
-        `;
-    },
-
-    /* ── Badge System ───────────────────────────────────────────────────── */
-    async _loadBadges() {
-        if (!this._uid) return;
-        try {
-            const data = await API.lms.getBadges(this._uid);
-            this._badges = data.badges || [];
-        } catch (e) {
-            console.error('Failed to load badges:', e);
-        }
-    },
-
-    async _showNewBadges(badgeTypes) {
-        const container = document.getElementById('ac-badge-toast');
-        if (!container) return;
-        
-        const badgeDefs = {
-            "beginner_trader": { name: "Beginner Trader", icon: "fa-seedling", color: "#34d399" },
-            "technical_analyst": { name: "Technical Analyst", icon: "fa-chart-line", color: "#60a5fa" },
-            "strategy_builder": { name: "Strategy Builder", icon: "fa-chess-knight", color: "#a78bfa" },
-            "pipways_certified": { name: "Pipways Certified", icon: "fa-certificate", color: "#f59e0b" },
-            "quiz_master": { name: "Quiz Master", icon: "fa-brain", color: "#f472b6" },
-            "perfect_score": { name: "Perfect Score", icon: "fa-star", color: "#fbbf24" },
-            "risk_manager": { name: "Risk Manager", icon: "fa-shield-alt", color: "#22d3ee" },
-            "psychology_pro": { name: "Psychology Pro", icon: "fa-brain", color: "#e879f9" },
-        };
-        
-        badgeTypes.forEach((type, i) => {
-            const def = badgeDefs[type] || { name: type, icon: "fa-medal", color: "#a78bfa" };
-            const badge = document.createElement('div');
-            badge.className = 'ac-badge-toast';
-            badge.style.animationDelay = `${i * 0.2}s`;
-            badge.innerHTML = `
-                <div class="ac-badge-icon" style="background:${def.color}20; color:${def.color};">
-                    <i class="fas ${def.icon}"></i>
-                </div>
-                <div class="ac-badge-info">
-                    <div class="ac-badge-title">Badge Earned!</div>
-                    <div class="ac-badge-name" style="color:${def.color};">${def.name}</div>
-                </div>
-            `;
-            container.appendChild(badge);
-            setTimeout(() => badge.remove(), 5000);
-        });
-    },
-
-    /* ── Mentor Banner ──────────────────────────────────────────────────── */
-    async _loadMentorBanner(guideData) {
-        if (!this._uid) return;
-        const banner = document.getElementById('ac-mentor-banner');
-        if (!banner) return;
-        
-        try {
-            const g = guideData || await API.lms.getMentorGuide(this._uid);
-            
-            if (g.first_visit) {
-                banner.innerHTML = `
-                    <div class="pw-card mb-5 ac-welcome-banner" 
-                         style="border-left:3px solid #34d399; background:linear-gradient(135deg,#0f0a1f,#1a0a2e);">
-                        <div class="pw-card-body">
-                            <div class="flex items-start gap-3">
-                                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" 
-                                     style="background:rgba(52,211,153,.2);">
-                                    <i class="fas fa-graduation-cap" style="color:#34d399;"></i>
-                                </div>
-                                <div class="flex-1">
-                                    <div class="text-xs font-semibold mb-1" style="color:#34d399;">WELCOME</div>
-                                    <p class="text-gray-300 text-sm leading-relaxed">${g.message}</p>
-                                    ${g.next_lesson ? `
-                                        <button class="btn btn-primary mt-3 text-xs" 
-                                                style="font-size:.78rem; padding:.35rem .85rem;"
-                                                onclick="AcademyPage._markFirstVisitThenContinue(${g.next_lesson.id}, '${_es(g.next_lesson.title)}')">
-                                            Start Learning: ${_es(g.next_lesson.title)} →
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                banner.innerHTML = `
-                    <div class="pw-card mb-5 ac-coach-banner" 
-                         style="border-left:3px solid #a78bfa; background:linear-gradient(135deg,#0f0a1f,#1a0a2e);">
-                        <div class="pw-card-body">
-                            <div class="flex items-start gap-3">
-                                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" 
-                                     style="background:rgba(167,139,250,.2);">
-                                    <i class="fas fa-chalkboard-teacher" style="color:#a78bfa;"></i>
-                                </div>
-                                <div class="flex-1">
-                                    <div class="text-xs font-semibold mb-1" style="color:#a78bfa;">TRADING COACH</div>
-                                    <p class="text-gray-300 text-sm leading-relaxed">${_es(g.message)}</p>
-                                    ${g.next_lesson ? `
-                                        <button class="btn btn-primary mt-3 text-xs" 
-                                                style="font-size:.78rem; padding:.35rem .85rem;"
-                                                onclick="AcademyPage._openLesson(${g.next_lesson.id}, '${_es(g.next_lesson.title)}')">
-                                            Continue: ${_es(g.next_lesson.title)} →
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        } catch (e) {
-            banner.innerHTML = '';
-        }
-    },
-
-    async _markFirstVisitThenContinue(lessonId, lessonTitle) {
-        try {
-            await API.lms.markFirstVisit();
-            this._firstVisit = false;
-            this._openLesson(lessonId, lessonTitle);
-        } catch (e) {
-            this._openLesson(lessonId, lessonTitle);
-        }
-    },
-
-    /* ── Breadcrumb ─────────────────────────────────────────────────────── */
-    _bc(level, module, lesson) {
-        const el = document.getElementById('ac-breadcrumb');
-        if (!el) return;
-        
-        if (!level) {
-            el.style.display = 'none';
-            el.innerHTML = '';
-            return;
-        }
-        
-        el.style.display = 'flex';
-        const l = level ? _es(level) : '';
-        const m = module ? _es(module) : '';
-        const le = lesson ? _es(lesson) : '';
-        
-        el.innerHTML = `
-            <a href="#" onclick="AcademyPage._showLevelSelector(); return false;" class="text-purple-400">Academy</a>
-            ${level ? `<span class="pw-breadcrumb-sep">›</span>
-                       <a href="#" onclick="AcademyPage._selectLevel(${this._level?.id || 0}, '${l}'); return false;" 
-                          class="text-purple-400">${l}</a>` : ''}
-            ${module ? `<span class="pw-breadcrumb-sep">›</span>
-                        <a href="#" onclick="AcademyPage._selectModule(${this._module?.id || 0}, '${m}'); return false;" 
-                           class="text-purple-400">${m}</a>` : ''}
-            ${lesson ? `<span class="pw-breadcrumb-sep">›</span><span class="text-gray-400">${le}</span>` : ''}
-        `;
-    },
-
-    /* ── Helpers ────────────────────────────────────────────────────────── */
-    _getUser() {
-        try {
-            return JSON.parse(localStorage.getItem('pipways_user') || '{}');
-        } catch (_) {
-            return {};
-        }
-    },
-
-    _loading: m => `<div class="loading"><div class="spinner"></div><p class="text-gray-500 text-sm">${m}</p></div>`,
-    
-    _aiLoading: m => `<div class="pw-card" style="border-left:3px solid #374151;">
-                        <div class="pw-card-body loading">
-                            <div class="spinner"></div>
-                            <p class="text-gray-500 text-sm">${m}</p>
-                        </div>
-                      </div>`,
-    
-    _error: (t, d) => `<div class="alert alert-error">
-                          <i class="fas fa-exclamation-circle mr-2"></i>
-                          <strong>${_es(t)}</strong> — ${_es(d || '')}
-                       </div>`,
-    
-    _emptyState: (t, s) => `<div class="pw-empty" style="padding:4rem 1rem;">
-                              <div class="pw-empty-icon" style="width:56px; height:56px;">
-                                  <i class="fas fa-book-open" style="color:#4b5563; font-size:1.2rem;"></i>
-                              </div>
-                              <p class="pw-empty-title">${_es(t)}</p>
-                              <p class="pw-empty-sub">${_es(s)}</p>
-                              <button onclick="AcademyPage._showLevelSelector()" 
-                                      class="btn btn-primary mt-4" 
-                                      style="font-size:.8rem; padding:.45rem 1rem;">
-                                  <i class="fas fa-refresh mr-1"></i> Retry
-                              </button>
-                            </div>`,
-
-    _setBtn(id, loading, html) {
-        const b = document.getElementById(id);
-        if (!b) return;
-        b.disabled = loading;
-        b.innerHTML = loading ? '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...' : html;
-    }
-};
-
-window.AcademyPage = AcademyPage;
-
-/* ── Global Styles ───────────────────────────────────────────────────────── */
-(function injectStyles() {
-    if (document.getElementById('ac-styles')) return;
-    
-    const s = document.createElement('style');
-    s.id = 'ac-styles';
-    s.textContent = `
-        /* Base Typography */
-        .ac-lesson-text {
-            color: #d1d5db;
-            font-size: 0.95rem;
-            line-height: 1.8;
-        }
-        .ac-lesson-text h3.ac-h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: white;
-            margin: 1.5rem 0 0.75rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #1f2937;
-        }
-        .ac-lesson-text h4.ac-h4 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #e5e7eb;
-            margin: 1.25rem 0 0.5rem;
-        }
-        .ac-lesson-text p.ac-p {
-            margin: 0.75rem 0;
-        }
-        .ac-lesson-text ul.ac-ul {
-            margin: 0.5rem 0 0.5rem 1.5rem;
-            list-style-type: disc;
-        }
-        .ac-lesson-text li.ac-li {
-            margin: 0.35rem 0;
-        }
-        .ac-lesson-text strong {
-            color: #fbbf24;
-            font-weight: 600;
-        }
-        .ac-lesson-text code.ac-inline-code {
-            background: #111827;
-            border: 1px solid #374151;
-            border-radius: 0.375rem;
-            padding: 0.125rem 0.375rem;
-            font-family: monospace;
-            font-size: 0.875em;
-            color: #f472b6;
-        }
-        .ac-lesson-text pre {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            overflow-x: auto;
-            margin: 1rem 0;
-        }
-
-        /* TradingView Widgets */
-        .ac-tradingview-widget {
-            background: #0d1321;
-            border: 1px solid #1f2937;
-            border-radius: 0.75rem;
-            margin: 1.5rem 0;
-            overflow: hidden;
-            min-height: 400px;
-            width: 100%;
-        }
-
-        /* SVG Diagrams */
-        .ac-svg-diagram {
-            width: 100%;
-            max-width: 500px;
-            margin: 20px auto;
-            display: block;
-            background: #0d1321;
-            border: 1px solid #1f2937;
-            border-radius: 0.5rem;
-            padding: 1rem;
-        }
-        .ac-svg-diagram text {
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-
-        /* Mobile Navigation */
-        .ac-mobile-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #111827;
-            border-top: 1px solid #1f2937;
-            z-index: 100;
-            padding: 0.5rem;
-            backdrop-filter: blur(10px);
-        }
-        .ac-mobile-nav-inner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.5rem;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .ac-nav-btn {
-            flex: 1;
-            background: #1f2937;
-            border: 1px solid #374151;
-            color: #e5e7eb;
-            padding: 0.75rem 0.5rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        .ac-nav-btn:active {
-            transform: scale(0.95);
-        }
-        .ac-nav-btn.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        .ac-nav-btn.ac-nav-back {
-            background: rgba(124,58,237,0.15);
-            border-color: rgba(124,58,237,0.3);
-            color: #a78bfa;
-        }
-
-        /* Badges */
-        .ac-badge-container {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 200;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            pointer-events: none;
-        }
-        .ac-badge-toast {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 0.75rem;
-            padding: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            animation: acBadgeSlide 0.5s ease-out;
-            pointer-events: auto;
-            min-width: 250px;
-        }
-        @keyframes acBadgeSlide {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .ac-badge-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-        .ac-badge-title {
-            font-size: 0.75rem;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .ac-badge-name {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        /* Completion States */
-        .ac-level-complete, .ac-module-complete {
-            position: relative;
-        }
-        .ac-complete-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #10b981;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            border: 2px solid #111827;
-        }
-        .ac-module-badge {
-            margin-top: 0.5rem;
-            font-size: 0.75rem;
-            color: #10b981;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        .ac-lesson-done {
-            background: rgba(16,185,129,0.05) !important;
-            border-color: rgba(16,185,129,0.2) !important;
-        }
-
-        /* Quiz */
-        .ac-quiz-opt:hover:not(:disabled) {
-            border-color: #374151 !important;
-            background: #1f2937 !important;
-        }
-        .ac-quiz-opt.selected {
-            border-color: #7c3aed !important;
-            background: rgba(124,58,237,0.12) !important;
-            color: #c4b5fd !important;
-        }
-        .ac-chart-opt:not(:disabled):hover {
-            border-color: #7c3aed !important;
-            background: rgba(124,58,237,0.08) !important;
-            color: #c4b5fd !important;
-        }
-
-        /* Mobile Responsiveness */
-        @media (max-width: 767px) {
-            .ac-level-grid, .ac-module-grid {
-                grid-template-columns: 1fr !important;
-            }
-            .ac-lesson-container, .ac-quiz-container, .ac-results-container {
-                max-width: 100% !important;
-                padding: 0 0.5rem;
-            }
-            .ac-lesson-title {
-                font-size: 1.1rem !important;
-            }
-            .ac-action-buttons {
-                flex-direction: column;
-            }
-            .ac-action-buttons button {
-                width: 100%;
-                justify-content: center;
-            }
-            .ac-svg-diagram {
-                max-width: 100%;
-                padding: 0.5rem;
-            }
-            .ac-tradingview-widget {
-                min-height: 300px;
-            }
-            .pw-card-body {
-                padding: 1rem !important;
-            }
-            #academy-container {
-                padding-bottom: 80px !important;
-            }
-            .ac-mobile-nav {
-                display: block !important;
-            }
-        }
-        @media (min-width: 768px) {
-            .ac-mobile-nav {
-                display: none !important;
-            }
-        }
-
-        /* Utilities */
-        .pw-breadcrumb-sep {
-            margin: 0 0.5rem;
-            color: #4b5563;
-        }
-    `;
-    document.head.appendChild(s);
-})();
-
-/* ── HTML Escape Helper ─────────────────────────────────────────────────── */
-function _es(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+BADGE_DEFINITIONS = {
+    "beginner_trader": {"name": "Beginner Trader", "icon": "fa-seedling", "color": "#34d399", "desc": "Completed Beginner level"},
+    "technical_analyst": {"name": "Technical Analyst", "icon": "fa-chart-line", "color": "#60a5fa", "desc": "Completed Intermediate level"},
+    "strategy_builder": {"name": "Strategy Builder", "icon": "fa-chess-knight", "color": "#a78bfa", "desc": "Completed Advanced level"},
+    "pipways_certified": {"name": "Pipways Certified", "icon": "fa-certificate", "color": "#f59e0b", "desc": "Completed entire Academy curriculum"},
+    "quiz_master": {"name": "Quiz Master", "icon": "fa-brain", "color": "#f472b6", "desc": "Passed 10 quizzes with 80%+"},
+    "perfect_score": {"name": "Perfect Score", "icon": "fa-star", "color": "#fbbf24", "desc": "Scored 100% on any quiz"},
+    "risk_manager": {"name": "Risk Manager", "icon": "fa-shield-alt", "color": "#22d3ee", "desc": "Mastered Risk Management modules"},
+    "psychology_pro": {"name": "Psychology Pro", "icon": "fa-brain", "color": "#e879f9", "desc": "Completed Trading Psychology module"},
 }
+
+async def _award_badge(user_id: int, badge_type: str) -> bool:
+    if badge_type not in BADGE_DEFINITIONS:
+        return False
+    try:
+        existing = await database.fetch_one(
+            "SELECT id FROM user_badges WHERE user_id=:uid AND badge_type=:bt",
+            {"uid": user_id, "bt": badge_type}
+        )
+        if existing:
+            return False
+        await database.execute(
+            "INSERT INTO user_badges (user_id, badge_type, earned_at) VALUES (:uid, :bt, NOW())",
+            {"uid": user_id, "bt": badge_type}
+        )
+        return True
+    except Exception as e:
+        print(f"[BADGE ERROR] Failed to award {badge_type} to user {user_id}: {e}", flush=True)
+        return False
+
+async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_score: float = None):
+    newly_awarded = []
+    
+    try:
+        # Level completion badges
+        level_counts = await database.fetch_all(
+            """SELECT m.level_id, COUNT(*) as cnt 
+               FROM user_learning_progress p
+               JOIN learning_lessons l ON l.id = p.lesson_id
+               JOIN learning_modules m ON m.id = l.module_id
+               WHERE p.user_id=:uid AND p.completed=TRUE
+               GROUP BY m.level_id""",
+            {"uid": user_id}
+        )
+        
+        level_totals = await database.fetch_all(
+            """SELECT level_id, COUNT(*) as total 
+               FROM learning_modules m
+               JOIN learning_lessons l ON l.module_id = m.id
+               GROUP BY level_id""",
+            {}
+        )
+        
+        level_map = {r["level_id"]: r["cnt"] for r in level_counts} if level_counts else {}
+        total_map = {r["level_id"]: r["total"] for r in level_totals} if level_totals else {}
+        
+        if level_map.get(1, 0) >= total_map.get(1, 999):
+            if await _award_badge(user_id, "beginner_trader"):
+                newly_awarded.append("beginner_trader")
+        
+        if level_map.get(2, 0) >= total_map.get(2, 999):
+            if await _award_badge(user_id, "technical_analyst"):
+                newly_awarded.append("technical_analyst")
+        
+        if level_map.get(3, 0) >= total_map.get(3, 999):
+            if await _award_badge(user_id, "strategy_builder"):
+                newly_awarded.append("strategy_builder")
+            
+            total_all = sum(total_map.values())
+            done_all = sum(level_map.values())
+            if done_all >= total_all:
+                if await _award_badge(user_id, "pipways_certified"):
+                    newly_awarded.append("pipways_certified")
+        
+        # Quiz badges
+        if quiz_score is not None:
+            if quiz_score == 100:
+                if await _award_badge(user_id, "perfect_score"):
+                    newly_awarded.append("perfect_score")
+            
+            try:
+                high_scores = await database.fetch_val(
+                    "SELECT COUNT(*) FROM user_learning_progress WHERE user_id=:uid AND quiz_score>=80",
+                    {"uid": user_id}
+                )
+                if high_scores and int(high_scores) >= 10:
+                    if await _award_badge(user_id, "quiz_master"):
+                        newly_awarded.append("quiz_master")
+            except Exception as e:
+                print(f"[BADGE CHECK ERROR] Quiz master check failed: {e}", flush=True)
+        
+        # Topic badges
+        if lesson_id:
+            try:
+                lesson = await database.fetch_one(
+                    """SELECT m.title FROM learning_lessons l
+                       JOIN learning_modules m ON m.id=l.module_id 
+                       WHERE l.id=:lid""",
+                    {"lid": lesson_id}
+                )
+                if lesson:
+                    title = lesson["title"].lower()
+                    if "risk" in title:
+                        if await _award_badge(user_id, "risk_manager"):
+                            newly_awarded.append("risk_manager")
+                    if "psychology" in title:
+                        if await _award_badge(user_id, "psychology_pro"):
+                            newly_awarded.append("psychology_pro")
+            except Exception as e:
+                print(f"[BADGE CHECK ERROR] Topic badge check failed: {e}", flush=True)
+    except Exception as e:
+        print(f"[BADGE CHECK ERROR] General badge check failed: {e}", flush=True)
+    
+    return newly_awarded
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# READ ENDPOINTS — All wrapped with try/except for safety
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/levels")
+async def get_levels(current_user=Depends(get_current_user)):
+    try:
+        rows = await database.fetch_all(
+            "SELECT id, name, description, order_index FROM learning_levels ORDER BY order_index"
+        )
+        return [dict(r) for r in (rows or [])]
+    except Exception as e:
+        print(f"[API ERROR] get_levels: {e}", flush=True)
+        return []  # Return empty array instead of crashing
+
+@router.get("/modules/{level_id}")
+async def get_modules(level_id: int, current_user=Depends(get_current_user)):
+    try:
+        level = await database.fetch_one("SELECT id FROM learning_levels WHERE id=:lid", {"lid": level_id})
+        if not level:
+            return []  # Return empty rather than 404
+        
+        modules = await database.fetch_all(
+            """SELECT id, title, description, order_index 
+               FROM learning_modules 
+               WHERE level_id=:lid ORDER BY order_index""",
+            {"lid": level_id}
+        )
+        
+        if not modules:
+            return []
+        
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        result = []
+        
+        for m in modules:
+            try:
+                total = await database.fetch_val(
+                    "SELECT COUNT(*) FROM learning_lessons WHERE module_id=:mid",
+                    {"mid": m["id"]}
+                ) or 0
+                
+                done = await database.fetch_val(
+                    """SELECT COUNT(*) FROM user_learning_progress 
+                       WHERE user_id=:uid AND module_id=:mid AND completed=TRUE""",
+                    {"uid": user_id, "mid": m["id"]}
+                ) or 0
+                
+                result.append({
+                    **dict(m),
+                    "lesson_count": int(total),
+                    "completed_count": int(done),
+                    "is_complete": total > 0 and done >= total,
+                })
+            except Exception as e:
+                print(f"[API ERROR] get_modules loop: {e}", flush=True)
+                result.append({**dict(m), "lesson_count": 0, "completed_count": 0, "is_complete": False})
+        
+        return result
+    except Exception as e:
+        print(f"[API ERROR] get_modules: {e}", flush=True)
+        return []
+
+@router.get("/lessons/{module_id}")
+async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
+    try:
+        module = await database.fetch_one("SELECT id FROM learning_modules WHERE id=:mid", {"mid": module_id})
+        if not module:
+            return []
+        
+        lessons = await database.fetch_all(
+            """SELECT id, title, order_index 
+               FROM learning_lessons 
+               WHERE module_id=:mid ORDER BY order_index""",
+            {"mid": module_id}
+        )
+        
+        if not lessons:
+            return []
+        
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        result = []
+        
+        for i, les in enumerate(lessons):
+            try:
+                progress = await database.fetch_one(
+                    """SELECT completed, quiz_score 
+                       FROM user_learning_progress 
+                       WHERE user_id=:uid AND lesson_id=:lid""",
+                    {"uid": user_id, "lid": les["id"]}
+                )
+                
+                unlocked = (i == 0)
+                if i > 0 and lessons:
+                    prev_id = lessons[i - 1]["id"]
+                    prev_row = await database.fetch_one(
+                        """SELECT completed FROM user_learning_progress 
+                           WHERE user_id=:uid AND lesson_id=:lid""",
+                        {"uid": user_id, "lid": prev_id}
+                    )
+                    unlocked = prev_row is not None and bool(prev_row["completed"])
+                
+                result.append({
+                    **dict(les),
+                    "completed": bool(progress["completed"]) if progress else False,
+                    "quiz_score": progress["quiz_score"] if progress else None,
+                    "unlocked": unlocked,
+                })
+            except Exception as e:
+                print(f"[API ERROR] get_lessons loop: {e}", flush=True)
+                result.append({**dict(les), "completed": False, "quiz_score": None, "unlocked": i == 0})
+        
+        return result
+    except Exception as e:
+        print(f"[API ERROR] get_lessons: {e}", flush=True)
+        return []
+
+@router.get("/lesson/{lesson_id}")
+async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
+    try:
+        lesson = await database.fetch_one(
+            """SELECT l.id, l.title, l.content, l.order_index, l.module_id,
+                      m.title AS module_title, m.level_id, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id = l.module_id
+               JOIN learning_levels lv ON lv.id = m.level_id
+               WHERE l.id = :lid""",
+            {"lid": lesson_id}
+        )
+        
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+        
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        
+        # Get adjacent lessons
+        adj = await database.fetch_all(
+            """SELECT l.id, l.title, l.order_index,
+                      EXISTS(SELECT 1 FROM user_learning_progress p 
+                             WHERE p.lesson_id=l.id AND p.user_id=:uid AND p.completed=TRUE) as completed
+               FROM learning_lessons l
+               WHERE l.module_id = (SELECT module_id FROM learning_lessons WHERE id=:lid)
+               ORDER BY l.order_index""",
+            {"lid": lesson_id, "uid": user_id}
+        )
+        
+        current_idx = next((i for i, a in enumerate(adj) if a["id"] == lesson_id), -1)
+        prev_lesson = adj[current_idx - 1] if current_idx > 0 else None
+        next_lesson = adj[current_idx + 1] if current_idx < len(adj) - 1 else None
+        
+        result = dict(lesson)
+        result["prev_lesson"] = {
+            "id": prev_lesson["id"],
+            "title": prev_lesson["title"],
+            "completed": prev_lesson["completed"]
+        } if prev_lesson else None
+        
+        result["next_lesson"] = {
+            "id": next_lesson["id"],
+            "title": next_lesson["title"],
+            "completed": next_lesson["completed"]
+        } if next_lesson else None
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API ERROR] get_lesson: {e}", flush=True)
+        raise HTTPException(500, "Failed to load lesson data")
+
+@router.get("/quiz/{lesson_id}")
+async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
+    try:
+        lesson = await database.fetch_one("SELECT id FROM learning_lessons WHERE id=:lid", {"lid": lesson_id})
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+        
+        questions = await database.fetch_all(
+            """SELECT id, question, option_a, option_b, option_c, option_d
+               FROM lesson_quizzes 
+               WHERE lesson_id=:lid ORDER BY id""",
+            {"lid": lesson_id}
+        )
+        
+        return {
+            "lesson_id": lesson_id,
+            "question_count": len(questions) if questions else 0,
+            "questions": [dict(q) for q in (questions or [])]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API ERROR] get_quiz: {e}", flush=True)
+        return {"lesson_id": lesson_id, "question_count": 0, "questions": []}
+
+@router.get("/progress/{user_id}")
+async def get_progress(user_id: int, current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        caller = user_data.get("id", 0)
+        is_admin = user_data.get("is_admin", False)
+        
+        if caller != user_id and not is_admin:
+            # Return empty progress for unauthorized rather than 403
+            return {
+                "user_id": user_id,
+                "total_lessons": 0,
+                "completed_lessons": 0,
+                "completion_rate": 0.0,
+                "progress": [],
+                "summary": []
+            }
+        
+        rows = await database.fetch_all(
+            """SELECT p.id, p.level_id, p.module_id, p.lesson_id, p.completed,
+                      p.quiz_score, p.completed_at, l.title AS lesson_title, m.title AS module_title
+               FROM user_learning_progress p
+               LEFT JOIN learning_lessons l ON l.id = p.lesson_id
+               LEFT JOIN learning_modules m ON m.id = p.module_id
+               WHERE p.user_id = :uid""",
+            {"uid": user_id}
+        )
+        
+        levels = await database.fetch_all("SELECT id, name FROM learning_levels ORDER BY order_index") or []
+        
+        summary = []
+        for lv in levels:
+            try:
+                total = await database.fetch_val(
+                    """SELECT COUNT(*) FROM learning_lessons les
+                       JOIN learning_modules m ON m.id=les.module_id 
+                       WHERE m.level_id=:lid""",
+                    {"lid": lv["id"]}
+                ) or 0
+                
+                done = await database.fetch_val(
+                    """SELECT COUNT(*) FROM user_learning_progress
+                       WHERE user_id=:uid AND level_id=:lid AND completed=TRUE""",
+                    {"uid": user_id, "lid": lv["id"]}
+                ) or 0
+                
+                summary.append({
+                    "level_id": lv["id"],
+                    "level_name": lv["name"],
+                    "total": int(total),
+                    "completed": int(done),
+                    "percent": round((int(done) / int(total) * 100) if total else 0, 1),
+                })
+            except Exception as e:
+                print(f"[API ERROR] get_progress summary loop: {e}", flush=True)
+                summary.append({
+                    "level_id": lv["id"],
+                    "level_name": lv["name"],
+                    "total": 0,
+                    "completed": 0,
+                    "percent": 0.0
+                })
+        
+        total_lessons_rows = await database.fetch_all("SELECT id FROM learning_lessons") or []
+        total_lessons = len(total_lessons_rows)
+        # FIX: Use bracket notation on Record objects (p["completed"])
+        completed_lessons = sum(1 for p in (rows or []) if p and p["completed"])
+        
+        return {
+            "user_id": user_id,
+            "total_lessons": total_lessons,
+            "completed_lessons": completed_lessons,
+            "completion_rate": round((completed_lessons / total_lessons * 100) if total_lessons else 0, 1),
+            "progress": [dict(r) for r in (rows or [])],
+            "summary": summary
+        }
+    except Exception as e:
+        print(f"[API ERROR] get_progress: {e}", flush=True)
+        # Return safe default on any error
+        return {
+            "user_id": user_id,
+            "total_lessons": 0,
+            "completed_lessons": 0,
+            "completion_rate": 0.0,
+            "progress": [],
+            "summary": [],
+            "error": "Failed to load progress"
+        }
+
+@router.get("/profile/{user_id}")
+async def get_profile(user_id: int, current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        caller = user_data.get("id", 0)
+        is_admin = user_data.get("is_admin", False)
+        
+        if caller != user_id and not is_admin:
+            return {"user_id": user_id, "weak_topics": [], "strong_topics": [], "first_academy_visit": True, "last_updated": None}
+        
+        row = await database.fetch_one(
+            """SELECT weak_topics, strong_topics, first_academy_visit, last_updated
+               FROM user_learning_profile WHERE user_id=:uid""",
+            {"uid": user_id}
+        )
+        
+        if not row:
+            return {
+                "user_id": user_id,
+                "weak_topics": [],
+                "strong_topics": [],
+                "first_academy_visit": True,
+                "last_updated": None
+            }
+        
+        def parse_json(val):
+            if not val:
+                return []
+            try:
+                return json.loads(val) if isinstance(val, str) else val
+            except:
+                return []
+        
+        # FIX: Convert Record to dict for .get() access
+        row_data = dict(row)
+        return {
+            "user_id": user_id,
+            "weak_topics": parse_json(row_data.get("weak_topics")),
+            "strong_topics": parse_json(row_data.get("strong_topics")),
+            "first_academy_visit": row_data.get("first_academy_visit") if row_data.get("first_academy_visit") is not None else True,
+            "last_updated": row_data.get("last_updated"),
+        }
+    except Exception as e:
+        print(f"[API ERROR] get_profile: {e}", flush=True)
+        return {
+            "user_id": user_id,
+            "weak_topics": [],
+            "strong_topics": [],
+            "first_academy_visit": True,
+            "last_updated": None,
+            "error": "Failed to load profile"
+        }
+
+@router.get("/badges/{user_id}")
+async def get_badges(user_id: int, current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        caller = user_data.get("id", 0)
+        is_admin = user_data.get("is_admin", False)
+        
+        if caller != user_id and not is_admin:
+            return {"user_id": user_id, "badges": [], "count": 0}
+        
+        rows = await database.fetch_all(
+            """SELECT badge_type, earned_at 
+               FROM user_badges 
+               WHERE user_id=:uid ORDER BY earned_at DESC""",
+            {"uid": user_id}
+        )
+        
+        badges = []
+        for r in (rows or []):
+            try:
+                defn = BADGE_DEFINITIONS.get(r["badge_type"], {})
+                badges.append({
+                    "type": r["badge_type"],
+                    "name": defn.get("name", r["badge_type"]),
+                    "icon": defn.get("icon", "fa-medal"),
+                    "color": defn.get("color", "#a78bfa"),
+                    "earned_at": r["earned_at"]
+                })
+            except Exception as e:
+                print(f"[API ERROR] get_badges loop: {e}", flush=True)
+                continue
+        
+        return {"user_id": user_id, "badges": badges, "count": len(badges)}
+    except Exception as e:
+        print(f"[API ERROR] get_badges: {e}", flush=True)
+        return {"user_id": user_id, "badges": [], "count": 0, "error": "Failed to load badges"}
+
+@router.post("/badges/check")
+async def check_badges(current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        if not user_id:
+            return {"newly_awarded": [], "count": 0}
+        
+        new_badges = await _check_and_award_badges(user_id)
+        return {"newly_awarded": new_badges, "count": len(new_badges)}
+    except Exception as e:
+        print(f"[API ERROR] check_badges: {e}", flush=True)
+        return {"newly_awarded": [], "count": 0}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WRITE ENDPOINTS — Wrapped for safety
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/quiz/submit")
+async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        if not user_id:
+            raise HTTPException(401, "Not authenticated")
+        
+        questions = await database.fetch_all(
+            """SELECT id, correct_answer, explanation, topic_slug 
+               FROM lesson_quizzes WHERE lesson_id=:lid ORDER BY id""",
+            {"lid": payload.lesson_id}
+        )
+        
+        if not questions:
+            raise HTTPException(404, "No quiz questions found for this lesson")
+        
+        q_map = {q["id"]: q for q in questions}
+        total = len(questions)
+        correct = 0
+        results = []
+        wrong_slugs = []
+        correct_slugs = []
+        
+        for ans in payload.answers:
+            try:
+                q_id = ans.question_id
+                selected = ans.selected_answer.upper()
+                row = q_map.get(q_id)
+                
+                if not row:
+                    continue
+                
+                is_correct = (selected == row["correct_answer"].upper())
+                if is_correct:
+                    correct += 1
+                    correct_slugs.append(row["topic_slug"])
+                else:
+                    wrong_slugs.append(row["topic_slug"])
+                
+                await database.execute(
+                    """INSERT INTO user_quiz_results 
+                       (user_id, lesson_id, question_id, selected_answer, is_correct, answered_at)
+                       VALUES (:uid, :lid, :qid, :ans, :ok, NOW())""",
+                    {"uid": user_id, "lid": payload.lesson_id, "qid": q_id, "ans": selected, "ok": is_correct}
+                )
+                
+                results.append({
+                    "question_id": q_id,
+                    "is_correct": is_correct,
+                    "correct_answer": row["correct_answer"],
+                    "explanation": row["explanation"],
+                })
+            except Exception as e:
+                print(f"[API ERROR] submit_quiz answer processing: {e}", flush=True)
+                continue
+        
+        score = round((correct / total * 100) if total else 0, 1)
+        passed = score >= 70
+        
+        if passed:
+            await _mark_lesson_complete(user_id, payload.lesson_id, score)
+        
+        await _update_learning_profile(user_id, wrong_slugs, correct_slugs)
+        new_badges = await _check_and_award_badges(user_id, payload.lesson_id, score)
+        
+        lesson = await database.fetch_one(
+            """SELECT l.title, lv.name AS level_name 
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id
+               JOIN learning_levels lv ON lv.id=m.level_id
+               WHERE l.id=:lid""",
+            {"lid": payload.lesson_id}
+        )
+        
+        feedback = await _quiz_feedback(
+            score, passed,
+            lesson["title"] if lesson else "this lesson",
+            wrong_slugs,
+            lesson["level_name"].lower() if lesson else "intermediate"
+        )
+        
+        return {
+            "score": score,
+            "correct": correct,
+            "total": total,
+            "passed": passed,
+            "results": results,
+            "mentor_feedback": feedback,
+            "new_badges": new_badges,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API ERROR] submit_quiz: {e}", flush=True)
+        raise HTTPException(500, "Failed to submit quiz")
+
+@router.post("/lesson/complete")
+async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        if not user_id:
+            raise HTTPException(401, "Not authenticated")
+        
+        await _mark_lesson_complete(user_id, payload.lesson_id, payload.quiz_score)
+        new_badges = await _check_and_award_badges(user_id, payload.lesson_id)
+        return {"success": True, "new_badges": new_badges}
+    except Exception as e:
+        print(f"[API ERROR] complete_lesson: {e}", flush=True)
+        raise HTTPException(500, "Failed to complete lesson")
+
+@router.post("/profile/first-visit-complete")
+async def mark_first_visit_complete(current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        if not user_id:
+            raise HTTPException(401, "Not authenticated")
+        
+        await database.execute(
+            """INSERT INTO user_learning_profile (user_id, weak_topics, strong_topics, first_academy_visit, last_updated)
+               VALUES (:uid, '[]', '[]', FALSE, NOW())
+               ON CONFLICT (user_id) DO UPDATE SET first_academy_visit=FALSE, last_updated=NOW()""",
+            {"uid": user_id}
+        )
+        
+        return {"success": True, "first_academy_visit": False}
+    except Exception as e:
+        print(f"[API ERROR] mark_first_visit_complete: {e}", flush=True)
+        raise HTTPException(500, "Failed to update profile")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI TRADING COACH ENDPOINTS — Wrapped for safety
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/mentor/guide/{user_id}")
+async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        caller = user_data.get("id", 0)
+        is_admin = user_data.get("is_admin", False)
+        
+        if caller != user_id and not is_admin:
+            # Return generic fallback for unauthorized
+            return {
+                "type": "welcome",
+                "message": "Welcome to Pipways Trading Academy! Start your journey with the Beginner level.",
+                "next_lesson": None,
+                "first_visit": True,
+                "weak_topics": [],
+            }
+        
+        profile = await database.fetch_one(
+            """SELECT weak_topics, strong_topics, first_academy_visit 
+               FROM user_learning_profile WHERE user_id=:uid""",
+            {"uid": user_id}
+        )
+        
+        is_first_visit = True
+        # FIX: Use bracket notation or check with dict conversion
+        if profile and profile["first_academy_visit"] is False:
+            is_first_visit = False
+        
+        progress = await database.fetch_all(
+            """SELECT p.lesson_id, p.completed, p.quiz_score, l.title
+               FROM user_learning_progress p 
+               JOIN learning_lessons l ON l.id=p.lesson_id
+               WHERE p.user_id=:uid""",
+            {"uid": user_id}
+        )
+        
+        # FIX: Use bracket notation on Record objects
+        done = [r["title"] for r in (progress or []) if r and r["completed"]]
+        # FIX: Use bracket notation for profile fields
+        weak = json.loads(profile["weak_topics"]) if profile and profile["weak_topics"] else []
+        strong = json.loads(profile["strong_topics"]) if profile and profile["strong_topics"] else []
+        
+        next_lesson = await database.fetch_one(
+            """SELECT l.id, l.title, m.title AS module_title, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id
+               JOIN learning_levels lv ON lv.id=m.level_id
+               WHERE l.id NOT IN (
+                   SELECT lesson_id FROM user_learning_progress 
+                   WHERE user_id=:uid AND completed=TRUE
+               )
+               ORDER BY m.order_index, l.order_index LIMIT 1""",
+            {"uid": user_id}
+        )
+        
+        if is_first_visit:
+            return {
+                "type": "welcome",
+                "message": "Welcome to Pipways Trading Academy! Start your journey with the Beginner level. Master the basics, then progress through structured modules designed by professional traders.",
+                "next_lesson": dict(next_lesson) if next_lesson else None,
+                "first_visit": True,
+                "weak_topics": [],
+            }
+        
+        # Trading Coach recommendation mode
+        ctx = (
+            f"Completed lessons ({len(done)}): {', '.join(done[-5:]) if done else 'none yet'}. "
+            f"Weak topics: {', '.join(weak) if weak else 'none'}. "
+            f"Strong topics: {', '.join(strong) if strong else 'none'}. "
+            f"Next lesson: {next_lesson['title'] + ' in ' + next_lesson['module_title'] if next_lesson else 'Academy complete'}."
+        )
+        
+        system = (
+            "You are the Pipways Trading Coach. Give a motivational 2-sentence coaching message. "
+            "Acknowledge progress, mention one weak area to focus on, and encourage completion of the next lesson. "
+            "Be warm, professional, and end with 'Continue Learning' energy."
+        )
+        
+        message = await _ai(system, f"Student progress:\n{ctx}")
+        
+        return {
+            "type": "recommendation",
+            "message": message,
+            "next_lesson": dict(next_lesson) if next_lesson else None,
+            "first_visit": False,
+            "completed_count": len(done),
+            "weak_topics": weak,
+        }
+    except Exception as e:
+        print(f"[API ERROR] mentor_guide: {e}", flush=True)
+        traceback.print_exc()
+        # Return safe fallback
+        return {
+            "type": "welcome",
+            "message": "Continue learning the Beginner modules to unlock personalized recommendations.",
+            "next_lesson": None,
+            "first_visit": True,
+            "weak_topics": [],
+        }
+
+@router.post("/mentor/teach")
+async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    try:
+        # FIX: Convert Record to dict to use .get() safely
+        user_data = dict(current_user) if current_user else {}
+        user_id = user_data.get("id", 0)
+        
+        lesson = await database.fetch_one(
+            """SELECT l.title, l.content, m.title AS module_title, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id
+               JOIN learning_levels lv ON lv.id=m.level_id
+               WHERE l.id=:lid""",
+            {"lid": lesson_id}
+        )
+        
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+        
+        # FIX: Convert lesson Record to dict for .get() access
+        lesson_data = dict(lesson)
+        
+        profile = await database.fetch_one(
+            "SELECT weak_topics FROM user_learning_profile WHERE user_id=:uid",
+            {"uid": user_id}
+        )
+        
+        weak = json.loads(profile["weak_topics"]) if profile and profile["weak_topics"] else []
+        level = lesson_data.get("level_name", "intermediate").lower()
+        
+        tone = {
+            "beginner": "Use very simple language and real-world analogies. Avoid jargon entirely.",
+            "intermediate": "Use technical terms with clear definitions. Connect to chart examples.",
+            "advanced": "Use institutional terminology. Discuss market structure and order flow.",
+        }.get(level, "Use clear, professional language.")
+        
+        system = (
+            f"You are the Pipways Trading Coach. {tone} "
+            "Structure: 1) Warm opening, 2) Core concept, 3) Step-by-step breakdown, "
+            "4) Trade example (pair, entry, stop, target), 5) Common pitfall, 6) Quick summary. "
+            "Keep under 450 words. Only explain THIS lesson content."
+        )
+        
+        content_preview = lesson_data.get("content", "")[:1200] if lesson_data.get("content") else ""
+        explanation = await _ai(system, f"Explain: {lesson_data.get('title', '')}\n\nContent: {content_preview}")
+        
+        return {
+            "lesson_title": lesson_data.get("title", ""),
+            "module_title": lesson_data.get("module_title", ""),
+            "level": lesson_data.get("level_name", ""),
+            "explanation": explanation,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API ERROR] mentor_teach: {e}", flush=True)
+        return {
+            "lesson_title": "Lesson",
+            "module_title": "Module",
+            "level": "Beginner",
+            "explanation": "Trading Coach explanation is temporarily unavailable. Please review the lesson content and try the quiz to reinforce your learning."
+        }
+
+@router.post("/mentor/practice")
+async def mentor_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    try:
+        lesson = await database.fetch_one(
+            """SELECT l.title, l.content, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id
+               JOIN learning_levels lv ON lv.id=m.level_id
+               WHERE l.id=:lid""",
+            {"lid": lesson_id}
+        )
+        
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+        
+        # FIX: Convert lesson Record to dict for .get() access
+        lesson_data = dict(lesson)
+        
+        system = (
+            "You are a Pipways Trading Coach. Create ONE short, realistic practice exercise. "
+            "Format: Scenario (1-2 sentences) → Question → Model Answer. "
+            "Use different currency pairs each time. Under 180 words."
+        )
+        
+        exercise = await _ai(system, f"Create exercise for '{lesson_data.get('title', '')}' at {lesson_data.get('level_name', 'Beginner')} level.")
+        
+        return {"lesson_title": lesson_data.get("title", ""), "exercise": exercise}
+    except Exception as e:
+        print(f"[API ERROR] mentor_practice: {e}", flush=True)
+        return {
+            "lesson_title": "Practice",
+            "exercise": "Practice Exercise:\n\nScenario: EUR/USD is testing a key support level at 1.0850 after a downtrend.\n\nQuestion: What factors should you check before deciding to buy at support?\n\nModel Answer: Check 1) Higher timeframe trend direction, 2) Presence of bullish candlestick patterns (pin bar, engulfing), 3) RSI for oversold conditions, 4) Volume confirmation on the bounce. Only enter if multiple factors align."
+        }
+
+@router.post("/mentor/chart-practice")
+async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    try:
+        lesson = await database.fetch_one(
+            """SELECT l.title, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id
+               JOIN learning_levels lv ON lv.id=m.level_id
+               WHERE l.id=:lid""",
+            {"lid": lesson_id}
+        )
+        
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+        
+        # FIX: Convert lesson Record to dict for .get() access
+        lesson_data = dict(lesson)
+        
+        system = (
+            "Create a chart-reading exercise. Return valid JSON with keys: "
+            "tv_symbol (e.g., FX:EURUSD, OANDA:GBPUSD), tv_interval (60), "
+            "scenario, question, options [A,B,C,D], correct (A/B/C/D), explanation. "
+            "No text outside JSON."
+        )
+        
+        level = lesson_data.get("level_name", "Beginner").lower()
+        complexity = {
+            "beginner": "support/resistance identification",
+            "intermediate": "trend context with S/R",
+            "advanced": "order blocks, liquidity sweeps, market structure",
+        }.get(level, "support and resistance")
+        
+        raw = await _ai(system, f"Create chart exercise for '{lesson_data.get('title', '')}' focusing on {complexity}.")
+        
+        try:
+            clean = raw.strip().strip("```json").strip("```").strip()
+            data = json.loads(clean)
+        except Exception:
+            data = {
+                "tv_symbol": "FX:EURUSD",
+                "tv_interval": "60",
+                "scenario": "EUR/USD H4 shows uptrend with pullback to 1.0850 support.",
+                "question": "Based on trend context, what would you expect at support?",
+                "options": ["A: Buy the bounce", "B: Sell the break", "C: Wait", "D: No trade"],
+                "correct": "A",
+                "explanation": "In an uptrend, pullbacks to support offer high-probability long entries.",
+            }
+        
+        return {
+            "lesson_title": lesson_data.get("title", ""),
+            "level": lesson_data.get("level_name", ""),
+            "chart_practice": data,
+        }
+    except Exception as e:
+        print(f"[API ERROR] mentor_chart_practice: {e}", flush=True)
+        return {
+            "lesson_title": "Chart Practice",
+            "level": "Beginner",
+            "chart_practice": {
+                "tv_symbol": "FX:EURUSD",
+                "tv_interval": "60",
+                "scenario": "EUR/USD H4 shows uptrend with pullback to 1.0850 support.",
+                "question": "Based on trend context, what would you expect at support?",
+                "options": ["A: Buy the bounce", "B: Sell the break", "C: Wait", "D: No trade"],
+                "correct": "A",
+                "explanation": "In an uptrend, pullbacks to support offer high-probability long entries.",
+            }
+        }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INTERNAL HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _parse_json(value):
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    try:
+        return json.loads(value)
+    except:
+        return []
+
+async def _mark_lesson_complete(user_id: int, lesson_id: int, score: float):
+    try:
+        lesson = await database.fetch_one(
+            """SELECT l.module_id, m.level_id 
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id 
+               WHERE l.id=:lid""",
+            {"lid": lesson_id}
+        )
+        
+        if not lesson:
+            return
+        
+        existing = await database.fetch_one(
+            """SELECT id FROM user_learning_progress 
+               WHERE user_id=:uid AND lesson_id=:lid""",
+            {"uid": user_id, "lid": lesson_id}
+        )
+        
+        if existing:
+            await database.execute(
+                """UPDATE user_learning_progress 
+                   SET completed=TRUE, quiz_score=:score, completed_at=NOW()
+                   WHERE user_id=:uid AND lesson_id=:lid""",
+                {"uid": user_id, "lid": lesson_id, "score": score}
+            )
+        else:
+            await database.execute(
+                """INSERT INTO user_learning_progress 
+                   (user_id, level_id, module_id, lesson_id, completed, quiz_score, completed_at)
+                   VALUES (:uid, :lv, :mid, :lid, TRUE, :score, NOW())""",
+                {
+                    "uid": user_id,
+                    "lv": lesson.get("level_id", 0),
+                    "mid": lesson.get("module_id", 0),
+                    "lid": lesson_id,
+                    "score": score
+                }
+            )
+    except Exception as e:
+        print(f"[HELPER ERROR] _mark_lesson_complete: {e}", flush=True)
+
+async def _update_learning_profile(user_id: int, wrong_slugs: list, correct_slugs: list):
+    try:
+        existing = await database.fetch_one(
+            "SELECT weak_topics, strong_topics FROM user_learning_profile WHERE user_id=:uid",
+            {"uid": user_id}
+        )
+        
+        if existing:
+            cur_weak = _parse_json(existing.get("weak_topics"))
+            cur_strong = _parse_json(existing.get("strong_topics"))
+            
+            new_weak = list(set(cur_weak + wrong_slugs) - set(correct_slugs))
+            new_strong = list(set(cur_strong + correct_slugs))
+            
+            await database.execute(
+                """UPDATE user_learning_profile 
+                   SET weak_topics=:w, strong_topics=:s, last_updated=NOW() 
+                   WHERE user_id=:uid""",
+                {"uid": user_id, "w": json.dumps(new_weak), "s": json.dumps(new_strong)}
+            )
+        else:
+            await database.execute(
+                """INSERT INTO user_learning_profile 
+                   (user_id, weak_topics, strong_topics, first_academy_visit, last_updated)
+                   VALUES (:uid, :w, :s, TRUE, NOW())""",
+                {"uid": user_id, "w": json.dumps(wrong_slugs), "s": json.dumps(correct_slugs)}
+            )
+    except Exception as e:
+        print(f"[HELPER ERROR] _update_learning_profile: {e}", flush=True)
+
+async def _quiz_feedback(score: float, passed: bool, lesson_title: str, wrong_slugs: list, level: str) -> str:
+    """Generate contextual AI feedback for quiz results"""
+    try:
+        if score == 100:
+            return f"Perfect mastery! You've demonstrated complete understanding of {lesson_title}. Ready for the next challenge?"
+        elif passed:
+            if wrong_slugs:
+                areas = ", ".join(wrong_slugs[:2])
+                return f"Strong performance on {lesson_title}! Just polish your understanding of {areas}, then continue forward."
+            return f"Great work passing {lesson_title}! Your trading knowledge is building steadily. Proceed to the next lesson with confidence."
+        else:
+            # Failed - provide targeted encouragement
+            focus = ", ".join(wrong_slugs[:3]) if wrong_slugs else "the core concepts"
+            advice = {
+                "beginner": "Every professional trader started here. Take time to review",
+                "intermediate": "Precision separates profitable traders. Revisit",
+                "advanced": "Institutional-grade trading demands mastery. Deep-dive into"
+            }.get(level, "Focus your study on")
+            return f"{advice} {focus} in {lesson_title}. Reattempt the quiz when the concepts click."
+    except Exception as e:
+        print(f"[HELPER ERROR] _quiz_feedback: {e}", flush=True)
+        return "Continue studying the material and retry the quiz when you feel confident."

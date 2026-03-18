@@ -1,15 +1,6 @@
 /**
- * Pipways — Trading Academy Frontend Module  (academy.js)
- * Follows the same pattern as admin.js / cms.js / courses.js.
- *
- * Loaded in dashboard.html via:
- *   <script src="/js/modules/academy.js"></script>
- *
- * Registered in DashboardController.loadSectionData:
- *   case 'academy': await AcademyPage.render(); break;
- *
- * Zero modifications to any existing file required beyond the
- * integration lines described at the bottom of this file.
+ * Pipways Trading Academy Frontend Module (academy.js)
+ * Enhanced with AI Mentor Integration, TradingView Charts, and Progress Tracking
  */
 
 /* ── LMS API methods ─────────────────────────────────────────────────────── */
@@ -32,8 +23,11 @@
         getMentorTeach:     (lid)  => post(`/learning/mentor/teach?lesson_id=${lid}`),
         getMentorPractice:  (lid)  => post(`/learning/mentor/practice?lesson_id=${lid}`),
         getChartPractice:   (lid)  => post(`/learning/mentor/chart-practice?lesson_id=${lid}`),
+        getLessonNavigation: (lid) => get(`/learning/lesson/${lid}/navigation`),
+        getBadges:          (uid)  => get(`/learning/badges/${uid}`),
         submitQuiz:         (lid, answers) => post('/learning/quiz/submit', { lesson_id: lid, answers }),
         completeLesson:     (lid, score)   => post('/learning/lesson/complete', { lesson_id: lid, quiz_score: score || 0 }),
+        getAIMentorRecommendations: (uid) => get(`/learning/ai-mentor/recommendations/${uid}`),
     };
 })();
 
@@ -44,16 +38,67 @@
 const AcademyPage = {
 
     _level: null, _module: null, _lesson: null, _quiz: null, _uid: null,
+    _navigation: null, // Stores next/prev lesson info
 
     async render() {
         const u = this._getUser(); this._uid = u?.id ?? null;
         const wrap = document.getElementById('academy-container');
         if (!wrap) return;
+        
+        // Check for first visit
+        const hasVisited = localStorage.getItem('academy_visited');
+        if (!hasVisited && this._uid) {
+            localStorage.setItem('academy_visited', 'true');
+            this._showWelcomeModal();
+        }
+        
         wrap.innerHTML = `
             <div id="ac-breadcrumb" class="pw-breadcrumb mb-4" style="display:none;"></div>
             <div id="ac-mentor-banner"></div>
+            <div id="ac-badges-banner" class="mb-4"></div>
             <div id="ac-main"></div>`;
         await this._showLevelSelector();
+    },
+
+    /* ── Welcome Modal ────────────────────────────────────────────────────── */
+    _showWelcomeModal() {
+        const modal = document.createElement('div');
+        modal.id = 'ac-welcome-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75';
+        modal.innerHTML = `
+            <div class="bg-gray-900 border border-purple-500 rounded-2xl p-8 max-w-lg mx-4 shadow-2xl transform transition-all">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-graduation-cap text-2xl text-white"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Welcome to Pipways Trading Academy!</h2>
+                    <p class="text-gray-400 mb-6">Master forex trading from beginner to advanced with structured lessons, interactive quizzes, and AI-powered coaching.</p>
+                    <div class="grid grid-cols-3 gap-3 mb-6 text-sm">
+                        <div class="bg-gray-800 p-3 rounded-lg">
+                            <div class="text-purple-400 font-bold text-lg">3</div>
+                            <div class="text-gray-500">Levels</div>
+                        </div>
+                        <div class="bg-gray-800 p-3 rounded-lg">
+                            <div class="text-purple-400 font-bold text-lg">21</div>
+                            <div class="text-gray-500">Modules</div>
+                        </div>
+                        <div class="bg-gray-800 p-3 rounded-lg">
+                            <div class="text-purple-400 font-bold text-lg">AI</div>
+                            <div class="text-gray-500">Coach</div>
+                        </div>
+                    </div>
+                    <button onclick="AcademyPage._closeWelcome()" class="btn btn-primary w-full">
+                        Start Learning <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    _closeWelcome() {
+        const modal = document.getElementById('ac-welcome-modal');
+        if (modal) modal.remove();
     },
 
     /* ── Level Selector ─────────────────────────────────────────────────── */
@@ -62,19 +107,33 @@ const AcademyPage = {
         this._bc(null,null,null);
         const main = document.getElementById('ac-main');
         main.innerHTML = this._loading('Loading levels…');
+        
         try {
-            const [levels, prog] = await Promise.all([
+            // Load badges and progress in parallel
+            const [levels, prog, badges] = await Promise.all([
                 API.lms.getLevels(),
                 this._uid ? API.lms.getProgress(this._uid).catch(()=>null) : null,
+                this._uid ? API.lms.getBadges(this._uid).catch(()=>null) : null,
             ]);
+            
+            // Render badges banner if user has badges
+            if (badges && badges.length > 0) {
+                this._renderBadgesBanner(badges);
+            }
+            
             const sm = {};
             (prog?.summary||[]).forEach(s=>sm[s.level_id]=s);
-            if (this._uid) this._loadMentorBanner();
+            if (this._uid) {
+                this._loadMentorBanner();
+                this._loadAIMentorRecommendations();
+            }
+            
             const cfg = [
-                {icon:'fa-seedling',  color:'#34d399', bg:'rgba(52,211,153,.15)'},
-                {icon:'fa-chart-line',color:'#60a5fa', bg:'rgba(96,165,250,.15)'},
-                {icon:'fa-trophy',    color:'#f59e0b', bg:'rgba(245,158,11,.15)'},
+                {icon:'fa-seedling',  color:'#34d399', bg:'rgba(52,211,153,.15)', label:'BEGINNER'},
+                {icon:'fa-chart-line',color:'#60a5fa', bg:'rgba(96,165,250,.15)', label:'INTERMEDIATE'},
+                {icon:'fa-trophy',    color:'#f59e0b', bg:'rgba(245,158,11,.15)', label:'ADVANCED'},
             ];
+            
             if (!levels || !levels.length) {
                 main.innerHTML = `
                 <div class="pw-empty" style="padding:4rem 1rem;">
@@ -93,33 +152,97 @@ const AcademyPage = {
                 </div>`;
                 return;
             }
-            main.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            ${levels.map((lv,i)=>{
-                const c=cfg[i%3], s=sm[lv.id], pct=s?s.percent:0, done=s?s.completed:0, tot=s?s.total:0;
-                return `<div class="pw-card cursor-pointer" onclick="AcademyPage._selectLevel(${lv.id},'${_es(lv.name)}')" style="border-top:3px solid ${c.color};">
-                    <div class="pw-card-body" style="padding:1.5rem;">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style="background:${c.bg};">
-                            <i class="fas ${c.icon}" style="color:${c.color};"></i>
+            
+            main.innerHTML = `
+                <div class="mb-6">
+                    <h1 class="text-2xl font-bold text-white mb-2">Trading Academy</h1>
+                    <p class="text-gray-400">Master forex trading with structured education from beginner to advanced</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                ${levels.map((lv,i)=>{
+                    const c=cfg[i%3], s=sm[lv.id], pct=s?s.percent:0, done=s?s.completed:0, tot=s?s.total:0;
+                    const isComplete = s && s.completed === s.total && s.total > 0;
+                    return `<div class="pw-card cursor-pointer transform transition hover:scale-105" onclick="AcademyPage._selectLevel(${lv.id},'${_es(lv.name)}')" style="border-top:3px solid ${c.color};">
+                        <div class="pw-card-body" style="padding:1.5rem;">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style="background:${c.bg};">
+                                <i class="fas ${c.icon}" style="color:${c.color};"></i>
+                            </div>
+                            <div class="text-xs font-bold mb-1" style="color:${c.color};letter-spacing:.06em;">${c.label}</div>
+                            <h3 class="text-white font-bold text-base mb-1">${_es(lv.name)}</h3>
+                            <p class="text-gray-500 text-xs leading-relaxed mb-4">${_es(lv.description)}</p>
+                            <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+                                <span>Progress</span>
+                                <span class="font-semibold" style="color:${c.color};">${pct}%</span>
+                            </div>
+                            <div class="pw-progress-bar"><div class="pw-progress-fill ${pct>=80&&pct<100?'near-done':''}" style="width:${pct}%;background:${c.color};"></div></div>
+                            <div class="text-xs text-gray-600 mt-2 flex justify-between">
+                                <span>${done} of ${tot} lessons done</span>
+                                ${isComplete?'<span class="text-green-400"><i class="fas fa-check-circle"></i> Complete</span>':''}
+                            </div>
                         </div>
-                        <div class="text-xs font-bold mb-1" style="color:${c.color};letter-spacing:.06em;">${_es(lv.name).toUpperCase()}</div>
-                        <h3 class="text-white font-bold text-base mb-1">${_es(lv.name)}</h3>
-                        <p class="text-gray-500 text-xs leading-relaxed mb-4">${_es(lv.description)}</p>
-                        <div class="flex justify-between text-xs text-gray-500 mb-1.5">
-                            <span>Progress</span>
-                            <span class="font-semibold" style="color:${c.color};">${pct}%</span>
-                        </div>
-                        <div class="pw-progress-bar"><div class="pw-progress-fill" style="width:${pct}%;background:${c.color};"></div></div>
-                        <div class="text-xs text-gray-600 mt-2">${done} of ${tot} lessons done</div>
-                    </div>
+                    </div>`;
+                }).join('')}
                 </div>`;
-            }).join('')}
-            </div>`;
         } catch(e) {
             main.innerHTML = this._error(
                 'Could not load Academy levels',
                 e.message + ' — check that <code style="background:#111;padding:.1rem .3rem;border-radius:.2rem;">learning.py</code> is mounted in <code style="background:#111;padding:.1rem .3rem;border-radius:.2rem;">main.py</code>'
             );
         }
+    },
+
+    /* ── Badges Banner ────────────────────────────────────────────────────── */
+    _renderBadgesBanner(badges) {
+        const banner = document.getElementById('ac-badges-banner');
+        if (!banner || !badges.length) return;
+        
+        const recentBadges = badges.slice(0, 3);
+        banner.innerHTML = `
+            <div class="pw-card" style="background: linear-gradient(135deg, #1a0a2e, #0f0a1f); border: 1px solid rgba(167, 139, 250, 0.2);">
+                <div class="pw-card-body py-3 px-4">
+                    <div class="flex items-center gap-4 overflow-x-auto pb-2 md:pb-0">
+                        <div class="text-xs font-semibold text-purple-400 whitespace-nowrap">ACHIEVEMENTS</div>
+                        ${recentBadges.map(b => `
+                            <div class="flex items-center gap-2 bg-gray-800 rounded-full px-3 py-1 whitespace-nowrap">
+                                <i class="fas ${_es(b.icon)} text-${b.color}-400"></i>
+                                <span class="text-xs text-gray-300">${_es(b.name)}</span>
+                            </div>
+                        `).join('')}
+                        ${badges.length > 3 ? `<div class="text-xs text-gray-500">+${badges.length - 3} more</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    /* ── AI Mentor Recommendations ─────────────────────────────────────────── */
+    async _loadAIMentorRecommendations() {
+        if (!this._uid) return;
+        try {
+            const recs = await API.lms.getAIMentorRecommendations(this._uid);
+            if (recs && recs.recommendations && recs.recommendations.length > 0) {
+                const banner = document.getElementById('ac-mentor-banner');
+                const rec = recs.recommendations[0];
+                banner.innerHTML = `
+                    <div class="pw-card mb-5" style="border-left:3px solid #f472b6;background:linear-gradient(135deg,#2a0a1f,#1a0a1f);">
+                        <div class="pw-card-body">
+                            <div class="flex items-start gap-3">
+                                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(244,114,182,.2);">
+                                    <i class="fas fa-robot" style="color:#f472b6;"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xs font-semibold mb-1" style="color:#f472b6;">AI MENTOR RECOMMENDATION</div>
+                                    <p class="text-gray-300 text-sm leading-relaxed mb-2">${_es(rec.reason)}</p>
+                                    <button class="btn btn-primary text-xs" style="font-size:.78rem;padding:.35rem .85rem;"
+                                            onclick="AcademyPage._openLesson(${rec.lesson_id},'${_es(rec.lesson_title)}')">
+                                        ${rec.module_name}: ${_es(rec.lesson_title)} →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        } catch(_) { /* Silent fail */ }
     },
 
     /* ── Module List ────────────────────────────────────────────────────── */
@@ -130,27 +253,44 @@ const AcademyPage = {
         main.innerHTML = this._loading('Loading modules…');
         try {
             const modules = await API.lms.getModules(levelId);
-            main.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            ${modules.map(m=>{
-                const pct=m.lesson_count?Math.round(m.completed_count/m.lesson_count*100):0;
-                return `<div class="pw-card cursor-pointer" onclick="AcademyPage._selectModule(${m.id},'${_es(m.title)}')"
-                    onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor=''">
-                    <div class="pw-card-body">
-                        <div class="flex items-start justify-between mb-2">
-                            <div>
-                                ${m.is_complete
-                                    ? `<span class="badge badge-success text-xs mb-1"><i class="fas fa-check-circle mr-1"></i>Complete</span>`
-                                    : `<span class="text-xs text-gray-500 mb-1 block">${m.completed_count}/${m.lesson_count} lessons</span>`}
-                                <h3 class="text-white font-semibold">${_es(m.title)}</h3>
+            main.innerHTML = `
+                <div class="mb-4">
+                    <h2 class="text-xl font-bold text-white mb-1">${_es(levelName)}</h2>
+                    <p class="text-gray-500 text-sm">Select a module to continue learning</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${modules.map((m,i)=>{
+                    const pct=m.lesson_count?Math.round(m.completed_count/m.lesson_count*100):0;
+                    const status = m.is_complete ? 'complete' : pct > 0 ? 'in-progress' : 'locked';
+                    const statusColor = status === 'complete' ? 'text-green-400' : status === 'in-progress' ? 'text-blue-400' : 'text-gray-500';
+                    const statusIcon = status === 'complete' ? 'fa-check-circle' : status === 'in-progress' ? 'fa-play-circle' : 'fa-lock';
+                    
+                    return `<div class="pw-card cursor-pointer ${status === 'locked'?'opacity-60':''}" 
+                        ${status !== 'locked'?`onclick="AcademyPage._selectModule(${m.id},'${_es(m.title)}')"
+                         onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor=''"`:''}>
+                        <div class="pw-card-body">
+                            <div class="flex items-start justify-between mb-2">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <i class="fas ${statusIcon} ${statusColor} text-xs"></i>
+                                        <span class="text-xs ${statusColor} font-semibold">${status.replace('-',' ').toUpperCase()}</span>
+                                    </div>
+                                    <h3 class="text-white font-semibold mb-1">${_es(m.title)}</h3>
+                                    <p class="text-gray-500 text-xs leading-relaxed">${_es(m.description)}</p>
+                                </div>
+                                ${status !== 'locked'?`<i class="fas fa-chevron-right text-gray-700 text-xs mt-1"></i>`:''}
                             </div>
-                            <i class="fas fa-chevron-right text-gray-700 text-xs mt-1"></i>
+                            <div class="mt-3">
+                                <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>${m.completed_count}/${m.lesson_count} lessons</span>
+                                    <span>${pct}%</span>
+                                </div>
+                                <div class="pw-progress-bar"><div class="pw-progress-fill ${pct>=80&&pct<100?'near-done':''}" style="width:${pct}%;"></div></div>
+                            </div>
                         </div>
-                        <p class="text-gray-500 text-xs leading-relaxed mb-3">${_es(m.description)}</p>
-                        <div class="pw-progress-bar"><div class="pw-progress-fill ${pct>=80&&pct<100?'near-done':''}" style="width:${pct}%;"></div></div>
-                    </div>
+                    </div>`;
+                }).join('')}
                 </div>`;
-            }).join('')}
-            </div>`;
         } catch(e) { main.innerHTML = this._error('Could not load modules', e.message); }
     },
 
@@ -162,32 +302,55 @@ const AcademyPage = {
         main.innerHTML = this._loading('Loading lessons…');
         try {
             const lessons = await API.lms.getLessons(moduleId);
-            main.innerHTML = `<div class="space-y-2 max-w-2xl">
-            ${lessons.map((l,i)=>{
-                const locked=!l.unlocked, done=l.completed;
-                const icon = done?'fa-check-circle text-green-400':locked?'fa-lock text-gray-700':'fa-play-circle text-purple-400';
-                const score = done&&l.quiz_score!==null
-                    ? `<span class="text-xs font-semibold" style="color:#34d399;">${l.quiz_score}%</span>` : '';
-                return `<div class="pw-card ${locked?'opacity-50':''} ${!locked?'cursor-pointer':''}"
-                    ${!locked?`onclick="AcademyPage._openLesson(${l.id},'${_es(l.title)}')"
-                     onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor=''"`:''}>
-                    <div class="pw-card-body" style="padding:.85rem 1.25rem;">
-                        <div class="flex items-center gap-3">
-                            <i class="fas ${icon} text-lg flex-shrink-0" style="width:20px;text-align:center;"></i>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-white font-medium text-sm truncate">Lesson ${i+1}: ${_es(l.title)}</span>
-                                    ${score}
-                                </div>
-                                ${locked?`<div class="text-xs text-gray-600 mt-0.5">Complete previous lesson to unlock</div>`:''}
-                            </div>
-                            ${!locked?`<i class="fas fa-chevron-right text-gray-700 text-xs flex-shrink-0"></i>`:''}
-                        </div>
+            main.innerHTML = `
+                <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold text-white mb-1">${_es(moduleTitle)}</h2>
+                        <p class="text-gray-500 text-sm">${lessons.filter(l=>l.completed).length} of ${lessons.length} lessons completed</p>
                     </div>
+                    <button onclick="AcademyPage._backToLevel()" class="btn btn-sm" style="background:#1f2937;border:1px solid #374151;color:#e5e7eb;align-self:flex-start;">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Level
+                    </button>
+                </div>
+                <div class="space-y-2 max-w-2xl">
+                ${lessons.map((l,i)=>{
+                    const locked=!l.unlocked, done=l.completed;
+                    const icon = done?'fa-check-circle text-green-400':locked?'fa-lock text-gray-700':'fa-play-circle text-purple-400';
+                    const score = done&&l.quiz_score!==null
+                        ? `<span class="text-xs font-semibold" style="color:#34d399;">${l.quiz_score}%</span>` : '';
+                    const bgClass = done ? 'bg-green-900/10 border-green-800/30' : locked ? 'bg-gray-900/50' : 'bg-gray-900';
+                    
+                    return `<div class="pw-card ${locked?'opacity-50':''} ${!locked?'cursor-pointer':''} ${bgClass}"
+                        ${!locked?`onclick="AcademyPage._openLesson(${l.id},'${_es(l.title)}')"
+                         onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor=''"`:''}>
+                        <div class="pw-card-body" style="padding:.85rem 1.25rem;">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas ${icon} text-sm"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-white font-medium text-sm truncate">Lesson ${i+1}: ${_es(l.title)}</span>
+                                        ${score}
+                                    </div>
+                                    ${locked?`<div class="text-xs text-gray-600 mt-0.5"><i class="fas fa-lock mr-1"></i>Complete previous lesson to unlock</div>`:''}
+                                    ${done?`<div class="text-xs text-green-600 mt-0.5"><i class="fas fa-check mr-1"></i>Completed</div>`:''}
+                                </div>
+                                ${!locked?`<i class="fas fa-chevron-right text-gray-700 text-xs flex-shrink-0"></i>`:''}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('')}
                 </div>`;
-            }).join('')}
-            </div>`;
         } catch(e) { main.innerHTML = this._error('Could not load lessons', e.message); }
+    },
+
+    _backToLevel() {
+        if (this._level) {
+            this._selectLevel(this._level.id, this._level.name);
+        } else {
+            this._showLevelSelector();
+        }
     },
 
     /* ── Lesson View ────────────────────────────────────────────────────── */
@@ -196,58 +359,178 @@ const AcademyPage = {
         this._bc(this._level?.name, this._module?.name, lessonTitle);
         const main = document.getElementById('ac-main');
         main.innerHTML = this._loading('Loading lesson…');
+        
         try {
-            const lesson = await API.lms.getLesson(lessonId);
-            main.innerHTML = `<div class="max-w-2xl">
-                <div class="pw-card mb-4">
-                    <div class="pw-card-hdr">
-                        <div>
-                            <div class="text-xs text-gray-500 mb-0.5">${_es(lesson.module_title)} · ${_es(lesson.level_name)}</div>
-                            <h2 class="card-title">${_es(lesson.title)}</h2>
+            const [lesson, navigation] = await Promise.all([
+                API.lms.getLesson(lessonId),
+                API.lms.getLessonNavigation(lessonId).catch(()=>null)
+            ]);
+            this._navigation = navigation;
+            
+            // Check if lesson needs TradingView chart
+            const needsChart = lesson.content.toLowerCase().includes('chart') || 
+                              lesson.content.toLowerCase().includes('support') ||
+                              lesson.content.toLowerCase().includes('resistance') ||
+                              lesson.content.toLowerCase().includes('trend');
+            
+            main.innerHTML = `
+                <div class="max-w-3xl mx-auto">
+                    ${this._renderLessonNavigation()}
+                    
+                    <div class="pw-card mb-4">
+                        <div class="pw-card-hdr flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div>
+                                <div class="text-xs text-gray-500 mb-0.5">${_es(lesson.module_title)} · ${_es(lesson.level_name)}</div>
+                                <h2 class="card-title text-lg sm:text-xl">${_es(lesson.title)}</h2>
+                            </div>
+                            <span class="badge badge-primary text-xs self-start sm:self-auto">${_es(lesson.level_name)}</span>
+                        </div>
+                        <div class="pw-card-body">
+                            ${needsChart?this._renderTradingViewWidget():''}
+                            <div class="ac-lesson-text">${this._md(lesson.content)}</div>
                         </div>
                     </div>
-                    <div class="pw-card-body">
-                        <div class="ac-lesson-text">${this._md(lesson.content)}</div>
+                    
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button class="btn btn-primary" onclick="AcademyPage._startQuiz(${lessonId})">
+                            <i class="fas fa-pencil-alt mr-2"></i>Take Quiz
+                        </button>
+                        <button id="ac-explain-btn" class="btn btn-secondary"
+                                onclick="AcademyPage._showExplanation(${lessonId})">
+                            <i class="fas fa-robot mr-2 text-purple-400"></i>Trading Coach Explain
+                        </button>
+                        <button id="ac-practice-btn" class="btn btn-secondary"
+                                onclick="AcademyPage._showPractice(${lessonId})">
+                            <i class="fas fa-dumbbell mr-2 text-yellow-400"></i>Practice
+                        </button>
+                        <button id="ac-chart-btn" class="btn btn-secondary"
+                                onclick="AcademyPage._showChartPractice(${lessonId})">
+                            <i class="fas fa-chart-bar mr-2 text-blue-400"></i>Chart Exercise
+                        </button>
                     </div>
-                </div>
-                <div class="flex flex-wrap gap-2 mb-4">
-                    <button class="btn btn-primary" onclick="AcademyPage._startQuiz(${lessonId})">
-                        <i class="fas fa-pencil-alt mr-2"></i>Take Quiz
-                    </button>
-                    <button id="ac-explain-btn" class="btn" style="background:#1f2937;border:1px solid #374151;color:#e5e7eb;"
-                            onclick="AcademyPage._showExplanation(${lessonId})">
-                        <i class="fas fa-robot mr-2" style="color:#a78bfa;"></i>AI Explanation
-                    </button>
-                    <button id="ac-practice-btn" class="btn" style="background:#1f2937;border:1px solid #374151;color:#e5e7eb;"
-                            onclick="AcademyPage._showPractice(${lessonId})">
-                        <i class="fas fa-dumbbell mr-2" style="color:#fbbf24;"></i>Practice
-                    </button>
-                    <button id="ac-chart-btn" class="btn" style="background:#1f2937;border:1px solid #374151;color:#e5e7eb;"
-                            onclick="AcademyPage._showChartPractice(${lessonId})">
-                        <i class="fas fa-chart-bar mr-2" style="color:#60a5fa;"></i>Chart Exercise
-                    </button>
-                </div>
-                <div id="ac-ai-panel"></div>
-            </div>`;
-        } catch(e) { main.innerHTML = this._error('Could not load lesson', e.message); }
+                    
+                    <div id="ac-ai-panel"></div>
+                    ${this._renderLessonNavigation('bottom')}
+                </div>`;
+                
+            // Initialize TradingView widget if present
+            if (needsChart) {
+                this._initTradingView();
+            }
+        } catch(e) { 
+            main.innerHTML = this._error('Could not load lesson', e.message); 
+        }
     },
 
+    /* ── TradingView Widget ─────────────────────────────────────────────── */
+    _renderTradingViewWidget() {
+        return `
+            <div class="mb-6 rounded-xl overflow-hidden border border-gray-700">
+                <div class="bg-gray-800 px-4 py-2 flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-400"><i class="fas fa-chart-line mr-2"></i>Live Chart Analysis</span>
+                    <span class="text-xs text-gray-500">Powered by TradingView</span>
+                </div>
+                <div class="tradingview-widget-container" style="height:400px;width:100%;">
+                    <div id="tradingview_chart" style="height:100%;"></div>
+                </div>
+                <div class="bg-gray-800 px-4 py-2 text-xs text-gray-500 text-center">
+                    Use the chart above to practice identifying trends, support, and resistance levels
+                </div>
+            </div>
+        `;
+    },
+
+    _initTradingView() {
+        // Load TradingView script dynamically
+        if (!window.TradingView) {
+            const script = document.createElement('script');
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.async = true;
+            script.onload = () => this._createTradingViewWidget();
+            document.head.appendChild(script);
+        } else {
+            this._createTradingViewWidget();
+        }
+    },
+
+    _createTradingViewWidget() {
+        if (window.TradingView && document.getElementById('tradingview_chart')) {
+            new TradingView.widget({
+                container_id: "tradingview_chart",
+                autosize: true,
+                symbol: "FX:EURUSD",
+                interval: "240",
+                timezone: "Etc/UTC",
+                theme: "dark",
+                style: "1",
+                locale: "en",
+                toolbar_bg: "#1a1a2e",
+                enable_publishing: false,
+                allow_symbol_change: true,
+                save_image: false,
+                studies: ["MASimple@tv-basicstudies", "MACD@tv-basicstudies"],
+                show_popup_button: true,
+                popup_width: "1000",
+                popup_height: "650",
+            });
+        }
+    },
+
+    /* ── Lesson Navigation ──────────────────────────────────────────────── */
+    _renderLessonNavigation(position = 'top') {
+        if (!this._navigation) return '';
+        
+        const {prev_lesson, next_lesson} = this._navigation;
+        const isTop = position === 'top';
+        
+        if (!prev_lesson && !next_lesson) return '';
+        
+        return `
+            <div class="flex ${isTop?'justify-between mb-4':'justify-between mt-6 pt-4 border-t border-gray-800'}">
+                ${prev_lesson 
+                    ? `<button onclick="AcademyPage._openLesson(${prev_lesson.id},'${_es(prev_lesson.title)}')" 
+                              class="btn btn-secondary text-sm flex items-center">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        <div class="text-left hidden sm:block">
+                            <div class="text-xs text-gray-500">Previous</div>
+                            <div class="truncate max-w-[150px]">${_es(prev_lesson.title)}</div>
+                        </div>
+                        <span class="sm:hidden">Previous</span>
+                       </button>`
+                    : `<div></div>`
+                }
+                ${next_lesson 
+                    ? `<button onclick="AcademyPage._openLesson(${next_lesson.id},'${_es(next_lesson.title)}')" 
+                              class="btn btn-primary text-sm flex items-center">
+                        <div class="text-right hidden sm:block">
+                            <div class="text-xs text-gray-500">Next Lesson</div>
+                            <div class="truncate max-w-[150px]">${_es(next_lesson.title)}</div>
+                        </div>
+                        <span class="sm:hidden">Next</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
+                       </button>`
+                    : `<div></div>`
+                }
+            </div>
+        `;
+    },
+
+    /* ── AI Trading Coach (formerly AI Explanation) ───────────────────────── */
     async _showExplanation(lessonId) {
         this._setBtn('ac-explain-btn',true,'Loading…');
         const panel = document.getElementById('ac-ai-panel');
-        panel.innerHTML = this._aiLoading('AI Mentor preparing explanation…');
+        panel.innerHTML = this._aiLoading('Trading Coach is preparing an explanation…');
         try {
             const d = await API.lms.getMentorTeach(lessonId);
             panel.innerHTML = `<div class="pw-card" style="border-left:3px solid #a78bfa;">
                 <div class="pw-card-hdr"><div class="flex items-center gap-2">
                     <i class="fas fa-robot" style="color:#a78bfa;"></i>
-                    <span class="card-title" style="font-size:.95rem;">AI Mentor · ${_es(d.lesson_title)}</span>
-                    <span class="badge badge-primary text-xs">${_es(d.level)}</span>
+                    <span class="card-title" style="font-size:.95rem;">Pipways Trading Coach · ${_es(d.level)}</span>
                 </div></div>
                 <div class="pw-card-body"><div class="ac-lesson-text">${this._md(d.explanation)}</div></div>
             </div>`;
         } catch(e) { panel.innerHTML = this._error('Explanation failed',e.message); }
-        this._setBtn('ac-explain-btn',false,'<i class="fas fa-robot mr-2" style="color:#a78bfa;"></i>AI Explanation');
+        this._setBtn('ac-explain-btn',false,'<i class="fas fa-robot mr-2 text-purple-400"></i>Trading Coach Explain');
     },
 
     async _showPractice(lessonId) {
@@ -264,7 +547,7 @@ const AcademyPage = {
                 <div class="pw-card-body"><div class="ac-lesson-text">${this._md(d.exercise)}</div></div>
             </div>`;
         } catch(e) { panel.innerHTML = this._error('Practice failed',e.message); }
-        this._setBtn('ac-practice-btn',false,'<i class="fas fa-dumbbell mr-2" style="color:#fbbf24;"></i>Practice');
+        this._setBtn('ac-practice-btn',false,'<i class="fas fa-dumbbell mr-2 text-yellow-400"></i>Practice');
     },
 
     async _showChartPractice(lessonId) {
@@ -281,6 +564,7 @@ const AcademyPage = {
                         onclick="AcademyPage._answerChart(${i},'${_es(cp.correct||'')}','${_es(cp.explanation||'')}')">
                     ${_es(opt)}
                 </button>`).join('');
+            
             panel.innerHTML = `<div class="pw-card" style="border-left:3px solid #60a5fa;">
                 <div class="pw-card-hdr"><div class="flex items-center gap-2">
                     <i class="fas fa-chart-bar" style="color:#60a5fa;"></i>
@@ -298,7 +582,7 @@ const AcademyPage = {
                 </div>
             </div>`;
         } catch(e) { panel.innerHTML = this._error('Chart exercise failed',e.message); }
-        this._setBtn('ac-chart-btn',false,'<i class="fas fa-chart-bar mr-2" style="color:#60a5fa;"></i>Chart Exercise');
+        this._setBtn('ac-chart-btn',false,'<i class="fas fa-chart-bar mr-2 text-blue-400"></i>Chart Exercise');
     },
 
     _answerChart(idx, correct, explanation) {
@@ -343,7 +627,7 @@ const AcademyPage = {
         const {questions,index} = this._quiz;
         const q=questions[index], total=questions.length, pct=Math.round(index/total*100);
         const main = document.getElementById('ac-main');
-        main.innerHTML = `<div class="max-w-xl">
+        main.innerHTML = `<div class="max-w-xl mx-auto">
             <div class="flex items-center justify-between mb-2 text-xs text-gray-500">
                 <span>Question ${index+1} of ${total}</span>
                 <span>${_es(this._lesson?.name||'Quiz')}</span>
@@ -413,12 +697,19 @@ const AcademyPage = {
                 </div>
             </div>`).join('');
 
-        main.innerHTML=`<div class="max-w-xl">
+        main.innerHTML=`<div class="max-w-xl mx-auto">
             <div class="pw-card mb-4" style="border-top:3px solid ${passClr};">
                 <div class="pw-card-body text-center" style="padding:2rem;">
                     <div class="text-5xl font-black mb-2" style="color:${passClr};">${result.score}%</div>
                     <div class="font-semibold text-white text-lg">${passMsg}</div>
                     <div class="text-gray-500 text-sm mt-1">${result.correct} of ${result.total} correct</div>
+                    ${result.new_badge?`
+                        <div class="mt-4 p-4 bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-xl border border-purple-500/30 animate-pulse">
+                            <i class="fas fa-trophy text-yellow-400 text-2xl mb-2"></i>
+                            <div class="text-white font-bold">New Badge Unlocked!</div>
+                            <div class="text-purple-300 text-sm">${_es(result.new_badge.name)}</div>
+                        </div>
+                    `:''}
                 </div>
             </div>
             ${result.mentor_feedback?`
@@ -426,7 +717,7 @@ const AcademyPage = {
                 <div class="pw-card-body">
                     <div class="flex items-center gap-2 mb-2">
                         <i class="fas fa-robot" style="color:#a78bfa;"></i>
-                        <strong class="text-white text-sm">Mentor Feedback</strong>
+                        <strong class="text-white text-sm">Trading Coach Feedback</strong>
                     </div>
                     <p class="text-gray-300 text-sm leading-relaxed">${_es(result.mentor_feedback)}</p>
                 </div>
@@ -439,37 +730,17 @@ const AcademyPage = {
                 ${result.passed
                     ?`<button class="btn btn-primary" onclick="AcademyPage._selectModule(${this._module?.id},'${_es(this._module?.name||'')}')"><i class="fas fa-arrow-left mr-2"></i>Back to Module</button>`
                     :`<button class="btn btn-primary" onclick="AcademyPage._startQuiz(${this._quiz.lessonId})"><i class="fas fa-redo mr-2"></i>Retry Quiz</button>`}
-                <button class="btn" style="background:#1f2937;border:1px solid #374151;color:#e5e7eb;"
+                <button class="btn btn-secondary"
                         onclick="AcademyPage._openLesson(${this._lesson?.id},'${_es(this._lesson?.name||'')}')">
                     <i class="fas fa-book-open mr-2"></i>Review Lesson
                 </button>
+                ${this._navigation?.next_lesson && result.passed
+                    ? `<button class="btn btn-success" onclick="AcademyPage._openLesson(${this._navigation.next_lesson.id},'${_es(this._navigation.next_lesson.title)}')">
+                        Next Lesson <i class="fas fa-arrow-right ml-2"></i>
+                       </button>`
+                    : ''}
             </div>
         </div>`;
-    },
-
-    /* ── AI Mentor Banner ───────────────────────────────────────────────── */
-    async _loadMentorBanner() {
-        if (!this._uid) return;
-        const banner = document.getElementById('ac-mentor-banner');
-        if (!banner) return;
-        try {
-            const g = await API.lms.getMentorGuide(this._uid);
-            banner.innerHTML=`<div class="pw-card mb-5" style="border-left:3px solid #a78bfa;background:linear-gradient(135deg,#0f0a1f,#1a0a2e);">
-                <div class="pw-card-body"><div class="flex items-start gap-3">
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(219,39,119,.2);">
-                        <i class="fas fa-robot" style="color:#f472b6;"></i>
-                    </div>
-                    <div class="flex-1">
-                        <div class="text-xs font-semibold mb-1" style="color:#a78bfa;">AI MENTOR</div>
-                        <p class="text-gray-300 text-sm leading-relaxed">${_es(g.message)}</p>
-                        ${g.next_lesson?`<button class="btn btn-primary mt-3 text-xs" style="font-size:.78rem;padding:.35rem .85rem;"
-                                onclick="AcademyPage._openLesson(${g.next_lesson.id},'${_es(g.next_lesson.title)}')">
-                            Continue: ${_es(g.next_lesson.title)} →
-                        </button>`:''}
-                    </div>
-                </div></div>
-            </div>`;
-        } catch(_) { banner.innerHTML=''; }
     },
 
     /* ── Breadcrumb ─────────────────────────────────────────────────────── */
@@ -478,10 +749,12 @@ const AcademyPage = {
         if(!el) return;
         if(!level){el.style.display='none';el.innerHTML='';return;}
         el.style.display='flex';
+        el.style.flexWrap = 'wrap';
+        el.style.gap = '0.5rem';
         el.innerHTML=
-            `<a href="#" onclick="AcademyPage._showLevelSelector();return false;" class="text-purple-400">Academy</a>`+
-            (level?`<span class="pw-breadcrumb-sep">›</span><a href="#" onclick="AcademyPage._selectLevel(${this._level?.id},'${_es(level)}');return false;" class="text-purple-400">${_es(level)}</a>`:'')+
-            (module?`<span class="pw-breadcrumb-sep">›</span><a href="#" onclick="AcademyPage._selectModule(${this._module?.id},'${_es(module)}');return false;" class="text-purple-400">${_es(module)}</a>`:'')+
+            `<a href="#" onclick="AcademyPage._showLevelSelector();return false;" class="text-purple-400 hover:text-purple-300">Academy</a>`+
+            (level?`<span class="pw-breadcrumb-sep">›</span><a href="#" onclick="AcademyPage._selectLevel(${this._level?.id},'${_es(level)}');return false;" class="text-purple-400 hover:text-purple-300">${_es(level)}</a>`:'')+
+            (module?`<span class="pw-breadcrumb-sep">›</span><a href="#" onclick="AcademyPage._selectModule(${this._module?.id},'${_es(module)}');return false;" class="text-purple-400 hover:text-purple-300">${_es(module)}</a>`:'')+
             (lesson?`<span class="pw-breadcrumb-sep">›</span><span class="text-gray-400">${_es(lesson)}</span>`:'');
     },
 
@@ -519,13 +792,49 @@ window.AcademyPage = AcademyPage;
     s.textContent=`
         .ac-lesson-text{color:#d1d5db;font-size:.9rem;line-height:1.75;}
         .ac-lesson-text .ac-p{margin:.75rem 0;}
-        .ac-h3{font-size:1rem;font-weight:600;color:white;margin:1.5rem 0 .5rem;}
-        .ac-h4{font-size:.95rem;font-weight:600;color:#d1d5db;margin:1.25rem 0 .4rem;}
+        .ac-h3{font-size:1.1rem;font-weight:600;color:white;margin:1.5rem 0 .5rem;}
+        .ac-h4{font-size:1rem;font-weight:600;color:#d1d5db;margin:1.25rem 0 .4rem;}
         .ac-ul{margin:.5rem 0 .5rem 1.25rem;list-style:disc;}
         .ac-li{margin:.2rem 0;}
         .ac-code{display:block;background:#111827;border:1px solid #1f2937;border-radius:.5rem;padding:1rem;font-size:.8rem;font-family:monospace;color:#a78bfa;overflow-x:auto;margin:.75rem 0;}
         .ac-inline-code{background:#111827;border:1px solid #1f2937;border-radius:.3rem;padding:.1rem .4rem;font-size:.8em;font-family:monospace;color:#fbbf24;}
         .ac-chart-opt:not(:disabled):hover{border-color:#7c3aed!important;background:rgba(124,58,237,.08)!important;color:#c4b5fd!important;}
+        
+        /* Mobile Responsiveness */
+        @media (max-width: 640px) {
+            .pw-card-body { padding: 1rem !important; }
+            .ac-lesson-text { font-size: 0.95rem; }
+            .ac-h3 { font-size: 1rem; }
+            .btn { width: 100%; margin-bottom: 0.5rem; justify-content: center; }
+            .flex-wrap { flex-direction: column; }
+            #academy-container { padding: 0.5rem; }
+        }
+        
+        .btn-secondary {
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #e5e7eb;
+        }
+        .btn-secondary:hover {
+            background: #374151;
+            border-color: #4b5563;
+        }
+        .btn-success {
+            background: #059669;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #047857;
+        }
+        
+        /* Animation for new badges */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     `;
     document.head.appendChild(s);
 })();
@@ -534,42 +843,3 @@ window.AcademyPage = AcademyPage;
 function _es(str){
     return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-
-/*
- ═══════════════════════════════════════════════════════════════════════════
-  INTEGRATION — add these 4 small pieces to dashboard.html
- ═══════════════════════════════════════════════════════════════════════════
-
- 1. SIDEBAR NAV (inside the LEARNING nav-section-label block):
-    <a href="#" data-section="academy" class="nav-link">
-        <i class="fas fa-graduation-cap nav-icon" style="color:#34d399;"></i>
-        <span>Trading Academy</span>
-    </a>
-
- 2. SECTION HTML (alongside the other <section> blocks):
-    <section id="section-academy" class="section hidden">
-        <div id="academy-container"></div>
-    </section>
-
- 3. loadSectionData switch (add case):
-        case 'academy':
-            if (typeof AcademyPage !== 'undefined') await AcademyPage.render();
-            break;
-
-    navigate() meta map (add entry):
-        'academy': { title: 'Trading Academy', sub: 'Structured lessons from beginner to advanced' },
-
- 4. SCRIPT TAG (at the bottom, after other module scripts):
-    <script src="/js/modules/academy.js"></script>
-
- ── Backend integration ──────────────────────────────────────────────────
- main.py — add two lines:
-    from . import learning
-    app.include_router(learning.router, prefix="/learning", tags=["Learning"])
-
- File placement:
-    lms_init.py  →  backend package directory (same as main.py)
-    learning.py  →  backend package directory
-    academy.js   →  frontend/js/modules/
- ═══════════════════════════════════════════════════════════════════════════
-*/

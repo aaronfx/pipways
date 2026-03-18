@@ -38,14 +38,13 @@
 const AcademyPage = {
 
     _level: null, _module: null, _lesson: null, _quiz: null, _uid: null,
-    _navigation: null, // Stores next/prev lesson info
+    _navigation: null,
 
     async render() {
         const u = this._getUser(); this._uid = u?.id ?? null;
         const wrap = document.getElementById('academy-container');
         if (!wrap) return;
         
-        // Check for first visit
         const hasVisited = localStorage.getItem('academy_visited');
         if (!hasVisited && this._uid) {
             localStorage.setItem('academy_visited', 'true');
@@ -60,7 +59,6 @@ const AcademyPage = {
         await this._showLevelSelector();
     },
 
-    /* ── Welcome Modal ────────────────────────────────────────────────────── */
     _showWelcomeModal() {
         const modal = document.createElement('div');
         modal.id = 'ac-welcome-modal';
@@ -79,7 +77,7 @@ const AcademyPage = {
                             <div class="text-gray-500">Levels</div>
                         </div>
                         <div class="bg-gray-800 p-3 rounded-lg">
-                            <div class="text-purple-400 font-bold text-lg">21</div>
+                            <div class="text-purple-400 font-bold text-lg">18</div>
                             <div class="text-gray-500">Modules</div>
                         </div>
                         <div class="bg-gray-800 p-3 rounded-lg">
@@ -109,20 +107,19 @@ const AcademyPage = {
         main.innerHTML = this._loading('Loading levels…');
         
         try {
-            // Load badges and progress in parallel
             const [levels, prog, badges] = await Promise.all([
                 API.lms.getLevels(),
                 this._uid ? API.lms.getProgress(this._uid).catch(()=>null) : null,
                 this._uid ? API.lms.getBadges(this._uid).catch(()=>null) : null,
             ]);
             
-            // Render badges banner if user has badges
             if (badges && badges.length > 0) {
                 this._renderBadgesBanner(badges);
             }
             
             const sm = {};
             (prog?.summary||[]).forEach(s=>sm[s.level_id]=s);
+            
             if (this._uid) {
                 this._loadMentorBanner();
                 this._loadAIMentorRecommendations();
@@ -191,28 +188,29 @@ const AcademyPage = {
         }
     },
 
-    /* ── Badges Banner ────────────────────────────────────────────────────── */
-    _renderBadgesBanner(badges) {
-        const banner = document.getElementById('ac-badges-banner');
-        if (!banner || !badges.length) return;
-        
-        const recentBadges = badges.slice(0, 3);
-        banner.innerHTML = `
-            <div class="pw-card" style="background: linear-gradient(135deg, #1a0a2e, #0f0a1f); border: 1px solid rgba(167, 139, 250, 0.2);">
-                <div class="pw-card-body py-3 px-4">
-                    <div class="flex items-center gap-4 overflow-x-auto pb-2 md:pb-0">
-                        <div class="text-xs font-semibold text-purple-400 whitespace-nowrap">ACHIEVEMENTS</div>
-                        ${recentBadges.map(b => `
-                            <div class="flex items-center gap-2 bg-gray-800 rounded-full px-3 py-1 whitespace-nowrap">
-                                <i class="fas ${_es(b.icon)} text-${b.color}-400"></i>
-                                <span class="text-xs text-gray-300">${_es(b.name)}</span>
-                            </div>
-                        `).join('')}
-                        ${badges.length > 3 ? `<div class="text-xs text-gray-500">+${badges.length - 3} more</div>` : ''}
+    /* ── AI Mentor Banner ───────────────────────────────────────────────── */
+    async _loadMentorBanner() {
+        if (!this._uid) return;
+        const banner = document.getElementById('ac-mentor-banner');
+        if (!banner) return;
+        try {
+            const g = await API.lms.getMentorGuide(this._uid);
+            banner.innerHTML=`<div class="pw-card mb-5" style="border-left:3px solid #a78bfa;background:linear-gradient(135deg,#0f0a1f,#1a0a2e);">
+                <div class="pw-card-body"><div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(219,39,119,.2);">
+                        <i class="fas fa-robot" style="color:#f472b6;"></i>
                     </div>
-                </div>
-            </div>
-        `;
+                    <div class="flex-1">
+                        <div class="text-xs font-semibold mb-1" style="color:#a78bfa;">TRADING COACH</div>
+                        <p class="text-gray-300 text-sm leading-relaxed">${_es(g.message)}</p>
+                        ${g.next_lesson?`<button class="btn btn-primary mt-3 text-xs" style="font-size:.78rem;padding:.35rem .85rem;"
+                                onclick="AcademyPage._openLesson(${g.next_lesson.id},'${_es(g.next_lesson.title)}')">
+                            Continue: ${_es(g.next_lesson.title)} →
+                        </button>`:''}
+                    </div>
+                </div></div>
+            </div>`;
+        } catch(_) { banner.innerHTML=''; }
     },
 
     /* ── AI Mentor Recommendations ─────────────────────────────────────────── */
@@ -243,6 +241,30 @@ const AcademyPage = {
                     </div>`;
             }
         } catch(_) { /* Silent fail */ }
+    },
+
+    /* ── Badges Banner ────────────────────────────────────────────────────── */
+    _renderBadgesBanner(badges) {
+        const banner = document.getElementById('ac-badges-banner');
+        if (!banner || !badges.length) return;
+        
+        const recentBadges = badges.slice(0, 3);
+        banner.innerHTML = `
+            <div class="pw-card" style="background: linear-gradient(135deg, #1a0a2e, #0f0a1f); border: 1px solid rgba(167, 139, 250, 0.2);">
+                <div class="pw-card-body py-3 px-4">
+                    <div class="flex items-center gap-4 overflow-x-auto pb-2 md:pb-0">
+                        <div class="text-xs font-semibold text-purple-400 whitespace-nowrap">ACHIEVEMENTS</div>
+                        ${recentBadges.map(b => `
+                            <div class="flex items-center gap-2 bg-gray-800 rounded-full px-3 py-1 whitespace-nowrap">
+                                <i class="fas ${_es(b.icon)} text-${b.color}-400"></i>
+                                <span class="text-xs text-gray-300">${_es(b.name)}</span>
+                            </div>
+                        `).join('')}
+                        ${badges.length > 3 ? `<div class="text-xs text-gray-500">+${badges.length - 3} more</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
     },
 
     /* ── Module List ────────────────────────────────────────────────────── */
@@ -367,7 +389,6 @@ const AcademyPage = {
             ]);
             this._navigation = navigation;
             
-            // Check if lesson needs TradingView chart
             const needsChart = lesson.content.toLowerCase().includes('chart') || 
                               lesson.content.toLowerCase().includes('support') ||
                               lesson.content.toLowerCase().includes('resistance') ||
@@ -413,7 +434,6 @@ const AcademyPage = {
                     ${this._renderLessonNavigation('bottom')}
                 </div>`;
                 
-            // Initialize TradingView widget if present
             if (needsChart) {
                 this._initTradingView();
             }
@@ -441,7 +461,6 @@ const AcademyPage = {
     },
 
     _initTradingView() {
-        // Load TradingView script dynamically
         if (!window.TradingView) {
             const script = document.createElement('script');
             script.src = 'https://s3.tradingview.com/tv.js';
@@ -515,7 +534,7 @@ const AcademyPage = {
         `;
     },
 
-    /* ── AI Trading Coach (formerly AI Explanation) ───────────────────────── */
+    /* ── AI Trading Coach ─────────────────────────────────────────────────── */
     async _showExplanation(lessonId) {
         this._setBtn('ac-explain-btn',true,'Loading…');
         const panel = document.getElementById('ac-ai-panel');
@@ -800,7 +819,6 @@ window.AcademyPage = AcademyPage;
         .ac-inline-code{background:#111827;border:1px solid #1f2937;border-radius:.3rem;padding:.1rem .4rem;font-size:.8em;font-family:monospace;color:#fbbf24;}
         .ac-chart-opt:not(:disabled):hover{border-color:#7c3aed!important;background:rgba(124,58,237,.08)!important;color:#c4b5fd!important;}
         
-        /* Mobile Responsiveness */
         @media (max-width: 640px) {
             .pw-card-body { padding: 1rem !important; }
             .ac-lesson-text { font-size: 0.95rem; }
@@ -827,7 +845,6 @@ window.AcademyPage = AcademyPage;
             background: #047857;
         }
         
-        /* Animation for new badges */
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -839,7 +856,6 @@ window.AcademyPage = AcademyPage;
     document.head.appendChild(s);
 })();
 
-/* ── Safe HTML escape ───────────────────────────────────────────────────── */
 function _es(str){
     return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }

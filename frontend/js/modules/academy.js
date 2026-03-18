@@ -1,6 +1,6 @@
 /**
- * Pipways Trading Academy Frontend Module v4.0 (Production)
- * Fixes: HTML rendering, TradingView widgets, SVG diagrams, 5-question quizzes, mobile nav
+ * Pipways Trading Academy Frontend Module v4.1 (Production)
+ * Fixes: HTML rendering, TradingView widgets, SVG diagrams, 5-question quizzes, safe DOM injection.
  */
 
 /* ── LMS API Extension ──────────────────────────────────────────────────── */
@@ -101,15 +101,18 @@ const AcademyPage = {
                 this._firstVisit = guide.first_visit;
             }
             
+            // Safe progress parsing
             const sm = {};
-            (prog?.summary || []).forEach(s => sm[s.level_id] = s);
+            if (prog && Array.isArray(prog.summary)) {
+                prog.summary.forEach(s => sm[s.level_id] = s);
+            }
             
             if (this._uid) this._loadMentorBanner(guide);
             
             const cfg = [
                 { icon: 'fa-seedling', color: '#34d399', bg: 'rgba(52,211,153,.15)' },
                 { icon: 'fa-chart-line', color: '#60a5fa', bg: 'rgba(96,165,250,.15)' },
-                { icon: 'fa-trophy', color: '#f59e0b', bg: 'rgba(245,158,11,.15)' },
+                { icon: 'fa-chess-knight', color: '#f59e0b', bg: 'rgba(245,158,11,.15)' },
             ];
             
             if (!levels || !levels.length) {
@@ -161,55 +164,6 @@ const AcademyPage = {
     },
 
     /* ── Module List ────────────────────────────────────────────────────── */
-    async _selectLevel(levelId, levelName) {
-        this._level = { id: levelId, name: levelName };
-        this._module = null;
-        this._bc(levelName, null, null);
-        this._hideMobileNav();
-        
-        const main = document.getElementById('ac-main');
-        main.innerHTML = this._loading('Loading modules...');
-        
-        try {
-            const modules = await API.lms.getModules(levelId);
-            
-            main.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 ac-module-grid">
-                ${modules.map(m => {
-                    const pct = m.lesson_count ? Math.round(m.completed_count / m.lesson_count * 100) : 0;
-                    const isComplete = m.is_complete;
-                    
-                    return `
-                    <div class="pw-card cursor-pointer ac-module-card ${isComplete ? 'ac-module-complete' : ''}" 
-                         onclick="AcademyPage._selectModule(${m.id}, '${_es(m.title)}')"
-                         onmouseover="this.style.borderColor='#374151'" 
-                         onmouseout="this.style.borderColor=''">
-                        <div class="pw-card-body">
-                            <div class="flex items-start justify-between mb-2">
-                                <div>
-                                    ${isComplete 
-                                        ? `<span class="badge badge-success text-xs mb-1"><i class="fas fa-check-circle mr-1"></i>Complete</span>`
-                                        : `<span class="text-xs text-gray-500 mb-1 block">${m.completed_count}/${m.lesson_count} lessons</span>`
-                                    }
-                                    <h3 class="text-white font-semibold">${_es(m.title)}</h3>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-700 text-xs mt-1"></i>
-                            </div>
-                            <p class="text-gray-500 text-xs leading-relaxed mb-3">${_es(m.description)}</p>
-                            <div class="pw-progress-bar">
-                                <div class="pw-progress-fill ${pct >= 80 && pct < 100 ? 'near-done' : ''}" 
-                                     style="width:${pct}%;"></div>
-                            </div>
-                            ${isComplete ? `<div class="ac-module-badge"><i class="fas fa-medal"></i> Module Complete</div>` : ''}
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>`;
-        } catch (e) {
-            main.innerHTML = this._error('Could not load modules', e.message);
-        }
-    },
-
-    /* ── Lesson List ────────────────────────────────────────────────────── */
     async _selectModule(moduleId, moduleTitle) {
         this._module = { id: moduleId, name: moduleTitle };
         this._lesson = null;
@@ -269,7 +223,6 @@ const AcademyPage = {
         try {
             const lesson = await API.lms.getLesson(lessonId);
             
-            // Wait for marked.js if not loaded
             if (typeof marked === 'undefined') {
                 await new Promise(resolve => {
                     const check = setInterval(() => {
@@ -319,7 +272,6 @@ const AcademyPage = {
                         </button>
                     </div>
                     
-                    <!-- Desktop Navigation -->
                     <div class="hidden md:flex justify-between items-center py-4 border-t border-gray-800">
                         ${lesson.prev_lesson 
                             ? `<button onclick="AcademyPage._openLesson(${lesson.prev_lesson.id}, '${_es(lesson.prev_lesson.title)}')" 
@@ -341,7 +293,6 @@ const AcademyPage = {
                 </div>
             `;
             
-            // Initialize TradingView widgets after DOM insertion
             setTimeout(() => this.initTradingViewWidgets(), 100);
             
         } catch (e) {
@@ -353,11 +304,9 @@ const AcademyPage = {
     _processLessonContent(content) {
         if (!content) return '';
         
-        // Use marked.js if available, otherwise fallback
         const parseMarkdown = (typeof marked !== 'undefined' && marked.parse) 
             ? (text) => marked.parse(text, { breaks: true, gfm: true })
             : (text) => {
-                // Fallback markdown parser
                 return text
                     .replace(/^## (.*$)/gim, '<h3 class="ac-h3">$1</h3>')
                     .replace(/^### (.*$)/gim, '<h4 class="ac-h4">$1</h4>')
@@ -369,10 +318,9 @@ const AcademyPage = {
                     .replace(/\n/gim, '<br>');
             };
         
-        // Parse markdown - this preserves HTML tags in the content
         let html = parseMarkdown(content);
         
-        // Fix SVG marker order (ensure defs come first in any SVG)
+        // Render SVGs safely
         html = html.replace(/<svg([^>]*)>([\s\S]*?)<\/svg>/g, (match, attrs, inner) => {
             const defsMatch = inner.match(/<defs>[\s\S]*?<\/defs>/);
             const defs = defsMatch ? defsMatch[0] : '';
@@ -392,7 +340,6 @@ const AcademyPage = {
             const id = el.id || 'tv-widget-' + Math.random().toString(36).substr(2, 9);
             el.id = id;
             
-            // Ensure container has height
             el.style.height = '400px';
             el.style.minHeight = '400px';
             
@@ -427,7 +374,6 @@ const AcademyPage = {
                     el.innerHTML = '<div class="p-4 text-gray-500 text-sm">Chart loading failed. Please refresh.</div>';
                 }
             } else {
-                // Load TradingView script if not present
                 el.innerHTML = '<div class="p-4 text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading chart...</div>';
                 
                 if (!window._tradingViewLoading) {
@@ -476,7 +422,7 @@ const AcademyPage = {
         if (nav) nav.classList.add('hidden');
     },
 
-    /* ── Quiz Engine (5 Questions) ──────────────────────────────────────── */
+    /* ── Quiz Engine ──────────────────────────────────────── */
     async _startQuiz(lessonId) {
         const main = document.getElementById('ac-main');
         main.innerHTML = this._loading('Loading quiz...');
@@ -653,7 +599,7 @@ const AcademyPage = {
                 <div class="pw-card mb-4 ac-feedback-card" style="border-left:3px solid #a78bfa;">
                     <div class="pw-card-body">
                         <div class="flex items-center gap-2 mb-2">
-                            <i class="fas fa-robot" style="color:#a78bfa;"></i>
+                            <i class="fas fa-chalkboard-teacher" style="color:#a78bfa;"></i>
                             <strong class="text-white text-sm">Trading Coach Feedback</strong>
                         </div>
                         <p class="text-gray-300 text-sm leading-relaxed">${_es(result.mentor_feedback)}</p>
@@ -860,10 +806,10 @@ const AcademyPage = {
             "technical_analyst": { name: "Technical Analyst", icon: "fa-chart-line", color: "#60a5fa" },
             "strategy_builder": { name: "Strategy Builder", icon: "fa-chess-knight", color: "#a78bfa" },
             "pipways_certified": { name: "Pipways Certified", icon: "fa-certificate", color: "#f59e0b" },
-            "quiz_master": { name: "Quiz Master", icon: "fa-brain", color: "#f472b6" },
-            "perfect_score": { name: "Perfect Score", icon: "fa-star", color: "#fbbf24" },
+            "quiz_master": { name: "Quiz Master", icon: "fa-cogs", color: "#f472b6" },
+            "perfect_score": { name: "Perfect Score", icon: "fa-medal", color: "#fbbf24" },
             "risk_manager": { name: "Risk Manager", icon: "fa-shield-alt", color: "#22d3ee" },
-            "psychology_pro": { name: "Psychology Pro", icon: "fa-brain", color: "#e879f9" },
+            "psychology_pro": { name: "Psychology Pro", icon: "fa-cogs", color: "#e879f9" },
         };
         
         badgeTypes.forEach((type, i) => {

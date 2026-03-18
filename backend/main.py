@@ -26,22 +26,20 @@ from . import ai_services
 from . import chart_analysis
 from . import performance
 from . import ai_mentor
-from . import ai_insights   # Proactive AI Insight Engine
+from . import ai_insights   
 from . import cms
 
-# Trading Academy LMS Imports
+# Trading Academy LMS Imports (MERGED ROUTERS)
 try:
     from . import learning
-    LEARNING_ROUTER = learning.router
-    print("[IMPORT] Learning module loaded", flush=True)
-except ImportError:
-    try:
-        from .academy_routes import router as academy_router
-        LEARNING_ROUTER = academy_router
-        print("[IMPORT] Academy routes loaded", flush=True)
-    except ImportError:
-        print("[IMPORT] WARNING: No learning/academy routes found", flush=True)
-        LEARNING_ROUTER = None
+    from . import academy_routes
+    LEARNING_ROUTER_MAIN = learning.router
+    LEARNING_ROUTER_FALLBACK = academy_routes.router
+    _HAS_ACADEMY = True
+    print("[IMPORT] Both Learning and Academy routes loaded successfully", flush=True)
+except ImportError as e:
+    _HAS_ACADEMY = False
+    print(f"[IMPORT] WARNING: Missing learning route files: {e}", flush=True)
 
 # LMS Initialization
 try:
@@ -55,7 +53,6 @@ except ImportError:
     async def upsert_curriculum():
         print("[LMS INIT] Cannot upsert curriculum without lms_init.py", flush=True)
 
-# Stock Terminal Import (FIX: Single import source)
 from . import stock_terminal_backend as stock_module
 stock_router = stock_module.router
 
@@ -70,10 +67,8 @@ APP_VERSION = "2.3.0"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        # Initialize database
         await init_database()
         
-        # Create tables
         try:
             database_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+psycopg2://").replace("postgresql+asyncpg://", "postgresql+psycopg2://")
             if database_url:
@@ -83,20 +78,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[DB] Table creation skipped: {e}", flush=True)
 
-        # Run migrations
         try:
             await run_migrations()
         except Exception as e:
             print(f"[DB MIGRATION] Error: {e}", flush=True)
 
-        # ── Initialize LMS Tables and Curriculum ──────────────────────
         if _HAS_LMS_INIT:
             try:
                 print("[LMS] Initializing tables...", flush=True)
                 await init_lms_tables()
                 print("[LMS] Tables ready", flush=True)
                 
-                # Seed curriculum if needed
                 try:
                     await upsert_curriculum()
                     print("[LMS] Curriculum seeded", flush=True)
@@ -105,14 +97,12 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"[LMS] Initialization error: {e}", flush=True)
 
-        # Initialize Chart Analysis HTTP client
         try:
             chart_analysis._http_client = httpx.AsyncClient(timeout=60.0)
             print("[CHART] HTTP client initialized", flush=True)
         except Exception as e:
             print(f"[CHART] HTTP client init error: {e}", flush=True)
 
-        # Initialize Stock Terminal Anthropic client
         try:
             anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
             if anthropic_key:
@@ -123,7 +113,6 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[STOCK] Client initialisation error: {e}", flush=True)
 
-        # Initialize CMS
         try:
             await cms._ensure_settings_table()
             print("[CMS] Settings table ready", flush=True)
@@ -138,7 +127,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Cleanup
     try:
         await database.disconnect()
     except Exception as e:
@@ -165,7 +153,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -174,14 +161,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check
 @app.get("/health")
 async def health_check():
     return {
         "status": "healthy",
         "version": APP_VERSION,
         "lms_available": _HAS_LMS_INIT,
-        "learning_router": LEARNING_ROUTER is not None,
+        "learning_router": _HAS_ACADEMY,
         "stock_terminal": {
             "anthropic_ready": stock_module._anthropic is not None,
             "data_source": "yfinance (free)",
@@ -202,7 +188,6 @@ async def health_check():
         ]
     }
 
-# Admin endpoint to manually trigger curriculum seed
 @app.post("/admin/init-academy")
 async def init_academy():
     """Manually initialize academy curriculum (admin only)"""
@@ -214,10 +199,6 @@ async def init_academy():
         return {"status": "success", "message": "Academy curriculum initialized"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# ==========================================
-# API ROUTES
-# ==========================================
 
 app.include_router(auth.router,             prefix="/auth",           tags=["Authentication"])
 app.include_router(signals.router,          prefix="/signals",        tags=["Trading Signals"])
@@ -235,14 +216,13 @@ app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI 
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
 
-# ── Trading Academy LMS Router ─────────────────────────────────────
-if LEARNING_ROUTER:
-    app.include_router(LEARNING_ROUTER, prefix="/learning", tags=["Learning"])
-    print("[ROUTES] Learning router mounted at /learning", flush=True)
+if _HAS_ACADEMY:
+    app.include_router(LEARNING_ROUTER_MAIN, prefix="/learning", tags=["Learning"])
+    app.include_router(LEARNING_ROUTER_FALLBACK, prefix="/learning", tags=["Learning Fallback"])
+    print("[ROUTES] Learning and Academy routers mounted at /learning", flush=True)
 else:
-    print("[ROUTES] WARNING: Learning router not available", flush=True)
+    print("[ROUTES] WARNING: Learning routers not available", flush=True)
     
-    # Fallback minimal routes to prevent 404s
     @app.get("/learning/levels")
     async def learning_levels_fallback():
         return {"error": "Learning module not configured", "levels": []}
@@ -254,10 +234,6 @@ else:
     @app.get("/learning/progress/{user_id}")
     async def progress_fallback(user_id: int):
         return {"user_id": user_id, "total_lessons": 0, "completed_lessons": 0, "completion_rate": 0}
-
-# ==========================================
-# STATIC FILES
-# ==========================================
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -276,10 +252,6 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     print(f"[STATIC] Mounted /static from {STATIC_DIR}", flush=True)
 
-# ==========================================
-# SPA ROUTING
-# ==========================================
-
 @app.get("/")
 async def serve_index():
     for path in [
@@ -295,9 +267,8 @@ async def serve_index():
         "status": "running", 
         "version": APP_VERSION, 
         "docs": "/docs",
-        "academy_status": "configured" if LEARNING_ROUTER else "not_configured"
+        "academy_status": "configured" if _HAS_ACADEMY else "not_configured"
     })
-
 
 @app.get("/dashboard.html")
 async def serve_dashboard():
@@ -310,7 +281,6 @@ async def serve_dashboard():
         if path and os.path.exists(path):
             return FileResponse(path)
     raise HTTPException(404, "dashboard.html not found")
-
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):

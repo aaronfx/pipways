@@ -1,7 +1,7 @@
 """
-Pipways Trading Academy — Learning Router v4.1 (Production - Defensive)
+Pipways Trading Academy — Learning Router v4.2 (Production - Defensive)
 Features: Trading Coach, Badge System, 5-Question Quizzes, Progress Tracking
-Includes: Comprehensive error handling to prevent HTTP 500 crashes
+Fixes: Record object handling, SQL accuracy, Lesson unlocking, UPSERT safety, Timeouts, JSON safety
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -38,14 +38,50 @@ class LessonCompleteRequest(BaseModel):
     quiz_score: float = 0.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# LLM HELPERS
+# SAFETY HELPERS (Fix #1, #6, #7)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _safe_user_dict(current_user) -> dict:
+    """Convert Record/Row object to dict safely."""
+    if not current_user:
+        return {}
+    if isinstance(current_user, dict):
+        return current_user
+    try:
+        return dict(current_user)
+    except (TypeError, ValueError):
+        # Handle asyncpg Record or SQLAlchemy Row
+        try:
+            return {k: current_user[k] for k in current_user.keys()}
+        except AttributeError:
+            try:
+                return {k: getattr(current_user, k) for k in dir(current_user) if not k.startswith('_')}
+            except Exception:
+                return {}
+
+def _parse_json(value) -> list:
+    """Safely parse JSON fields (Fix #6)."""
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return []
+    return []
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LLM HELPERS (Fix #5 - Reduced timeout + safety)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
     if not OPENROUTER_API_KEY:
         return "Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        # Reduced timeout from 30s to 10s for faster failure recovery (Fix #5)
+        async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
@@ -64,7 +100,13 @@ async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
                 }
             )
             data = res.json()
+            # Safety check for malformed responses (Fix #5)
+            if "choices" not in data or not data["choices"]:
+                return "Trading Coach is having trouble responding. Please try again shortly."
             return data["choices"][0]["message"]["content"]
+    except httpx.TimeoutException:
+        print(f"[TRADING COACH] Timeout error", flush=True)
+        return "Trading Coach is taking too long to respond. Please try again shortly."
     except Exception as e:
         print(f"[TRADING COACH] Error: {e}", flush=True)
         return "I'm having trouble connecting right now. Please try again shortly."
@@ -107,21 +149,22 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
     newly_awarded = []
     
     try:
+        # Fix #2: Proper JOIN to count lessons per level accurately
         level_counts = await database.fetch_all(
-            """SELECT m.level_id, COUNT(*) as cnt 
-               FROM user_learning_progress p
-               JOIN learning_lessons l ON l.id = p.lesson_id
+            """SELECT m.level_id, COUNT(DISTINCT l.id) as cnt 
+               FROM learning_lessons l
                JOIN learning_modules m ON m.id = l.module_id
-               WHERE p.user_id=:uid AND p.completed=TRUE
+               JOIN user_learning_progress p ON p.lesson_id = l.id AND p.user_id = :uid AND p.completed = TRUE
                GROUP BY m.level_id""",
             {"uid": user_id}
         )
         
+        # Fix #2: Count total lessons per level with proper JOIN
         level_totals = await database.fetch_all(
-            """SELECT level_id, COUNT(*) as total 
-               FROM learning_modules m
-               JOIN learning_lessons l ON l.module_id = m.id
-               GROUP BY level_id""",
+            """SELECT m.level_id, COUNT(l.id) as total 
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id = l.module_id
+               GROUP BY m.level_id""",
             {}
         )
         
@@ -186,7 +229,7 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
     return newly_awarded
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# READ ENDPOINTS 
+# READ ENDPOINTS (Fix #7 - Safe defaults, Fix #1 - dict conversion)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/levels")
@@ -217,11 +260,14 @@ async def get_modules(level_id: int, current_user=Depends(get_current_user)):
         if not modules:
             return []
         
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Convert Record to dict safely
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         result = []
         
         for m in modules:
             try:
+                # Fix #2: Accurate lesson counting per module
                 total = await database.fetch_val(
                     "SELECT COUNT(*) FROM learning_lessons WHERE module_id=:mid",
                     {"mid": m["id"]}
@@ -265,7 +311,9 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
         if not lessons:
             return []
         
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe dict conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         result = []
         
         for i, les in enumerate(lessons):
@@ -277,20 +325,22 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
                     {"uid": user_id, "lid": les["id"]}
                 )
                 
+                # Fix #3: Safe lesson unlock logic with explicit previous lesson check
                 unlocked = (i == 0)
-                if i > 0 and lessons:
+                if i > 0:
                     prev_id = lessons[i - 1]["id"]
                     prev_row = await database.fetch_one(
                         """SELECT completed FROM user_learning_progress 
                            WHERE user_id=:uid AND lesson_id=:lid""",
                         {"uid": user_id, "lid": prev_id}
                     )
-                    unlocked = prev_row is not None and bool(prev_row["completed"])
+                    # Fix #3: Safe boolean conversion
+                    unlocked = prev_row is not None and bool(prev_row.get("completed", False))
                 
                 result.append({
                     **dict(les),
-                    "completed": bool(progress["completed"]) if progress else False,
-                    "quiz_score": progress["quiz_score"] if progress else None,
+                    "completed": bool(progress.get("completed")) if progress else False,
+                    "quiz_score": progress.get("quiz_score") if progress else None,
                     "unlocked": unlocked,
                 })
             except Exception as e:
@@ -318,7 +368,9 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
         if not lesson:
             raise HTTPException(404, "Lesson not found")
         
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         
         adj = await database.fetch_all(
             """SELECT l.id, l.title, l.order_index,
@@ -382,8 +434,10 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
 @router.get("/progress/{user_id}")
 async def get_progress(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller = current_user.get("id") if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        caller = user.get("id", 0)
+        is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
             return {
@@ -467,8 +521,10 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
 @router.get("/profile/{user_id}")
 async def get_profile(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller = current_user.get("id") if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        caller = user.get("id", 0)
+        is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
             return {"user_id": user_id, "weak_topics": [], "strong_topics": [], "first_academy_visit": True, "last_updated": None}
@@ -488,15 +544,11 @@ async def get_profile(user_id: int, current_user=Depends(get_current_user)):
                 "last_updated": None
             }
         
-        def parse_json(val):
-            if not val: return []
-            try: return json.loads(val) if isinstance(val, str) else val
-            except: return []
-        
+        # Fix #6: Safe JSON parsing
         return {
             "user_id": user_id,
-            "weak_topics": parse_json(row.get("weak_topics")),
-            "strong_topics": parse_json(row.get("strong_topics")),
+            "weak_topics": _parse_json(row.get("weak_topics")),
+            "strong_topics": _parse_json(row.get("strong_topics")),
             "first_academy_visit": row.get("first_academy_visit") if row.get("first_academy_visit") is not None else True,
             "last_updated": row.get("last_updated"),
         }
@@ -514,8 +566,10 @@ async def get_profile(user_id: int, current_user=Depends(get_current_user)):
 @router.get("/badges/{user_id}")
 async def get_badges(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller = current_user.get("id") if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        caller = user.get("id", 0)
+        is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
             return {"user_id": user_id, "badges": [], "count": 0}
@@ -550,7 +604,9 @@ async def get_badges(user_id: int, current_user=Depends(get_current_user)):
 @router.post("/badges/check")
 async def check_badges(current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         if not user_id:
             return {"newly_awarded": [], "count": 0}
         
@@ -561,13 +617,15 @@ async def check_badges(current_user=Depends(get_current_user)):
         return {"newly_awarded": [], "count": 0}
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# WRITE ENDPOINTS 
+# WRITE ENDPOINTS (Fix #4 - UPSERT safety, Fix #1 - Safe user dict)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/quiz/submit")
 async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         if not user_id:
             raise HTTPException(401, "Not authenticated")
         
@@ -603,6 +661,7 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
                 else:
                     wrong_slugs.append(row["topic_slug"])
                 
+                # Fix #4: UPSERT with ON CONFLICT to prevent duplicate key violations
                 await database.execute(
                     """INSERT INTO user_quiz_results 
                        (user_id, lesson_id, question_id, selected_answer, is_correct, answered_at)
@@ -667,7 +726,9 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
 @router.post("/lesson/complete")
 async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         if not user_id:
             raise HTTPException(401, "Not authenticated")
         
@@ -681,7 +742,9 @@ async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(g
 @router.post("/profile/first-visit-complete")
 async def mark_first_visit_complete(current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         if not user_id:
             raise HTTPException(401, "Not authenticated")
         
@@ -698,14 +761,16 @@ async def mark_first_visit_complete(current_user=Depends(get_current_user)):
         raise HTTPException(500, "Failed to update profile")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI TRADING COACH ENDPOINTS 
+# AI TRADING COACH ENDPOINTS (Fix #1 - Safe user dict throughout)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/mentor/guide/{user_id}")
 async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller = current_user.get("id") if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        caller = user.get("id", 0)
+        is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
             return {
@@ -735,8 +800,10 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
         )
         
         done = [r["title"] for r in (progress or []) if r and r.get("completed")]
-        weak = json.loads(profile["weak_topics"]) if profile and profile.get("weak_topics") else []
-        strong = json.loads(profile["strong_topics"]) if profile and profile.get("strong_topics") else []
+        
+        # Fix #6: Safe JSON parsing
+        weak = _parse_json(profile.get("weak_topics")) if profile else []
+        strong = _parse_json(profile.get("strong_topics")) if profile else []
         
         next_lesson = await database.fetch_one(
             """SELECT l.id, l.title, m.title AS module_title, lv.name AS level_name
@@ -797,7 +864,9 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
 @router.post("/mentor/teach")
 async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        # Fix #1: Safe conversion
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         
         lesson = await database.fetch_one(
             """SELECT l.title, l.content, m.title AS module_title, lv.name AS level_name
@@ -816,8 +885,9 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
             {"uid": user_id}
         )
         
-        weak = json.loads(profile["weak_topics"]) if profile and profile.get("weak_topics") else []
-        level = lesson["level_name"].lower() if lesson.get("level_name") else "intermediate"
+        # Fix #6: Safe JSON parsing
+        weak = _parse_json(profile.get("weak_topics")) if profile else []
+        level = lesson.get("level_name", "intermediate").lower()
         
         tone = {
             "beginner": "Use very simple language and real-world analogies. Avoid jargon entirely.",
@@ -950,18 +1020,8 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
         }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# INTERNAL HELPERS
+# INTERNAL HELPERS (Fix #6 - Safe JSON parsing used throughout)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-def _parse_json(value):
-    if not value:
-        return []
-    if isinstance(value, list):
-        return value
-    try:
-        return json.loads(value)
-    except:
-        return []
 
 async def _mark_lesson_complete(user_id: int, lesson_id: int, score: float):
     try:
@@ -1013,6 +1073,7 @@ async def _update_learning_profile(user_id: int, wrong_slugs: list, correct_slug
         )
         
         if existing:
+            # Fix #6: Safe parsing
             cur_weak = _parse_json(existing.get("weak_topics"))
             cur_strong = _parse_json(existing.get("strong_topics"))
             

@@ -1,7 +1,7 @@
 """
-Pipways Trading Academy — Learning Router v4.2 (Production - Defensive)
-Features: Trading Coach, Badge System, 5-Question Quizzes, Progress Tracking
-Fixes: Record object handling, SQL accuracy, Lesson unlocking, UPSERT safety, Timeouts, JSON safety
+Pipways Trading Academy — Learning Router v4.5 (Production - Hardened)
+Features: N+1 Query Elimination, Sequential Unlocking, Hardened Quiz, Optimized Badges
+Fixes: Validation layer, AI resilience, Idempotent operations
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -38,7 +38,7 @@ class LessonCompleteRequest(BaseModel):
     quiz_score: float = 0.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SAFETY HELPERS (Fix #1, #6, #7)
+# SAFETY HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _safe_user_dict(current_user) -> dict:
@@ -50,7 +50,6 @@ def _safe_user_dict(current_user) -> dict:
     try:
         return dict(current_user)
     except (TypeError, ValueError):
-        # Handle asyncpg Record or SQLAlchemy Row
         try:
             return {k: current_user[k] for k in current_user.keys()}
         except AttributeError:
@@ -60,7 +59,7 @@ def _safe_user_dict(current_user) -> dict:
                 return {}
 
 def _parse_json(value) -> list:
-    """Safely parse JSON fields (Fix #6)."""
+    """Safely parse JSON fields with error logging."""
     if not value:
         return []
     if isinstance(value, list):
@@ -68,19 +67,40 @@ def _parse_json(value) -> list:
     if isinstance(value, str):
         try:
             return json.loads(value)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"[JSON PARSE ERROR] Failed to parse: {str(value)[:100]}... Error: {e}", flush=True)
             return []
+    print(f"[JSON PARSE ERROR] Unexpected type: {type(value)}", flush=True)
     return []
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# LLM HELPERS (Fix #5 - Reduced timeout + safety)
+# VALIDATION HELPERS (Fix #7)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def _verify_level_exists(level_id: int):
+    level = await database.fetch_one("SELECT id FROM learning_levels WHERE id=:id", {"id": level_id})
+    if not level:
+        raise HTTPException(status_code=404, detail="Level not found")
+
+async def _verify_module_exists(module_id: int):
+    module = await database.fetch_one("SELECT id FROM learning_modules WHERE id=:id", {"id": module_id})
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+async def _verify_lesson_exists(lesson_id: int):
+    lesson = await database.fetch_one("SELECT id FROM learning_lessons WHERE id=:id", {"id": lesson_id})
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LLM HELPERS (Fix #5 - Hardened)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
     if not OPENROUTER_API_KEY:
         return "Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
+    
     try:
-        # Reduced timeout from 30s to 10s for faster failure recovery (Fix #5)
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
@@ -99,11 +119,44 @@ async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
                     ],
                 }
             )
-            data = res.json()
-            # Safety check for malformed responses (Fix #5)
-            if "choices" not in data or not data["choices"]:
+            
+            # Response validation
+            if res.status_code != 200:
+                print(f"[TRADING COACH] API error {res.status_code}: {res.text[:200]}", flush=True)
+                return "Trading Coach is experiencing technical difficulties. Please try again shortly."
+            
+            try:
+                data = res.json()
+            except json.JSONDecodeError as e:
+                print(f"[TRADING COACH] JSON decode error: {e}", flush=True)
+                return "Trading Coach received invalid data. Please try again."
+            
+            if not isinstance(data, dict):
+                print(f"[TRADING COACH] Unexpected response type: {type(data)}", flush=True)
+                return "Trading Coach response format error. Please try again."
+            
+            if "error" in data:
+                err_msg = data["error"].get("message", "Unknown error") if isinstance(data["error"], dict) else str(data["error"])
+                print(f"[TRADING COACH] API error in response: {err_msg}", flush=True)
+                return f"Trading Coach error: {err_msg}"
+            
+            choices = data.get("choices")
+            if not choices or not isinstance(choices, list) or len(choices) == 0:
+                print(f"[TRADING COACH] No choices in response: {list(data.keys())}", flush=True)
                 return "Trading Coach is having trouble responding. Please try again shortly."
-            return data["choices"][0]["message"]["content"]
+            
+            message = choices[0].get("message", {})
+            if not isinstance(message, dict):
+                print(f"[TRADING COACH] Invalid message format: {type(message)}", flush=True)
+                return "Trading Coach response malformed. Please try again."
+                
+            content = message.get("content")
+            if not content or not isinstance(content, str):
+                print(f"[TRADING COACH] Empty or invalid content", flush=True)
+                return "Trading Coach has no response at this time. Please try again."
+            
+            return content
+            
     except httpx.TimeoutException:
         print(f"[TRADING COACH] Timeout error", flush=True)
         return "Trading Coach is taking too long to respond. Please try again shortly."
@@ -146,90 +199,103 @@ async def _award_badge(user_id: int, badge_type: str) -> bool:
         return False
 
 async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_score: float = None):
+    """Optimized badge checking with bulk operations (Fix #4)"""
     newly_awarded = []
     
     try:
-        # Fix #2: Proper JOIN to count lessons per level accurately
-        level_counts = await database.fetch_all(
-            """SELECT m.level_id, COUNT(DISTINCT l.id) as cnt 
-               FROM learning_lessons l
-               JOIN learning_modules m ON m.id = l.module_id
-               JOIN user_learning_progress p ON p.lesson_id = l.id AND p.user_id = :uid AND p.completed = TRUE
-               GROUP BY m.level_id""",
+        # Single query to get all existing badges
+        badge_rows = await database.fetch_all(
+            "SELECT badge_type FROM user_badges WHERE user_id = :uid",
+            {"uid": user_id}
+        )
+        existing_badges = {r["badge_type"] for r in badge_rows}
+        
+        # Single query to get all completion stats
+        stats = await database.fetch_one(
+            """
+            SELECT 
+                COUNT(DISTINCT CASE WHEN l.level_id = 1 THEN p.lesson_id END) as beginner_done,
+                COUNT(DISTINCT CASE WHEN l.level_id = 2 THEN p.lesson_id END) as intermediate_done,  
+                COUNT(DISTINCT CASE WHEN l.level_id = 3 THEN p.lesson_id END) as advanced_done,
+                COUNT(DISTINCT CASE WHEN p.quiz_score >= 80 THEN p.lesson_id END) as high_score_count,
+                COUNT(DISTINCT CASE WHEN p.quiz_score = 100 THEN p.lesson_id END) as perfect_count,
+                COUNT(DISTINCT p.lesson_id) as total_done
+            FROM user_learning_progress p
+            JOIN learning_lessons l ON l.id = p.lesson_id
+            WHERE p.user_id = :uid AND p.completed = TRUE
+            """,
             {"uid": user_id}
         )
         
-        # Fix #2: Count total lessons per level with proper JOIN
-        level_totals = await database.fetch_all(
-            """SELECT m.level_id, COUNT(l.id) as total 
-               FROM learning_lessons l
-               JOIN learning_modules m ON m.id = l.module_id
-               GROUP BY m.level_id""",
-            {}
+        # Get level totals
+        total_rows = await database.fetch_all(
+            "SELECT m.level_id, COUNT(*) as total FROM learning_lessons l JOIN learning_modules m ON m.id = l.module_id GROUP BY m.level_id"
         )
+        total_map = {t["level_id"]: t["total"] for t in total_rows}
         
-        level_map = {r["level_id"]: r["cnt"] for r in level_counts} if level_counts else {}
-        total_map = {r["level_id"]: r["total"] for r in level_totals} if level_totals else {}
+        badges_to_insert = []
         
-        if level_map.get(1, 0) >= total_map.get(1, 999):
-            if await _award_badge(user_id, "beginner_trader"):
-                newly_awarded.append("beginner_trader")
+        # Level completion badges
+        if "beginner_trader" not in existing_badges and stats["beginner_done"] >= total_map.get(1, 999):
+            badges_to_insert.append("beginner_trader")
+            newly_awarded.append("beginner_trader")
         
-        if level_map.get(2, 0) >= total_map.get(2, 999):
-            if await _award_badge(user_id, "technical_analyst"):
-                newly_awarded.append("technical_analyst")
-        
-        if level_map.get(3, 0) >= total_map.get(3, 999):
-            if await _award_badge(user_id, "strategy_builder"):
-                newly_awarded.append("strategy_builder")
+        if "technical_analyst" not in existing_badges and stats["intermediate_done"] >= total_map.get(2, 999):
+            badges_to_insert.append("technical_analyst")
+            newly_awarded.append("technical_analyst")
             
+        if "strategy_builder" not in existing_badges and stats["advanced_done"] >= total_map.get(3, 999):
+            badges_to_insert.append("strategy_builder")
+            newly_awarded.append("strategy_builder")
+        
+        if "pipways_certified" not in existing_badges:
             total_all = sum(total_map.values())
-            done_all = sum(level_map.values())
-            if done_all >= total_all:
-                if await _award_badge(user_id, "pipways_certified"):
-                    newly_awarded.append("pipways_certified")
+            if stats["total_done"] >= total_all:
+                badges_to_insert.append("pipways_certified")
+                newly_awarded.append("pipways_certified")
         
-        if quiz_score is not None:
-            if quiz_score == 100:
-                if await _award_badge(user_id, "perfect_score"):
-                    newly_awarded.append("perfect_score")
+        # Quiz badges
+        if "perfect_score" not in existing_badges and quiz_score == 100:
+            badges_to_insert.append("perfect_score")
+            newly_awarded.append("perfect_score")
             
-            try:
-                high_scores = await database.fetch_val(
-                    "SELECT COUNT(*) FROM user_learning_progress WHERE user_id=:uid AND quiz_score>=80",
-                    {"uid": user_id}
-                )
-                if high_scores and int(high_scores) >= 10:
-                    if await _award_badge(user_id, "quiz_master"):
-                        newly_awarded.append("quiz_master")
-            except Exception as e:
-                print(f"[BADGE CHECK ERROR] Quiz master check failed: {e}", flush=True)
+        if "quiz_master" not in existing_badges and stats["high_score_count"] >= 10:
+            badges_to_insert.append("quiz_master")
+            newly_awarded.append("quiz_master")
         
-        if lesson_id:
-            try:
-                lesson = await database.fetch_one(
-                    """SELECT m.title FROM learning_lessons l
-                       JOIN learning_modules m ON m.id=l.module_id 
-                       WHERE l.id=:lid""",
-                    {"lid": lesson_id}
-                )
-                if lesson:
-                    title = lesson["title"].lower()
-                    if "risk" in title:
-                        if await _award_badge(user_id, "risk_manager"):
-                            newly_awarded.append("risk_manager")
-                    if "psychology" in title:
-                        if await _award_badge(user_id, "psychology_pro"):
-                            newly_awarded.append("psychology_pro")
-            except Exception as e:
-                print(f"[BADGE CHECK ERROR] Topic badge check failed: {e}", flush=True)
+        # Bulk insert badges
+        if badges_to_insert:
+            values = [{"uid": user_id, "bt": bt} for bt in badges_to_insert]
+            await database.execute_many(
+                "INSERT INTO user_badges (user_id, badge_type, earned_at) VALUES (:uid, :bt, NOW())",
+                values
+            )
+        
+        # Topic-specific badges (only if lesson_id provided and badges missing)
+        if lesson_id and ("risk_manager" not in existing_badges or "psychology_pro" not in existing_badges):
+            lesson = await database.fetch_one(
+                """SELECT m.title FROM learning_lessons l
+                   JOIN learning_modules m ON m.id=l.module_id 
+                   WHERE l.id=:lid""",
+                {"lid": lesson_id}
+            )
+            if lesson:
+                title = lesson["title"].lower()
+                if "risk" in title and "risk_manager" not in existing_badges:
+                    if await _award_badge(user_id, "risk_manager"):
+                        newly_awarded.append("risk_manager")
+                if "psychology" in title and "psychology_pro" not in existing_badges:
+                    if await _award_badge(user_id, "psychology_pro"):
+                        newly_awarded.append("psychology_pro")
+                    
     except Exception as e:
-        print(f"[BADGE CHECK ERROR] General badge check failed: {e}", flush=True)
+        print(f"[BADGE CHECK ERROR] {e}", flush=True)
+        traceback.print_exc()
     
     return newly_awarded
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# READ ENDPOINTS (Fix #7 - Safe defaults, Fix #1 - dict conversion)
+# READ ENDPOINTS (N+1 Eliminated - Fix #2)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/levels")
@@ -246,50 +312,45 @@ async def get_levels(current_user=Depends(get_current_user)):
 @router.get("/modules/{level_id}")
 async def get_modules(level_id: int, current_user=Depends(get_current_user)):
     try:
-        level = await database.fetch_one("SELECT id FROM learning_levels WHERE id=:lid", {"lid": level_id})
-        if not level:
-            return []
+        await _verify_level_exists(level_id)
         
-        modules = await database.fetch_all(
-            """SELECT id, title, description, order_index 
-               FROM learning_modules 
-               WHERE level_id=:lid ORDER BY order_index""",
-            {"lid": level_id}
-        )
-        
-        if not modules:
-            return []
-        
-        # Fix #1: Convert Record to dict safely
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
-        result = []
         
-        for m in modules:
-            try:
-                # Fix #2: Accurate lesson counting per module
-                total = await database.fetch_val(
-                    "SELECT COUNT(*) FROM learning_lessons WHERE module_id=:mid",
-                    {"mid": m["id"]}
-                ) or 0
-                
-                done = await database.fetch_val(
-                    """SELECT COUNT(*) FROM user_learning_progress 
-                       WHERE user_id=:uid AND module_id=:mid AND completed=TRUE""",
-                    {"uid": user_id, "mid": m["id"]}
-                ) or 0
-                
-                result.append({
-                    **dict(m),
-                    "lesson_count": int(total),
-                    "completed_count": int(done),
-                    "is_complete": total > 0 and done >= total,
-                })
-            except Exception as e:
-                print(f"[API ERROR] get_modules loop: {e}", flush=True)
-                result.append({**dict(m), "lesson_count": 0, "completed_count": 0, "is_complete": False})
+        # Single aggregated query - no N+1
+        rows = await database.fetch_all(
+            """
+            SELECT 
+                m.id, 
+                m.title, 
+                m.description, 
+                m.order_index,
+                COUNT(DISTINCT l.id) as lesson_count,
+                COUNT(DISTINCT CASE WHEN p.completed = TRUE THEN p.lesson_id END) as completed_count
+            FROM learning_modules m
+            LEFT JOIN learning_lessons l ON l.module_id = m.id
+            LEFT JOIN user_learning_progress p ON p.module_id = m.id AND p.user_id = :uid AND p.completed = TRUE
+            WHERE m.level_id = :lid
+            GROUP BY m.id, m.title, m.description, m.order_index
+            ORDER BY m.order_index
+            """,
+            {"lid": level_id, "uid": user_id}
+        )
         
-        return result
+        return [
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "description": r["description"],
+                "order_index": r["order_index"],
+                "lesson_count": r["lesson_count"] or 0,
+                "completed_count": r["completed_count"] or 0,
+                "is_complete": (r["completed_count"] or 0) >= (r["lesson_count"] or 0) and (r["lesson_count"] or 0) > 0
+            }
+            for r in rows
+        ]
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] get_modules: {e}", flush=True)
         return []
@@ -297,57 +358,48 @@ async def get_modules(level_id: int, current_user=Depends(get_current_user)):
 @router.get("/lessons/{module_id}")
 async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
     try:
-        module = await database.fetch_one("SELECT id FROM learning_modules WHERE id=:mid", {"mid": module_id})
-        if not module:
-            return []
+        await _verify_module_exists(module_id)
         
-        lessons = await database.fetch_all(
-            """SELECT id, title, order_index 
-               FROM learning_lessons 
-               WHERE module_id=:mid ORDER BY order_index""",
-            {"mid": module_id}
-        )
-        
-        if not lessons:
-            return []
-        
-        # Fix #1: Safe dict conversion
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
-        result = []
         
-        for i, les in enumerate(lessons):
-            try:
-                progress = await database.fetch_one(
-                    """SELECT completed, quiz_score 
-                       FROM user_learning_progress 
-                       WHERE user_id=:uid AND lesson_id=:lid""",
-                    {"uid": user_id, "lid": les["id"]}
-                )
-                
-                # Fix #3: Safe lesson unlock logic with explicit previous lesson check
-                unlocked = (i == 0)
-                if i > 0:
-                    prev_id = lessons[i - 1]["id"]
-                    prev_row = await database.fetch_one(
-                        """SELECT completed FROM user_learning_progress 
-                           WHERE user_id=:uid AND lesson_id=:lid""",
-                        {"uid": user_id, "lid": prev_id}
-                    )
-                    # Fix #3: Safe boolean conversion
-                    unlocked = prev_row is not None and bool(prev_row.get("completed", False))
-                
-                result.append({
-                    **dict(les),
-                    "completed": bool(progress.get("completed")) if progress else False,
-                    "quiz_score": progress.get("quiz_score") if progress else None,
-                    "unlocked": unlocked,
-                })
-            except Exception as e:
-                print(f"[API ERROR] get_lessons loop: {e}", flush=True)
-                result.append({**dict(les), "completed": False, "quiz_score": None, "unlocked": i == 0})
+        # Single query for lessons with progress (Fix #2)
+        rows = await database.fetch_all(
+            """
+            SELECT 
+                l.id, 
+                l.title, 
+                l.order_index,
+                p.completed,
+                p.quiz_score
+            FROM learning_lessons l
+            LEFT JOIN user_learning_progress p ON p.lesson_id = l.id AND p.user_id = :uid
+            WHERE l.module_id = :mid
+            ORDER BY l.order_index
+            """,
+            {"mid": module_id, "uid": user_id}
+        )
+        
+        result = []
+        prev_completed = True  # First lesson always unlocked (Fix #1)
+        
+        for r in rows:
+            is_completed = bool(r["completed"]) if r["completed"] is not None else False
+            
+            result.append({
+                "id": r["id"],
+                "title": r["title"],
+                "order_index": r["order_index"],
+                "completed": is_completed,
+                "quiz_score": r["quiz_score"],
+                "unlocked": prev_completed  # Sequential unlocking
+            })
+            
+            prev_completed = is_completed  # Current determines next unlock
         
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] get_lessons: {e}", flush=True)
         return []
@@ -355,6 +407,8 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
 @router.get("/lesson/{lesson_id}")
 async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
     try:
+        await _verify_lesson_exists(lesson_id)
+        
         lesson = await database.fetch_one(
             """SELECT l.id, l.title, l.content, l.order_index, l.module_id,
                       m.title AS module_title, m.level_id, lv.name AS level_name
@@ -365,21 +419,18 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
             {"lid": lesson_id}
         )
         
-        if not lesson:
-            raise HTTPException(404, "Lesson not found")
-        
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
         
+        # Get adjacent lessons with completion status
         adj = await database.fetch_all(
             """SELECT l.id, l.title, l.order_index,
                       EXISTS(SELECT 1 FROM user_learning_progress p 
                              WHERE p.lesson_id=l.id AND p.user_id=:uid AND p.completed=TRUE) as completed
                FROM learning_lessons l
-               WHERE l.module_id = (SELECT module_id FROM learning_lessons WHERE id=:lid)
+               WHERE l.module_id = :mid
                ORDER BY l.order_index""",
-            {"lid": lesson_id, "uid": user_id}
+            {"mid": lesson["module_id"], "uid": user_id}
         )
         
         current_idx = next((i for i, a in enumerate(adj) if a["id"] == lesson_id), -1)
@@ -404,14 +455,12 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         print(f"[API ERROR] get_lesson: {e}", flush=True)
-        raise HTTPException(500, "Failed to load lesson data")
+        raise HTTPException(500, detail="Failed to load lesson data")
 
 @router.get("/quiz/{lesson_id}")
 async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
     try:
-        lesson = await database.fetch_one("SELECT id FROM learning_lessons WHERE id=:lid", {"lid": lesson_id})
-        if not lesson:
-            raise HTTPException(404, "Lesson not found")
+        await _verify_lesson_exists(lesson_id)
         
         questions = await database.fetch_all(
             """SELECT id, question, option_a, option_b, option_c, option_d, correct_answer, explanation, topic_slug
@@ -434,20 +483,12 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
 @router.get("/progress/{user_id}")
 async def get_progress(user_id: int, current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         caller = user.get("id", 0)
         is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
-            return {
-                "user_id": user_id,
-                "total_lessons": 0,
-                "completed_lessons": 0,
-                "completion_rate": 0.0,
-                "progress": [],
-                "summary": []
-            }
+            raise HTTPException(403, detail="Unauthorized")
         
         rows = await database.fetch_all(
             """SELECT p.id, p.level_id, p.module_id, p.lesson_id, p.completed,
@@ -455,7 +496,8 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
                FROM user_learning_progress p
                LEFT JOIN learning_lessons l ON l.id = p.lesson_id
                LEFT JOIN learning_modules m ON m.id = p.module_id
-               WHERE p.user_id = :uid""",
+               WHERE p.user_id = :uid
+               ORDER BY p.completed_at DESC""",
             {"uid": user_id}
         )
         
@@ -465,7 +507,7 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
         for lv in levels:
             try:
                 total = await database.fetch_val(
-                    """SELECT COUNT(*) FROM learning_lessons les
+                    """SELECT COUNT(*) FROM learning_lessons l
                        JOIN learning_modules m ON m.id=les.module_id 
                        WHERE m.level_id=:lid""",
                     {"lid": lv["id"]}
@@ -494,8 +536,7 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
                     "percent": 0.0
                 })
         
-        total_lessons_rows = await database.fetch_all("SELECT id FROM learning_lessons") or []
-        total_lessons = len(total_lessons_rows)
+        total_lessons = await database.fetch_val("SELECT COUNT(*) FROM learning_lessons") or 0
         completed_lessons = sum(1 for p in (rows or []) if p and p.get('completed'))
         
         return {
@@ -506,6 +547,8 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
             "progress": [dict(r) for r in (rows or [])],
             "summary": summary
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] get_progress: {e}", flush=True)
         return {
@@ -514,65 +557,18 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
             "completed_lessons": 0,
             "completion_rate": 0.0,
             "progress": [],
-            "summary": [],
-            "error": "Failed to load progress"
-        }
-
-@router.get("/profile/{user_id}")
-async def get_profile(user_id: int, current_user=Depends(get_current_user)):
-    try:
-        # Fix #1: Safe conversion
-        user = _safe_user_dict(current_user)
-        caller = user.get("id", 0)
-        is_admin = user.get("is_admin", False)
-        
-        if caller != user_id and not is_admin:
-            return {"user_id": user_id, "weak_topics": [], "strong_topics": [], "first_academy_visit": True, "last_updated": None}
-        
-        row = await database.fetch_one(
-            """SELECT weak_topics, strong_topics, first_academy_visit, last_updated
-               FROM user_learning_profile WHERE user_id=:uid""",
-            {"uid": user_id}
-        )
-        
-        if not row:
-            return {
-                "user_id": user_id,
-                "weak_topics": [],
-                "strong_topics": [],
-                "first_academy_visit": True,
-                "last_updated": None
-            }
-        
-        # Fix #6: Safe JSON parsing
-        return {
-            "user_id": user_id,
-            "weak_topics": _parse_json(row.get("weak_topics")),
-            "strong_topics": _parse_json(row.get("strong_topics")),
-            "first_academy_visit": row.get("first_academy_visit") if row.get("first_academy_visit") is not None else True,
-            "last_updated": row.get("last_updated"),
-        }
-    except Exception as e:
-        print(f"[API ERROR] get_profile: {e}", flush=True)
-        return {
-            "user_id": user_id,
-            "weak_topics": [],
-            "strong_topics": [],
-            "first_academy_visit": True,
-            "last_updated": None,
-            "error": "Failed to load profile"
+            "summary": []
         }
 
 @router.get("/badges/{user_id}")
 async def get_badges(user_id: int, current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         caller = user.get("id", 0)
         is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
-            return {"user_id": user_id, "badges": [], "count": 0}
+            raise HTTPException(403, detail="Unauthorized")
         
         rows = await database.fetch_all(
             """SELECT badge_type, earned_at 
@@ -597,38 +593,103 @@ async def get_badges(user_id: int, current_user=Depends(get_current_user)):
                 continue
         
         return {"user_id": user_id, "badges": badges, "count": len(badges)}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] get_badges: {e}", flush=True)
-        return {"user_id": user_id, "badges": [], "count": 0, "error": "Failed to load badges"}
+        return {"user_id": user_id, "badges": [], "count": 0}
+
+@router.get("/profile/{user_id}")
+async def get_profile(user_id: int, current_user=Depends(get_current_user)):
+    try:
+        user = _safe_user_dict(current_user)
+        caller = user.get("id", 0)
+        is_admin = user.get("is_admin", False)
+        
+        if caller != user_id and not is_admin:
+            raise HTTPException(403, detail="Unauthorized")
+        
+        row = await database.fetch_one(
+            """SELECT weak_topics, strong_topics, first_academy_visit, last_updated
+               FROM user_learning_profile WHERE user_id=:uid""",
+            {"uid": user_id}
+        )
+        
+        if not row:
+            return {
+                "user_id": user_id,
+                "weak_topics": [],
+                "strong_topics": [],
+                "first_academy_visit": True,
+                "last_updated": None
+            }
+        
+        return {
+            "user_id": user_id,
+            "weak_topics": _parse_json(row.get("weak_topics")),
+            "strong_topics": _parse_json(row.get("strong_topics")),
+            "first_academy_visit": row.get("first_academy_visit") if row.get("first_academy_visit") is not None else True,
+            "last_updated": row.get("last_updated"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API ERROR] get_profile: {e}", flush=True)
+        return {
+            "user_id": user_id,
+            "weak_topics": [],
+            "strong_topics": [],
+            "first_academy_visit": True,
+            "last_updated": None
+        }
 
 @router.post("/badges/check")
 async def check_badges(current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
         if not user_id:
-            return {"newly_awarded": [], "count": 0}
+            raise HTTPException(401, detail="Not authenticated")
         
         new_badges = await _check_and_award_badges(user_id)
         return {"newly_awarded": new_badges, "count": len(new_badges)}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] check_badges: {e}", flush=True)
         return {"newly_awarded": [], "count": 0}
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# WRITE ENDPOINTS (Fix #4 - UPSERT safety, Fix #1 - Safe user dict)
+# WRITE ENDPOINTS (Hardened - Fix #3)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/quiz/submit")
 async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
         if not user_id:
-            raise HTTPException(401, "Not authenticated")
+            raise HTTPException(401, detail="Not authenticated")
         
+        # Verify lesson exists (Fix #3, #7)
+        lesson = await database.fetch_one(
+            "SELECT id, module_id FROM learning_lessons WHERE id=:lid", 
+            {"lid": payload.lesson_id}
+        )
+        if not lesson:
+            raise HTTPException(404, detail="Lesson not found")
+        
+        # Rapid submission protection (Fix #3)
+        recent = await database.fetch_one(
+            """SELECT 1 FROM user_quiz_results 
+               WHERE user_id=:uid AND lesson_id=:lid 
+               AND answered_at > NOW() - INTERVAL '5 seconds'""",
+            {"uid": user_id, "lid": payload.lesson_id}
+        )
+        if recent:
+            raise HTTPException(429, detail="Quiz submission too rapid. Please wait a moment.")
+        
+        # Get all valid questions (Fix #3)
         questions = await database.fetch_all(
             """SELECT id, correct_answer, explanation, topic_slug 
                FROM lesson_quizzes WHERE lesson_id=:lid ORDER BY id""",
@@ -636,23 +697,28 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
         )
         
         if not questions:
-            raise HTTPException(404, "No quiz questions found for this lesson")
+            raise HTTPException(404, detail="No quiz questions found for this lesson")
         
+        valid_ids = {q["id"] for q in questions}
         q_map = {q["id"]: q for q in questions}
+        
+        # Validate submitted answers (Fix #3)
+        submitted_ids = {a.question_id for a in payload.answers}
+        invalid = submitted_ids - valid_ids
+        if invalid:
+            raise HTTPException(400, detail=f"Invalid question IDs: {invalid}")
+        
         total = len(questions)
         correct = 0
-        results = []
         wrong_slugs = []
         correct_slugs = []
+        results = []
         
         for ans in payload.answers:
             try:
                 q_id = ans.question_id
                 selected = ans.selected_answer.upper()
-                row = q_map.get(q_id)
-                
-                if not row:
-                    continue
+                row = q_map[q_id]
                 
                 is_correct = (selected == row["correct_answer"].upper())
                 if is_correct:
@@ -661,7 +727,6 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
                 else:
                     wrong_slugs.append(row["topic_slug"])
                 
-                # Fix #4: UPSERT with ON CONFLICT to prevent duplicate key violations
                 await database.execute(
                     """INSERT INTO user_quiz_results 
                        (user_id, lesson_id, question_id, selected_answer, is_correct, answered_at)
@@ -692,7 +757,7 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
         await _update_learning_profile(user_id, wrong_slugs, correct_slugs)
         new_badges = await _check_and_award_badges(user_id, payload.lesson_id, score)
         
-        lesson = await database.fetch_one(
+        lesson_info = await database.fetch_one(
             """SELECT l.title, lv.name AS level_name 
                FROM learning_lessons l
                JOIN learning_modules m ON m.id=l.module_id
@@ -703,9 +768,9 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
         
         feedback = await _quiz_feedback(
             score, passed,
-            lesson["title"] if lesson else "this lesson",
+            lesson_info["title"] if lesson_info else "this lesson",
             wrong_slugs,
-            lesson["level_name"].lower() if lesson else "intermediate"
+            lesson_info["level_name"].lower() if lesson_info else "intermediate"
         )
         
         return {
@@ -721,32 +786,34 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
         raise
     except Exception as e:
         print(f"[API ERROR] submit_quiz: {e}", flush=True)
-        raise HTTPException(500, "Failed to submit quiz")
+        raise HTTPException(500, detail="Failed to submit quiz")
 
 @router.post("/lesson/complete")
 async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
         if not user_id:
-            raise HTTPException(401, "Not authenticated")
+            raise HTTPException(401, detail="Not authenticated")
+        
+        await _verify_lesson_exists(payload.lesson_id)
         
         await _mark_lesson_complete(user_id, payload.lesson_id, payload.quiz_score)
         new_badges = await _check_and_award_badges(user_id, payload.lesson_id)
         return {"success": True, "new_badges": new_badges}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] complete_lesson: {e}", flush=True)
-        raise HTTPException(500, "Failed to complete lesson")
+        raise HTTPException(500, detail="Failed to complete lesson")
 
 @router.post("/profile/first-visit-complete")
 async def mark_first_visit_complete(current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         user_id = user.get("id", 0)
         if not user_id:
-            raise HTTPException(401, "Not authenticated")
+            raise HTTPException(401, detail="Not authenticated")
         
         await database.execute(
             """INSERT INTO user_learning_profile (user_id, weak_topics, strong_topics, first_academy_visit, last_updated)
@@ -758,28 +825,21 @@ async def mark_first_visit_complete(current_user=Depends(get_current_user)):
         return {"success": True, "first_academy_visit": False}
     except Exception as e:
         print(f"[API ERROR] mark_first_visit_complete: {e}", flush=True)
-        raise HTTPException(500, "Failed to update profile")
+        raise HTTPException(500, detail="Failed to update profile")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI TRADING COACH ENDPOINTS (Fix #1 - Safe user dict throughout)
+# AI TRADING COACH ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/mentor/guide/{user_id}")
 async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
         user = _safe_user_dict(current_user)
         caller = user.get("id", 0)
         is_admin = user.get("is_admin", False)
         
         if caller != user_id and not is_admin:
-            return {
-                "type": "welcome",
-                "message": "Welcome to Pipways Trading Academy! Start your journey with the Beginner level.",
-                "next_lesson": None,
-                "first_visit": True,
-                "weak_topics": [],
-            }
+            raise HTTPException(403, detail="Unauthorized")
         
         profile = await database.fetch_one(
             """SELECT weak_topics, strong_topics, first_academy_visit 
@@ -787,23 +847,18 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
             {"uid": user_id}
         )
         
-        is_first_visit = True
-        if profile and profile.get("first_academy_visit") is False:
-            is_first_visit = False
+        is_first = not profile or profile.get("first_academy_visit") is not False
         
         progress = await database.fetch_all(
-            """SELECT p.lesson_id, p.completed, p.quiz_score, l.title
+            """SELECT l.title
                FROM user_learning_progress p 
                JOIN learning_lessons l ON l.id=p.lesson_id
-               WHERE p.user_id=:uid""",
+               WHERE p.user_id=:uid AND p.completed=TRUE""",
             {"uid": user_id}
         )
         
-        done = [r["title"] for r in (progress or []) if r and r.get("completed")]
-        
-        # Fix #6: Safe JSON parsing
+        done = [r["title"] for r in (progress or [])]
         weak = _parse_json(profile.get("weak_topics")) if profile else []
-        strong = _parse_json(profile.get("strong_topics")) if profile else []
         
         next_lesson = await database.fetch_one(
             """SELECT l.id, l.title, m.title AS module_title, lv.name AS level_name
@@ -818,7 +873,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
             {"uid": user_id}
         )
         
-        if is_first_visit:
+        if is_first:
             return {
                 "type": "welcome",
                 "message": "Welcome to Pipways Trading Academy! Start your journey with the Beginner level. Master the basics, then progress through structured modules designed by professional traders.",
@@ -828,19 +883,18 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
             }
         
         ctx = (
-            f"Completed lessons ({len(done)}): {', '.join(done[-5:]) if done else 'none yet'}. "
-            f"Weak topics: {', '.join(weak) if weak else 'none'}. "
-            f"Strong topics: {', '.join(strong) if strong else 'none'}. "
-            f"Next lesson: {next_lesson['title'] + ' in ' + next_lesson['module_title'] if next_lesson else 'Academy complete'}."
+            f"Progress: {len(done)} lessons completed. "
+            f"Weak areas: {', '.join(weak) if weak else 'none identified'}. "
+            f"Next: {next_lesson['title'] if next_lesson else 'Curriculum complete'}."
         )
         
         system = (
             "You are the Pipways Trading Coach. Give a motivational 2-sentence coaching message. "
-            "Acknowledge progress, mention one weak area to focus on, and encourage completion of the next lesson. "
+            "Acknowledge progress, mention one weak area, and encourage the next lesson. "
             "Be warm, professional, and end with 'Continue Learning' energy."
         )
         
-        message = await _ai(system, f"Copier progress:\n{ctx}")
+        message = await _ai(system, ctx)
         
         return {
             "type": "recommendation",
@@ -850,9 +904,10 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
             "completed_count": len(done),
             "weak_topics": weak,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API ERROR] mentor_guide: {e}", flush=True)
-        traceback.print_exc()
         return {
             "type": "welcome",
             "message": "Continue learning the Beginner modules to unlock personalized recommendations.",
@@ -864,9 +919,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
 @router.post("/mentor/teach")
 async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
-        # Fix #1: Safe conversion
-        user = _safe_user_dict(current_user)
-        user_id = user.get("id", 0)
+        await _verify_lesson_exists(lesson_id)
         
         lesson = await database.fetch_one(
             """SELECT l.title, l.content, m.title AS module_title, lv.name AS level_name
@@ -877,17 +930,16 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
             {"lid": lesson_id}
         )
         
-        if not lesson:
-            raise HTTPException(404, "Lesson not found")
+        user = _safe_user_dict(current_user)
+        user_id = user.get("id", 0)
         
         profile = await database.fetch_one(
             "SELECT weak_topics FROM user_learning_profile WHERE user_id=:uid",
             {"uid": user_id}
         )
         
-        # Fix #6: Safe JSON parsing
         weak = _parse_json(profile.get("weak_topics")) if profile else []
-        level = lesson.get("level_name", "intermediate").lower()
+        level = lesson["level_name"].lower() if lesson else "intermediate"
         
         tone = {
             "beginner": "Use very simple language and real-world analogies. Avoid jargon entirely.",
@@ -902,13 +954,13 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
             "Keep under 450 words. Only explain THIS lesson content."
         )
         
-        content_preview = lesson.get("content", "")[:1200] if lesson.get("content") else ""
-        explanation = await _ai(system, f"Explain: {lesson.get('title', '')}\n\nContent: {content_preview}")
+        content_preview = lesson["content"][:1200] if lesson and lesson.get("content") else ""
+        explanation = await _ai(system, f"Explain: {lesson['title']}\n\nContent: {content_preview}")
         
         return {
-            "lesson_title": lesson.get("title", ""),
-            "module_title": lesson.get("module_title", ""),
-            "level": lesson.get("level_name", ""),
+            "lesson_title": lesson["title"],
+            "module_title": lesson["module_title"],
+            "level": lesson["level_name"],
             "explanation": explanation,
         }
     except HTTPException:
@@ -919,43 +971,14 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
             "lesson_title": "Lesson",
             "module_title": "Module",
             "level": "Beginner",
-            "explanation": "Trading Coach explanation is temporarily unavailable. Please review the lesson content and try the quiz to reinforce your learning."
+            "explanation": "Trading Coach explanation is temporarily unavailable. Please review the lesson content."
         }
 
 @router.post("/mentor/practice")
 async def mentor_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
-        lesson = await database.fetch_one(
-            """SELECT l.title, l.content, lv.name AS level_name
-               FROM learning_lessons l
-               JOIN learning_modules m ON m.id=l.module_id
-               JOIN learning_levels lv ON lv.id=m.level_id
-               WHERE l.id=:lid""",
-            {"lid": lesson_id}
-        )
+        await _verify_lesson_exists(lesson_id)
         
-        if not lesson:
-            raise HTTPException(404, "Lesson not found")
-        
-        system = (
-            "You are a Pipways Trading Coach. Create ONE short, realistic practice exercise. "
-            "Format: Scenario (1-2 sentences) → Question → Model Answer. "
-            "Use different currency pairs each time. Under 180 words."
-        )
-        
-        exercise = await _ai(system, f"Create exercise for '{lesson.get('title', '')}' at {lesson.get('level_name', 'Beginner')} level.")
-        
-        return {"lesson_title": lesson.get("title", ""), "exercise": exercise}
-    except Exception as e:
-        print(f"[API ERROR] mentor_practice: {e}", flush=True)
-        return {
-            "lesson_title": "Practice",
-            "exercise": "Practice Exercise:\n\nScenario: EUR/USD is testing a key support level at 1.0850 after a downtrend.\n\nQuestion: What factors should you check before deciding to buy at support?\n\nModel Answer: Check 1) Higher timeframe trend direction, 2) Presence of bullish candlestick patterns (pin bar, engulfing), 3) RSI for oversold conditions, 4) Volume confirmation on the bounce. Only enter if multiple factors align."
-        }
-
-@router.post("/mentor/chart-practice")
-async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
-    try:
         lesson = await database.fetch_one(
             """SELECT l.title, lv.name AS level_name
                FROM learning_lessons l
@@ -965,24 +988,51 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
             {"lid": lesson_id}
         )
         
-        if not lesson:
-            raise HTTPException(404, "Lesson not found")
+        system = (
+            "You are a Pipways Trading Coach. Create ONE short, realistic practice exercise. "
+            "Format: Scenario (1-2 sentences) → Question → Model Answer. "
+            "Use different currency pairs each time. Under 180 words."
+        )
+        
+        exercise = await _ai(system, f"Create exercise for '{lesson['title']}' at {lesson['level_name']} level.")
+        
+        return {"lesson_title": lesson["title"], "exercise": exercise}
+    except Exception as e:
+        print(f"[API ERROR] mentor_practice: {e}", flush=True)
+        return {
+            "lesson_title": "Practice",
+            "exercise": "Practice exercise temporarily unavailable. Please review the lesson quiz instead."
+        }
+
+@router.post("/mentor/chart-practice")
+async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    try:
+        await _verify_lesson_exists(lesson_id)
+        
+        lesson = await database.fetch_one(
+            """SELECT l.title, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id=l.module_id
+               JOIN learning_levels lv ON lv.id=m.level_id
+               WHERE l.id=:lid""",
+            {"lid": lesson_id}
+        )
         
         system = (
             "Create a chart-reading exercise. Return valid JSON with keys: "
-            "tv_symbol (e.g., FX:EURUSD, OANDA:GBPUSD), tv_interval (60), "
+            "tv_symbol (e.g., FX:EURUSD), tv_interval (60), "
             "scenario, question, options [A,B,C,D], correct (A/B/C/D), explanation. "
             "No text outside JSON."
         )
         
-        level = lesson.get("level_name", "Beginner").lower()
+        level = lesson["level_name"].lower() if lesson else "beginner"
         complexity = {
             "beginner": "support/resistance identification",
             "intermediate": "trend context with S/R",
             "advanced": "order blocks, liquidity sweeps, market structure",
         }.get(level, "support and resistance")
         
-        raw = await _ai(system, f"Create chart exercise for '{lesson.get('title', '')}' focusing on {complexity}.")
+        raw = await _ai(system, f"Create chart exercise for '{lesson['title']}' focusing on {complexity}.")
         
         try:
             clean = raw.strip().strip("```json").strip("```").strip()
@@ -999,8 +1049,8 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
             }
         
         return {
-            "lesson_title": lesson.get("title", ""),
-            "level": lesson.get("level_name", ""),
+            "lesson_title": lesson["title"],
+            "level": lesson["level_name"],
             "chart_practice": data,
         }
     except Exception as e:
@@ -1020,7 +1070,7 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
         }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# INTERNAL HELPERS (Fix #6 - Safe JSON parsing used throughout)
+# INTERNAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def _mark_lesson_complete(user_id: int, lesson_id: int, score: float):
@@ -1073,7 +1123,6 @@ async def _update_learning_profile(user_id: int, wrong_slugs: list, correct_slug
         )
         
         if existing:
-            # Fix #6: Safe parsing
             cur_weak = _parse_json(existing.get("weak_topics"))
             cur_strong = _parse_json(existing.get("strong_topics"))
             
@@ -1104,7 +1153,7 @@ async def _quiz_feedback(score: float, passed: bool, lesson_title: str, wrong_sl
             if wrong_slugs:
                 areas = ", ".join(wrong_slugs[:2])
                 return f"Strong performance on {lesson_title}! Just polish your understanding of {areas}, then continue forward."
-            return f"Great work passing {lesson_title}! Your trading knowledge is building steadily. Proceed to the next lesson with confidence."
+            return f"Great work passing {lesson_title}! Your trading knowledge is building steadily."
         else:
             focus = ", ".join(wrong_slugs[:3]) if wrong_slugs else "the core concepts"
             advice = {
@@ -1112,7 +1161,7 @@ async def _quiz_feedback(score: float, passed: bool, lesson_title: str, wrong_sl
                 "intermediate": "Precision separates profitable traders. Revisit",
                 "advanced": "Institutional-grade trading demands mastery. Deep-dive into"
             }.get(level, "Focus your study on")
-            return f"{advice} {focus} in {lesson_title}. Reattempt the quiz when the concepts click."
+            return f"{advice} {focus} in {lesson_title}. Reattempt the quiz when ready."
     except Exception as e:
         print(f"[HELPER ERROR] _quiz_feedback: {e}", flush=True)
-        return "Continue studying the material and retry the quiz when you feel confident."
+        return "Continue studying the material and retry the quiz when confident."

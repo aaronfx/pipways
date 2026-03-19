@@ -1,6 +1,8 @@
 /**
  * AI Mentor Frontend with Trading Academy Integration
  * Renders lesson recommendation cards below AI responses
+ * 
+ * REQUIRED CSS: See CSS block at bottom of file
  */
 
 class AIMentor {
@@ -49,6 +51,9 @@ class AIMentor {
         this.chatContainer?.insertAdjacentHTML('beforeend', welcomeHTML);
     }
 
+    /**
+     * FIXED: Handles API call to /mentor/ask and renders recommendations separately
+     */
     async sendMessage() {
         const message = this.inputField?.value.trim();
         if (!message) return;
@@ -61,7 +66,8 @@ class AIMentor {
         this.showTyping();
 
         try {
-            const response = await fetch(`${this.apiBaseUrl}/mentor/ask`, {
+            // CRITICAL FIX: Direct API call to /mentor/ask (not /api/ai/mentor/ask)
+            const response = await fetch(`/mentor/ask`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -80,8 +86,11 @@ class AIMentor {
             // Remove typing indicator
             this.hideTyping();
 
-            // Add AI message with recommendations
-            this.addMessage(data.response, 'ai', data.recommendations);
+            // Add AI text response
+            this.addMessage(data.response, 'ai');
+
+            // CRITICAL FIX: Render recommendations into dedicated container
+            this.renderRecommendations(data.recommendations || []);
 
             // Update progress sidebar if available
             if (data.academy_progress) {
@@ -92,19 +101,18 @@ class AIMentor {
             this.hideTyping();
             this.addMessage(
                 "I'm having trouble connecting. Please try again shortly.", 
-                'ai',
-                [{
-                    type: 'lesson',
-                    title: 'Trading Academy',
-                    description: 'Browse all lessons',
-                    url: '/academy.html',
-                    reason: 'recommended'
-                }]
+                'ai'
             );
+            // Clear recommendations on error
+            this.renderRecommendations([]);
         }
     }
 
-    addMessage(text, sender, recommendations = []) {
+    /**
+     * Adds chat message to container
+     * FIXED: Removed recommendations parameter - now handled separately
+     */
+    addMessage(text, sender) {
         const isAI = sender === 'ai';
         const messageHTML = `
             <div class="message ${isAI ? 'ai-message' : 'user-message'}">
@@ -112,74 +120,109 @@ class AIMentor {
                 <div class="message-content">
                     <div class="message-text">${this.escapeHtml(text)}</div>
                     <div class="message-time">${this.getCurrentTime()}</div>
-
-                    ${isAI && recommendations.length > 0 ? this.renderLessonCards(recommendations) : ''}
                 </div>
             </div>
         `;
-
         this.chatContainer?.insertAdjacentHTML('beforeend', messageHTML);
         this.scrollToBottom();
     }
 
-    renderLessonCards(recommendations) {
-        if (!recommendations || recommendations.length === 0) return '';
+    /**
+     * NEW: Renders lesson recommendations into dedicated container
+     * Prevents duplicates, handles empty state, provides clean UI
+     */
+    renderRecommendations(recommendations) {
+        const container = document.getElementById('mentor-recommendations');
+        if (!container) {
+            console.warn('[AIMentor] mentor-recommendations container not found in DOM');
+            return;
+        }
 
-        const cardsHTML = recommendations.map((rec, index) => {
-            const isNextStep = rec.reason === 'next_step';
-            const cardClass = isNextStep ? 'lesson-card-next' : 'lesson-card-recommended';
-            const badgeText = isNextStep ? 'Continue Learning' : 'Recommended Lesson';
-            const badgeClass = isNextStep ? 'badge-next' : 'badge-recommended';
-            const lessonId = rec.metadata?.lesson_id || '';
+        // CRITICAL: Clear old recommendations to prevent duplicates
+        container.innerHTML = '';
+        
+        // Handle empty recommendations - hide container
+        if (!recommendations || recommendations.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
 
-            return `
-                <div class="lesson-card ${cardClass}" 
-                     onclick="mentor.openLesson(${lessonId}, '${rec.url}')"
-                     data-lesson-id="${lessonId}">
-                    <div class="lesson-card-header">
-                        <span class="lesson-badge ${badgeClass}">${badgeText}</span>
-                        <span class="lesson-icon">📚</span>
-                    </div>
-                    <div class="lesson-card-body">
-                        <h4 class="lesson-title">${this.escapeHtml(rec.title)}</h4>
-                        <p class="lesson-description">${this.escapeHtml(rec.description)}</p>
-                    </div>
-                    <div class="lesson-card-footer">
-                        <button class="lesson-cta-btn">
-                            ${isNextStep ? '▶ Continue' : '🎯 Start Lesson'}
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        // Show container and render header
+        container.style.display = 'block';
+        const header = document.createElement('div');
+        header.className = 'recommendations-header';
+        header.innerHTML = '<span>📚</span> Recommended Lessons';
+        container.appendChild(header);
 
-        return `
-            <div class="lesson-recommendations">
-                <div class="recommendations-label">📖 Recommended for you:</div>
-                <div class="lesson-cards-container">
-                    ${cardsHTML}
-                </div>
-            </div>
-        `;
+        // Create grid for cards
+        const grid = document.createElement('div');
+        grid.className = 'recommendations-grid';
+
+        // Render each recommendation card
+        recommendations.forEach((rec) => {
+            const lessonId = rec.metadata?.lesson_id;
+            const card = this.createRecommendationCard(rec, lessonId);
+            grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+        this.scrollToBottom();
     }
 
-    async openLesson(lessonId, url) {
-        // Track the click
+    /**
+     * NEW: Creates a single recommendation card DOM element
+     */
+    createRecommendationCard(rec, lessonId) {
+        const card = document.createElement('div');
+        card.className = 'lesson-card';
+        
+        card.innerHTML = `
+            <div class="lesson-card-content">
+                <div class="lesson-badge">Trading Academy</div>
+                <h4 class="lesson-title">${this.escapeHtml(rec.title)}</h4>
+                <p class="lesson-description">${this.escapeHtml(rec.description)}</p>
+                <button class="lesson-cta-btn" type="button">
+                    Start Lesson →
+                </button>
+            </div>
+        `;
+
+        // Click handler for entire card
+        card.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleLessonClick(lessonId, rec.url);
+        });
+
+        return card;
+    }
+
+    /**
+     * NEW: Handles lesson click with tracking and navigation
+     * FIXED: Uses POST /mentor/track-lesson-click with JSON body
+     */
+    async handleLessonClick(lessonId, url) {
+        // Track click if we have lesson ID
         if (lessonId) {
             try {
-                await fetch(`${this.apiBaseUrl}/mentor/track-lesson-click?lesson_id=${lessonId}`, {
+                await fetch(`/mentor/track-lesson-click`, {
                     method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json',
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
+                    },
+                    body: JSON.stringify({ lesson_id: lessonId })  // Required format
                 });
             } catch (e) {
-                console.log('Tracking failed, continuing anyway');
+                console.error('[AIMentor] Click tracking failed:', e);
+                // Continue to navigation even if tracking fails
             }
         }
 
-        // Navigate to academy
-        window.open(url, '_blank');
+        // Navigate to lesson URL
+        if (url) {
+            window.open(url, '_blank');
+        }
     }
 
     handleQuickCommand(cmd) {
@@ -257,3 +300,114 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Expose to global scope for onclick handlers
 window.mentor = mentor;
+
+/**
+ * REQUIRED CSS - Add to your stylesheet
+ * 
+ * #mentor-recommendations {
+ *     margin: 20px 0;
+ *     padding: 20px;
+ *     background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+ *     border-radius: 12px;
+ *     border: 1px solid #bae6fd;
+ * }
+ * 
+ * .recommendations-header {
+ *     font-size: 16px;
+ *     font-weight: 600;
+ *     color: #0369a1;
+ *     margin-bottom: 16px;
+ *     display: flex;
+ *     align-items: center;
+ *     gap: 8px;
+ * }
+ * 
+ * .recommendations-grid {
+ *     display: grid;
+ *     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+ *     gap: 16px;
+ * }
+ * 
+ * .lesson-card {
+ *     background: white;
+ *     border-radius: 10px;
+ *     padding: 20px;
+ *     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+ *     cursor: pointer;
+ *     transition: all 0.2s ease;
+ *     border: 1px solid #e2e8f0;
+ *     position: relative;
+ *     overflow: hidden;
+ * }
+ * 
+ * .lesson-card:hover {
+ *     transform: translateY(-3px);
+ *     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+ *     border-color: #3b82f6;
+ * }
+ * 
+ * .lesson-card::before {
+ *     content: '';
+ *     position: absolute;
+ *     top: 0;
+ *     left: 0;
+ *     width: 4px;
+ *     height: 100%;
+ *     background: #3b82f6;
+ *     opacity: 0;
+ *     transition: opacity 0.2s;
+ * }
+ * 
+ * .lesson-card:hover::before {
+ *     opacity: 1;
+ * }
+ * 
+ * .lesson-badge {
+ *     display: inline-block;
+ *     font-size: 11px;
+ *     font-weight: 600;
+ *     text-transform: uppercase;
+ *     letter-spacing: 0.5px;
+ *     color: #3b82f6;
+ *     background: #eff6ff;
+ *     padding: 4px 10px;
+ *     border-radius: 20px;
+ *     margin-bottom: 12px;
+ * }
+ * 
+ * .lesson-title {
+ *     margin: 0 0 8px 0;
+ *     font-size: 16px;
+ *     font-weight: 600;
+ *     color: #1e293b;
+ *     line-height: 1.4;
+ * }
+ * 
+ * .lesson-description {
+ *     margin: 0 0 16px 0;
+ *     font-size: 14px;
+ *     color: #64748b;
+ *     line-height: 1.5;
+ * }
+ * 
+ * .lesson-cta-btn {
+ *     background: #3b82f6;
+ *     color: white;
+ *     border: none;
+ *     padding: 10px 20px;
+ *     border-radius: 8px;
+ *     font-size: 14px;
+ *     font-weight: 500;
+ *     cursor: pointer;
+ *     transition: all 0.2s;
+ *     display: inline-flex;
+ *     align-items: center;
+ *     gap: 6px;
+ *     width: 100%;
+ *     justify-content: center;
+ * }
+ * 
+ * .lesson-cta-btn:hover {
+ *     background: #2563eb;
+ * }
+ */

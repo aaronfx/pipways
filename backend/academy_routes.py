@@ -32,6 +32,18 @@ from .database import database
 
 router = APIRouter()
 
+def _user_get(user, key, default=None):
+    """Safe attribute access for both dict and asyncpg Record objects."""
+    if user is None:
+        return default
+    try:
+        return user[key]
+    except (KeyError, TypeError):
+        try:
+            return user.get(key, default)
+        except AttributeError:
+            return default
+
 # ── Locate academy.html ───────────────────────────────────────────────────────
 # Checks: frontend/static/ → static/ → same dir as this file
 _BASE = Path(__file__).parent
@@ -146,7 +158,7 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
             """SELECT level_id, COUNT(*) as total
                FROM learning_modules m
                JOIN learning_lessons l ON l.module_id = m.id
-               GROUP BY level_id""", {}
+               GROUP BY level_id"""
         )
         level_map = {r["level_id"]: r["cnt"]   for r in level_counts} if level_counts else {}
         total_map = {r["level_id"]: r["total"] for r in level_totals} if level_totals else {}
@@ -267,7 +279,7 @@ async def get_modules(level_id: int, current_user=Depends(get_current_user)):
         if not modules:
             return []
 
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         result = []
         for m in modules:
             try:
@@ -309,7 +321,7 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
         if not lessons:
             return []
 
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         result = []
         for i, les in enumerate(lessons):
             try:
@@ -355,7 +367,7 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
         if not lesson:
             raise HTTPException(404, "Lesson not found")
 
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         adj = await database.fetch_all(
             """SELECT l.id, l.title, l.order_index,
                       EXISTS(
@@ -411,8 +423,8 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
 @router.get("/learning/progress/{user_id}")
 async def get_progress(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller   = current_user.get("id")       if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        caller   = _user_get(current_user, "id", 0)
+        is_admin = _user_get(current_user, "is_admin", False)
         if caller != user_id and not is_admin:
             return {"user_id": user_id, "total_lessons": 0, "completed_lessons": 0,
                     "completion_rate": 0.0, "progress": [], "summary": []}
@@ -476,8 +488,8 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
 @router.get("/learning/badges/{user_id}")
 async def get_badges(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller   = current_user.get("id")       if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        caller   = _user_get(current_user, "id", 0)
+        is_admin = _user_get(current_user, "is_admin", False)
         if caller != user_id and not is_admin:
             return {"user_id": user_id, "badges": [], "count": 0}
 
@@ -504,8 +516,8 @@ async def get_badges(user_id: int, current_user=Depends(get_current_user)):
 @router.get("/learning/mentor/guide/{user_id}")
 async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
     try:
-        caller   = current_user.get("id")       if current_user else 0
-        is_admin = current_user.get("is_admin") if current_user else False
+        caller   = _user_get(current_user, "id", 0)
+        is_admin = _user_get(current_user, "is_admin", False)
         if caller != user_id and not is_admin:
             raise HTTPException(403, "Forbidden")
 
@@ -557,7 +569,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
 @router.post("/learning/badges/check")
 async def check_badges(current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         if not user_id:
             return {"newly_awarded": [], "count": 0}
         new_badges = await _check_and_award_badges(user_id)
@@ -569,7 +581,7 @@ async def check_badges(current_user=Depends(get_current_user)):
 @router.post("/learning/quiz/submit")
 async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         if not user_id:
             raise HTTPException(401, "Not authenticated")
 
@@ -662,7 +674,7 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
 @router.post("/learning/lesson/complete")
 async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         if not user_id:
             raise HTTPException(401, "Not authenticated")
         await _mark_lesson_complete(user_id, payload.lesson_id, payload.quiz_score)
@@ -675,7 +687,7 @@ async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(g
 @router.post("/learning/profile/first-visit-complete")
 async def mark_first_visit_complete(current_user=Depends(get_current_user)):
     try:
-        user_id = current_user.get("id") if current_user else 0
+        user_id = _user_get(current_user, "id", 0)
         if not user_id:
             raise HTTPException(401, "Not authenticated")
 
@@ -839,6 +851,7 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
         return {"lesson_title": "Chart Practice", "level": "Beginner",
                 "chart_practice": fallback, **fallback}
 
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ADMIN — Seed health + reseed
 # ══════════════════════════════════════════════════════════════════════════════
@@ -869,32 +882,23 @@ async def academy_status(current_user=Depends(get_current_user)):
 
 @router.post("/admin/academy/reseed")
 async def academy_reseed(current_user=Depends(get_current_user)):
-    """
-    Admin only. Wipes curriculum tables and re-seeds from ACADEMY_CURRICULUM.
-    Does NOT touch user_learning_progress, user_badges, or user_quiz_results.
-    """
-    is_admin = current_user.get("is_admin") if current_user else False
+    """Admin only. Wipes curriculum and re-seeds from ACADEMY_CURRICULUM."""
+    is_admin = _user_get(current_user, "is_admin", False)
     if not is_admin:
         raise HTTPException(403, "Admin only")
-
     try:
         from .lms_init import seed_academy
-
         print("[RESEED] Admin triggered full reseed — clearing curriculum...", flush=True)
-        # Delete in reverse FK order; preserve user data
         await database.execute("DELETE FROM lesson_quizzes")
         await database.execute("DELETE FROM learning_lessons")
         await database.execute("DELETE FROM learning_modules")
         await database.execute("DELETE FROM learning_levels")
-        print("[RESEED] Curriculum cleared. Seeding now...", flush=True)
-
+        print("[RESEED] Cleared. Seeding now...", flush=True)
         await seed_academy()
-
         r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
         r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
         r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
         r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
-
         return {
             "status":  "success",
             "message": "Academy curriculum reseeded successfully",
@@ -906,7 +910,6 @@ async def academy_reseed(current_user=Depends(get_current_user)):
     except Exception as e:
         print(f"[RESEED ERROR] {e}", flush=True)
         raise HTTPException(500, f"Reseed failed: {e}")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # INTERNAL HELPERS

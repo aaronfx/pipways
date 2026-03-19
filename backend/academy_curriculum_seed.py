@@ -1511,96 +1511,80 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Fibonacci Retracements and Extensions",
                         "content": """## Quick Definition
-    
-    bonacci Retracements** measure pullback depth within trends using ratios derived from the Fibonacci sequence (23.6%, 38.2%, 50%, 61.8%). **Extensions** project profit targets beyond the 100% level (127.2%, 161.8%, 261.8%).
-    
-    
-    
-    oncept Explanation
-    
-    Key Fibonacci Levels
-    
-    vel | Significance |
-    ----|--------------|
-    38.2%** | Shallow retracement in strong trends |
-    50%** | Midpoint (not true Fibonacci but widely used) |
-    61.8%** | Golden Ratio—deepest healthy retracement |
-    78.6%** | Deep retracement, often last chance |
-    
-    Extension Targets
-    **127.2%** (1.272): First target, conservative
-    **161.8%** (1.618): Golden extension, primary target
-    **261.8%** (2.618): Extended target in strong trends
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    awing Fibonacci Retracement**:
-    Identify clear impulse move (swing low to high for uptrends)
-    Draw tool from swing start to swing end
-    Mark 38.2%, 50%, 61.8% levels
-    Wait for price to reach these zones
-    Look for confirmation signals at Fib levels
-    Enter with stop beyond 78.6% or swing extreme
-    
-    
-    
-    eal Trading Example
-    
-    R/USD Fibonacci Trade** (June 2024):
-    Impulse: 1.0700 → 1.0900 (200 pips)
-    Retracement: Pullback to 1.0820 (61.8% level)
-    Confirmation: Bullish hammer at 61.8%
-    Entry: 1.0825
-    Stop: 1.0785 (below 78.6%, 40 pips)
-    Target 1: 1.0924 (127.2% extension)
-    Target 2: 1.0956 (161.8% extension)
-    Result: Both targets hit over 5 days
-    
-     class="ac-svg-diagram" viewBox="0 0 400 200">
-    ine x1="50" y1="150" x2="350" y2="50" stroke="#60a5fa" stroke-width="2"/>
-    ext x="30" y="155" fill="#60a5fa" font-size="12">0%</text>
-    ext x="360" y="55" fill="#60a5fa" font-size="12">100%</text>
-    ine x1="150" y1="125" x2="170" y2="125" stroke="#f59e0b" stroke-width="3"/>
-    ext x="180" y="130" fill="#f59e0b" font-size="10">38.2%</text>
-    ine x1="200" y1="100" x2="220" y2="100" stroke="#f59e0b" stroke-width="3"/>
-    ext x="230" y="105" fill="#f59e0b" font-size="10">50%</text>
-    ine x1="250" y1="75" x2="270" y2="75" stroke="#22c55e" stroke-width="3"/>
-    ext x="280" y="80" fill="#22c55e" font-size="10">61.8%</text>
-    ircle cx="260" cy="75" r="5" fill="#22c55e"/>
-    ext x="260" y="60" text-anchor="middle" fill="#22c55e" font-size="10">Entry Zone</text>
-    g>
-    
-    
-    
-     Chart Example
-    
-    bonacci Levels](/static/charts/fibonacci_retracement_example.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    rcing Fibonacci Everywhere**: Drawing Fibonacci on every chart regardless of trend clarity. Fibonacci only works with clear impulse moves in established trends. Choppy, ranging markets produce random Fibonacci signals.
-    
-    
-    
-     Pro Tip
-    
-    e 61.8% Sweet Spot**: The 61.8% retracement (Golden Ratio) is the highest-probability entry zone in healthy trends. Price often respects this level before continuing. Combine with price action confirmation for best results.
-    
-    
-    
-    ey Takeaway
-    
-    nacci levels are self-fulfilling because institutions use them. The 38.2-61.8% zone offers the best risk/reward for entries. Extensions project logical profit targets. Always confirm with price action—Fibonacci alone is not enough.
-    
-    
-    
-    ractice Question
-    
-     strong uptrend, which Fibonacci retracement level typically offers the deepest "healthy" pullback entry?""",
+
+Fibonacci retracements identify potential support and resistance levels based on key ratios (23.6%, 38.2%, 50%, 61.8%, 78.6%) derived from the Fibonacci sequence. They show where price may pause or reverse during a pullback.
+
+---
+
+## Concept Explanation
+
+### Key Fibonacci Levels
+
+*   **23.6%** — Shallow retracement, strong trend
+*   **38.2%** — Common first pullback level
+*   **50.0%** — Psychological midpoint (not a Fib ratio but widely used)
+*   **61.8%** — The "Golden Ratio" — highest probability reversal zone
+*   **78.6%** — Deep retracement, trend may be weakening
+
+### Extensions (Profit Targets)
+
+*   **127.2%** — First extension target
+*   **161.8%** — Major extension target
+*   **261.8%** — Aggressive target in strong trends
+
+---
+
+## Step-by-Step Breakdown
+
+1.  **Identify the swing** — Find a clear high and low
+2.  **Draw from swing low to swing high** (uptrend) or high to low (downtrend)
+3.  **Wait for pullback** — Price retraces toward key levels
+4.  **Look for confluence** — Fib level + support/resistance + candlestick pattern
+5.  **Enter at the confluence zone** — 61.8% is highest probability
+6.  **Set targets** — Use extensions (127.2%, 161.8%) for take profit
+
+---
+
+## Real Trading Example
+
+**EUR/USD Fibonacci Trade:**
+*   Swing Low: 1.0700 | Swing High: 1.0900
+*   61.8% Retracement: 1.0776
+*   Price pulls back to 1.0778 with bullish engulfing
+*   Entry: 1.0780 | Stop: 1.0745 | Target: 1.0968 (127.2% extension)
+*   Result: 2.5 R:R achieved
+
+---
+
+## 📊 Chart Example
+
+<svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="480" height="200" fill="#0d1117" rx="8"/>
+  <text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Fibonacci Retracement — EUR/USD</text>
+  <line x1="40" y1="170" x2="200" y2="50" stroke="#34d399" stroke-width="2"/>
+  <polyline points="200,50 240,90 260,80 280,100 300,88" fill="none" stroke="#60a5fa" stroke-width="2"/>
+  <line x1="30" y1="97" x2="420" y2="97" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4"/>
+  <text x="425" y="101" fill="#fbbf24" font-size="9">61.8%</text>
+  <line x1="30" y1="110" x2="420" y2="110" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3"/>
+  <text x="425" y="114" fill="#f59e0b" font-size="9">50.0%</text>
+  <line x1="30" y1="125" x2="420" y2="125" stroke="#f87171" stroke-width="1" stroke-dasharray="3"/>
+  <text x="425" y="129" fill="#f87171" font-size="9">38.2%</text>
+  <circle cx="280" cy="100" r="6" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <text x="285" y="93" fill="#fbbf24" font-size="9">Entry zone</text>
+  <text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Enter at 61.8% with confluence confirmation.</text>
+</svg>
+
+---
+
+## 💡 Pro Tip
+
+**Fib + S/R Confluence**: When a 61.8% retracement coincides with a previous support level AND a moving average, probability of a bounce increases significantly. Never trade Fibonacci alone.
+
+---
+
+## Key Takeaway
+
+Fibonacci retracements are self-fulfilling — so many traders use them that price often respects these levels. Focus on the 38.2% and 61.8% with confluence for highest-probability entries.""",
                         "quiz": [
                             {"question": "Most significant Fibonacci retracement?", "option_a": "23.6%", "option_b": "38.2%", "option_c": "61.8%", "option_d": "78.6%", "correct_answer": "C", "explanation": "61.8% is the Golden Ratio and highest-probability retracement level.", "topic_slug": "fibonacci"},
                             {"question": "Fibonacci extension target for strong trends?", "option_a": "100%", "option_b": "127.2%", "option_c": "161.8%", "option_d": "261.8%", "correct_answer": "C", "explanation": "161.8% is the Golden extension, primary target in strong trends.", "topic_slug": "fibonacci"},
@@ -1610,95 +1594,62 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Confluence Trading",
                         "content": """## Quick Definition
-    
-    nfluence** occurs when multiple technical factors align at the same price zone, creating higher-probability trading setups. More confluence = higher probability + better risk/reward.
-    
-    
-    
-    oncept Explanation
-    
-    Types of Confluence
-    
-    rizontal Confluence**:
-    Previous support/resistance
-    Round numbers (1.1000, 1.2000)
-    Psychological levels
-    
-    namic Confluence**:
-    Moving averages (20, 50, 200 EMA/SMA)
-    Trendlines
-    Channels
-    
-    bonacci Confluence**:
-    Multiple Fibonacci levels align
-    Fibonacci + horizontal level
-    Fibonacci + dynamic level
-    
-    The Confluence Score
-    
-    nfluence Factors | Probability | Recommended Size |
-    ----------------|-------------|-------------------|
-    factor | 45-50% | 0.5% risk |
-    factors | 55-60% | 1% risk |
-     factors | 65-75% | 2% risk |
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    ilding Confluence Zones**:
-    Identify horizontal support/resistance
-    Check if Fibonacci retracement aligns
-    Check if moving average is nearby
-    Look for trendline confluence
-    Check for round numbers
-    Mark the zone where 3+ factors align
-    Wait for price action confirmation
-    
-    
-    
-    eal Trading Example
-    
-    P/USD Perfect Confluence** (May 2024):
-    **Horizontal**: Previous resistance at 1.2500
-    **Fibonacci**: 61.8% retracement at 1.2490
-    **Dynamic**: 50 EMA at 1.2505
-    **Psychological**: Round number 1.2500
-    **Confirmation**: Bullish pin bar at 1.2500
-    Entry: 1.2505
-    Stop: 1.2455 (50 pips)
-    Target: 1.2620 (115 pips)
-    Result: 2.3 R:R, target hit in 4 days
-    
-    
-    
-     Chart Example
-    
-    nfluence Trading](/static/charts/confluence_trading_zones.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    e-Factor Trading**: Taking trades based solely on one indicator or level. Single-factor setups have lower probability and require wider stops. Always seek minimum 2-3 confluence factors for A-grade setups.
-    
-    
-    
-     Pro Tip
-    
-    e Magnet Zone**: When 3+ factors align within 10-15 pips, you have found a "magnet zone." Price is drawn to these areas. Even if price overshoots, it often returns to respect these high-confluence zones.
-    
-    
-    
-    ey Takeaway
-    
-    luence stacks probability in your favor. Look for zones where horizontal, dynamic, and Fibonacci levels align. 3+ confluence factors = A-grade setups. Single-factor setups should be avoided or sized smaller.
-    
-    
-    
-    ractice Question
-    
-     is the minimum number of confluence factors recommended for A-grade setups?""",
+
+Confluence is when **multiple technical factors align at the same price level**, dramatically increasing the probability of a trade working. The more confluences, the stronger the setup.
+
+---
+
+## Concept Explanation
+
+### Types of Confluence Factors
+
+*   **Structure levels** — Support, resistance, previous highs/lows
+*   **Moving averages** — MA20, MA50, MA200
+*   **Fibonacci levels** — 38.2%, 61.8% retracements
+*   **Round numbers** — 1.1000, 1.0500, 1.2000 (psychological levels)
+*   **Candlestick patterns** — Pin bar, engulfing at the zone
+*   **Order blocks** — Institutional accumulation zones
+
+### Confluence Scoring System
+
+*   1-2 confluences — Skip the trade
+*   3 confluences — Acceptable setup
+*   4+ confluences — High probability, take the trade
+
+---
+
+## Step-by-Step Breakdown
+
+1.  **Mark your levels** — Draw all S/R, MAs, and Fibonacci on the chart
+2.  **Find the cluster** — Look for a zone where 3+ factors converge
+3.  **Wait for price** — Let price come to your zone, do not chase
+4.  **Get entry confirmation** — Candlestick pattern at the confluence zone
+5.  **Execute** — Enter with tight stop below the zone
+6.  **Target next structure** — Use the next major level as take profit
+
+---
+
+## Real Trading Example
+
+**GBP/USD Confluence Short:**
+*   Daily resistance at 1.2850
+*   61.8% Fibonacci retracement at 1.2848
+*   MA50 at 1.2845
+*   Round number 1.2850
+*   4 confluences — bearish pin bar forms
+*   Entry: 1.2848 | Stop: 1.2875 | Target: 1.2750 — Result: 3.7 R:R
+
+---
+
+## 💡 Pro Tip
+
+**The Zone, Not the Line**: Price rarely respects exact levels. Define a 10-20 pip zone around your confluence area. Place limit orders throughout the zone rather than waiting for one exact price.
+
+---
+
+## Key Takeaway
+
+Confluence transforms average setups into high-probability trades. Never enter on a single factor. Build a checklist: structure + indicator + pattern = trade. More confluences equals higher confidence.""",
                         "quiz": [
                             {"question": "Types of confluence include?", "option_a": "Only horizontal", "option_b": "Horizontal, dynamic, Fibonacci", "option_c": "Only Fibonacci", "option_d": "Only indicators", "correct_answer": "B", "explanation": "Three main types: horizontal (S/R), dynamic (MAs), and Fibonacci levels.", "topic_slug": "fibonacci"},
                             {"question": "Recommended risk for 3+ confluence factors?", "option_a": "0.5%", "option_b": "1%", "option_c": "2%", "option_d": "5%", "correct_answer": "C", "explanation": "High confluence (3+ factors) justifies standard 2% risk per trade.", "topic_slug": "fibonacci"},
@@ -1714,96 +1665,89 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Order Blocks and Institutional Levels",
                         "content": """## Quick Definition
-    
-    der Blocks (OB)** are the last opposing candle before a strong impulsive move, representing where institutions accumulated or distributed positions. They act as magnets for future price action.
-    
-    
-    
-    oncept Explanation
-    
-    Types of Order Blocks
-    
-    llish Order Block**:
-    Last bearish candle before strong bullish move
-    Acts as support when price returns
-    Often formed at market structure shifts
-    
-    arish Order Block**:
-    Last bullish candle before strong bearish move
-    Acts as resistance when price returns
-    Validated by Break of Structure (BOS)
-    
-    Key Characteristics
-    **Displacement**: Strong impulsive move away from OB
-    **Mitigation**: Price returns to OB to fill remaining orders
-    **Break of Structure**: Confirms directional intent
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    ading Order Blocks**:
-    Identify clear impulse move (displacement)
-    Mark the last opposing candle (the OB)
-    Wait for price to return to OB zone
-    Confirm with lower timeframe structure break
-    Enter with stop beyond OB extreme
-    Target next liquidity pool or extension
-    
-    
-    
-    eal Trading Example
-    
-    R/USD Bullish Order Block** (April 2024):
-    **Impulse**: Strong bullish move from 1.0700 → 1.0850
-    **OB**: Last bearish candle before impulse (1.0720-1.0735)
-    **Return**: Price retraces to OB zone 5 days later
-    **Confirmation**: 15m bullish engulfing at OB
-    Entry: 1.0730
-    Stop: 1.0705 (25 pips)
-    Target: 1.0820 (90 pips)
-    Result: 3.6 R:R, target hit in 2 days
-    
-     class="ac-svg-diagram" viewBox="0 0 400 200">
-    ect x="100" y="120" width="40" height="30" fill="#ef4444" opacity="0.6" rx="3"/>
-    ext x="120" y="140" text-anchor="middle" fill="white" font-size="10">OB</text>
-    ine x1="140" y1="135" x2="280" y2="60" stroke="#22c55e" stroke-width="3"/>
-    ext x="210" y="90" text-anchor="middle" fill="#22c55e" font-size="12">Displacement</text>
-    ath d="M 300 60 Q 320 100 280 120" stroke="#60a5fa" stroke-width="2" stroke-dasharray="5,5"/>
-    ext x="320" y="90" fill="#60a5fa" font-size="10">Return to OB</text>
-    ircle cx="120" cy="120" r="8" fill="none" stroke="#f59e0b" stroke-width="2"/>
-    ext x="120" y="175" text-anchor="middle" fill="#f59e0b" font-size="10">Entry Zone</text>
-    g>
-    
-    
-    
-     Chart Example
-    
-    der Blocks](/static/charts/order_block_example.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    rking Every Candle**: Drawing boxes around every pullback candle. Not every consolidation is an order block. Valid OBs require clear displacement and Break of Structure. Focus on significant swing points only.
-    
-    
-    
-     Pro Tip
-    
-     Mitigation Concept**: Institutions leave unfilled orders at OBs. When price returns, these orders get filled, creating the reaction. The best entries are at the 50% of the OB body—where most institutional orders remain unexecuted.
-    
-    
-    
-    ey Takeaway
-    
-    r blocks reveal institutional footprints. Valid OBs show displacement and structure breaks. Price returns to OBs to mitigate (fill) remaining orders. Trade the return with confirmation for high-probability entries.
-    
-    
-    
-    ractice Question
-    
-     validates an order block?""",
+
+**Order Blocks (OB)** are the last opposing candle before a strong impulsive move, representing where institutions accumulated or distributed positions. They act as magnets for future price action.
+
+---
+
+## Concept Explanation
+
+### Types of Order Blocks
+
+**Bullish Order Block:**
+*   Last bearish candle before a strong bullish move
+*   Acts as support when price returns
+*   Often formed at market structure shifts
+
+**Bearish Order Block:**
+*   Last bullish candle before a strong bearish move
+*   Acts as resistance when price returns
+*   Validated by a Break of Structure (BOS)
+
+### Key Characteristics
+
+*   **Displacement** — Strong impulsive move away from the OB
+*   **Mitigation** — Price returns to OB to fill remaining institutional orders
+*   **Break of Structure** — Confirms directional intent before the OB forms
+
+---
+
+## Step-by-Step Breakdown
+
+1.  Identify a clear impulse move (displacement)
+2.  Mark the last opposing candle — that is the Order Block
+3.  Wait for price to return to the OB zone
+4.  Confirm with a lower timeframe structure break
+5.  Enter with stop beyond the OB extreme
+6.  Target the next liquidity pool or swing high/low
+
+---
+
+## Real Trading Example
+
+**EUR/USD Bullish Order Block:**
+*   Impulse: Strong bullish move from 1.0700 to 1.0850
+*   OB: Last bearish candle before impulse (1.0720-1.0735)
+*   Return: Price retraces to OB zone 5 days later
+*   Confirmation: 15m bullish engulfing at OB
+*   Entry: 1.0730 | Stop: 1.0705 (25 pips) | Target: 1.0820 (90 pips)
+*   Result: 3.6 R:R, target hit in 2 days
+
+---
+
+## 📊 Chart Example
+
+<svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="480" height="200" fill="#0d1117" rx="8"/>
+  <text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Bullish Order Block — EUR/USD</text>
+  <rect x="80" y="120" width="30" height="40" fill="rgba(239,68,68,0.5)" stroke="#f87171" rx="2"/>
+  <text x="95" y="172" text-anchor="middle" fill="#f87171" font-size="9">OB</text>
+  <line x1="110" y1="135" x2="280" y2="55" stroke="#34d399" stroke-width="2.5"/>
+  <text x="200" y="82" text-anchor="middle" fill="#34d399" font-size="10">Displacement</text>
+  <path d="M 310 55 Q 340 100 300 130 Q 270 145 95 130" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="5" fill="none"/>
+  <text x="360" y="90" fill="#60a5fa" font-size="9">Return to OB</text>
+  <circle cx="95" cy="130" r="7" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <text x="95" y="190" text-anchor="middle" fill="#fbbf24" font-size="9">Entry Zone</text>
+  <text x="240" y="198" text-anchor="middle" fill="#6b7280" font-size="8">Last bearish candle before impulse = Order Block</text>
+</svg>
+
+---
+
+## 🚫 Common Beginner Mistake
+
+**Marking Every Candle**: Drawing boxes around every pullback. Not every candle is a valid OB. Valid OBs require clear displacement and a Break of Structure. Focus on significant swing points only.
+
+---
+
+## 💡 Pro Tip
+
+**The 50% Entry**: Institutions leave unfilled orders at OBs. The best entries are at the 50% of the OB body where most institutional orders remain unexecuted. Use a limit order at the midpoint.
+
+---
+
+## Key Takeaway
+
+Order blocks reveal institutional footprints. Valid OBs need displacement and structure breaks. Price returns to OBs to fill institutional orders. Enter on the return with lower-timeframe confirmation.""",
                         "quiz": [
                             {"question": "Order Block definition?", "option_a": "Any consolidation", "option_b": "Last opposing candle before displacement", "option_c": "Breakout candle", "option_d": "Random price level", "correct_answer": "B", "explanation": "OB is the last opposing candle before strong impulsive move.", "topic_slug": "market_structure"},
                             {"question": "OB validation requires?", "option_a": "Slow movement", "option_b": "Displacement and structure break", "option_c": "Range-bound price", "option_d": "High volume only", "correct_answer": "B", "explanation": "Valid OBs require strong displacement away and Break of Structure.", "topic_slug": "market_structure"},
@@ -1813,90 +1757,59 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Liquidity and Market Structure",
                         "content": """## Quick Definition
-    
-    quidity** refers to pools of orders (stop losses, breakout traders) that institutions target before major moves. **Market Structure** tracks highs and lows to determine trend direction and institutional intent.
-    
-    
-    
-    oncept Explanation
-    
-    Types of Liquidity
-    
-    y-Side Liquidity (BSL)**:
-    Cluster of buy stops above swing highs
-    Targets of breakout traders
-    Institutions sell into these pools
-    
-    ll-Side Liquidity (SSL)**:
-    Cluster of sell stops below swing lows
-    Targets of breakdown traders
-    Institutions buy from these pools
-    
-    Market Structure Shifts
-    
-    eak of Structure (BOS)**:
-    Price breaks previous high/low with momentum
-    Confirms trend continuation
-    Indicates institutional commitment
-    
-    ange of Character (CHoCH)**:
-    First sign of trend reversal
-    Breaks structure in opposite direction
-    Indicates institutional shift in bias
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    e AMD (Accumulation-Manipulation-Distribution) Cycle**:
-    **Accumulation**: Institutions build positions in range
-    **Manipulation**: Price sweeps liquidity (stops) to trap retail
-    **Distribution**: True move in institutional direction
-    **Mark**: OBs and Fair Value Gaps form during distribution
-    
-    
-    
-    eal Trading Example
-    
-    P/JPY Liquidity Sweep** (March 2024):
-    **Setup**: Price near 188.00 with swing highs at 188.50
-    **Accumulation**: Consolidation 187.80-188.20
-    **Manipulation**: Spike to 188.60 (sweeps BSL above 188.50)
-    **Distribution**: Sharp rejection back below 188.00
-    **Entry**: Break below 188.00 after sweep
-    Stop: 188.70 (above manipulation high)
-    Target: 186.50 (next SSL pool)
-    Result: 150-pip move captured
-    
-    
-    
-     Chart Example
-    
-    quidity Sweep](/static/charts/liquidity_sweep_example.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    ading the Sweep**: Entering when price breaks a level without waiting for manipulation completion. Retail traders get swept out at highs/lows while institutions enter on the reversal. Wait for the sweep + rejection.
-    
-    
-    
-     Pro Tip
-    
-    e Liquidity Magnet**: Price is drawn to liquidity pools like a magnet. Before any major move, price typically sweeps the nearest liquidity (taking out stops), then reverses in the true direction. Never place stops at obvious levels—they will be swept.
-    
-    
-    
-    ey Takeaway
-    
-    ets move to harvest liquidity. Institutions sweep retail stops before true moves. Understanding BOS and CHoCH reveals institutional intent. Wait for liquidity sweeps before entering—don't be the liquidity being harvested.
-    
-    
-    
-    ractice Question
-    
-     typically happens before a major trend reversal?""",
+
+**Liquidity** refers to clusters of stop-loss orders in the market. Institutions need liquidity to fill large orders — they hunt these levels before making their real directional move.
+
+---
+
+## Concept Explanation
+
+### Where Liquidity Pools Exist
+
+*   **Above swing highs** — Buy-stop orders from breakout traders and stop-losses from short sellers
+*   **Below swing lows** — Sell-stop orders and stop-losses from long holders
+*   **Equal highs/lows** — Double tops and bottoms attract institutional stop hunting
+*   **Round numbers** — 1.1000, 1.2000 — dense stop-loss clustering
+
+### Types of Liquidity
+
+*   **Buy-side liquidity (BSL)** — Above highs where stops are clustered
+*   **Sell-side liquidity (SSL)** — Below lows where stops are clustered
+*   **Inducement** — A fake breakout to grab liquidity before the real move
+
+---
+
+## Step-by-Step Breakdown
+
+1.  Mark all recent swing highs and lows — these are liquidity pools
+2.  Note equal highs or equal lows — prime targets for stop hunts
+3.  Watch for the sweep — price breaks the level briefly, then reverses fast
+4.  Enter after the sweep — the reversal after a liquidity grab is the trade
+5.  Place stop below the swept low (or above swept high)
+6.  Target the opposing liquidity pool
+
+---
+
+## Real Trading Example
+
+**GBP/USD Liquidity Sweep:**
+*   Three equal lows at 1.2600 forming a sell-side liquidity pool
+*   Price spikes below to 1.2585, sweeping stops
+*   Immediate recovery back above 1.2600 — bullish rejection
+*   Entry: 1.2605 | Stop: 1.2580 | Target: 1.2720
+*   Result: 4.6 R:R — the classic stop hunt and reverse
+
+---
+
+## 💡 Pro Tip
+
+**Do not be the liquidity** — Most retail traders place stops at obvious levels just below support. Institutions know this. Place stops at less obvious locations — below the wick, not the candle body.
+
+---
+
+## Key Takeaway
+
+Markets move from liquidity pool to liquidity pool. Smart money sweeps stops before reversing. Understanding liquidity turns painful stop hunts into recognisable and profitable entry signals.""",
                         "quiz": [
                             {"question": "Buy-Side Liquidity (BSL) is found?", "option_a": "Below swing lows", "option_b": "Above swing highs", "option_c": "At moving averages", "option_d": "In the middle of ranges", "correct_answer": "B", "explanation": "BSL is above swing highs—where breakout traders place stops.", "topic_slug": "market_structure"},
                             {"question": "CHoCH indicates?", "option_a": "Trend continuation", "option_b": "Potential trend reversal", "option_c": "Consolidation", "option_d": "No significance", "correct_answer": "B", "explanation": "Change of Character signals shift in market structure.", "topic_slug": "market_structure"},
@@ -1912,107 +1825,54 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Expectancy and Profit Factor",
                         "content": """## Quick Definition
-    
-    pectancy** measures the average profit/loss per trade over time—your true edge. **Profit Factor** compares total gains to total losses. These metrics determine if your system is profitable and sustainable.
-    
-    
-    
-    oncept Explanation
-    
-    Expectancy Formula
-    pectancy = (Win Rate × Avg Win) – (Loss Rate × Avg Loss)**
-    
-    ple:
-    Win Rate: 45%
-    Avg Win: 2.5R
-    Loss Rate: 55%
-    Avg Loss: 1R
-    Expectancy: (0.45 × 2.5) – (0.55 × 1) = 1.125 – 0.55 = **+0.575R per trade**
-    
-    Profit Factor
-    ofit Factor = Gross Profit / Gross Loss**
-    
-    1.0+ = Breakeven
-    1.3+ = Acceptable
-    1.5+ = Good
-    2.0+ = Excellent
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    lculating Your Edge**:
-    Track minimum 100 trades for statistical significance
-    Calculate win rate (wins / total trades)
-    Calculate average win in R-multiples
-    Calculate average loss in R-multiples
-    Apply expectancy formula
-    Positive expectancy = tradable edge
-    Negative expectancy = broken system or execution issues
-    
-    
-    
-    eal Trading Example
-    
-    ader A vs Trader B (100 trades each)**:
-    
-    ader A**:
-    Win Rate: 65%
-    Avg Win: 1.2R
-    Avg Loss: 1R
-    Expectancy: (0.65 × 1.2) – (0.35 × 1) = 0.78 – 0.35 = **+0.43R**
-    
-    ader B**:
-    Win Rate: 40%
-    Avg Win: 3R
-    Avg Loss: 1R
-    Expectancy: (0.40 × 3) – (0.60 × 1) = 1.2 – 0.6 = **+0.60R**
-    
-    sult**: Trader B makes more despite lower win rate due to better R:R!
-    
-     class="ac-svg-diagram" viewBox="0 0 400 150">
-    ect x="20" y="30" width="170" height="90" fill="rgba(96,165,250,0.2)" stroke="#60a5fa" rx="5"/>
-    ext x="105" y="55" text-anchor="middle" fill="#60a5fa" font-size="14">Trader A</text>
-    ext x="105" y="75" text-anchor="middle" fill="#9ca3af" font-size="12">65% Win Rate</text>
-    ext x="105" y="95" text-anchor="middle" fill="#9ca3af" font-size="12">1.2:1 R:R</text>
-    ext x="105" y="115" text-anchor="middle" fill="#22c55e" font-size="12">+0.43R</text>
-    
-    ect x="210" y="30" width="170" height="90" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" rx="5"/>
-    ext x="295" y="55" text-anchor="middle" fill="#f59e0b" font-size="14">Trader B</text>
-    ext x="295" y="75" text-anchor="middle" fill="#9ca3af" font-size="12">40% Win Rate</text>
-    ext x="295" y="95" text-anchor="middle" fill="#9ca3af" font-size="12">3:1 R:R</text>
-    ext x="295" y="115" text-anchor="middle" fill="#22c55e" font-size="12">+0.60R</text>
-    g>
-    
-    
-    
-     Chart Example
-    
-    pectancy](/static/charts/expectancy_calculation_example.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    cusing on Win Rate Alone**: A 70% win rate seems impressive, but if average win is 0.8R and average loss is 1.5R, the system loses money. Expectancy combines win rate AND R-multiples. Optimize for positive expectancy, not win rate.
-    
-    
-    
-     Pro Tip
-    
-    e R-Multiple Focus**: Track all trades in R-multiples (units of risk), not dollars. This normalizes results regardless of account size. A 2R win is always twice your risk—easy to compare across different position sizes.
-    
-    
-    
-    ey Takeaway
-    
-    ctancy is your true edge. Positive expectancy = profitable system over time. Win rate alone is meaningless—R-multiples matter more. Track minimum 100 trades before judging a system. Profit factor > 1.5 indicates good system health.
-    
-    
-    
-    ractice Question
-    
-    er has 50% win rate, 2:1 average R:R. Expectancy per trade?""",
+
+**Expectancy** measures the average profit or loss per trade, combining win rate and risk:reward. A positive expectancy means the strategy is profitable over many trades.
+
+---
+
+## Concept Explanation
+
+### Expectancy Formula
+
+**Expectancy = (Win Rate x Avg Win) - (Loss Rate x Avg Loss)**
+
+Example with 40% win rate, $150 avg win, $100 avg loss:
+*   (0.40 x $150) - (0.60 x $100) = $60 - $60 = break-even
+
+### Profit Factor
+
+**Profit Factor = Total Gross Profit divided by Total Gross Loss**
+
+*   Above 1.5 — Good trading system
+*   Above 2.0 — Excellent trading system
+*   Below 1.0 — Losing system
+
+### Win Rate vs R:R Reality
+
+A 35% win rate with 3:1 R:R is more profitable than a 65% win rate with 0.5:1 R:R. Win rate alone means nothing without knowing the R:R.
+
+---
+
+## Step-by-Step Breakdown
+
+1.  Track every trade — win/loss, entry, exit, P&L in pips and dollars
+2.  Calculate after 50 or more trades — smaller samples are misleading
+3.  Compute expectancy using the formula above
+4.  Calculate profit factor — total wins divided by total losses
+5.  Adjust if needed — improve R:R or tighten entry criteria
+6.  Review monthly — markets change and edges can degrade over time
+
+---
+
+## 💡 Pro Tip
+
+**The 35% Win Rate Reality**: You can be consistently profitable with only a 35% win rate if your average winner is 3x your average loser. Focus on R:R quality, not on being right more often.
+
+---
+
+## Key Takeaway
+
+Expectancy and profit factor define whether your system makes money long-term. Track your trades obsessively. The math never lies — if expectancy is negative, fix the system before going live.""",
                         "quiz": [
                             {"question": "Expectancy formula components?", "option_a": "Only win rate", "option_b": "Win rate and R-multiples", "option_c": "Only profit factor", "option_d": "Only drawdown", "correct_answer": "B", "explanation": "Expectancy = (Win Rate × Avg Win) – (Loss Rate × Avg Loss).", "topic_slug": "advanced_risk"},
                             {"question": "Good profit factor threshold?", "option_a": "0.5", "option_b": "1.0", "option_c": "1.5+", "option_d": "3.0", "correct_answer": "C", "explanation": "Profit factor above 1.5 indicates healthy system performance.", "topic_slug": "advanced_risk"},
@@ -2022,104 +1882,54 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Portfolio Heat and Correlation",
                         "content": """## Quick Definition
-    
-    rtfolio Heat** is total exposed risk across all open positions. **Correlation** measures how similarly different pairs move. Managing both prevents catastrophic drawdowns when markets move together.
-    
-    
-    
-    oncept Explanation
-    
-    Portfolio Heat Calculation
-    tal Heat = Sum of all position risks**
-    
-    ple:
-    Position 1: 2% risk
-    Position 2: 2% risk
-    Position 3: 1% risk
-    **Total Heat**: 5%
-    
-    essional limits:
-    Retail traders: Maximum 6-8% heat
-    Professional traders: Maximum 3-5% heat
-    
-    Correlation Risk
-    
-    ghly Correlated Pairs** (>0.80):
-    EUR/USD and GBP/USD
-    AUD/USD and NZD/USD
-    Gold (XAU/USD) and EUR/USD (often)
-    
-    fect**: Trading correlated pairs = doubling risk on same move
-    
-    Diversification Score
-    
-    tup | Correlation | Adjusted Risk |
-    ----|-------------|---------------|
-    R/USD only | N/A | 2% |
-    R/USD + GBP/USD | 0.90 | Effectively 3.8% |
-    R/USD + USD/JPY | 0.20 | Effectively 2.2% |
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    naging Portfolio Risk**:
-    Calculate individual position risk (1-2%)
-    Check correlation between all open positions
-    Adjust for correlation:
-    *   >0.80 correlation: Reduce each position by 50%
-    *   0.50-0.80: Reduce by 25%
-    Sum total portfolio heat
-    Ensure total heat < 6% (retail) or < 3% (pro)
-    Monitor heat daily; reduce if approaching limits
-    
-    
-    
-    eal Trading Example
-    
-    rtfolio Heat Mistake** (April 2024):
-    **Trader**: Long EUR/USD (2% risk), Long GBP/USD (2% risk), Long AUD/USD (2% risk)
-    **Correlation**: All positively correlated (~0.85)
-    **Effective Heat**: 5.1% (not 6%)
-    **USD News**: Strong NFP triggers USD rally
-    **Result**: All positions hit stops simultaneously
-    **Loss**: -5.1% in 1 hour (not acceptable -6%)
-    **Lesson**: Correlated positions compound risk
-    
-    
-    
-     Chart Example
-    
-    rrelation](/static/charts/correlation_matrix_example.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    rrelated Portfolio**: Taking 3 long positions on EUR/USD, GBP/USD, and AUD/USD simultaneously. These move together 85%+ of the time. A USD strengthening event hits all three stops at once. Diversify across uncorrelated pairs or reduce size per correlated trade.
-    
-    
-    
-     Pro Tip
-    
-    e Correlation Rotation**: Maintain a watchlist of 3 uncorrelated groups:
-    Group 1: EUR pairs (EUR/USD, EUR/JPY)
-    Group 2: USD/Commodity pairs (USD/CAD, USD/NOK)
-    Group 3: Safe havens (USD/JPY, USD/CHF)
-    
-    r have more than 1 position per group simultaneously.
-    
-    
-    
-    ey Takeaway
-    
-    folio heat management prevents catastrophic correlated losses. Maximum 6% total risk for retail traders. Highly correlated pairs should be treated as one position. True diversification requires uncorrelated markets.
-    
-    
-    
-    ractice Question
-    
-    trade EUR/USD and GBP/USD (0.90 correlation) with 2% each. Effective heat?""",
+
+**Portfolio heat** is the total percentage of your account at risk across all open trades simultaneously. **Correlation** measures how similarly two pairs move — trading correlated pairs multiplies your real risk without you realising it.
+
+---
+
+## Concept Explanation
+
+### Portfolio Heat Rule
+
+*   Maximum total heat at any time: 5-6% of account
+*   If risking 1% per trade, maximum 5-6 simultaneous open trades
+*   Exceeding this means one bad news event can cause severe account drawdown
+
+### Currency Correlation Examples
+
+**Positively Correlated (move in the same direction):**
+*   EUR/USD and GBP/USD — approximately 85% correlated
+*   EUR/USD and AUD/USD — approximately 75% correlated
+
+**Negatively Correlated (move in opposite directions):**
+*   EUR/USD and USD/CHF — approximately -90% correlated
+*   EUR/USD and USD/JPY — approximately -60% correlated
+
+### The Hidden Risk Trap
+
+Buying EUR/USD AND GBP/USD simultaneously is effectively doubling your EUR position. If USD strengthens, both trades lose at the same time.
+
+---
+
+## Step-by-Step Breakdown
+
+1.  List all open positions and their individual risk percentages
+2.  Sum total risk — it must stay below 5-6% at all times
+3.  Check correlations — avoid trading same-direction correlated pairs at full size
+4.  If trading correlated pairs, halve each position size to maintain real risk
+5.  Monitor total heat daily, especially before major news events
+
+---
+
+## 💡 Pro Tip
+
+**News Event Risk**: During FOMC, NFP, or major central bank events, all correlated pairs move violently together. Close one leg of correlated pairs before these events to avoid double losses.
+
+---
+
+## Key Takeaway
+
+Controlling portfolio heat and understanding correlation separates professional risk management from amateur trading. One event can destroy multiple positions simultaneously if correlation is ignored.""",
                         "quiz": [
                             {"question": "Portfolio heat definition?", "option_a": "Account balance", "option_b": "Total risk across all positions", "option_c": "Number of trades", "option_d": "Win rate", "correct_answer": "B", "explanation": "Heat = sum of all active position risks.", "topic_slug": "advanced_risk"},
                             {"question": "Maximum recommended heat for retail?", "option_a": "15%", "option_b": "6-8%", "option_c": "20%", "option_d": "2%", "correct_answer": "B", "explanation": "Retail traders should limit total portfolio heat to 6-8%.", "topic_slug": "advanced_risk"},
@@ -2135,94 +1945,55 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Backtesting Your Strategy",
                         "content": """## Quick Definition
-    
-    cktesting** applies trading rules to historical data to measure performance. It validates your edge before risking real capital and reveals whether your system has positive expectancy.
-    
-    
-    
-    oncept Explanation
-    
-    Types of Backtesting
-    
-    nual Backtesting**:
-    Scroll through historical charts bar by bar
-    Apply your rules precisely as written
-    Record every trade outcome
-    Time-consuming but builds intuition
-    
-    tomated Backtesting**:
-    Code strategy in trading platform
-    Run on years of historical data
-    Instant results and statistics
-    Risk of overfitting (curve-fitting)
-    
-    Key Metrics to Track
-    
-    tric | Minimum Target | Notes |
-    -----|---------------|-------|
-    mple Size | 100+ trades | Statistical significance |
-    n Rate | 40%+ | With good R:R can be profitable |
-    ofit Factor | 1.3+ | Gross profit / gross loss |
-    x Drawdown | <20% | Worst peak-to-trough decline |
-    pectancy | >0.2R | Positive edge per trade |
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    nual Backtesting Process**:
-    Define precise entry/exit/stop rules (write them down)
-    Select 2-3 years of historical data
-    Start at beginning, scroll candle by candle
-    Mark every valid setup (even if not taking them)
-    Record: Entry, Stop, Target, Outcome (win/loss), R-multiple
-    Complete minimum 100 trades
-    Calculate win rate, expectancy, profit factor
-    If positive expectancy, proceed to demo trading
-    
-    
-    
-    eal Trading Example
-    
-    eakout Strategy Backtest Results** (EUR/USD, 2022-2024):
-    **Sample**: 156 trades over 2 years
-    **Win Rate**: 42.3%
-    **Avg Win**: 2.8R
-    **Avg Loss**: 1R
-    **Expectancy**: (0.423 × 2.8) – (0.577 × 1) = **+0.61R**
-    **Profit Factor**: 1.62
-    **Max Drawdown**: 18.4%
-    **Conclusion**: System has edge—proceed to forward testing
-    
-    
-    
-     Chart Example
-    
-    cktesting](/static/charts/backtesting_equity_curve.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    erry-Picking**: Only recording "perfect" setups and ignoring marginal ones. This inflates results unrealistically. Backtest ALL setups that meet your criteria—even ugly ones. Real trading includes ugly setups.
-    
-    
-    
-     Pro Tip
-    
-    e Blind Backtest**: Have someone else backtest your rules without knowing your preferred pairs or timeframes. If results are positive on multiple pairs/timeframes, your edge is robust (not curve-fitted).
-    
-    
-    
-    ey Takeaway
-    
-    testing proves your edge exists historically. Minimum 100 trades for statistical validity. Track expectancy, not just win rate. If backtest fails, system is broken—don't trade it live. Walk-forward testing validates backtest results.
-    
-    
-    
-    ractice Question
-    
-    mum sample size for statistically valid backtest?""",
+
+**Backtesting** is testing your trading strategy against historical data to evaluate performance before risking real money. It proves whether your edge is statistically real or just a recent coincidence.
+
+---
+
+## Concept Explanation
+
+### Manual vs Automated Backtesting
+
+**Manual Backtesting:**
+*   Scroll back through charts and mark trades by hand
+*   More time-consuming but builds deeper chart reading skills
+*   Use TradingView replay mode for realistic simulation
+
+**Automated Backtesting:**
+*   Software tests rules-based systems on years of historical data
+*   Faster but requires precise, quantifiable rule definition
+*   Tools: MetaTrader Strategy Tester, Python with pandas
+
+### Key Metrics to Track
+
+*   **Win rate** — Percentage of profitable trades
+*   **Profit factor** — Gross profit divided by gross loss (target above 1.5)
+*   **Maximum drawdown** — Largest peak-to-trough equity decline
+*   **Expectancy** — Average profit per trade in dollars or R
+*   **Number of trades** — Minimum 200 for statistical significance
+
+---
+
+## Step-by-Step Breakdown
+
+1.  Define exact entry and exit rules — every condition must be specific
+2.  Select at least 2 years of historical data
+3.  Record every qualifying trade in a spreadsheet with screenshot
+4.  Calculate all key metrics after completing the test
+5.  Analyse losing streaks — what market conditions cause them?
+6.  Refine rules based on data and re-test — avoid over-optimising
+
+---
+
+## 💡 Pro Tip
+
+**Forward Test Before Going Live**: After backtesting shows positive results, paper trade for 1-2 months to confirm the edge holds in current market conditions before risking real capital.
+
+---
+
+## Key Takeaway
+
+Backtesting builds statistical confidence in your approach. Without it, you are gambling on hope. A strategy showing positive expectancy across 200 or more historical trades has a genuine, measurable edge.""",
                         "quiz": [
                             {"question": "Backtesting purpose?", "option_a": "Predict exact prices", "option_b": "Validate edge historically", "option_c": "Replace live trading", "option_d": "Eliminate risk", "correct_answer": "B", "explanation": "Backtesting validates whether your system has positive expectancy.", "topic_slug": "system_development"},
                             {"question": "Minimum trades for valid backtest?", "option_a": "10", "option_b": "50", "option_c": "100+", "option_d": "1000", "correct_answer": "C", "explanation": "Minimum 100 trades for statistical significance.", "topic_slug": "system_development"},
@@ -2232,107 +2003,48 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Creating Your Trading System",
                         "content": """## Quick Definition
-    
-    Trading System** is a complete set of rules covering: setups, entries, exits, risk management, and position sizing. Good systems remove discretion and emotion from trading decisions.
-    
-    
-    
-    oncept Explanation
-    
-    System Components
-    
-     Market Selection**
-    Which pairs/instruments to trade
-    Minimum daily volume requirements
-    Preferred trading sessions
-    
-     Setup Criteria**
-    Precise conditions for valid trade
-    Confluence requirements (minimum factors)
-    Timeframe alignment rules
-    
-     Entry Rules**
-    Specific trigger conditions
-    Order types (market, limit, stop)
-    Confirmation requirements
-    
-     Exit Rules**
-    Stop loss placement (technical vs fixed)
-    Take profit targets (R-multiples)
-    Trailing stop conditions
-    
-     Risk Management**
-    Fixed % risk per trade
-    Maximum daily/weekly loss limits
-    Correlation adjustments
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    ilding Your System**:
-    Choose ONE setup to master (e.g., pin bars at S/R)
-    Write exact entry rules (no ambiguity)
-    Define stop loss rules (always technical)
-    Set minimum R:R (1:2 or better)
-    Fix risk per trade (1-2%)
-    Backtest 100+ trades
-    Paper trade for 20 trades
-    Go live with reduced size (0.5%)
-    Scale up after 50 successful live trades
-    
-    
-    
-    eal Trading Example
-    
-    e "London Breakout" System**:
-    
-    tup**:
-    Asian session range forms (20:00-08:00 UTC)
-    Price near session high or low
-    Minimum range: 30 pips
-    
-    try**:
-    Buy stop 5 pips above Asian high
-    Sell stop 5 pips below Asian low
-    
-    op**: Beyond opposite side of range
-    
-    rget**: 2R minimum
-    
-    sk**: 1% per trade, max 2 trades/day
-    
-    sult**: 38% win rate, 2.4:1 R:R, +0.41R expectancy
-    
-    
-    
-     Chart Example
-    
-    ading System](/static/charts/trading_system_flowchart.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    stem Hopping**: Abandoning a system after 10-20 losses. Even good systems have losing streaks. Backtest results showed 40% win rate—you should EXPECT 6 losses in a row occasionally. Stick to your system through variance.
-    
-    
-    
-     Pro Tip
-    
-    e "One Setup" Rule**: Master ONE setup completely before adding others. Most successful traders use 2-3 setups maximum. Specialization beats diversification in trading. Become the world's best pin bar trader rather than average at 10 patterns.
-    
-    
-    
-    ey Takeaway
-    
-    mplete trading system leaves no decisions to discretion. Every scenario is covered by rules. Backtest before trading live. Paper trade before sizing up. Master one setup before diversifying. Consistency comes from system discipline.
-    
-    
-    
-    ractice Question
-    
-    many setups should a beginner focus on initially?""",
+
+A **trading system** is a complete, rules-based framework specifying exactly when to enter, exit, and manage every trade. Removing emotion from execution is the entire purpose.
+
+---
+
+## Concept Explanation
+
+### The 10 Components of a Complete System
+
+1.  **Market selection** — Which pairs to trade and which to avoid
+2.  **Timeframe** — Higher timeframe for analysis, lower for entry
+3.  **Trend filter** — Direction requirement before any trade
+4.  **Setup criteria** — What structure or pattern must be present
+5.  **Entry trigger** — The exact condition that fires your entry
+6.  **Stop loss rule** — Where the stop goes and why
+7.  **Take profit rule** — Fixed R:R or structure-based target
+8.  **Position sizing** — Percentage risk per trade
+9.  **Trade management** — Breakeven rules, partial take profit rules
+10. **Session and news filter** — When not to trade
+
+---
+
+## Step-by-Step Breakdown
+
+1.  Write every rule explicitly in plain language
+2.  Backtest the complete ruleset on 200 or more historical trades
+3.  Paper trade for 1-2 months to forward-test the rules
+4.  Review performance data and refine based on evidence, not feeling
+5.  Go live with minimum position sizes first
+6.  Review weekly — is the system performing within expected parameters?
+
+---
+
+## 💡 Pro Tip
+
+**The One-Sentence Test**: If you cannot explain your entry rule in one clear sentence, it is too complex. Simple systems you can execute consistently under pressure outperform complex systems you second-guess.
+
+---
+
+## Key Takeaway
+
+A trading system converts your edge into a repeatable, scalable process. The discipline to follow the system under pressure is worth more than any particular entry technique. Systems create professionals; discretion creates gamblers.""",
                         "quiz": [
                             {"question": "Most important system component?", "option_a": "Complex indicators", "option_b": "Clear, unambiguous rules", "option_c": "High win rate", "option_d": "Many setups", "correct_answer": "B", "explanation": "Clear rules eliminate discretion and emotion.", "topic_slug": "system_development"},
                             {"question": "Beginner setup recommendation?", "option_a": "Master 10 setups", "option_b": "Master 1 setup first", "option_c": "No setup needed", "option_d": "Use all available patterns", "correct_answer": "B", "explanation": "Master one setup completely before adding complexity.", "topic_slug": "system_development"},
@@ -2348,116 +2060,47 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Creating Your Trading Plan",
                         "content": """## Quick Definition
-    
-    Trading Plan** is your complete business blueprint covering goals, strategies, routines, and review processes. It transforms trading from gambling into a structured business operation.
-    
-    
-    
-    oncept Explanation
-    
-    Trading Plan Components
-    
-    ction 1: Goals and Objectives**
-    Monthly/Yearly return targets (realistic: 3-5% monthly)
-    Maximum acceptable drawdown (15-20%)
-    Timeline to profitability (6-12 months)
-    Account growth milestones
-    
-    ction 2: Trading Strategy**
-    Specific setups you will trade
-    Entry/exit rules (exact criteria)
-    Risk per trade (1-2%)
-    Maximum trades per day/week
-    
-    ction 3: Risk Management**
-    Daily loss limit (e.g., 3%)
-    Weekly loss limit (e.g., 6%)
-    Correlation rules
-    Portfolio heat maximum (6%)
-    
-    ction 4: Routine and Schedule**
-    Pre-market preparation time
-    Active trading hours
-    Post-market review time
-    Weekend analysis time
-    
-    ction 5: Review Process**
-    Weekly performance review
-    Monthly deep analysis
-    Quarterly strategy evaluation
-    Annual goal reassessment
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    iting Your Plan**:
-    Document your complete trading system
-    Set realistic 6-month and 1-year goals
-    Define daily routine (pre, during, post market)
-    Create risk limits and circuit breakers
-    Establish review schedule
-    Print and sign the plan (commitment)
-    Review weekly—track adherence
-    Update quarterly if needed
-    
-    
-    
-    eal Trading Example
-    
-    ofessional Trading Plan Snapshot**:
-    
-    als**:
-    Monthly target: 4% return
-    Max drawdown: 15%
-    12-month goal: 60% account growth
-    
-    rategy**:
-    Primary: Breakout system (H4)
-    Secondary: Pin bar reversals (Daily)
-    Risk: 1.5% per trade
-    
-    sk Limits**:
-    Daily max loss: 3%
-    Weekly max loss: 6%
-    Consecutive losses: Stop after 3
-    
-    utine**:
-    Pre-market: 7:00-8:00 UTC (analysis)
-    Trading: 8:00-12:00 UTC only
-    Review: 20:00 UTC daily
-    
-    sult**: 90% plan adherence = consistent profitability
-    
-    
-    
-     Chart Example
-    
-    ading Plan](/static/charts/trading_plan_template.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    e Mental Plan**: Having a "rough idea" but nothing written down. Written plans are 3x more likely to be followed. Write it, print it, post it by your monitor. Vague plans produce vague results.
-    
-    
-    
-     Pro Tip
-    
-    e Signature Rule**: Print your trading plan, sign it, and post it by your trading station. The physical act of signing creates psychological commitment. Refer to it when tempted to break rules.
-    
-    
-    
-    ey Takeaway
-    
-     trading plan is your business plan. It covers every aspect of your trading operation. Write it down. Review it weekly. Update it quarterly. Follow it religiously. Traders with written plans outperform those without by 3:1.
-    
-    
-    
-    ractice Question
-    
-    often should you review your trading plan performance?""",
+
+A **trading plan** is your personal operating manual — covering goals, risk parameters, psychology rules, and review processes. It is the difference between treating trading as a business versus gambling.
+
+---
+
+## Concept Explanation
+
+### Trading System vs Trading Plan
+
+*   **Trading system** — The technical rules: when to enter and exit
+*   **Trading plan** — The business framework: how you operate as a trader
+
+### Core Sections of a Trading Plan
+
+1.  **Goals** — Monthly return target and maximum acceptable drawdown
+2.  **Risk parameters** — Max risk per trade, max daily loss, max weekly loss
+3.  **Trading hours** — Which sessions and days you will trade
+4.  **Pre-trade checklist** — Steps required before entering any position
+5.  **Post-trade review** — What to record and analyse after each trade
+6.  **Psychology rules** — What to do during and after a losing streak
+7.  **Monthly review** — Which performance metrics to evaluate
+
+### Example Non-Negotiable Rules
+
+*   Stop trading after 3 consecutive losses in one session
+*   Never risk more than 2% of account on one trade
+*   Never trade 30 minutes before major scheduled news
+*   Always place stop loss before entering a position
+*   Review trading journal every Sunday before the new week
+
+---
+
+## 💡 Pro Tip
+
+**The Circuit Breaker**: Define in advance the conditions that trigger a trading halt. If you lose 4% in one day, close everything and do not trade for 24 hours. This single rule prevents account destruction during emotional states.
+
+---
+
+## Key Takeaway
+
+Most traders fail not because their system is bad but because they abandon it under pressure. A written trading plan creates accountability and consistency. Review it weekly and hold yourself to it like a professional contract.""",
                         "quiz": [
                             {"question": "Trading plan purpose?", "option_a": "Predict prices", "option_b": "Structure trading as business", "option_c": "Replace analysis", "option_d": "Guarantee profits", "correct_answer": "B", "explanation": "A trading plan is your complete business blueprint for trading.", "topic_slug": "trading_plan"},
                             {"question": "Key plan components?", "option_a": "Only entry rules", "option_b": "Goals, strategy, risk, routine, review", "option_c": "Only profit targets", "option_d": "Only stop losses", "correct_answer": "B", "explanation": "Complete plans cover goals, strategy, risk management, routine, and review process.", "topic_slug": "trading_plan"},
@@ -2467,110 +2110,50 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Performance Review and Optimization",
                         "content": """## Quick Definition
-    
-    rformance Review** is systematic analysis of your trading results to identify strengths, weaknesses, and optimization opportunities. Regular review transforms good traders into great ones.
-    
-    
-    
-    oncept Explanation
-    
-    Review Frequencies
-    
-    ily Review (5-10 minutes)**:
-    Did I follow my plan?
-    Emotional state during trades
-    Any rule violations?
-    Lessons for tomorrow
-    
-    ekly Review (30-60 minutes)**:
-    Win rate and expectancy
-    R-multiple distribution
-    Setup performance comparison
-    Mistake patterns
-    
-    nthly Review (2-3 hours)**:
-    Equity curve analysis
-    Drawdown periods study
-    Strategy performance by market condition
-    Goal progress assessment
-    
-    arterly Review (Full day)**:
-    System optimization
-    Strategy refinement
-    Major rule adjustments
-    Goal reassessment
-    
-    Key Metrics to Analyze
-    
-    tric | Good | Excellent |
-    -----|------|-----------|
-    n Rate | 45%+ | 55%+ |
-    ofit Factor | 1.5+ | 2.0+ |
-    pectancy | >0.3R | >0.5R |
-    an Adherence | 80%+ | 90%+ |
-    
-    
-    
-    tep-by-Step Breakdown
-    
-    ekly Review Process**:
-    Export all trades for the week
-    Calculate win rate, avg win, avg loss
-    Compute expectancy and profit factor
-    Review each losing trade—identify errors
-    Categorize mistakes (emotional, technical, execution)
-    Set focus for next week (one improvement area)
-    Journal insights and commitments
-    
-    
-    
-    eal Trading Example
-    
-    nthly Review Insights** (Trader X):
-    
-    ta**:
-    Win Rate: 52%
-    Profit Factor: 1.4 (below 1.5 target)
-    Expectancy: +0.35R
-    
-    ttern Discovered**:
-    Trades after 2pm UTC: -0.2R expectancy
-    Trades before 10am UTC: +0.6R expectancy
-    
-    timization**:
-    Eliminated afternoon trading
-    Increased morning session focus
-    Next month: +0.58R expectancy
-    
-    
-    
-     Chart Example
-    
-    rformance Review](/static/charts/performance_review_dashboard.png)
-    
-    
-    
-     Common Beginner Mistake
-    
-    ipping Reviews**: Trading day after day without review is like practicing golf without watching your swing. You repeat the same errors indefinitely. Even 10 minutes of daily review compounds into massive improvement over a year.
-    
-    
-    
-     Pro Tip
-    
-    e One-Focus Rule**: Each week, identify ONE area to improve. Don't try to fix everything at once. If you're cutting winners early, focus only on that for one week. Master one skill before moving to the next.
-    
-    
-    
-    ey Takeaway
-    
-    ormance review separates professionals from amateurs. Review daily, weekly, monthly, quarterly. Track metrics, identify patterns, optimize continuously. The trader who reviews consistently beats the trader who doesn't—regardless of starting skill level.
-    
-    
-    
-    ractice Question
-    
-     frequency for in-depth strategy review?""",
+
+**Performance review** is the systematic analysis of your trading results to identify strengths, weaknesses, and specific improvements. Without it, the same mistakes repeat indefinitely.
+
+---
+
+## Concept Explanation
+
+### What to Track in Your Trading Journal
+
+*   Date, currency pair, session, trade direction
+*   Entry price, stop loss level, take profit level
+*   Risk percentage, R:R ratio achieved
+*   Win or loss, actual profit and loss in dollars
+*   Setup type (order block, S/R level, chart pattern)
+*   Entry and exit screenshots
+*   Emotional state at time of trade
+*   Notes on execution quality
+
+### Weekly Review Process
+
+1.  **Quantitative** — Win rate, profit factor, average R:R for the week
+2.  **Qualitative** — What rules were followed? What was violated?
+3.  **Pattern analysis** — Which setup types are most and least profitable?
+4.  **Session analysis** — Which trading sessions produce the best results?
+5.  **Psychology review** — Were there emotional or revenge trades?
+
+### Monthly Optimisation Steps
+
+*   Remove setup types that consistently underperform over 20 or more trades
+*   Increase position size only on your highest-probability setup types
+*   Adjust session focus based on actual performance data
+*   Review whether current market conditions suit your strategy
+
+---
+
+## 💡 Pro Tip
+
+**The 80/20 Rule**: Track which 20% of your setups generate 80% of your profits. Then focus exclusively on those setups and eliminate everything else from your trading.
+
+---
+
+## Key Takeaway
+
+Elite traders treat performance review as their most important habit. Your trading journal is more valuable than any course or indicator. The data tells you exactly what to change — if you are willing to look at it honestly.""",
                         "quiz": [
                             {"question": "Performance review purpose?", "option_a": "Find scapegoats", "option_b": "Identify improvement areas", "option_c": "Avoid losses", "option_d": "Predict next trade", "correct_answer": "B", "explanation": "Review identifies patterns and areas for optimization.", "topic_slug": "trading_plan"},
                             {"question": "Daily review duration?", "option_a": "5-10 minutes", "option_b": "2 hours", "option_c": "All evening", "option_d": "No review needed", "correct_answer": "A", "explanation": "Daily review should be quick—5-10 minutes maximum.", "topic_slug": "trading_plan"},

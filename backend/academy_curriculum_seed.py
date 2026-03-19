@@ -17,7 +17,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "What is Forex Trading?",
-                            "content": """## Quick Definition
+                            "content": """💡 Imagine you're at an airport exchanging pounds for dollars before a trip — you've just done Forex trading. Now picture that same market running 24 hours a day with $7.5 trillion changing hands.
+
+> **Forex is like a global currency exchange booth** — but instead of a booth at the airport, it's a digital marketplace connecting banks, institutions, and traders worldwide. The exchange rate you see is set by supply and demand, not a cashier.
+
+---
+
+## Quick Definition
     
     Forex (Foreign Exchange) is the global marketplace where currencies are traded. It operates **24 hours a day, 5 days a week**, with over **$7.5 trillion** traded daily.
     
@@ -94,7 +100,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Who Trades Forex and Why?",
-                            "content": """## Quick Definition
+                            "content": """💡 When the Swiss National Bank unexpectedly removed its currency peg in 2015, the franc surged 30% in minutes — wiping out entire brokerages. That's the power of the players behind the Forex market.
+
+> **Think of the Forex market like an ocean**. Central banks are the tides — slow but unstoppable. Hedge funds are the waves — powerful and directional. Retail traders (you) are surfers — small, fast, and able to profit by riding the bigger moves rather than creating them.
+
+---
+
+## Quick Definition
     
     Forex participants range from **central banks** to individual retail traders, each with different goals and market impact.
     
@@ -189,7 +201,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Major, Minor and Exotic Pairs",
-                            "content": """## Quick Definition
+                            "content": """💡 Walk into any bank and ask for EUR/USD — they'll quote you instantly. Ask for USD/TRY and they'll hesitate. That hesitation is the difference between major, minor, and exotic pairs.
+
+> **Currency pairs are like highways**. Major pairs (EUR/USD, GBP/USD) are motorways — wide, busy, cheap to use, and predictable. Minor pairs are A-roads — less traffic, slightly more expensive. Exotics are country lanes — unpredictable, costly, and best avoided by beginners.
+
+---
+
+## Quick Definition
     
     Currency pairs are categorized by liquidity: **Majors** (most traded), **Minors** (crosses without USD), and **Exotics** (emerging markets).
     
@@ -272,7 +290,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Reading Pips and Spreads",
-                            "content": """## Quick Definition
+                            "content": """💡 A professional trader once said: 'The spread is the broker's salary. Every trade you open, you start in the red.' Understanding pips and spreads is understanding exactly how much ground you need to cover before you start profiting.
+
+> **A pip is like a cent in forex**. Just as prices in a supermarket change by cents, currency prices change by pips. If EUR/USD moves from 1.0850 to 1.0851, that's 1 pip. The spread is the gap between buying and selling price — like the difference between the price a car dealer buys and sells a vehicle.
+
+---
+
+## Quick Definition
     
     A **pip** is the smallest price move (0.0001 for most pairs). The **spread** is the difference between buy (ask) and sell (bid) prices.
     
@@ -359,7 +383,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Understanding Leverage",
-                            "content": """## Quick Definition
+                            "content": """💡 A trader opens a $100,000 trade with just $1,000 in their account. An hour later they've lost everything. Leverage is the most powerful — and most dangerous — tool in forex.
+
+> **Leverage is like a mortgage on a house**. You put down $20,000 and control a $200,000 property. If the house value rises 5%, you made $10,000 on a $20,000 deposit — a 50% return. But if prices fall 10%, you lose $20,000 and still owe the bank. Forex leverage works the same way, just faster.
+
+---
+
+## Quick Definition
     
     **Leverage** allows controlling large positions with small capital. Expressed as ratio (1:100), meaning $1,000 controls $100,000 position.
     
@@ -447,7 +477,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Position Sizing Calculation",
-                            "content": """## Quick Definition
+                            "content": """💡 Two traders both win 60% of their trades. After a year, one has doubled their account. The other has blown theirs. The only difference? Position sizing.
+
+> **Position sizing is like betting in poker**. A good poker player doesn't go all-in on every hand — they size their bet based on the strength of their cards and how much they can afford to lose. In forex, your 'bet' size should be calculated mathematically, not emotionally.
+
+---
+
+## Quick Definition
     
     **Position sizing** determines lot size based on account size, risk percentage, and stop loss distance. This is the most critical skill for survival.
     
@@ -527,7 +563,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Trading Sessions Explained",
-                            "content": """## Quick Definition
+                            "content": """💡 It's 3am in London. The forex market is open — but barely anyone is trading EUR/USD. Come back at 9am and it's a completely different world. Timing in forex is everything.
+
+> **The forex market is like a relay race across three time zones**. Tokyo passes the baton to London, London passes to New York. Each session has its own personality — Tokyo is calm (range-bound), London is volatile (trend-starting), and New York is powerful (trend-confirming or reversing).
+
+---
+
+## Quick Definition
     
     The Forex market operates **24/5**, divided into three sessions: Asian (Tokyo), London, and New York. Each has unique characteristics affecting volatility and liquidity.
     
@@ -618,7 +660,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Best Times to Trade",
-                            "content": """## Quick Definition
+                            "content": """💡 The exact same strategy can win during London session and lose consistently during Asian session. Not because the strategy is broken — because the market conditions are completely different.
+
+> **Trading at the wrong time is like fishing at noon in summer** — the fish are there but not biting. The London-New York overlap (13:00–17:00 GMT) is your dawn and dusk window when conditions are perfect: high volume, tight spreads, and directional moves.
+
+---
+
+## Quick Definition
     
     Not all trading hours are equal. The **Golden Window** offers the best combination of liquidity, volatility, and directional movement.
     
@@ -701,7 +749,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "The 1-2% Rule",
-                            "content": """## Quick Definition
+                            "content": """💡 A trader with a 40% win rate and proper risk management will outperform a trader with a 70% win rate who risks 10% per trade. This is the counterintuitive truth at the core of professional trading.
+
+> **Risk management is like insurance**. You don't know when you'll have an accident, but you pay a small premium to ensure it doesn't destroy you financially. The 1-2% rule is your trading insurance — it caps your downside so that even 10 consecutive losses don't end your career.
+
+---
+
+## Quick Definition
     
     Never risk more than **1-2% of total account equity** on any single trade. This ensures survival through inevitable losing streaks.
     
@@ -775,7 +829,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Stop Loss and Take Profit",
-                            "content": """## Quick Definition
+                            "content": """💡 Every professional trader has a story of a trade they 'just held a bit longer' that turned a manageable loss into an account-destroying one. Stop losses exist precisely for these human moments.
+
+> **A stop loss is like a seatbelt**. You don't wear a seatbelt because you plan to crash — you wear it because you know accidents happen and you want to survive them. A stop loss doesn't guarantee you won't lose. It guarantees the loss won't kill your account.
+
+---
+
+## Quick Definition
     
     Every trade requires predetermined exit points: **Stop Loss** (maximum acceptable loss) and **Take Profit** (target where reward justifies risk).
     
@@ -862,7 +922,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Candlestick Charts Explained",
-                            "content": """## Quick Definition
+                            "content": """💡 Japanese rice traders in the 17th century discovered that price patterns repeated because human psychology repeated. 300 years later, those same patterns still work in forex — because fear and greed haven't changed.
+
+> **Each candlestick is a story of a battle** between buyers and sellers over a specific time period. A tall green candle says buyers dominated completely. A small red candle with long wicks says neither side won. Reading candlesticks is reading crowd psychology — compressed into a single bar.
+
+---
+
+## Quick Definition
     
     Candlestick charts display price using "candles" showing **Open, High, Low, Close (OHLC)** for specific periods.
     
@@ -940,7 +1006,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Support and Resistance Basics",
-                            "content": """## Quick Definition
+                            "content": """💡 EUR/USD hits 1.0800 and bounces. Three weeks later it hits 1.0800 again and bounces again. This isn't coincidence — it's thousands of traders watching the same level, placing orders at the same price.
+
+> **Support is a floor, resistance is a ceiling**. Imagine a ball bouncing inside a room — it hits the floor (support) and bounces up, hits the ceiling (resistance) and bounces down. When the ceiling is broken, it becomes the new floor. When the floor breaks, it becomes the new ceiling.
+
+---
+
+## Quick Definition
     
     **Support**: Price level where buying overcomes selling, causing bounces.
     **Resistance**: Price level where selling overcomes buying, causing rejections.
@@ -1028,7 +1100,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Identifying Trends",
-                            "content": """## Quick Definition
+                            "content": """💡 The most common mistake in forex isn't picking the wrong entry — it's picking the right entry in the wrong direction. Identifying the trend correctly is the difference between swimming with the current and fighting it.
+
+> **A trend is like an escalator**. An uptrend is an escalator going up — you can walk up (trade long) and make progress, or stand still and still go up. Fighting the trend is like walking down an up escalator — exhausting and usually losing.
+
+---
+
+## Quick Definition
     
     A **trend** is the general direction of price movement over time. Trends exist in three timeframes simultaneously: primary (long-term), intermediate (medium-term), and short-term.
     
@@ -1105,7 +1183,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Multiple Timeframe Analysis",
-                            "content": """## Quick Definition
+                            "content": """💡 A 1-minute chart shows a perfect buy signal. The daily chart shows you're trying to buy at the top of a massive downtrend. Top-down analysis would have saved you from that trade.
+
+> **Multiple timeframes are like a GPS and a map**. The weekly/daily chart is your GPS showing the big picture — which city you're heading to. The 4-hour chart is your map — which roads to take. The 1-hour chart is your street view — exactly when to turn. Use all three together.
+
+---
+
+## Quick Definition
     
     **Multiple Timeframe Analysis (MTA)** uses longer timeframes to identify the primary trend, intermediate for timing, and shorter for precise entries. This creates a complete market view.
     
@@ -1188,7 +1272,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Dynamic Support and Resistance",
-                            "content": """## Quick Definition
+                            "content": """💡 A moving average isn't just a line on a chart. When thousands of institutional traders use the same MA settings, that line becomes a self-fulfilling zone of support and resistance.
+
+> **Dynamic support is like a moving safety net**. Unlike fixed support levels, moving averages follow price — rising during an uptrend, falling during a downtrend. They adapt to market conditions, giving you levels that are always relevant rather than levels from weeks ago.
+
+---
+
+## Quick Definition
     
     **Dynamic Support/Resistance** moves with price, unlike static horizontal levels. Includes moving averages, trendlines, and channels that adapt to current market conditions.
     
@@ -1266,7 +1356,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Chart Patterns",
-                            "content": """## Quick Definition
+                            "content": """💡 Chart patterns are not magic. They work because they represent repeatable human psychology — the same fear, greed, and indecision that plays out the same way across all markets and all time periods.
+
+> **Chart patterns are like recurring storylines in movies**. Head and Shoulders is always the story of an overextended hero who rises, falls, makes one last push, then collapses. Double Bottom is the comeback story — hitting rock bottom twice before the turnaround. The stories repeat because human nature repeats.
+
+---
+
+## Quick Definition
     
     **Chart Patterns** are recognizable price formations that predict future movements. Patterns reflect market psychology and repeat across all markets and timeframes.
     
@@ -1352,7 +1448,13 @@ ACADEMY_CURRICULUM = [
                     "lessons": [
                         {
                             "title": "Moving Average Strategies",
-                            "content": """## Quick Definition
+                            "content": """💡 In 2020, the Golden Cross formed on EUR/USD — the 50 MA crossed above the 200 MA. Over the next six months, the pair rose over 1,000 pips. Understanding what triggered that move is worth understanding.
+
+> **Moving averages are like the speedometer and direction of a car**. A fast MA (MA20) reacts like a sports car — quick to change direction. A slow MA (MA50/200) moves like a heavy truck — slow to turn but powerful when it does. When the sports car overtakes the truck going upward = Golden Cross = bullish signal.
+
+---
+
+## Quick Definition
     
     **Moving Averages (MA)** smooth price data to identify trend direction. Crossovers, dynamic support, and slope analysis generate trading signals.
     
@@ -1431,7 +1533,13 @@ ACADEMY_CURRICULUM = [
                         },
                         {
                             "title": "Momentum Indicators (RSI and MACD)",
-                            "content": """## Quick Definition
+                            "content": """💡 Price can lie. Volume can deceive. But when price makes a new high and RSI makes a lower high — momentum is warning you the move is running out of fuel before most traders even notice.
+
+> **RSI is like a car's fuel gauge**. Above 70 means the tank is overflowing (overbought — may need to slow down). Below 30 means the tank is nearly empty (oversold — potential refuel/bounce). MACD is like the car's acceleration — positive histogram means gaining speed, negative means slowing down.
+
+---
+
+## Quick Definition
     
     **Momentum Indicators** measure the speed and strength of price movements. RSI identifies overbought/oversold conditions. MACD shows trend direction and momentum changes.
     
@@ -1524,7 +1632,13 @@ ACADEMY_CURRICULUM = [
                 "lessons": [
                     {
                         "title": "Fibonacci Retracements and Extensions",
-                        "content": """## Quick Definition
+                        "content": """💡 The same mathematical ratio found in sunflower seeds, nautilus shells, and the human body also appears in financial markets. Fibonacci numbers work not because of mysticism — but because so many traders use them that price respects them.
+
+> **Fibonacci retracements are like a rubber band**. Stretch a rubber band (a big price move), and it will pull back proportionally before continuing. The 38.2% and 61.8% levels are where that rubber band typically snaps back to before the main direction resumes.
+
+---
+
+## Quick Definition
     
     bonacci Retracements** measure pullback depth within trends using ratios derived from the Fibonacci sequence (23.6%, 38.2%, 50%, 61.8%). **Extensions** project profit targets beyond the 100% level (127.2%, 161.8%, 261.8%).
     
@@ -1624,7 +1738,13 @@ ACADEMY_CURRICULUM = [
                     },
                     {
                         "title": "Confluence Trading",
-                        "content": """## Quick Definition
+                        "content": """💡 A lone archer with a single arrow has one chance. Give that archer ten arrows pointing at the same target and the odds shift dramatically. Confluence trading is giving yourself ten arrows.
+
+> **Confluence is like multiple witnesses at a crime scene**. One witness saying they saw the suspect isn't very convincing. Ten independent witnesses pointing to the same person is compelling evidence. In trading, each confluence factor (support + Fibonacci + MA + pattern) is an independent witness confirming the same trade.
+
+---
+
+## Quick Definition
     
     nfluence** occurs when multiple technical factors align at the same price zone, creating higher-probability trading setups. More confluence = higher probability + better risk/reward.
     
@@ -1729,7 +1849,13 @@ ACADEMY_CURRICULUM = [
                 "lessons": [
                     {
                         "title": "Order Blocks and Institutional Levels",
-                        "content": """## Quick Definition
+                        "content": """💡 Why does price mysteriously reverse at levels that seem random on a retail trader's chart? Because institutions left unfilled orders there — and price always returns to fill them.
+
+> **An order block is like a shop that ran out of stock**. Imagine Apple running out of iPhones at $999. When the price drops back to $999, everyone who missed the first time rushes to buy — creating a strong bounce. Order blocks work the same way: institutions placed huge buy/sell orders, the market moved away, and when price returns, those orders get filled again.
+
+---
+
+## Quick Definition
     
     der Blocks (OB)** are the last opposing candle before a strong impulsive move, representing where institutions accumulated or distributed positions. They act as magnets for future price action.
     
@@ -1829,7 +1955,13 @@ ACADEMY_CURRICULUM = [
                     },
                     {
                         "title": "Liquidity and Market Structure",
-                        "content": """## Quick Definition
+                        "content": """💡 You placed your stop loss just below support — exactly where your broker's chart said to. Two minutes later, price spikes below your stop, then reverses sharply upward. You weren't just unlucky. You were the liquidity.
+
+> **Liquidity pools are like speed bumps for big vehicles**. A semi-truck can't make sharp turns — it needs space. Institutions can't buy or sell $500 million without moving the market. So they engineer a stop hunt to flush out smaller players, collect their exits as institutional entries, then drive price in the real direction.
+
+---
+
+## Quick Definition
     
     quidity** refers to pools of orders (stop losses, breakout traders) that institutions target before major moves. **Market Structure** tracks highs and lows to determine trend direction and institutional intent.
     
@@ -1929,7 +2061,13 @@ ACADEMY_CURRICULUM = [
                 "lessons": [
                     {
                         "title": "Expectancy and Profit Factor",
-                        "content": """## Quick Definition
+                        "content": """💡 A trader with a 35% win rate made $120,000 in a year. Another with a 75% win rate lost $40,000. Win rate tells you almost nothing without knowing the R:R ratio.
+
+> **Expectancy is like the house edge in a casino**. The casino doesn't win every hand — it wins enough, with a large enough edge, over enough hands. Your trading system works the same way: a positive expectancy means the math works in your favour over many trades, even if you lose frequently.
+
+---
+
+## Quick Definition
     
     pectancy** measures the average profit/loss per trade over time—your true edge. **Profit Factor** compares total gains to total losses. These metrics determine if your system is profitable and sustainable.
     
@@ -2040,7 +2178,13 @@ ACADEMY_CURRICULUM = [
                     },
                     {
                         "title": "Portfolio Heat and Correlation",
-                        "content": """## Quick Definition
+                        "content": """💡 A trader thought they were diversified across four currency pairs. Then the US jobs report dropped and all four moved against them simultaneously — because all four were correlated to USD.
+
+> **Correlated pairs are like electrical circuits in parallel**. If one blows, they all blow because they share the same current. EUR/USD and GBP/USD both depend on USD strength — if the dollar surges, both fall together. Trading them simultaneously with full size is like having twice the exposure to a single risk.
+
+---
+
+## Quick Definition
     
     rtfolio Heat** is total exposed risk across all open positions. **Correlation** measures how similarly different pairs move. Managing both prevents catastrophic drawdowns when markets move together.
     
@@ -2154,7 +2298,13 @@ ACADEMY_CURRICULUM = [
                 "lessons": [
                     {
                         "title": "Backtesting Your Strategy",
-                        "content": """## Quick Definition
+                        "content": """💡 Would you fly in a plane built by an engineer who never tested it? Yet most traders risk real money on strategies they've never verified against historical data.
+
+> **Backtesting is like a flight simulator**. A pilot doesn't learn emergency procedures in an actual emergency — they practice in a simulator first. Backtesting lets you crash and survive virtually a hundred times before risking real capital, revealing exactly where and why your strategy fails.
+
+---
+
+## Quick Definition
     
     cktesting** applies trading rules to historical data to measure performance. It validates your edge before risking real capital and reveals whether your system has positive expectancy.
     
@@ -2252,7 +2402,13 @@ ACADEMY_CURRICULUM = [
                     },
                     {
                         "title": "Creating Your Trading System",
-                        "content": """## Quick Definition
+                        "content": """💡 Two traders see the exact same EUR/USD setup. One enters. One skips it. At the end of the year, one has a profitable track record and one has an inconsistent mess. The difference is having a system versus trading on feel.
+
+> **A trading system is like a recipe**. A chef with a recipe makes the same excellent dish every time. A chef who 'just wings it' produces brilliant food occasionally and disasters frequently. Your trading system is your recipe — follow it precisely and the results become predictable and improvable.
+
+---
+
+## Quick Definition
     
     Trading System** is a complete set of rules covering: setups, entries, exits, risk management, and position sizing. Good systems remove discretion and emotion from trading decisions.
     
@@ -2369,7 +2525,13 @@ ACADEMY_CURRICULUM = [
                 "lessons": [
                     {
                         "title": "Creating Your Trading Plan",
-                        "content": """## Quick Definition
+                        "content": """💡 Professionals in every high-stakes field — surgeons, pilots, athletes — use checklists and plans. The ones who skip them are the ones who make costly mistakes under pressure. Trading is no different.
+
+> **A trading plan is a business plan for your trading**. You wouldn't start a business without defining your goals, your operating rules, your risk limits, and your review process. Yet most traders enter the market with no plan at all — then wonder why results are inconsistent.
+
+---
+
+## Quick Definition
     
     Trading Plan** is your complete business blueprint covering goals, strategies, routines, and review processes. It transforms trading from gambling into a structured business operation.
     
@@ -2489,7 +2651,13 @@ ACADEMY_CURRICULUM = [
                     },
                     {
                         "title": "Performance Review and Optimization",
-                        "content": """## Quick Definition
+                        "content": """💡 Elite athletes review every match footage. Top traders review every trade. The journal is not a diary — it's the most valuable data source for improving your edge.
+
+> **Performance review is like compound interest for skill**. Each week you review, you get 1% better. Over a year, 52 weekly reviews compound into dramatic improvement. Without review, you repeat the same mistakes indefinitely — like trying to improve your golf game without ever watching your swing.
+
+---
+
+## Quick Definition
     
     rformance Review** is systematic analysis of your trading results to identify strengths, weaknesses, and optimization opportunities. Regular review transforms good traders into great ones.
     

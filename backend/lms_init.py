@@ -141,7 +141,8 @@ _LEARNING_TABLE_SQLS = [
         option_d TEXT NOT NULL DEFAULT '',
         correct_answer VARCHAR(1) NOT NULL,
         explanation TEXT NOT NULL DEFAULT '',
-        topic_slug VARCHAR(100) NOT NULL DEFAULT ''
+        topic_slug VARCHAR(100) NOT NULL DEFAULT '',
+        UNIQUE(lesson_id, question)
     )""",
     """CREATE TABLE IF NOT EXISTS user_learning_progress (
         id SERIAL PRIMARY KEY,
@@ -231,6 +232,7 @@ async def init_lms_tables():
     print(f"[LMS INIT] Schema ready — {ok} ok, {warn} warnings", flush=True)
 
     await seed_academy()
+    await dedup_quizzes()
     await update_lesson_visuals()
 
 
@@ -505,6 +507,85 @@ async def update_lesson_visuals():
 
     except Exception as e:
         print(f"[VISUAL UPDATE ERROR] {e}", flush=True)
+
+
+async def dedup_quizzes():
+    """
+    One-time cleanup: removes duplicate quiz questions caused by multiple seed runs.
+    Keeps the LOWEST id for each (lesson_id, question) pair — deletes all duplicates.
+    Also adds the UNIQUE constraint if it doesn't exist yet (idempotent).
+    Safe to run on every startup — exits fast when no duplicates exist.
+    """
+    try:
+        # Check for duplicates first
+        dup_check = await database.fetch_one(
+            """SELECT COUNT(*) AS c FROM (
+                SELECT lesson_id, question
+                FROM lesson_quizzes
+                GROUP BY lesson_id, question
+                HAVING COUNT(*) > 1
+            ) t"""
+        )
+        dup_count = dup_check["c"] if dup_check else 0
+
+        if dup_count == 0:
+            print("[QUIZ DEDUP] No duplicate questions found — skipping.", flush=True)
+        else:
+            print(f"[QUIZ DEDUP] Found {dup_count} duplicate question groups. Cleaning...", flush=True)
+            # Delete duplicates — keep the row with the lowest id
+            await database.execute(
+                """DELETE FROM lesson_quizzes
+                   WHERE id NOT IN (
+                       SELECT MIN(id)
+                       FROM lesson_quizzes
+                       GROUP BY lesson_id, question
+                   )"""
+            )
+            remaining = await database.fetch_one(
+                "SELECT COUNT(*) AS c FROM lesson_quizzes"
+            )
+            print(
+                f"[QUIZ DEDUP] Done. {remaining['c'] if remaining else 0} questions remain.",
+                flush=True,
+            )
+
+        # Add UNIQUE constraint if not already present (idempotent)
+        try:
+            await database.execute(
+                """ALTER TABLE lesson_quizzes
+                   ADD CONSTRAINT uq_lesson_question UNIQUE (lesson_id, question)"""
+            )
+            print("[QUIZ DEDUP] UNIQUE constraint added to lesson_quizzes.", flush=True)
+        except Exception:
+            pass  # Constraint already exists — expected on subsequent runs
+
+        # Cap at 5 questions per lesson — remove excess (keep lowest 5 ids)
+        excess_check = await database.fetch_one(
+            """SELECT COUNT(*) AS c FROM (
+                SELECT lesson_id
+                FROM lesson_quizzes
+                GROUP BY lesson_id
+                HAVING COUNT(*) > 5
+            ) t"""
+        )
+        excess_lessons = excess_check["c"] if excess_check else 0
+        if excess_lessons > 0:
+            print(f"[QUIZ DEDUP] {excess_lessons} lessons have >5 questions — trimming to 5.", flush=True)
+            await database.execute(
+                """DELETE FROM lesson_quizzes
+                   WHERE id NOT IN (
+                       SELECT id FROM (
+                           SELECT id,
+                                  ROW_NUMBER() OVER (PARTITION BY lesson_id ORDER BY id) AS rn
+                           FROM lesson_quizzes
+                       ) ranked
+                       WHERE rn <= 5
+                   )"""
+            )
+            print("[QUIZ DEDUP] Trimmed to max 5 questions per lesson.", flush=True)
+
+    except Exception as e:
+        print(f"[QUIZ DEDUP ERROR] {e}", flush=True)
 
 
 # =============================================================================

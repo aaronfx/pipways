@@ -98,6 +98,45 @@ class LessonRecommendation(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     reason: Literal["recommended", "next_step", "foundational", "remedial"] = "recommended"
 
+class UserContext(BaseModel):
+    """User context for mentor responses - MUST be defined before use"""
+    journal_performance: Optional[Dict[str, Any]] = None
+    last_chart_analysis: Optional[Dict[str, Any]] = None
+    active_signals: List[Dict[str, Any]] = []
+    available_courses: List[Dict[str, Any]] = []
+    recent_blogs: List[Dict[str, Any]] = []
+    trading_stats: Optional[Dict[str, Any]] = None
+    user_skill_level: str = "intermediate"
+    academy_structure: Optional[AcademyStructure] = None
+    academy_progress: Optional[UserAcademyProgress] = None
+
+class MentorQuery(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    context: Optional[str] = Field(None, max_length=1000)
+    skill_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
+    topic: Optional[str] = None
+    include_platform_context: bool = True
+
+class MentorResponse(BaseModel):
+    response: str
+    recommendations: List[LessonRecommendation]
+    context_used: Dict[str, Any]
+    command_triggered: Optional[str] = None
+    confidence: float = Field(default=0.9, ge=0, le=1)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    academy_progress: Optional[Dict[str, Any]] = None
+
+class CoachInsights(BaseModel):
+    trading_personality: str
+    strengths: List[str]
+    weaknesses: List[str]
+    risk_profile: str
+    discipline_score: int
+    consistency_score: int
+    recommended_next_steps: List[str]
+    recommended_resources: List[LessonRecommendation]
+    academy_progress: Optional[Dict[str, Any]] = None
+
 # ==========================================
 # CONTEXT ENGINE (Extended with Academy)
 # ==========================================
@@ -584,17 +623,6 @@ def generate_recommendations(
 # AI PROMPT ENGINEERING (Academy-Enhanced)
 # ==========================================
 
-class UserContext(BaseModel):
-    journal_performance: Optional[Dict[str, Any]] = None
-    last_chart_analysis: Optional[Dict[str, Any]] = None
-    active_signals: List[Dict[str, Any]] = []
-    available_courses: List[Dict[str, Any]] = []
-    recent_blogs: List[Dict[str, Any]] = []
-    trading_stats: Optional[Dict[str, Any]] = None
-    user_skill_level: str = "intermediate"
-    academy_structure: Optional[AcademyStructure] = None
-    academy_progress: Optional[UserAcademyProgress] = None
-
 def build_system_prompt(context: UserContext, skill_level: str) -> str:
     """Build comprehensive system prompt with Academy integration"""
 
@@ -661,22 +689,6 @@ Provide clear, structured advice. Use bullet points for actionable steps. Always
 # ==========================================
 # MAIN ENDPOINTS (Enhanced)
 # ==========================================
-
-class MentorQuery(BaseModel):
-    question: str = Field(..., min_length=1, max_length=2000)
-    context: Optional[str] = Field(None, max_length=1000)
-    skill_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
-    topic: Optional[str] = None
-    include_platform_context: bool = True
-
-class MentorResponse(BaseModel):
-    response: str
-    recommendations: List[LessonRecommendation]
-    context_used: Dict[str, Any]
-    command_triggered: Optional[str] = None
-    confidence: float = Field(default=0.9, ge=0, le=1)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    academy_progress: Optional[Dict[str, Any]] = None
 
 @router.post("/ask", response_model=MentorResponse)
 async def ask_mentor(
@@ -865,17 +877,6 @@ Or ask me anything about trading! I'll always guide you to relevant Academy less
 # ==========================================
 # ADDITIONAL ENDPOINTS
 # ==========================================
-
-class CoachInsights(BaseModel):
-    trading_personality: str
-    strengths: List[str]
-    weaknesses: List[str]
-    risk_profile: str
-    discipline_score: int
-    consistency_score: int
-    recommended_next_steps: List[str]
-    recommended_resources: List[LessonRecommendation]
-    academy_progress: Optional[Dict[str, Any]] = None
 
 @router.get("/insights", response_model=CoachInsights)
 async def get_coach_insights(

@@ -1798,6 +1798,84 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
                 "chart_practice": fallback, **fallback}
 
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RESUME LEARNING
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/learning/resume")
+async def resume_learning(current_user=Depends(get_current_user)):
+    """
+    Returns the lesson the user should resume/start next.
+    type: "continue" | "start" | "complete"
+    """
+    user_id = _user_get(current_user, "id", 0)
+    if not user_id:
+        raise HTTPException(401, "Not authenticated")
+    try:
+        last_completed = await database.fetch_one(
+            """SELECT p.lesson_id, p.completed_at,
+                      l.title AS lesson_title, l.module_id, l.order_index,
+                      m.title AS module_title, m.level_id,
+                      lv.name AS level_name
+               FROM user_learning_progress p
+               JOIN learning_lessons l  ON l.id  = p.lesson_id
+               JOIN learning_modules m  ON m.id  = l.module_id
+               JOIN learning_levels  lv ON lv.id = m.level_id
+               WHERE p.user_id = :uid AND p.completed = TRUE
+               ORDER BY p.completed_at DESC NULLS LAST
+               LIMIT 1""",
+            {"uid": user_id},
+        )
+        if last_completed:
+            next_lesson = await database.fetch_one(
+                """SELECT l.id, l.title, l.module_id,
+                          m.title AS module_title, lv.name AS level_name
+                   FROM learning_lessons l
+                   JOIN learning_modules m  ON m.id  = l.module_id
+                   JOIN learning_levels  lv ON lv.id = m.level_id
+                   WHERE l.module_id = :mid AND l.order_index > :oi
+                     AND NOT EXISTS (
+                         SELECT 1 FROM user_learning_progress p
+                         WHERE p.lesson_id = l.id AND p.user_id = :uid AND p.completed = TRUE
+                     )
+                   ORDER BY l.order_index LIMIT 1""",
+                {"mid": last_completed["module_id"],
+                 "oi": last_completed["order_index"], "uid": user_id},
+            )
+            if next_lesson:
+                return {"has_progress": True, "type": "continue",
+                        "lesson_id": next_lesson["id"], "title": next_lesson["title"],
+                        "module": next_lesson["module_title"], "level": next_lesson["level_name"],
+                        "last_lesson": last_completed["lesson_title"]}
+
+        first_incomplete = await database.fetch_one(
+            """SELECT l.id, l.title, m.title AS module_title, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m  ON m.id  = l.module_id
+               JOIN learning_levels  lv ON lv.id = m.level_id
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM user_learning_progress p
+                   WHERE p.lesson_id = l.id AND p.user_id = :uid AND p.completed = TRUE
+               )
+               ORDER BY lv.order_index, m.order_index, l.order_index LIMIT 1""",
+            {"uid": user_id},
+        )
+        if first_incomplete:
+            has_any = last_completed is not None
+            return {"has_progress": has_any,
+                    "type": "continue" if has_any else "start",
+                    "lesson_id": first_incomplete["id"], "title": first_incomplete["title"],
+                    "module": first_incomplete["module_title"], "level": first_incomplete["level_name"],
+                    "last_lesson": last_completed["lesson_title"] if last_completed else None}
+
+        return {"has_progress": True, "type": "complete", "lesson_id": None,
+                "title": "All lessons completed!", "module": None, "level": None, "last_lesson": None}
+    except Exception as e:
+        print(f"[API ERROR] resume_learning: {e}", flush=True)
+        return {"has_progress": False, "type": "start", "lesson_id": None,
+                "title": None, "module": None, "level": None, "last_lesson": None}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # AI DIAGRAM ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1897,6 +1975,36 @@ async def regenerate_lesson_diagram(lesson_id: int, current_user=Depends(get_cur
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(500, str(e))
+
+@router.post("/admin/academy/reseed")
+async def admin_reseed(current_user=Depends(get_current_user)):
+    """Admin only: wipe all curriculum data and reseed from academy_curriculum_seed.py."""
+    if not _user_get(current_user, "is_admin", False):
+        raise HTTPException(403, "Admin only")
+    try:
+        from .lms_init import seed_academy, dedup_quizzes
+        # Delete curriculum (preserves user progress due to CASCADE constraints on lesson refs)
+        await database.execute("DELETE FROM lesson_quizzes")
+        await database.execute("DELETE FROM learning_lessons")
+        await database.execute("DELETE FROM learning_modules")
+        await database.execute("DELETE FROM learning_levels")
+        print("[RESEED] Curriculum cleared — reseeding now...", flush=True)
+        await seed_academy()
+        await dedup_quizzes()
+        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
+        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
+        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
+        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
+        return {
+            "status": "success",
+            "levels": r_lv["c"] if r_lv else 0,
+            "modules": r_mo["c"] if r_mo else 0,
+            "lessons": r_le["c"] if r_le else 0,
+            "quizzes": r_qu["c"] if r_qu else 0,
+        }
+    except Exception as e:
+        print(f"[RESEED ERROR] {e}", flush=True)
         raise HTTPException(500, str(e))
 
 # ══════════════════════════════════════════════════════════════════════════════

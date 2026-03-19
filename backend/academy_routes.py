@@ -222,221 +222,606 @@ def extract_diagram_context(title: str, content: str) -> dict:
 
 def build_diagram_prompt(classification: str, context: dict, attempt: int = 0) -> str:
     """
-    Returns a highly structured, classification-specific prompt.
-    Each template guides the AI with zero ambiguity.
-    attempt=1 adds "simplify diagram" for retry.
+    Returns a precise, coordinate-driven prompt per lesson classification.
+    Exact pixel positions prevent label overlap and layout inconsistency.
+    attempt > 0 adds a simplification instruction for retries.
     """
-    simplify = "\n\nIMPORTANT: Keep the diagram SIMPLE. Fewer elements, larger labels." if attempt > 0 else ""
-    vals = context.get("values", {})
-    elems = context.get("elements", [])
+    simplify = "\n\nIMPORTANT: Simplify. Use fewer elements. Make labels larger and further apart." if attempt > 0 else ""
+    vals  = context.get("values", {})
     title = context.get("concept", "Forex Concept")
     intent = context.get("intent", title)
+    tl    = title.lower() + " " + intent.lower()
 
-    pa = vals.get("price_a", "1.0850")
-    pb = vals.get("price_b", "1.0820")
-    pc = vals.get("price_c", "1.0890")
+    pa      = vals.get("price_a", "1.0850")
+    pb      = vals.get("price_b", "1.0820")
+    pc      = vals.get("price_c", "1.0890")
     pips_val = vals.get("pips", "20")
-    rr_val = vals.get("rr", "1:2")
-    pct_val = vals.get("pct", "1")
+    rr_val  = vals.get("rr", "1:2")
 
+    # ── PRICE ACTION ─────────────────────────────────────────────────────────
     if classification == "price_action":
-        return f"""Create an SVG price action diagram for: "{title}"
+        return f"""Create an SVG price action diagram. Title: "{title}"
 
-CONTEXT: {intent}
+EXACT ELEMENTS — place each at the coordinates given:
 
-DRAW THIS EXACTLY:
-1. A price polyline showing an uptrend (rising from bottom-left to top-right)
-2. A horizontal dashed green line labeled "Entry {pa}" 
-3. A horizontal dashed red line below entry labeled "Stop Loss {pb}"
-4. A horizontal dashed green line above entry labeled "Take Profit {pc}"
-5. A filled yellow circle at the entry point on the price line
-6. A green upward arrow showing the expected move to TP
-7. Annotate the risk zone (red bracket) and reward zone (green bracket) on the right
-8. Title: "{title}" in purple at the top
-9. Footer text: "R:R = {rr_val} | Risk = {pips_val} pips"
+1. Background: <rect width="480" height="220" fill="#0d1117" rx="8"/>
+2. Title: x=240 y=16 text-anchor=middle fill=#a78bfa font-size=11 font-weight=bold
 
-Use polyline for price, dashed lines for levels, circle for entry.{simplify}"""
+3. Price polyline (uptrend):
+   points="30,185 80,165 130,170 180,140 220,148 260,115 300,125 350,95 400,100 450,75"
+   stroke=#34d399 stroke-width=2 fill=none
 
+4. Entry level line: x1=30 y1=130 x2=370 y2=130 stroke=#fbbf24 stroke-width=1.5 stroke-dasharray=4
+5. Stop Loss line:   x1=30 y1=158 x2=370 y2=158 stroke=#f87171 stroke-width=1.5 stroke-dasharray=4
+6. Take Profit line: x1=30 y1=100 x2=370 y2=100 stroke=#34d399 stroke-width=1.5 stroke-dasharray=4
+
+7. Entry circle: cx=220 cy=130 r=6 fill=#fbbf24
+
+8. RIGHT-SIDE LABELS (x=375, stacked 28px apart — NO overlap):
+   - "Entry {pa}"         x=375 y=128 fill=#fbbf24 font-size=9
+   - "Stop Loss {pb}"     x=375 y=156 fill=#f87171 font-size=9
+   - "Take Profit {pc}"   x=375 y=98  fill=#34d399 font-size=9
+
+9. Risk bracket:   vertical line x=460 y1=130 y2=158 stroke=#f87171 stroke-width=1
+   Label "Risk"    x=465 y=147 fill=#f87171 font-size=8
+10. Reward bracket: vertical line x=460 y1=100 y2=130 stroke=#34d399 stroke-width=1
+    Label "Reward"  x=463 y=118 fill=#34d399 font-size=8
+
+11. Green arrow pointing up: at x=300 y=108, triangle pointing up fill=#34d399
+
+12. Footer: x=240 y=215 text-anchor=middle fill=#6b7280 font-size=9
+    Text: "R:R = {rr_val}  |  Risk = {pips_val} pips  |  Entry {pa}  |  SL {pb}  |  TP {pc}"{simplify}"""
+
+    # ── RISK MANAGEMENT ──────────────────────────────────────────────────────
     if classification == "risk_management":
-        return f"""Create an SVG risk management diagram for: "{title}"
+        if any(k in tl for k in ["leverage", "margin", "lot"]):
+            return f"""Create an SVG leverage comparison diagram. Title: "{title}"
 
-CONTEXT: {intent}
+EXACT ELEMENTS:
 
-DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top
-2. Three horizontal bar comparisons side by side:
-   - Bar 1 (green, narrow): "1% risk — Safe" — account survives drawdown
-   - Bar 2 (yellow, medium): "2% risk — Moderate" — some drawdown  
-   - Bar 3 (red, wide): "5%+ risk — Danger" — severe drawdown
-3. Show dollar amounts or percentages on each bar
-4. Add labels: "Risk Per Trade" on x-axis
-5. Add a "DANGER ZONE" red label above the 5% bar
-6. Footer: "Professional traders risk 0.5–2% per trade maximum"
-7. Show a formula box: "Lot Size = (Account × Risk%) ÷ (SL pips × Pip Value)"{simplify}"""
+1. Background + Title (standard)
 
+2. THREE HORIZONTAL BARS — each starts at x=30, labels to the RIGHT:
+
+Bar 1 (y=65, height=22, green #34d399, fill-opacity=0.85):
+   rect x=30 y=65 width=80 height=22 fill=#34d399 rx=3
+   Label: x=118 y=81 fill=#34d399 font-size=9 "1:1 — $1,000 controls $1,000"
+
+Bar 2 (y=105, height=22, yellow #fbbf24, fill-opacity=0.85):
+   rect x=30 y=105 width=170 height=22 fill=#fbbf24 rx=3
+   Label: x=208 y=121 fill=#fbbf24 font-size=9 "1:10 — $1,000 controls $10,000"
+
+Bar 3 (y=145, height=22, red #f87171, fill-opacity=0.85):
+   rect x=30 y=145 width=330 height=22 fill=#f87171 rx=3
+   Label: x=368 y=161 fill=#f87171 font-size=9 "1:100 — $1,000 controls $100,000 ⚠"
+
+3. Section label: x=30 y=55 fill=#9ca3af font-size=9 "Leverage Level → Position Size"
+
+4. Warning box: rect x=30 y=178 width=420 height=18 fill=#1f2937 rx=3
+   Text: x=240 y=191 text-anchor=middle fill=#f59e0b font-size=9 "Higher leverage = larger position = bigger risk per pip"
+
+5. Footer: "Higher leverage amplifies both profits AND losses — use with caution"{simplify}"""
+
+        if any(k in tl for k in ["stop loss", "take profit", "risk reward", "r:r"]):
+            return f"""Create an SVG risk vs reward diagram. Title: "{title}"
+
+EXACT ELEMENTS:
+
+1. Background + Title (standard)
+
+2. Price line (vertical entry then move):
+   polyline points="70,170 70,80 240,50" stroke=#60a5fa stroke-width=2 fill=none
+
+3. Entry horizontal line: x1=30 y1=130 x2=450 y2=130 stroke=#fbbf24 stroke-width=1.5 stroke-dasharray=4
+   Entry circle: cx=70 cy=130 r=6 fill=#fbbf24
+   Label "Entry {pa}" x=455 y=128 text-anchor=end fill=#fbbf24 font-size=9
+
+4. Stop Loss line: x1=30 y1=168 x2=450 y2=168 stroke=#f87171 stroke-width=1.5 stroke-dasharray=4
+   Label "Stop Loss {pb}" x=455 y=166 text-anchor=end fill=#f87171 font-size=9
+
+5. Take Profit line: x1=30 y1=88 x2=450 y2=88 stroke=#34d399 stroke-width=1.5 stroke-dasharray=4
+   Label "Take Profit {pc}" x=455 y=86 text-anchor=end fill=#34d399 font-size=9
+
+6. RED ZONE (risk area): rect x=72 y=130 width=120 height=38 fill=#f87171 fill-opacity=0.1 stroke=none
+   Label "RISK {pips_val} pips" x=132 y=152 text-anchor=middle fill=#f87171 font-size=9
+
+7. GREEN ZONE (reward area): rect x=72 y=88 width=120 height=42 fill=#34d399 fill-opacity=0.1 stroke=none
+   Label "REWARD" x=132 y=110 text-anchor=middle fill=#34d399 font-size=9
+
+8. R:R label (large, prominent): x=300 y=135 fill=#fbbf24 font-size=22 font-weight=bold text-anchor=middle
+   Text: "{rr_val}"
+   Sub-label: x=300 y=150 fill=#6b7280 font-size=9 text-anchor=middle "Risk : Reward"
+
+9. Footer: "Never risk more than 2% per trade. Aim for minimum 1:2 risk:reward."{simplify}"""
+
+        # Position sizing / general risk management
+        return f"""Create an SVG position sizing diagram. Title: "{title}"
+
+EXACT ELEMENTS:
+
+1. Background + Title (standard)
+
+2. Formula box: rect x=30 y=32 width=420 height=30 fill=#1f2937 stroke=#7c3aed stroke-width=1 rx=5
+   Text: x=240 y=52 text-anchor=middle fill=#c4b5fd font-size=10 font-weight=bold
+   "Lot Size = (Account × Risk%) ÷ (Stop Pips × Pip Value)"
+
+3. Example box: rect x=30 y=72 width=420 height=28 fill=#0d1117 stroke=#1f2937 rx=4
+   Text: x=240 y=91 text-anchor=middle fill=#9ca3af font-size=9
+   "$10,000 × 1% = $100 ÷ (20 pips × $1) = 0.5 mini lots"
+
+4. THREE RISK BARS (stacked, starting y=112, height=20, gap=8):
+
+Bar 1: rect x=30 y=112 width=80  height=20 fill=#34d399 rx=3
+   Label: x=118 y=126 fill=#34d399 font-size=9 "1% risk — Safe ($100 on $10k)"
+
+Bar 2: rect x=30 y=140 width=160 height=20 fill=#fbbf24 rx=3
+   Label: x=198 y=154 fill=#fbbf24 font-size=9 "3% risk — Caution ($300 on $10k)"
+
+Bar 3: rect x=30 y=168 width=300 height=20 fill=#f87171 rx=3
+   Label: x=338 y=182 fill=#f87171 font-size=9 "10% risk — DANGER ($1,000 on $10k)"
+
+5. Footer: "Professional traders risk 0.5–2% maximum per trade"{simplify}"""
+
+    # ── INDICATORS ───────────────────────────────────────────────────────────
     if classification == "indicator":
-        # Determine which indicator
-        tl = title.lower() + " " + intent.lower()
-        if "rsi" in tl or "strength" in tl:
-            return f"""Create an SVG RSI indicator panel for: "{title}"
 
-DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top
-2. A price chart panel (top 40% of SVG) — simple polyline showing price movement
-3. Below it, an RSI panel (bottom 50%) with:
-   - Horizontal red dashed line at y=70 labeled "70 Overbought"
-   - Horizontal green dashed line at y=30 labeled "30 Oversold"  
-   - Horizontal grey line at y=50 labeled "50 Midline"
-   - RSI line oscillating — dip into oversold zone then bounce up
-   - Mark the oversold point with a green circle and "BUY SIGNAL" label
-4. Footer: "RSI < 30 = Oversold (look to buy) | RSI > 70 = Overbought (look to sell)"{simplify}"""
+        if "rsi" in tl or ("relative strength" in tl and "fibonacci" not in tl):
+            return f"""Create an SVG RSI indicator panel. Title: "{title}"
+
+EXACT TWO-PANEL LAYOUT:
+
+PANEL 1 — PRICE (y=28 to y=90):
+rect x=20 y=28 width=440 height=62 fill=#111827 rx=4
+Label "Price" x=30 y=40 fill=#60a5fa font-size=9
+Price polyline: points="30,82 75,70 120,75 165,58 210,65 255,50 300,60 345,45 390,52 435,42"
+stroke=#60a5fa stroke-width=2 fill=none
+
+PANEL 2 — RSI (y=96 to y=200):
+rect x=20 y=96 width=440 height=104 fill=#111827 rx=4
+
+Level lines (INSIDE panel, x1=25 x2=455):
+- Overbought (70): y=114 stroke=#f87171 stroke-width=1 stroke-dasharray=4
+  Label "70 Overbought" x=430 y=112 text-anchor=end fill=#f87171 font-size=9
+
+- Midline (50): y=148 stroke=#374151 stroke-width=1 stroke-dasharray=2
+  Label "50" x=462 y=151 fill=#6b7280 font-size=9
+
+- Oversold (30): y=182 stroke=#34d399 stroke-width=1 stroke-dasharray=4
+  Label "30 Oversold" x=430 y=181 text-anchor=end fill=#34d399 font-size=9
+
+RSI line: points="30,145 75,138 120,143 165,128 210,180 255,168 300,148 345,132 390,126 435,130"
+stroke=#a78bfa stroke-width=2 fill=none
+
+Oversold signal circle: cx=210 cy=180 r=5 fill=#34d399
+Signal label: x=218 y=178 fill=#34d399 font-size=9 "BUY"
+
+Footer: x=240 y=215 text-anchor=middle fill=#6b7280 font-size=9
+"RSI below 30 = oversold (buy signal) | RSI above 70 = overbought (sell signal)"{simplify}"""
 
         if "macd" in tl:
-            return f"""Create an SVG MACD indicator diagram for: "{title}"
+            return f"""Create an SVG MACD indicator diagram. Title: "{title}"
 
-DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top
-2. Price panel (top 35%) — upward trending polyline
-3. MACD panel (bottom 55%) with:
-   - Zero line across middle (grey dashed)
-   - MACD histogram bars: green bars above zero, red bars below zero
-   - MACD signal line (yellow) crossing above histogram = bullish signal
-   - Mark the crossover with a yellow circle labeled "Signal"
-   - Label: "MACD Line" and "Signal Line"
-4. Footer: "MACD crossover above zero = bullish momentum"{simplify}"""
+EXACT TWO-PANEL LAYOUT:
 
-        # Generic indicator (Fibonacci, MA, etc.)
-        return f"""Create an SVG indicator/tool diagram for: "{title}"
+PANEL 1 — PRICE (y=28 to y=80):
+rect x=20 y=28 width=440 height=52 fill=#111827 rx=4
+Label "Price" x=30 y=40 fill=#60a5fa font-size=9
+Price polyline: points="30,72 90,62 150,66 210,50 270,55 330,42 390,46 440,36"
+stroke=#60a5fa stroke-width=2 fill=none
+
+PANEL 2 — MACD (y=86 to y=200):
+rect x=20 y=86 width=440 height=114 fill=#111827 rx=4
+
+Zero line: x1=25 y1=143 x2=455 y2=143 stroke=#374151 stroke-width=1 stroke-dasharray=3
+Label "0" x=462 y=146 fill=#6b7280 font-size=9
+
+HISTOGRAM BARS (width=14 each, spaced 18px, y-axis centered on y=143):
+Green bars ABOVE zero (top edge to y=143):
+  rect x=32  y=122 width=14 height=21 fill=#34d399 rx=1 opacity=0.8
+  rect x=50  y=118 width=14 height=25 fill=#34d399 rx=1 opacity=0.8
+  rect x=68  y=126 width=14 height=17 fill=#34d399 rx=1 opacity=0.8
+  rect x=86  y=135 width=14 height=8  fill=#34d399 rx=1 opacity=0.8
+Red bars BELOW zero (y=143 to bottom):
+  rect x=104 y=143 width=14 height=14 fill=#f87171 rx=1 opacity=0.8
+  rect x=122 y=143 width=14 height=22 fill=#f87171 rx=1 opacity=0.8
+  rect x=140 y=143 width=14 height=16 fill=#f87171 rx=1 opacity=0.8
+  rect x=158 y=143 width=14 height=6  fill=#f87171 rx=1 opacity=0.8
+Green bars resuming:
+  rect x=176 y=130 width=14 height=13 fill=#34d399 rx=1 opacity=0.8
+  rect x=194 y=122 width=14 height=21 fill=#34d399 rx=1 opacity=0.8
+  rect x=212 y=115 width=14 height=28 fill=#34d399 rx=1 opacity=0.8
+
+MACD line (blue):
+  polyline points="32,130 68,128 104,150 140,158 176,138 212,122 280,118 360,114 440,108"
+  stroke=#60a5fa stroke-width=2 fill=none
+Signal line (yellow):
+  polyline points="32,133 68,132 104,146 140,154 176,142 212,128 280,122 360,116 440,110"
+  stroke=#fbbf24 stroke-width=1.5 fill=none stroke-dasharray=3
+
+Bullish crossover circle: cx=176 cy=140 r=6 fill=none stroke=#fbbf24 stroke-width=2
+Label "Cross" x=185 y=138 fill=#fbbf24 font-size=9
+
+Legend (bottom-right, spaced 16px apart):
+  "— MACD" x=320 y=188 fill=#60a5fa font-size=9
+  "— Signal" x=370 y=188 fill=#fbbf24font-size=9
+
+Footer: "MACD line crosses above signal = bullish momentum building"{simplify}"""
+
+        if "fibonacci" in tl or "fib" in tl:
+            return f"""Create an SVG Fibonacci retracement diagram. Title: "{title}"
+
+EXACT ELEMENTS:
+
+1. Background + Title (standard)
+
+2. Price upswing then pullback:
+   Impulse up: polyline points="30,190 200,50" stroke=#34d399 stroke-width=2 fill=none
+   Retracement: polyline points="200,50 280,110 320,98" stroke=#60a5fa stroke-width=1.5 fill=none stroke-dasharray=3
+
+3. FIBONACCI LEVELS — horizontal lines with labels on RIGHT (x=400+):
+   Each line x1=30, x2=390. Labels at x=395, spaced minimum 16px apart on y-axis:
+
+   0% level:   y=50  stroke=#e5e7eb  label "0% — 1.0900"    x=395 y=48  fill=#9ca3af font-size=9
+   23.6% level: y=86  stroke=#60a5fa  label "23.6% — 1.0822" x=395 y=84  fill=#60a5fa font-size=9
+   38.2% level: y=107 stroke=#a78bfa  label "38.2% — 1.0771" x=395 y=105 fill=#a78bfa font-size=9
+   50% level:  y=120 stroke=#fbbf24  label "50% — 1.0725"   x=395 y=118 fill=#fbbf24 font-size=9
+   61.8% level: y=133 stroke=#f59e0b  label "61.8% — 1.0680" x=395 y=131 fill=#f59e0b font-size=9  ← GOLDEN RATIO
+   78.6% level: y=151 stroke=#f87171  label "78.6% — 1.0625" x=395 y=149 fill=#f87171 font-size=9
+   100% level: y=190 stroke=#e5e7eb  label "100% — 1.0500"  x=395 y=188 fill=#9ca3af font-size=9
+
+4. Entry circle at 61.8%: cx=280 cy=133 r=6 fill=#fbbf24
+   Label "Entry Zone" x=250 y=128 fill=#fbbf24 font-size=9
+
+5. "GOLDEN RATIO" label: x=200 y=131 fill=#f59e0b font-size=8 font-style=italic "← Golden Ratio"
+
+Footer: "61.8% retracement is the highest-probability reversal zone — use with confluence"{simplify}"""
+
+        if any(k in tl for k in ["moving average", "ma ", "ema", "sma", "crossover", "golden cross"]):
+            return f"""Create an SVG moving average crossover diagram. Title: "{title}"
+
+EXACT ELEMENTS:
+
+1. Background + Title (standard)
+
+2. Price line (faint): points="30,170 90,155 150,158 210,135 270,140 330,115 390,118 450,95"
+   stroke=#374151 stroke-width=1.5 fill=none
+
+3. MA20 FAST (green — reacts quicker):
+   points="30,175 90,158 150,155 210,130 270,135 330,108 390,110 450,88"
+   stroke=#34d399 stroke-width=2 fill=none
+
+4. MA50 SLOW (orange — lags behind):
+   points="30,182 90,172 150,168 210,158 270,150 330,135 390,125 450,108"
+   stroke=#f59e0b stroke-width=2 fill=none
+
+5. GOLDEN CROSS (where MA20 crosses above MA50):
+   Circle cx=270 cy=143 r=8 fill=none stroke=#fbbf24 stroke-width=2
+   Label "Golden Cross" x=282 y=140 fill=#fbbf24 font-size=9 font-weight=bold
+   Arrow pointing up at cx=270 cy=130
+
+6. LEGEND (bottom-left, y=175 and y=190 — 15px apart):
+   Green line + "MA20 (Fast)" x=55 y=178 fill=#34d399 font-size=9
+   Orange line + "MA50 (Slow)" x=55 y=193 fill=#f59e0b font-size=9
+
+7. Label "BUY when MA20 crosses ABOVE MA50" x=240 y=55 text-anchor=middle fill=#34d399 font-size=9
+
+Footer: "MA20 crosses above MA50 = Golden Cross (buy signal). Below = Death Cross (sell)."{simplify}"""
+
+        # Generic indicator fallback
+        return f"""Create an SVG indicator diagram. Title: "{title}"
 
 CONTEXT: {intent}
 
 DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top
-2. Price chart (polyline) showing a clear trend
-3. Overlay the key levels this indicator produces:
-   - For Fibonacci: horizontal lines at 23.6%, 38.2%, 50%, 61.8% with labels
-   - For Moving Average: a smooth curved line over price, labeled "MA20" and "MA50"
-   - Mark where price bounces off the key level with a green circle
-4. Annotate the trading signal clearly
-5. Footer: One-line explanation of how to use this indicator{simplify}"""
+1. Title "{title}" at standard position
+2. A price panel (top 40%, y=28–105): rect fill=#111827, price polyline trending upward
+3. An indicator panel (bottom 50%, y=110–200): rect fill=#111827
+4. In the indicator panel show the key signal levels as horizontal dashed lines
+5. Show the indicator line oscillating, marking the key signal point with a yellow circle
+6. Label each level clearly on the RIGHT side (x=430+), one per line, 14px apart
+7. Add a legend at bottom showing what each line color means
+Footer: Explain in one sentence when to act on this indicator{simplify}"""
 
+    # ── PATTERNS ─────────────────────────────────────────────────────────────
     if classification == "pattern":
-        tl = title.lower()
+
+        if any(k in tl for k in ["candlestick", "candle", "doji", "hammer", "engulf", "pin bar", "inside bar"]):
+            return f"""Create an SVG candlestick anatomy diagram. Title: "{title}"
+
+EXACT COORDINATES — TWO CANDLES WELL SEPARATED, LABELS IN CENTER:
+
+LEFT CANDLE — Bullish (centered at x=115):
+  Upper wick: x1=115 y1=42 x2=115 y2=62 stroke=#34d399 stroke-width=2
+  Body rect:  x=90 y=62 width=50 height=94 fill=#0d2818 stroke=#34d399 stroke-width=2 rx=2
+  Lower wick: x1=115 y1=156 x2=115 y2=176 stroke=#34d399 stroke-width=2
+  Top label:  x=115 y=34 text-anchor=middle fill=#34d399 font-size=10 font-weight=bold "Bullish (Green)"
+
+RIGHT CANDLE — Bearish (centered at x=335):
+  Upper wick: x1=335 y1=42 x2=335 y2=62 stroke=#f87171 stroke-width=2
+  Body rect:  x=310 y=62 width=50 height=94 fill=#2a0d0d stroke=#f87171 stroke-width=2 rx=2
+  Lower wick: x1=335 y1=156 x2=335 y2=176 stroke=#f87171 stroke-width=2
+  Top label:  x=335 y=34 text-anchor=middle fill=#f87171 font-size=10 font-weight=bold "Bearish (Red)"
+
+CENTER LABELS — ALL between x=160 and x=290, stacked 28px apart:
+  "High (upper wick)"   x=225 y=50  text-anchor=middle fill=#9ca3af font-size=9
+  "Open / Close"        x=225 y=78  text-anchor=middle fill=#9ca3af font-size=9
+  "Close / Open"        x=225 y=150 text-anchor=middle fill=#9ca3af font-size=9
+  "Low (lower wick)"    x=225 y=183 text-anchor=middle fill=#9ca3af font-size=9
+
+CONNECTOR LINES (thin grey, dashed, connecting center labels to candle bodies):
+  x1=175 y1=78  x2=140 y2=78  stroke=#374151 stroke-width=1 stroke-dasharray=3  (→ green body top)
+  x1=275 y1=78  x2=310 y2=78  stroke=#374151 stroke-width=1 stroke-dasharray=3  (→ red body top)
+  x1=175 y1=150 x2=140 y2=150 stroke=#374151 stroke-width=1 stroke-dasharray=3  (→ green body bottom)
+  x1=275 y1=150 x2=310 y2=150 stroke=#374151 stroke-width=1 stroke-dasharray=3  (→ red body bottom)
+  x1=195 y1=50  x2=115 y2=50  stroke=#374151 stroke-width=1 stroke-dasharray=3  (→ top wick)
+  x1=195 y1=183 x2=115 y2=176 stroke=#374151 stroke-width=1 stroke-dasharray=3  (→ bottom wick)
+
+Footer: "Green = buyers dominated that candle | Red = sellers dominated | Body size = conviction"{simplify}"""
+
         if "head" in tl or "shoulder" in tl:
-            shape = "head_and_shoulders"
-        elif "double" in tl and "bottom" in tl:
-            shape = "double_bottom"
-        elif "double" in tl and "top" in tl:
-            shape = "double_top"
-        elif "flag" in tl or "pennant" in tl:
-            shape = "flag"
-        else:
-            shape = "generic"
+            return f"""Create an SVG Head and Shoulders pattern diagram. Title: "{title}"
 
-        shapes = {
-            "head_and_shoulders": """Draw a Head and Shoulders pattern:
-   - Left shoulder: smaller peak at left
-   - Head: taller central peak
-   - Right shoulder: smaller peak matching left
-   - Neckline: horizontal line connecting the two troughs
-   - Red downward arrow after right shoulder showing breakdown
-   - Label each part: "Left Shoulder", "Head", "Right Shoulder", "Neckline"
-   - Label "SELL SIGNAL" with red arrow pointing down after neckline break""",
-            "double_bottom": """Draw a Double Bottom (W pattern):
-   - Two equal lows connected by a peak in the middle
-   - Resistance line at the peak level (dashed)
-   - Green upward arrow after second bottom bounces
-   - Label: "Bottom 1", "Bottom 2", "Resistance", "BUY SIGNAL"
-   - Show price breaking above resistance with green arrow""",
-            "double_top": """Draw a Double Top (M pattern):
-   - Two equal highs connected by a trough in the middle  
-   - Support line at the trough level (dashed)
-   - Red downward arrow after second top rejects
-   - Label: "Top 1", "Top 2", "Support/Neckline", "SELL SIGNAL"
-   - Show price breaking below support with red arrow""",
-            "flag": """Draw a Bull Flag pattern:
-   - Strong vertical pole (sharp price surge upward)
-   - Consolidation channel sloping slightly downward (the flag)
-   - Breakout above channel with green arrow
-   - Label: "Pole", "Flag Channel", "Breakout"
-   - Show measured move target (same height as pole)""",
-            "generic": f"""Draw the chart pattern described by: "{title}"
-   - Show the recognizable shape of the pattern
-   - Label key points (peaks, troughs, necklines)
-   - Show the expected direction after pattern completes
-   - Mark entry point with yellow circle
-   - Mark target with green dashed line""",
-        }
+EXACT COORDINATES:
 
-        return f"""Create an SVG chart pattern diagram for: "{title}"
+Price polyline (the pattern shape):
+points="30,175 80,140 120,152 170,105 220,150 270,138 310,178"
+stroke=#60a5fa stroke-width=2 fill=none
 
-DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top
-2. {shapes[shape]}
-3. Entry circle (yellow) at the signal point
-4. Footer: "Wait for CONFIRMATION before entering — never trade a pattern in progress"{simplify}"""
+PEAKS AND TROUGHS — labels ABOVE peaks, BELOW troughs:
+Left shoulder peak:  cx=80  cy=140 r=5 fill=#f87171  label "L. Shoulder" x=68  y=130 fill=#f87171 font-size=9
+Left trough:         cx=120 cy=152 r=4 fill=#6b7280
+Head peak:           cx=170 cy=105 r=6 fill=#f87171  label "Head"        x=158 y=95  fill=#f87171 font-size=10 font-weight=bold
+Right trough:        cx=220 cy=150 r=4 fill=#6b7280
+Right shoulder peak: cx=270 cy=138 r=5 fill=#f87171  label "R. Shoulder" x=258 y=128 fill=#f87171 font-size=9
+Breakdown point:     cx=310 cy=178 r=5 fill=#fbbf24
 
-    if classification == "structure":
-        tl = title.lower()
-        if "order block" in tl:
-            detail = """Draw Order Block diagram:
-   - Price impulse: sharp move UP from a red bearish candle (the OB)
-   - Mark the last bearish candle before impulse with a green box labeled "Order Block"
-   - Dashed return path showing price retracing back to OB
-   - Yellow circle at OB zone labeled "Entry Zone"
-   - Green arrow from OB pointing up labeled "Expected Move"
-   - Label: "Displacement" on the impulse, "Mitigation" on the return"""
-        elif "liquidity" in tl:
-            detail = """Draw Liquidity Sweep diagram:
-   - Price approaching a cluster of equal lows (sell-side liquidity)
-   - Price dips BELOW the lows briefly (the sweep) — red wick
-   - Immediate rejection and recovery above the lows
-   - Mark the sweep zone with red shading labeled "Liquidity Swept"
-   - Green circle at recovery point labeled "Entry After Sweep"
-   - Show stops being triggered below with small "X" marks
-   - Green arrow showing the continuation move after sweep"""
-        elif "bos" in tl or "choch" in tl or "structure" in tl:
-            detail = """Draw Market Structure diagram:
-   - Uptrend with labeled Higher Highs (HH) and Higher Lows (HL)
-   - Mark each HH with green circle labeled "HH"
-   - Mark each HL with yellow circle labeled "HL"  
-   - Show a Break of Structure (BOS): price exceeds previous HH
-   - Mark BOS point with purple line and "BOS" label
-   - Show potential entry at next HL after BOS"""
-        else:
-            detail = """Draw Support and Resistance diagram:
-   - Price oscillating between two horizontal levels
-   - Red dashed line at top labeled "Resistance — sellers dominate"
-   - Green dashed line at bottom labeled "Support — buyers dominate"
-   - Show price bouncing off support (green arrows up)
-   - Show price rejecting resistance (red arrows down)
-   - Mark entry at support bounce with yellow circle"""
+NECKLINE: x1=120 y1=152 x2=380 y2=155 stroke=#a78bfa stroke-width=1.5 stroke-dasharray=4
+Label "Neckline" x=385 y=153 fill=#a78bfa font-size=9
 
-        return f"""Create an SVG market structure diagram for: "{title}"
+BREAKDOWN ARROW (red, pointing down): at x=310 from y=178 to y=200
+Sell label: x=320 y=195 fill=#f87171 font-size=9 font-weight=bold "SELL SIGNAL"
+
+Footer: "Neckline break = entry signal. Stop above right shoulder. Target = head height below neckline."{simplify}"""
+
+        if "double" in tl and "bottom" in tl:
+            return f"""Create an SVG Double Bottom (W pattern) diagram. Title: "{title}"
+
+EXACT COORDINATES:
+
+Price polyline:
+points="30,80 80,150 130,100 180,150 230,75 310,60 400,45"
+stroke=#60a5fa stroke-width=2 fill=none
+
+LABELS — alternating above/below with 14px minimum gap:
+Bottom 1: cx=80  cy=150 r=6 fill=#fbbf24  label "Bottom 1" x=55  y=168 fill=#fbbf24 font-size=9
+Peak:     cx=130 cy=100 r=4 fill=#9ca3af
+Bottom 2: cx=180 cy=150 r=6 fill=#fbbf24  label "Bottom 2" x=155 y=168 fill=#fbbf24 font-size=9
+Breakout: cx=230 cy=75  r=6 fill=#34d399  label "Breakout" x=238 y=68  fill=#34d399 font-size=9 font-weight=bold
+
+RESISTANCE LINE: x1=30 y1=100 x2=450 y2=100 stroke=#f87171 stroke-width=1.5 stroke-dasharray=4
+Label "Resistance" x=455 y=98 text-anchor=end fill=#f87171 font-size=9
+
+BUY ARROW (green, pointing up): at x=230 from y=75 up to y=50
+Label "BUY SIGNAL" x=240 y=48 fill=#34d399 font-size=9 font-weight=bold
+
+MEASURED MOVE TARGET:
+Target line: x1=230 y1=50 x2=450 y2=50 stroke=#34d399 stroke-width=1 stroke-dasharray=2
+Label "Target" x=455 y=48 text-anchor=end fill=#34d399 font-size=9
+
+Footer: "Two equal lows = strong support. Break above resistance = buy signal."{simplify}"""
+
+        if "double" in tl and "top" in tl:
+            return f"""Create an SVG Double Top (M pattern) diagram. Title: "{title}"
+
+EXACT COORDINATES:
+
+Price polyline:
+points="30,150 80,80 130,130 180,80 230,155 310,170 400,185"
+stroke=#60a5fa stroke-width=2 fill=none
+
+Top 1: cx=80  cy=80  r=6 fill=#fbbf24  label "Top 1"   x=68  y=70  fill=#fbbf24 font-size=9
+Trough: cx=130 cy=130 r=4 fill=#9ca3af
+Top 2: cx=180 cy=80  r=6 fill=#fbbf24  label "Top 2"   x=168 y=70  fill=#fbbf24 font-size=9
+Breakdown: cx=230 cy=155 r=6 fill=#f87171 label "Breakdown" x=238 y=165 fill=#f87171 font-size=9
+
+SUPPORT LINE: x1=30 y1=130 x2=450 y2=130 stroke=#34d399 stroke-width=1.5 stroke-dasharray=4
+Label "Neckline Support" x=455 y=128 text-anchor=end fill=#34d399 font-size=9
+
+SELL ARROW (red, pointing down): at x=230 from y=155 down to y=185
+Label "SELL SIGNAL" x=240 y=200 fill=#f87171 font-size=9 font-weight=bold
+
+Footer: "Two equal highs = strong resistance. Break below neckline = sell signal."{simplify}"""
+
+        if "flag" in tl or "pennant" in tl:
+            return f"""Create an SVG Bull Flag pattern diagram. Title: "{title}"
+
+EXACT COORDINATES:
+
+POLE (strong vertical surge): x1=80 y1=180 x2=80 y2=65 stroke=#34d399 stroke-width=3
+Label "Pole" x=88 y=130 fill=#34d399 font-size=9
+
+FLAG (parallel channel sloping down):
+Upper channel: points="80,65 160,75 200,82" stroke=#60a5fa stroke-width=1.5 fill=none stroke-dasharray=3
+Lower channel: points="80,90 160,100 200,107" stroke=#60a5fa stroke-width=1.5 fill=none stroke-dasharray=3
+Fill between: polygon points="80,65 160,75 200,82 200,107 160,100 80,90" fill=#60a5fa fill-opacity=0.08
+
+BREAKOUT ARROW (green, strong): from x=200,y=82 pointing up-right to x=280,y=45
+polyline points="200,82 280,45" stroke=#34d399 stroke-width=2.5
+Arrow head at (280,45) pointing up-right
+
+MEASURED MOVE TARGET:
+Height of pole = 115px. Target is same distance above breakout.
+Target line: x1=200 y1=45 x2=420 y2=45 stroke=#34d399 stroke-width=1 stroke-dasharray=3
+Label "Target (equal to pole)" x=405 y=40 fill=#34d399 font-size=9
+
+Labels:
+"Flag Channel" x=150 y=118 text-anchor=middle fill=#60a5fa font-size=9
+"Breakout" x=240 y=72 fill=#34d399 font-size=9 font-weight=bold
+
+Footer: "Pole = impulse move. Flag = consolidation. Breakout = entry. Target = pole height."{simplify}"""
+
+        # Generic pattern fallback
+        return f"""Create an SVG chart pattern diagram. Title: "{title}"
 
 CONTEXT: {intent}
 
 DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top
-2. {detail}
-3. Footer: One sentence explaining when to trade this structure{simplify}"""
+1. Title "{title}" at standard position
+2. A price polyline showing the pattern shape clearly — peaks and troughs clearly visible
+3. Label EACH key point (peaks, troughs, necklines) with text ABOVE or BELOW the point
+   — labels above peaks, labels below troughs, minimum 16px vertical gap between any two labels
+4. A horizontal dashed line at the key breakout/breakdown level labeled "Breakout Level"
+5. Entry circle (yellow, r=6) at the signal point with label "Entry" offset right by 12px
+6. Green or red arrow showing expected direction after pattern completes
+7. "Target" dashed line showing the measured move objective
+Footer: "Wait for CONFIRMATION (breakout candle close) before entering"{simplify}"""
 
-    # Default: concept diagram
+    # ── MARKET STRUCTURE ─────────────────────────────────────────────────────
+    if classification == "structure":
+
+        if "order block" in tl:
+            return f"""Create an SVG Order Block diagram. Title: "{title}"
+
+EXACT COORDINATES:
+
+1. Background + Title (standard)
+
+2. ORDER BLOCK CANDLE (the last bearish candle before the impulse):
+   rect x=60 y=118 width=28 height=42 fill=#2a0d0d stroke=#f87171 stroke-width=1.5 rx=2
+   Label "Order Block" x=74 y=172 text-anchor=middle fill=#f87171 font-size=9
+
+3. DISPLACEMENT (strong bullish impulse up from OB):
+   polyline points="88,135 140,100 190,70 240,50"
+   stroke=#34d399 stroke-width=3 fill=none
+   Label "Displacement" x=170 y=65 text-anchor=middle fill=#34d399 font-size=9
+
+4. RETURN TO OB (price retraces back — dashed blue):
+   polyline points="240,50 290,75 330,100 360,118"
+   stroke=#60a5fa stroke-width=1.5 fill=none stroke-dasharray=5
+   Label "Return to OB" x=330 y=90 fill=#60a5fa font-size=9
+
+5. ENTRY ZONE AT OB:
+   rect x=345 y=115 width=50 height=42 fill=#34d399 fill-opacity=0.15 stroke=#34d399 stroke-width=1 stroke-dasharray=3 rx=2
+   Circle cx=370 cy=136 r=6 fill=#fbbf24
+   Label "Entry" x=400 y=134 fill=#fbbf24 font-size=9 font-weight=bold
+
+6. EXPECTED MOVE UP (green arrow):
+   polyline points="370,130 400,100 430,75"
+   stroke=#34d399 stroke-width=2 fill=none
+   Arrowhead at (430,75)
+
+Footer: "Last bearish candle before impulse = Order Block. Enter when price returns. Stop below OB."{simplify}"""
+
+        if "liquidity" in tl:
+            return f"""Create an SVG Liquidity Sweep diagram. Title: "{title}"
+
+EXACT COORDINATES:
+
+1. Background + Title (standard)
+
+2. EQUAL LOWS (sell-side liquidity pool):
+   Three equal-height candle wicks touching y=160:
+   x1=80  y1=140 x2=80  y2=162 stroke=#6b7280 stroke-width=2
+   x1=130 y1=138 x2=130 y2=162 stroke=#6b7280 stroke-width=2
+   x1=180 y1=135 x2=180 y2=162 stroke=#6b7280 stroke-width=2
+   Equal lows line: x1=60 y1=162 x2=450 y2=162 stroke=#f87171 stroke-width=1 stroke-dasharray=4
+   Label "Sell-Side Liquidity" x=240 y=158 text-anchor=middle fill=#f87171 font-size=9
+
+3. LIQUIDITY SWEEP (price dips BELOW the equal lows briefly):
+   polyline points="180,135 220,155 240,172 260,155 290,125"
+   stroke=#f87171 stroke-width=2.5 fill=none
+   Red shaded spike zone: rect x=225 y=160 width=40 height=18 fill=#f87171 fill-opacity=0.2 rx=2
+   Label "Swept!" x=245 y=193 text-anchor=middle fill=#f87171 font-size=9 font-weight=bold
+
+4. REJECTION AND RECOVERY:
+   polyline points="290,125 330,105 370,80 420,60"
+   stroke=#34d399 stroke-width=2.5 fill=none
+   Circle cx=290 cy=125 r=7 fill=none stroke=#34d399 stroke-width=2
+   Label "Entry After Sweep" x=298 y=120 fill=#34d399 font-size=9
+
+5. STOP LOSS MARKERS below sweep:
+   "×" markers: x=235 y=185, x=248 y=185, x=260 y=185 fill=#f87171 font-size=10
+
+Footer: "Price sweeps stop-losses below lows, then reverses. Enter AFTER the wick recovers above."{simplify}"""
+
+        if any(k in tl for k in ["bos", "choch", "break of structure", "change of character", "market structure"]):
+            return f"""Create an SVG Market Structure (BOS/CHoCH) diagram. Title: "{title}"
+
+EXACT COORDINATES — LABELS ALTERNATE ABOVE/BELOW TO PREVENT OVERLAP:
+
+Price polyline (uptrend with BOS):
+points="25,190 70,165 100,175 145,140 178,153 218,118 252,132 292,98 315,112 340,88 380,100 420,72"
+stroke=#60a5fa stroke-width=2 fill=none
+
+SWING POINTS (circles r=5, labels STRICTLY alternating ABOVE peaks, BELOW troughs):
+HL1: cx=70  cy=165 r=5 fill=#fbbf24  label x=58  y=180 fill=#fbbf24 font-size=9 "HL"   ← BELOW
+HH1: cx=145 cy=140 r=5 fill=#34d399  label x=133 y=130 fill=#34d399 font-size=9 "HH"   ← ABOVE
+HL2: cx=178 cy=153 r=5 fill=#fbbf24  label x=166 y=168 fill=#fbbf24 font-size=9 "HL"   ← BELOW
+HH2: cx=218 cy=118 r=5 fill=#34d399  label x=206 y=108 fill=#34d399 font-size=9 "HH"   ← ABOVE
+HL3: cx=252 cy=132 r=5 fill=#fbbf24  label x=240 y=147 fill=#fbbf24 font-size=9 "HL"   ← BELOW
+BOS: cx=292 cy=98  r=6 fill=#a78bfa  label x=298 y=92  fill=#a78bfa font-size=9 font-weight=bold "BOS ↑"  ← ABOVE-RIGHT
+HL4: cx=315 cy=112 r=5 fill=#fbbf24  label x=303 y=127 fill=#fbbf24 font-size=9 "HL"   ← BELOW
+Entry: cx=340 cy=112 r=6 fill=#fbbf24
+
+BOS REFERENCE LINE (where HH2 was broken):
+x1=218 y1=118 x2=460 y2=118 stroke=#a78bfa stroke-width=1 stroke-dasharray=4
+Label "Previous HH" x=455 y=114 text-anchor=end fill=#a78bfa font-size=8
+
+ENTRY LABEL: x=350 y=110 fill=#fbbf24 font-size=9 "Entry"
+
+SMALL LEGEND (y=175 and y=190 — 15px apart, left side x=25):
+Green dot cx=32 cy=172 r=4 fill=#34d399  "= HH (Higher High)" x=40 y=175 fill=#9ca3af font-size=8
+Yellow dot cx=32 cy=187 r=4 fill=#fbbf24 "= HL (Higher Low)"  x=40 y=190 fill=#9ca3af font-size=8
+
+Footer: "BOS = trend continuation confirmed. Enter at next HL after BOS."{simplify}"""
+
+        # Generic structure (support/resistance)
+        return f"""Create an SVG support and resistance diagram. Title: "{title}"
+
+EXACT COORDINATES:
+
+1. Background + Title (standard)
+
+2. Price polyline oscillating between two levels:
+   points="25,155 70,128 100,160 140,118 175,155 215,115 255,152 295,112 335,150 375,108 420,148 455,105"
+   stroke=#60a5fa stroke-width=2 fill=none
+
+3. RESISTANCE LINE: x1=25 y1=112 x2=460 y2=112 stroke=#f87171 stroke-width=2 stroke-dasharray=6
+   Label "RESISTANCE" x=30 y=106 fill=#f87171 font-size=10 font-weight=bold
+
+4. SUPPORT LINE: x1=25 y1=158 x2=460 y2=158 stroke=#34d399 stroke-width=2 stroke-dasharray=6
+   Label "SUPPORT" x=30 y=176 fill=#34d399 font-size=10 font-weight=bold
+
+5. REJECTION ARROWS at resistance (red, pointing down): at x=140, x=215, x=295
+   Each: x1=xpos y1=112 x2=xpos y2=100 stroke=#f87171 stroke-width=1.5 — arrowhead at top
+
+6. BOUNCE ARROWS at support (green, pointing up): at x=100, x=175, x=255
+   Each: x1=xpos y1=158 x2=xpos y2=146 stroke=#34d399 stroke-width=1.5 — arrowhead at top
+
+7. Entry circle: cx=420 cy=148 r=6 fill=#fbbf24
+   Label "Buy here" x=430 y=146 fill=#fbbf24 font-size=9
+
+Footer: "Support = buy zone. Resistance = sell zone. Role reversal: broken support becomes resistance."{simplify}"""
+
+    # ── CONCEPT (default) ────────────────────────────────────────────────────
     return f"""Create an SVG educational diagram for the forex concept: "{title}"
 
 CONTEXT: {intent}
 
-DRAW THIS EXACTLY:
-1. Title: "{title}" in purple at top  
-2. A clear, minimal visual that illustrates the CORE concept:
-   - Use boxes, arrows, and labels to show relationships
-   - If it's a calculation: show the formula in a highlighted box with an example
-   - If it's a comparison: use side-by-side labeled sections
-   - If it's a process: use a simple flowchart with numbered steps
-   - If it's a market concept: show a simple annotated price example
-3. Use green for positive/bullish outcomes, red for negative/bearish
-4. Keep it simple — 5 to 8 elements maximum
-5. Footer: One-sentence key takeaway{simplify}"""
+INSTRUCTIONS:
+1. Title "{title}" at standard position (x=240 y=16 purple)
+2. Choose the MOST APPROPRIATE visual for this concept:
+   - CALCULATION/FORMULA → purple highlighted box at y=38-78 with formula text, worked example box below
+   - COMPARISON → two or three side-by-side columns with colored headers and bullet points
+   - PROCESS/STEPS → numbered flow boxes connected by arrows (top to bottom or left to right)
+   - MARKET CONCEPT → simple annotated price chart with entry/exit markers
+3. SPACING RULES — strictly enforced:
+   - All text labels minimum 14px apart vertically
+   - No text outside x=20 to x=460 boundary
+   - All text inside y=22 to y=208 boundary
+4. Use green (#34d399) for positive outcomes, red (#f87171) for negative, yellow (#fbbf24) for highlights
+5. Maximum 15 elements total (not counting background)
+6. Footer: one sentence key takeaway for this specific concept{simplify}"""
 
 
 # ── 4. MASTER SYSTEM PROMPT ───────────────────────────────────────────────────

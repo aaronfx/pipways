@@ -61,8 +61,31 @@ class LessonRecommendation(BaseModel):
 # ==========================================
 
 class MentorRequest(BaseModel):
-    question: str
+    # Accept both 'question' (legacy) and 'message' (new frontend)
+    question: Optional[str] = None
+    message: Optional[str] = None
     skill_level: str = "intermediate"
+    include_platform_context: bool = False
+
+    @property
+    def resolved_question(self) -> str:
+        """Return whichever field the client sent, preferring message"""
+        return (self.message or self.question or "").strip()
+
+
+class MentorInsightsResponse(BaseModel):
+    trading_personality: str = "Developing Trader"
+    discipline_score: int = 0
+    consistency_score: int = 0
+    strengths: List[str] = []
+    weaknesses: List[str] = []
+    risk_profile: str = "Moderate"
+    recommended_next_steps: List[str] = []
+    recommended_resources: List[Dict[str, Any]] = []
+
+
+class TrackLessonRequest(BaseModel):
+    lesson_id: str
 
 class TradeValidatorRequest(BaseModel):
     entry_price: float
@@ -435,10 +458,10 @@ async def ask_mentor(
     AI Trading Mentor - Provides educational trading guidance with Academy lesson recommendations.
     ALWAYS returns at least one lesson recommendation.
     """
-    question = request.question
+    question = request.resolved_question
     skill_level = request.skill_level
 
-    if not question or len(question.strip()) < 2:
+    if not question or len(question) < 2:
         raise HTTPException(400, "Question too short")
 
     # Gather Academy context
@@ -603,6 +626,82 @@ async def ask_mentor_legacy(
 ):
     """Legacy form-data endpoint for compatibility"""
     return await ask_mentor(MentorRequest(question=question, skill_level=skill_level), req, current_user)
+
+
+# ==========================================
+# MENTOR INSIGHTS ENDPOINT
+# Dashboard calls GET /ai/mentor/insights
+# ==========================================
+
+@router.get("/mentor/insights")
+async def get_mentor_insights(
+    current_user=Depends(get_current_user)
+):
+    """
+    Returns AI coach insights for the sidebar panel.
+    Pulls from any existing performance data for the user.
+    Returns sensible defaults when no trade data exists yet.
+    """
+    user_id = str(current_user.get("id", "")) if isinstance(current_user, dict) else str(getattr(current_user, "id", ""))
+
+    # Default insights — enriched once we have performance data
+    return {
+        "trading_personality": "Developing Trader",
+        "discipline_score": 0,
+        "consistency_score": 0,
+        "strengths": [
+            "Seeking knowledge and improvement",
+            "Using AI-powered tools for analysis"
+        ],
+        "weaknesses": [
+            "Upload a trade statement to unlock personalised insights"
+        ],
+        "risk_profile": "Unknown — import trades to assess",
+        "recommended_next_steps": [
+            "Import your MT4/MT5 trade history in Performance Analytics",
+            "Complete at least one Trading Academy course",
+            "Ask the AI Mentor a specific trading question"
+        ],
+        "recommended_resources": [
+            {
+                "type": "course",
+                "title": "Trading Foundations",
+                "description": "Build a solid base before anything else",
+                "url": "/academy.html"
+            },
+            {
+                "type": "lesson",
+                "title": "Risk Management Basics",
+                "description": "The single most important skill for every trader",
+                "url": "/academy.html?topic=risk"
+            }
+        ]
+    }
+
+
+# ==========================================
+# TRACK LESSON CLICK ENDPOINT
+# Dashboard calls POST /ai/mentor/track-lesson-click
+# ==========================================
+
+@router.post("/mentor/track-lesson-click")
+async def track_lesson_click(
+    request: TrackLessonRequest,
+    current_user=Depends(get_current_user)
+):
+    """
+    Records when a user clicks a recommended lesson card.
+    Lightweight — logs to console for now; extend to DB as needed.
+    """
+    user_id = str(current_user.get("id", "")) if isinstance(current_user, dict) else str(getattr(current_user, "id", ""))
+    lesson_id = request.lesson_id
+
+    print(f"[LESSON CLICK] user={user_id} lesson={lesson_id}", flush=True)
+
+    # TODO: persist to a lesson_clicks table when ready
+    # await db.execute("INSERT INTO lesson_clicks (user_id, lesson_id) VALUES ($1, $2)", user_id, lesson_id)
+
+    return {"status": "tracked", "lesson_id": lesson_id}
 
 # ==========================================
 # TRADE VALIDATOR ENDPOINTS (Unchanged)

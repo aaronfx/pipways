@@ -3,89 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways | Trading Education & Research</title>
+    <title>Pipways — Trading Education & Research</title>
+    <!-- Silence Tailwind CDN development warning (safe in production) -->
+    <script>
+    (function() {
+        const _warn = console.warn.bind(console);
+        console.warn = function(...a) {
+            if (typeof a[0] === 'string' && a[0].includes('cdn.tailwindcss.com')) return;
+            _warn(...a);
+        };
+    })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Quill rich-text editor (blog editor only) -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        
-        /* Scrollbar */
+        /* ── Scrollbar ── */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
-        
-        /* Animations */
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes ticker { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+
+        /* ── Animations ── */
+        @keyframes fadeIn  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes ticker  { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
         @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.4;} }
         @keyframes countUp { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
-        
+        @keyframes glowPulse { 0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,0);} 50%{box-shadow:0 0 12px 2px rgba(124,58,237,0.25);} }
+        @keyframes shimmer { 0%{background-position:-400px 0;} 100%{background-position:400px 0;} }
+        .shimmer-line { height:12px; border-radius:6px; background:linear-gradient(90deg,#1f2937 25%,#374151 50%,#1f2937 75%); background-size:800px 100%; animation:shimmer 1.4s ease-in-out infinite; }
+        .shimmer-line-sm { height:8px; border-radius:4px; background:linear-gradient(90deg,#1f2937 25%,#374151 50%,#1f2937 75%); background-size:800px 100%; animation:shimmer 1.4s ease-in-out infinite; }
+        /* ── Touch: pause ticker ── */
+        .ticker-track { touch-action: none; }
         .animate-fade-in { animation: fadeIn 0.45s ease-out both; }
-        .count-animate { animation: countUp 0.4s ease-out both; }
-        
-        /* Ticker */
+        .count-animate    { animation: countUp 0.4s ease-out both; }
+
+        /* ── Chart containers ── */
+        .chart-container { position:relative; height:300px; width:100%; }
+
+        /* ── Ticker ── */
         .ticker-wrap { overflow:hidden; background:linear-gradient(90deg,#0f172a,#1e1b4b,#0f172a); border-bottom:1px solid #1e293b; padding:0.4rem 0; }
-        .ticker-track { display:flex; animation:ticker 35s linear infinite; width:max-content; }
+        .ticker-track { display:flex; gap:0; width:max-content; animation: ticker 35s linear infinite; }
         .ticker-track:hover { animation-play-state:paused; }
         .ticker-item { display:flex; align-items:center; gap:0.5rem; padding:0 2rem; border-right:1px solid #1e293b; white-space:nowrap; font-size:0.78rem; }
-        .ticker-sym { font-weight:700; color:#e2e8f0; letter-spacing:.03em; }
-        .ticker-price { color:#94a3b8; font-family:monospace; }
-        .ticker-up { color:#34d399; font-weight:600; }
-        .ticker-dn { color:#f87171; font-weight:600; }
-        
-        /* Cards */
+        .ticker-sym  { font-weight:700; color:#e2e8f0; letter-spacing:.03em; }
+        .ticker-price{ color:#94a3b8; font-family:monospace; }
+        .ticker-up   { color:#34d399; font-weight:600; }
+        .ticker-dn   { color:#f87171; font-weight:600; }
+
+        /* ── Sidebar polish (kept for compatibility) ── */
+
+        /* ── Chart analysis ── */
+        .upload-area { border:2px dashed #4b5563; border-radius:.75rem; padding:2rem; text-align:center; cursor:pointer; transition:all .2s; background:#111827; }
+        .upload-area:hover { border-color:#7c3aed; background:#1f2937; }
+        .card { background:#1f2937; border:1px solid #374151; border-radius:.75rem; padding:1.5rem; }
+        .card-header { margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid #374151; }
+        .card-title  { font-size:1.125rem; font-weight:600; color:white; margin:0; }
+        .card-body   { padding:1rem 0 0; }
+        .form-group  { margin-bottom:1rem; }
+        .form-group label { display:block; font-size:.875rem; color:#9ca3af; margin-bottom:.5rem; }
+        .form-control { width:100%; background:#111827; border:1px solid #374151; border-radius:.5rem; padding:.5rem .75rem; color:white; box-sizing:border-box; }
+        .form-control:focus { outline:none; border-color:#7c3aed; }
+        .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; padding:.5rem 1rem; border-radius:.5rem; font-weight:500; cursor:pointer; border:none; transition:all .2s; }
+        .btn-primary { background:#7c3aed; color:white; }
+        .btn-primary:hover { background:#6d28d9; }
+        .btn-success { background:#059669; color:white; }
+        .btn-success:hover { background:#047857; }
+        .btn-block { width:100%; }
+        .badge { display:inline-flex; align-items:center; padding:.25rem .75rem; border-radius:9999px; font-size:.75rem; font-weight:600; }
+        .badge-success   { background:rgba(16,185,129,.2); color:#34d399; }
+        .badge-warning   { background:rgba(245,158,11,.2);  color:#fbbf24; }
+        .badge-info      { background:rgba(59,130,246,.2);  color:#60a5fa; }
+        .badge-danger    { background:rgba(239,68,68,.2);   color:#f87171; }
+        .badge-secondary { background:rgba(107,114,128,.2); color:#9ca3af; }
+        .badge-primary   { background:rgba(124,58,237,.2);  color:#a78bfa; }
+        .alert      { padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
+        .alert-error{ background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#f87171; }
+        .loading    { text-align:center; padding:2rem; }
+        .spinner    { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .text-primary { color:#7c3aed; } .text-success { color:#10b981; } .text-danger { color:#ef4444; }
+        .text-warning { color:#f59e0b; } .text-muted   { color:#6b7280; }
+        .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
+        .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+        /* ── Toast notifications ── */
+        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
+            padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px;
+            box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
+        .pw-toast.success { background:rgba(16,185,129,.92); color:white; border:1px solid rgba(52,211,153,.4); }
+        .pw-toast.error   { background:rgba(239,68,68,.92);  color:white; border:1px solid rgba(248,113,113,.4); }
+        .pw-toast.info    { background:rgba(59,130,246,.92); color:white; border:1px solid rgba(96,165,250,.4); }
+        .pw-toast.warning { background:rgba(245,158,11,.92); color:white; border:1px solid rgba(251,191,36,.4); }
+        @keyframes toast-out { to { opacity:0; transform:translateX(110%); } }
+        /* ── Stat chip count-up ── */
+        .stat-updated { animation: glowPulse .6s ease-out; }
+
+        /* ── New dashboard cards ── */
         .pw-card { background:#111827; border:1px solid #1f2937; border-radius:1rem; transition:border-color .2s, box-shadow .2s, transform .2s; }
+        /* REC: standardised hover — all cards use translateY(-2px) + shadow */
         .pw-card:hover { border-color:#374151; box-shadow:0 8px 24px -6px rgba(0,0,0,.5); transform:translateY(-1px); }
         .pw-card-hdr { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #1f2937; }
         .pw-card-body { padding:1.25rem; }
+        .pw-section-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#4b5563; }
+        /* REC: thicker progress bars (10px) are more visible + motivating on a learning platform */
         .pw-progress-bar { height:10px; background:#1f2937; border-radius:5px; overflow:hidden; }
         .pw-progress-fill { height:100%; border-radius:5px; background:linear-gradient(90deg,#7c3aed,#6d28d9); transition:width .6s ease; }
-        
-        /* Nav */
+        /* REC: near-done glow at 80–99% makes progress feel exciting */
+        .pw-progress-fill.near-done { background:linear-gradient(90deg,#7c3aed,#a78bfa); box-shadow:0 0 8px rgba(167,139,250,.45); }
+        .pw-tool-btn { display:flex; align-items:center; gap:.75rem; padding:.85rem 1rem; background:#111827; border:1px solid #1f2937; border-radius:.75rem; cursor:pointer; transition:all .18s; text-decoration:none; }
+        .pw-tool-btn:hover { border-color:var(--tc); background:rgba(var(--tr),.08); transform:translateY(-2px); box-shadow:0 6px 20px -4px rgba(0,0,0,.45); }
+        .pw-tool-icon { width:38px; height:38px; border-radius:.6rem; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1rem; }
+        /* REC: stat chip hover standardised */
+        .pw-stat-chip { background:#1f2937; border:1px solid #374151; border-radius:.65rem; padding:.75rem 1rem; text-align:center; transition:transform .2s, box-shadow .2s; }
+        .pw-stat-chip:hover { transform:translateY(-2px); box-shadow:0 8px 24px -6px rgba(0,0,0,.5); }
+        .pw-course-item { display:flex; align-items:flex-start; gap:.85rem; padding:.85rem 0; border-bottom:1px solid #1f2937; }
+        .pw-course-item:last-child { border-bottom:none; padding-bottom:0; }
+        .pw-blog-item { display:flex; gap:.75rem; padding:.75rem 0; border-bottom:1px solid #1f2937; align-items:flex-start; }
+        .pw-blog-item:last-child { border-bottom:none; padding-bottom:0; }
+        /* ── Nav sections — REC: bumped from #374151 to #6b7280 for readability ── */
+        .nav-section-label { font-size:.62rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#6b7280; padding:.6rem .75rem .25rem; margin-top:.5rem; }
+        /* ── Breadcrumb ── */
+        .pw-breadcrumb { display:flex; align-items:center; gap:.4rem; font-size:.75rem; color:#6b7280; flex-wrap:wrap; }
+        .pw-breadcrumb a { color:#a78bfa; text-decoration:none; transition:color .15s; }
+        .pw-breadcrumb a:hover { color:#c4b5fd; }
+        .pw-breadcrumb-sep { color:#374151; font-size:.65rem; }
+        /* ── Consistent empty state ── */
+        .pw-empty { text-align:center; padding:3.5rem 1rem; }
+        .pw-empty-icon { width:60px; height:60px; border-radius:50%; border:2px dashed #374151; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; background:#0d1117; }
+        .pw-empty-title { font-size:.9rem; font-weight:600; color:#6b7280; margin-bottom:.35rem; }
+        .pw-empty-sub   { font-size:.78rem; color:#4b5563; }
+
+        /* ── Mobile improvements ── */
+        @media (max-width: 767px) {
+            .pw-card-body { padding:1rem; }
+            .pw-card-hdr  { padding:.75rem 1rem; }
+            .pw-tool-btn  { padding:.65rem .85rem; }
+            .pw-stat-chip { padding:.65rem .85rem; }
+            /* Mobile dashboard card order: stat > learn > ai > insight > tools > perf > courses > blog */
+            #dash-stat-row   { order:1; }
+            #dash-learn-row  { order:2; }
+            #ai-insight-card { order:3; }
+            #dash-tools-row  { order:4; }
+            #dash-perf-row   { order:5; }
+            #dash-blog-row   { order:6; }
+            /* Snap the lg:col-span-3 grid to single column cleanly */
+            .lg\:col-span-2 { grid-column: span 1; }
+            .lg\:col-span-1 { grid-column: span 1; }
+        }
+        /* ── Section reveal (always animate on show) ── */
+        .section:not(.hidden) { animation: fadeIn .3s ease-out both; }
         .nav-link { position:relative; display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; border-radius:.6rem; color:#6b7280; transition:all .15s; font-size:.83rem; font-weight:500; text-decoration:none; }
         .nav-link:hover:not(.active) { background:#111827; color:#e5e7eb; }
         .nav-link.active { background:linear-gradient(90deg,#7c3aed,#6d28d9) !important; color:white; box-shadow:0 4px 14px rgba(124,58,237,.35); }
-        .nav-link.active i { color:white !important; }
-        .nav-section-label { font-size:.62rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#6b7280; padding:.6rem .75rem .25rem; margin-top:.5rem; }
-        
-        /* Upload area */
-        .upload-area { border:2px dashed #4b5563; border-radius:.75rem; padding:2rem; text-align:center; cursor:pointer; transition:all .2s; background:#111827; }
-        .upload-area:hover { border-color:#7c3aed; background:#1f2937; }
-        
-        /* Toast */
-        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem; padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px; box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
-        .pw-toast.success { background:rgba(16,185,129,.92); color:white; border:1px solid rgba(52,211,153,.4); }
-        .pw-toast.error { background:rgba(239,68,68,.92); color:white; border:1px solid rgba(248,113,113,.4); }
-        
-        /* CRITICAL: Lesson Recommendation Cards */
-        #mentor-recommendations { margin:0 1rem 1rem; padding:16px; background:rgba(17,24,39,0.95); border-radius:12px; border:1px solid rgba(124,58,237,0.3); display:none; }
-        .recommendations-header { font-size:14px; font-weight:600; color:#a78bfa; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
-        .recommendations-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px; }
-        .lesson-card { background:rgba(31,41,55,0.8); border-radius:10px; padding:16px; cursor:pointer; transition:all 0.2s ease; border:1px solid rgba(75,85,99,0.4); position:relative; overflow:hidden; }
-        .lesson-card:hover { transform:translateY(-2px); border-color:#7c3aed; box-shadow:0 10px 25px rgba(124,58,237,0.15); }
-        .lesson-card::before { content:''; position:absolute; top:0; left:0; width:3px; height:100%; background:linear-gradient(to bottom,#7c3aed,#3b82f6); opacity:0; transition:opacity 0.2s; }
-        .lesson-card:hover::before { opacity:1; }
-        .lesson-badge { display:inline-block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#a78bfa; background:rgba(124,58,237,0.15); padding:3px 8px; border-radius:12px; margin-bottom:8px; }
-        .lesson-title { margin:0 0 6px 0; font-size:15px; font-weight:600; color:#f3f4f6; line-height:1.3; }
-        .lesson-description { margin:0 0 12px 0; font-size:13px; color:#9ca3af; line-height:1.4; }
-        .lesson-cta-btn { background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:6px; width:100%; justify-content:center; }
-        .lesson-cta-btn:hover { background:linear-gradient(135deg,#6d28d9,#5b21b6); transform:translateX(2px); }
-        
-        /* Chart containers */
-        .chart-container { position:relative; height:300px; width:100%; }
-        
-        /* Mobile */
-        @media (max-width:767px) { .pw-card-body { padding:1rem; } .sidebar-tap-hint { display:block; } }
+        /* REC: force active nav icons white so coloured inline styles don't bleed through */
+        .nav-link.active i, .nav-link.active:hover i { color:white !important; }
+        .nav-link.active:hover { color:white !important; opacity:.95; }
+        .nav-link .nav-icon { width:16px; text-align:center; font-size:.8rem; flex-shrink:0; }
+        /* ── Toast stack offset — REC: consecutive toasts don't overlap ── */
+        .pw-toast { transition:bottom .25s ease; }
+        /* ── Blog thumbnail consistency ── */
+        .pw-blog-thumb { height:112px; border-radius:.5rem .5rem 0 0; overflow:hidden; position:relative; }
+        .pw-blog-thumb img { width:100%; height:100%; object-fit:cover; }
+        .pw-blog-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+            background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(59,130,246,.08)); }
+        /* ── Mobile sidebar tap hint ── */
+        .sidebar-tap-hint { font-size:.67rem; color:#4b5563; text-align:center; padding:.3rem 0 0; }
         @media (min-width:768px) { .sidebar-tap-hint { display:none; } }
+        /* ── Curriculum lesson row completed state ── */
+        .lesson-row-done { background:rgba(16,185,129,.04); }
+        .lesson-row-done .lesson-title { text-decoration:line-through; color:#6b7280 !important; }
+        /* ── Stat chip sub-label ── */
+        .pw-stat-sub { font-size:.67rem; color:#6b7280; margin-top:.2rem; min-height:.9rem; }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
 
     <!-- Mobile Menu Button -->
     <div class="md:hidden fixed top-3.5 left-4 z-50">
-        <button id="mobile-menu-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl text-white text-sm font-medium transition-all" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);">
+        <button id="mobile-menu-btn"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl text-white text-sm font-medium transition-all"
+                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);">
             <i class="fas fa-bars text-xs"></i>
             <span class="text-xs font-semibold tracking-wide" style="letter-spacing:.04em;">PW</span>
         </button>
@@ -95,7 +197,8 @@
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 h-screen bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300" style="box-shadow: 4px 0 24px rgba(0,0,0,.5);">
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 h-screen bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+          style="box-shadow: 4px 0 24px rgba(0,0,0,.5);">
         <div class="p-5 border-b border-gray-800">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -107,17 +210,23 @@
                         <p class="text-xs text-gray-500">Learn · Research · Grow</p>
                     </div>
                 </div>
-                <button id="sidebar-close-btn" class="md:hidden p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-all" onclick="document.getElementById('sidebar').classList.add('-translate-x-full');document.getElementById('sidebar-overlay').classList.add('hidden');">
+                <!-- Mobile close button -->
+                <button id="sidebar-close-btn"
+                        class="md:hidden p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-all"
+                        onclick="document.getElementById('sidebar').classList.add('-translate-x-full');document.getElementById('sidebar-overlay').classList.add('hidden');">
                     <i class="fas fa-times text-sm"></i>
                 </button>
             </div>
         </div>
 
         <nav class="flex-1 overflow-y-auto py-3 px-2" style="scrollbar-width:none;">
+
+            <!-- Dashboard -->
             <a href="#" data-section="dashboard" class="nav-link active">
                 <i class="fas fa-home nav-icon"></i><span>Dashboard</span>
             </a>
 
+            <!-- LEARNING -->
             <div class="nav-section-label">Learning</div>
             <a href="#" data-section="courses" class="nav-link">
                 <i class="fas fa-graduation-cap nav-icon" style="color:#a78bfa;"></i><span>Courses</span>
@@ -132,6 +241,7 @@
                 <i class="fas fa-newspaper nav-icon" style="color:#2dd4bf;"></i><span>Blog</span>
             </a>
 
+            <!-- RESEARCH -->
             <div class="nav-section-label">Research</div>
             <a href="#" data-section="analysis" class="nav-link">
                 <i class="fas fa-chart-bar nav-icon" style="color:#60a5fa;"></i><span>Chart Analysis</span>
@@ -143,17 +253,21 @@
                 <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
             </a>
 
+            <!-- DEVELOPMENT -->
             <div class="nav-section-label">Development</div>
             <a href="#" data-section="journal" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
                 <span>Performance Analytics</span>
+
             </a>
 
+            <!-- AI ASSISTANT -->
             <div class="nav-section-label">AI Assistant</div>
             <a href="#" data-section="mentor" class="nav-link">
                 <i class="fas fa-robot nav-icon" style="color:#e879f9;"></i><span>AI Mentor</span>
             </a>
 
+            <!-- ADMIN (hidden until admin check) -->
             <div id="admin-menu-container" class="hidden">
                 <div class="nav-section-label" style="color:#7f1d1d;">Admin</div>
                 <a href="#" data-section="admin" class="nav-link" style="border-left:2px solid #dc2626;border-radius:.6rem 0 0 .6rem;">
@@ -167,2225 +281,8 @@
         <div class="sidebar-tap-hint px-3 pb-1">Tap outside to close</div>
 
         <div class="p-4 border-t border-gray-800">
+            <!-- User profile -->
             <div class="flex items-center gap-2.5 mb-3 p-2.5 rounded-xl" style="background:#111827;border:1px solid #1f2937;">
                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                     <i class="fas fa-user text-xs"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p id="user-name" class="font-semibold text-sm text-white truncate">Loading…</p>
-                    <p id="user-email" class="text-xs text-gray-600 truncate">…</p>
-                </div>
-                <button onclick="dashboard.navigate('courses')" title="My learning progress" class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all" style="background:rgba(124,58,237,.15);">
-                    <i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i>
-                </button>
-            </div>
-            <button onclick="dashboard.logout()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all" style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2);" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
-                <i class="fas fa-sign-out-alt text-xs"></i> Sign out
-            </button>
-        </div>
-    </aside>
-
-    <main class="flex-1 h-screen overflow-y-auto">
-        <!-- Live Market Ticker -->
-        <div class="ticker-wrap">
-            <div class="ticker-track" id="ticker-track"></div>
-        </div>
-
-        <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-3 flex justify-between items-center">
-            <div class="md:hidden" style="width:60px;"></div>
-            <div>
-                <nav id="header-breadcrumb" class="flex items-center gap-2 text-xs text-gray-500 mb-0.5 hidden"></nav>
-                <h2 id="page-title" class="text-xl font-bold text-white leading-tight">Dashboard</h2>
-                <p class="text-xs text-gray-500" id="header-subtitle">Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">Trader</span></p>
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400">
-                    <span id="market-status-dot" class="w-2 h-2 rounded-full bg-green-400 inline-block flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
-                    <span id="live-clock" class="font-mono">--:--:--</span>
-                    <span class="text-gray-700">|</span>
-                    <span id="market-status-text" class="text-green-400 font-medium">Markets Open</span>
-                </div>
-                <div class="relative" id="notif-wrapper">
-                    <button id="notif-btn" onclick="dashboard._toggleNotifPanel()" class="relative p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800">
-                        <i class="fas fa-bell text-lg"></i>
-                        <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                    </button>
-                    <div id="notif-panel" class="hidden absolute right-0 mt-2 w-72 rounded-xl border overflow-hidden z-50" style="background:#111827;border-color:#1f2937;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);">
-                        <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color:#1f2937;">
-                            <span class="text-sm font-semibold text-white">Notifications</span>
-                            <button onclick="dashboard._toggleNotifPanel()" class="text-gray-600 hover:text-white text-xs transition-colors">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div id="notif-list" class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-8 text-center">
-                                <i class="fas fa-bell-slash text-gray-700 text-2xl mb-2 block"></i>
-                                <p class="text-xs text-gray-600">No new notifications</p>
-                            </div>
-                        </div>
-                        <div class="px-4 py-2.5 border-t text-center" style="border-color:#1f2937;">
-                            <button onclick="dashboard._toggleNotifPanel(); dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">
-                                View all activity →
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <div class="p-4 md:p-6 max-w-7xl mx-auto">
-            
-            <!-- DASHBOARD SECTION -->
-            <section id="section-dashboard" class="section animate-fade-in">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                    <div>
-                        <h2 id="greeting-text" class="text-2xl font-bold text-white">Good morning 👋</h2>
-                        <p class="text-sm text-gray-500 mt-0.5" id="greeting-sub">Your learning and research hub</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span id="dash-market-dot" class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
-                        <span id="dash-market-text" class="text-xs text-gray-500">Markets Open</span>
-                        <span class="text-gray-700 mx-1">·</span>
-                        <a href="/academy" class="text-xs text-green-400 hover:text-green-300 transition-colors font-medium">Trading Academy →</a>
-                        <span class="text-gray-700 mx-1">·</span>
-                        <a href="#" onclick="dashboard.navigate('mentor')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">Ask AI Mentor →</a>
-                    </div>
-                </div>
-
-                <!-- Stat Chips -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5" id="dash-stat-row">
-                    <div class="pw-card cursor-pointer" onclick="dashboard.navigate('courses')">
-                        <div class="pw-card-body text-center">
-                            <div class="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style="background:rgba(167,139,250,.15);">
-                                <i class="fas fa-graduation-cap text-sm" style="color:#a78bfa;"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-white count-animate" id="stat-courses">—</div>
-                            <div class="text-xs text-gray-500">Available Courses</div>
-                        </div>
-                    </div>
-                    <div class="pw-card cursor-pointer" onclick="dashboard.navigate('webinars')">
-                        <div class="pw-card-body text-center">
-                            <div class="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style="background:rgba(251,191,36,.12);">
-                                <i class="fas fa-video text-sm" style="color:#fbbf24;"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-white count-animate" id="stat-webinars">—</div>
-                            <div class="text-xs text-gray-500">Upcoming Webinars</div>
-                        </div>
-                    </div>
-                    <div class="pw-card cursor-pointer" onclick="dashboard.navigate('blog')">
-                        <div class="pw-card-body text-center">
-                            <div class="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style="background:rgba(45,212,191,.12);">
-                                <i class="fas fa-newspaper text-sm" style="color:#2dd4bf;"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-white count-animate" id="stat-blog">—</div>
-                            <div class="text-xs text-gray-500">Research Articles</div>
-                        </div>
-                    </div>
-                    <div class="pw-card cursor-pointer" onclick="dashboard.navigate('signals')">
-                        <div class="pw-card-body text-center">
-                            <div class="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style="background:rgba(52,211,153,.12);">
-                                <i class="fas fa-satellite-dish text-sm" style="color:#34d399;"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-white count-animate" id="stat-signals">—</div>
-                            <div class="text-xs text-gray-500">Market Signals</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Continue Learning + AI Mentor -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                    <div class="pw-card lg:col-span-2">
-                        <div class="pw-card-hdr">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(124,58,237,.2);">
-                                    <i class="fas fa-graduation-cap" style="color:#a78bfa;"></i>
-                                </div>
-                                <span class="font-semibold text-white text-sm">Continue Learning</span>
-                            </div>
-                            <a href="#" onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">View all →</a>
-                        </div>
-                        <div class="pw-card-body" id="dash-learning-body">
-                            <div class="text-center py-8 text-gray-500">Loading your progress...</div>
-                        </div>
-                    </div>
-
-                    <div class="pw-card" style="background:linear-gradient(145deg,#0f0a1f,#1a0a2e);">
-                        <div class="pw-card-hdr" style="border-bottom-color:#2d1060;">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(219,39,119,.2);">
-                                    <i class="fas fa-robot" style="color:#f472b6;"></i>
-                                </div>
-                                <span class="font-semibold text-white text-sm">AI Mentor</span>
-                            </div>
-                            <span class="text-xs px-2 py-0.5 rounded-full font-semibold" style="background:rgba(219,39,119,.2);color:#f9a8d4;">Online</span>
-                        </div>
-                        <div class="pw-card-body">
-                            <p class="text-gray-400 text-xs leading-relaxed mb-4">Your personal AI trading coach is ready. Ask about strategy, risk, trade review, or market psychology.</p>
-                            <button onclick="dashboard.navigate('mentor'); setTimeout(()=>dashboard.askMentor('Review my trading approach and suggest improvements'),400);" class="w-full text-left px-3 py-2 rounded-lg text-xs transition-all mb-2" style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.25);color:#c4b5fd;">
-                                <i class="fas fa-chart-line mr-2 text-purple-400"></i>Review my trading approach
-                            </button>
-                            <button onclick="dashboard.navigate('mentor'); setTimeout(()=>dashboard.askMentor('What should I focus on learning next?'),400);" class="w-full text-left px-3 py-2 rounded-lg text-xs transition-all mb-2" style="background:rgba(219,39,119,.1);border:1px solid rgba(219,39,119,.2);color:#fbcfe8;">
-                                <i class="fas fa-lightbulb mr-2 text-pink-400"></i>What should I learn next?
-                            </button>
-                            <button onclick="dashboard.navigate('mentor')" class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all mt-2" style="background:linear-gradient(90deg,#7c3aed,#db2777);color:white;">
-                                Open AI Mentor →
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Research Workspace -->
-                <div class="pw-card mb-4">
-                    <div class="pw-card-hdr">
-                        <div class="flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(52,211,153,.15);">
-                                <i class="fas fa-tools" style="color:#34d399;"></i>
-                            </div>
-                            <span class="font-semibold text-white text-sm">Research Workspace</span>
-                        </div>
-                    </div>
-                    <div class="pw-card-body">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <button onclick="dashboard.navigate('analysis')" class="group text-left rounded-xl p-4 transition-all duration-200" style="background:#0d1321;border:1px solid #1f2937;" onmouseover="this.style.borderColor='#60a5fa';this.style.background='rgba(59,130,246,.06)'" onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(59,130,246,.15);">
-                                        <i class="fas fa-chart-bar" style="color:#60a5fa;font-size:1rem;"></i>
-                                    </div>
-                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
-                                </div>
-                                <div class="text-sm font-semibold text-white mb-1">Chart Analysis</div>
-                                <div class="text-xs text-gray-500 leading-relaxed">Upload any chart for AI-powered SMC analysis.</div>
-                            </button>
-
-                            <button onclick="dashboard.navigate('stocks')" class="group text-left rounded-xl p-4 transition-all duration-200" style="background:#0d1321;border:1px solid #1f2937;" onmouseover="this.style.borderColor='#34d399';this.style.background='rgba(16,185,129,.06)'" onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(16,185,129,.15);">
-                                        <i class="fas fa-chart-pie" style="color:#34d399;font-size:1rem;"></i>
-                                    </div>
-                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
-                                </div>
-                                <div class="text-sm font-semibold text-white mb-1">AI Stock Research</div>
-                                <div class="text-xs text-gray-500 leading-relaxed">Deep-dive research on any stock using AI.</div>
-                            </button>
-
-                            <button onclick="dashboard.navigate('journal')" class="group text-left rounded-xl p-4 transition-all duration-200" style="background:#0d1321;border:1px solid #1f2937;" onmouseover="this.style.borderColor='#fb923c';this.style.background='rgba(249,115,22,.06)'" onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(249,115,22,.15);">
-                                        <i class="fas fa-chart-line" style="color:#fb923c;font-size:1rem;"></i>
-                                    </div>
-                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
-                                </div>
-                                <div class="text-sm font-semibold text-white mb-1">Performance Analytics</div>
-                                <div class="text-xs text-gray-500 leading-relaxed">Import your trade history for AI coaching.</div>
-                            </button>
-
-                            <a href="/academy" class="group text-left rounded-xl p-4 transition-all duration-200" style="background:#0d1321;border:1px solid #1f2937;display:block;text-decoration:none;" onmouseover="this.style.borderColor='#a78bfa';this.style.background='rgba(124,58,237,.06)'" onmouseout="this.style.borderColor='#1f2937';this.style.background='#0d1321'">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:rgba(124,58,237,.15);">
-                                        <i class="fas fa-book-open" style="color:#a78bfa;font-size:1rem;"></i>
-                                    </div>
-                                    <i class="fas fa-arrow-right text-gray-700 text-xs mt-1 transition-transform group-hover:translate-x-0.5"></i>
-                                </div>
-                                <div class="text-sm font-semibold text-white mb-1">Trading Academy</div>
-                                <div class="text-xs text-gray-500 leading-relaxed">Structured lessons with AI explanations.</div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Performance + Latest Courses -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-                    <div class="pw-card">
-                        <div class="pw-card-hdr">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(251,146,60,.15);">
-                                    <i class="fas fa-chart-line" style="color:#fb923c;"></i>
-                                </div>
-                                <span class="font-semibold text-white text-sm">Performance</span>
-                            </div>
-                            <a href="#" onclick="dashboard.navigate('journal')" class="text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium">Analyze →</a>
-                        </div>
-                        <div class="pw-card-body" id="dash-perf-body">
-                            <div class="text-center py-4">
-                                <div class="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3" style="background:rgba(251,146,60,.1);border:2px dashed rgba(251,146,60,.25);">
-                                    <i class="fas fa-upload text-orange-400"></i>
-                                </div>
-                                <p class="text-sm text-gray-400 font-medium">No trades analysed yet</p>
-                                <p class="text-xs text-gray-600 mt-1 mb-4">Upload your MT4/MT5/CSV statement to see your win rate and AI coaching.</p>
-                                <button onclick="dashboard.navigate('journal')" class="w-full py-2 rounded-lg text-xs font-semibold transition-all" style="background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c;">
-                                    <i class="fas fa-file-import mr-1.5"></i>Import Trades
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pw-card lg:col-span-2">
-                        <div class="pw-card-hdr">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(167,139,250,.15);">
-                                    <i class="fas fa-play-circle" style="color:#a78bfa;"></i>
-                                </div>
-                                <span class="font-semibold text-white text-sm">Latest Courses</span>
-                            </div>
-                            <a href="#" onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">Browse all →</a>
-                        </div>
-                        <div class="pw-card-body" id="dash-courses-body">
-                            <div class="text-center py-8 text-gray-500">Loading courses...</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Latest Blog -->
-                <div class="pw-card">
-                    <div class="pw-card-hdr">
-                        <div class="flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(45,212,191,.15);">
-                                <i class="fas fa-newspaper" style="color:#2dd4bf;"></i>
-                            </div>
-                            <span class="font-semibold text-white text-sm">Latest Research & Blog</span>
-                        </div>
-                        <a href="#" onclick="dashboard.navigate('blog')" class="text-xs text-teal-400 hover:text-teal-300 transition-colors font-medium">View all →</a>
-                    </div>
-                    <div class="pw-card-body" id="dash-blog-body">
-                        <div class="text-center py-8 text-gray-500">Loading articles...</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- SIGNALS SECTION -->
-            <section id="section-signals" class="section hidden">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                    <div>
-                        <h3 class="text-xl font-bold text-white">Market Signals</h3>
-                        <p class="text-sm text-gray-500 mt-0.5">Active trading opportunities from our analysts</p>
-                    </div>
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-400" style="background:#111827;border:1px solid #1f2937;">
-                        <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
-                        Live signals
-                    </div>
-                </div>
-                <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            </section>
-
-            <!-- JOURNAL SECTION -->
-            <section id="section-journal" class="section hidden">
-                <div class="mb-6">
-                    <div class="flex items-center gap-2 mb-2">
-                        <h3 class="text-xl font-bold text-white">Performance Analytics</h3>
-                        <span class="text-xs px-2 py-0.5 rounded-full font-bold" style="background:#064e3b;color:#34d399;">AI-Powered</span>
-                    </div>
-                    <p class="text-sm text-gray-500">Import statements from MT4, MT5, CSV or Excel — get instant AI coaching</p>
-                </div>
-
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
-                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trade Data</h4>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-                        <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt4">
-                            <i class="fas fa-file-code text-blue-400"></i> MT4
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt5">
-                            <i class="fas fa-file-code text-green-400"></i> MT5
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="csv">
-                            <i class="fas fa-file-csv text-yellow-400"></i> CSV
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="excel">
-                            <i class="fas fa-file-excel text-green-500"></i> Excel
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="screenshot">
-                            <i class="fas fa-camera text-pink-400"></i> OCR
-                        </button>
-                        <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-sm text-white">
-                            <i class="fas fa-edit"></i> Manual
-                        </button>
-                    </div>
-
-                    <div id="journal-dropzone" class="upload-area">
-                        <input type="file" id="journal-file-input" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.html,.htm,.png,.jpg,.jpeg">
-                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
-                        <p class="text-gray-300 mb-2">Drop your trading statement here</p>
-                        <p class="text-sm text-gray-500">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images</p>
-                        <p class="text-xs text-purple-400 mt-2" id="selected-format">Select a format above</p>
-                    </div>
-
-                    <div id="upload-status" class="mt-4 hidden"></div>
-                    <div id="journal-upload-loading" class="hidden mt-4 text-center">
-                        <div class="inline-flex items-center gap-2 text-blue-400">
-                            <i class="fas fa-spinner fa-spin"></i><span>Analyzing with AI...</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Performance Overview -->
-                <div id="performance-overview" class="hidden mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="text-lg font-bold text-white">Performance Overview</h4>
-                        <span id="overall-grade-badge" class="px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold">--</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-white" id="stat-total-trades">--</div>
-                            <div class="text-xs text-gray-400">Trades</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-green-400" id="stat-win-rate">--</div>
-                            <div class="text-xs text-gray-400">Win Rate</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-blue-400" id="stat-profit-factor">--</div>
-                            <div class="text-xs text-gray-400">Profit Factor</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-purple-400" id="stat-expectancy">--</div>
-                            <div class="text-xs text-gray-400">Expectancy</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-orange-400" id="stat-max-drawdown">--</div>
-                            <div class="text-xs text-gray-400">Max DD</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-green-400" id="stat-winning-streak">--</div>
-                            <div class="text-xs text-gray-400">Win Streak</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-red-400" id="stat-losing-streak">--</div>
-                            <div class="text-xs text-gray-400">Loss Streak</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div>
-                            <div class="text-xs text-gray-400">Net P&L</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Charts -->
-                <div id="analytics-charts" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-line text-blue-400 mr-2"></i>Equity Curve</h4>
-                        <div class="chart-container">
-                            <canvas id="equity-curve-chart"></canvas>
-                        </div>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-pie text-green-400 mr-2"></i>Trade Distribution</h4>
-                        <div class="chart-container">
-                            <canvas id="trade-distribution-chart"></canvas>
-                        </div>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 lg:col-span-2">
-                        <h4 class="font-bold text-white mb-4"><i class="fas fa-calendar-alt text-purple-400 mr-2"></i>Monthly Performance</h4>
-                        <div class="chart-container">
-                            <canvas id="monthly-performance-chart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AI Coach -->
-                <div id="ai-coach-section" class="hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border border-purple-700/50 mb-6">
-                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-purple-400 mr-2"></i>AI Trading Coach</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
-                            <div class="text-3xl font-bold text-blue-400 mb-1" id="ai-discipline-score">--</div>
-                            <div class="text-sm text-gray-400">Discipline Score</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
-                            <div class="text-3xl font-bold text-green-400 mb-1" id="ai-risk-score">--</div>
-                            <div class="text-sm text-gray-400">Risk Management</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
-                            <div class="text-3xl font-bold text-purple-400 mb-1" id="ai-consistency-score">--</div>
-                            <div class="text-sm text-gray-400">Strategy Consistency</div>
-                        </div>
-                    </div>
-                    <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-4">
-                        <h5 class="font-bold text-red-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Main Issue Detected</h5>
-                        <p id="ai-main-mistake" class="text-gray-300">--</p>
-                    </div>
-                    <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mb-4">
-                        <h5 class="font-bold text-blue-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>AI Recommendation</h5>
-                        <p id="ai-recommendation" class="text-gray-300">--</p>
-                    </div>
-                </div>
-
-                <!-- Trade History -->
-                <div id="trade-history" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <h4 class="font-bold text-white mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Trade History</h4>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-gray-500 uppercase bg-gray-900">
-                                <tr>
-                                    <th class="px-4 py-3">Date</th>
-                                    <th class="px-4 py-3">Symbol</th>
-                                    <th class="px-4 py-3">Direction</th>
-                                    <th class="px-4 py-3">Entry</th>
-                                    <th class="px-4 py-3">Exit</th>
-                                    <th class="px-4 py-3">P&L</th>
-                                </tr>
-                            </thead>
-                            <tbody id="trades-table-body" class="text-gray-300"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Manual Entry Form -->
-                <div id="manual-entry-form" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700 mt-6">
-                    <h4 class="font-bold text-white mb-4"><i class="fas fa-plus-circle text-green-400 mr-2"></i>Add Trade Manually</h4>
-                    <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" onsubmit="event.preventDefault(); dashboard.addManualTrade();">
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Symbol</label>
-                            <input type="text" id="manual-symbol" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="EURUSD" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Direction</label>
-                            <select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
-                                <option value="BUY">Buy</option>
-                                <option value="SELL">Sell</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
-                            <input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">P&L ($)</label>
-                            <input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
-                        </div>
-                        <div class="md:col-span-2 lg:col-span-4 flex items-end">
-                            <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors">
-                                <i class="fas fa-plus mr-2"></i>Add Trade
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            <!-- STOCKS SECTION -->
-            <section id="section-stocks" class="section hidden">
-                <iframe src="/static/stock_terminal.html" class="w-full h-[900px] border-0 rounded-xl"></iframe>
-            </section>
-
-            <!-- COURSES SECTION -->
-            <section id="section-courses" class="section hidden">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                    <div>
-                        <h3 class="text-xl font-bold text-white">Trading Academy</h3>
-                        <p class="text-sm text-gray-500 mt-0.5">Structured courses to build your trading knowledge</p>
-                    </div>
-                </div>
-                <div id="courses-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-            </section>
-
-            <!-- WEBINARS SECTION -->
-            <section id="section-webinars" class="section hidden">
-                <div class="mb-6">
-                    <h3 class="text-xl font-bold text-white">Live Webinars</h3>
-                    <p class="text-sm text-gray-500 mt-0.5">Expert-led sessions, market walkthroughs and Q&A</p>
-                </div>
-                <div id="webinars-container" class="space-y-4"></div>
-            </section>
-
-            <!-- BLOG SECTION -->
-            <section id="section-blog" class="section hidden">
-                <div class="mb-6">
-                    <h3 class="text-xl font-bold text-white">Research & Blog</h3>
-                    <p class="text-sm text-gray-500 mt-0.5">Market analysis, trading insights and educational content</p>
-                </div>
-                <div id="blog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-            </section>
-
-            <!-- ADMIN SECTION -->
-            <section id="section-admin" class="section hidden">
-                <div id="admin-container"></div>
-            </section>
-
-            <!-- CMS SECTION -->
-            <section id="section-cms" class="section hidden">
-                <div id="cms-container"></div>
-            </section>
-
-            <!-- MENTOR SECTION - WITH RECOMMENDATION FIX -->
-            <section id="section-mentor" class="section hidden">
-                <div class="max-w-7xl mx-auto h-[calc(100vh-140px)]">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                        <div class="lg:col-span-2 flex flex-col h-full">
-                            <div class="bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700 overflow-hidden">
-                                <div class="p-4 border-b border-gray-700 bg-gradient-to-r from-purple-900/50 to-blue-900/50 flex justify-between items-center">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center animate-pulse">
-                                            <i class="fas fa-robot text-white"></i>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-bold text-white">Pipways AI Copilot</h3>
-                                            <p class="text-xs text-gray-400">Platform Intelligence System</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button onclick="dashboard.clearMentorChat()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors" title="Clear History">
-                                            <i class="fas fa-trash-alt mr-1"></i>Clear
-                                        </button>
-                                        <button onclick="dashboard.toggleMentorHelp()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
-                                            <i class="fas fa-question-circle mr-1"></i>Help
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Chat Messages -->
-                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50">
-                                    <div class="flex gap-3 animate-fade-in">
-                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                            <i class="fas fa-robot text-xs text-white"></i>
-                                        </div>
-                                        <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
-                                            <p class="text-gray-200 text-sm leading-relaxed">
-                                                👋 Welcome! I'm your <strong>Pipways Trading Copilot</strong>. I have access to your:
-                                            </p>
-                                            <ul class="mt-2 space-y-1 text-sm text-gray-300">
-                                                <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Performance Analytics</li>
-                                                <li class="flex items-center gap-2"><i class="fas fa-satellite-dish text-green-400 text-xs"></i> Active Signals</li>
-                                                <li class="flex items-center gap-2"><i class="fas fa-graduation-cap text-purple-400 text-xs"></i> Educational Resources</li>
-                                                <li class="flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-xs"></i> Chart Analysis History</li>
-                                            </ul>
-                                            <p class="mt-2 text-xs text-gray-400">Try typing <code class="bg-gray-800 px-1 rounded">/review-trades</code> or <code class="bg-gray-800 px-1 rounded">/signals</code></p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- CRITICAL FIX: Recommendations Container -->
-                                <div id="mentor-recommendations">
-                                    <div class="recommendations-header">
-                                        <span>📚</span> Recommended Lessons
-                                    </div>
-                                    <div class="recommendations-grid" id="recommendations-grid-container">
-                                        <!-- Cards rendered here dynamically -->
-                                    </div>
-                                </div>
-
-                                <!-- Typing Indicator -->
-                                <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700">
-                                    <div class="flex items-center gap-2 text-gray-400 text-sm">
-                                        <div class="flex gap-1">
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0s"></div>
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                                        </div>
-                                        <span class="text-xs">AI is analyzing your data...</span>
-                                    </div>
-                                </div>
-
-                                <!-- Input Area -->
-                                <div class="p-4 border-t border-gray-700 bg-gray-800">
-                                    <div class="flex gap-2 mb-2 overflow-x-auto pb-2 scrollbar-hide" id="quick-actions">
-                                        <button onclick="dashboard.askMentor('/review-trades')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📊 Review Trades
-                                        </button>
-                                        <button onclick="dashboard.askMentor('/strategy')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            🎯 Strategy Check
-                                        </button>
-                                        <button onclick="dashboard.askMentor('/signals')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📡 Active Signals
-                                        </button>
-                                        <button onclick="dashboard.askMentor('Why am I losing trades?')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            🤔 Why am I losing?
-                                        </button>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <input type="text" id="mentor-input" placeholder="Ask about your trading, signals, or type /help..." 
-                                            class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                                            onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
-                                        <button onclick="dashboard.sendMentorMessage()" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg transition-all transform hover:scale-105">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Sidebar -->
-                        <div class="lg:col-span-1 space-y-4 overflow-y-auto">
-                            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
-                                <div class="flex items-center gap-2 mb-4">
-                                    <i class="fas fa-user-graduate text-purple-400"></i>
-                                    <h4 class="font-bold text-white">AI Coach Insights</h4>
-                                </div>
-                                <div id="coach-insights-loading" class="text-center py-4">
-                                    <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
-                                        <i class="fas fa-spinner fa-spin"></i> Analyzing...
-                                    </div>
-                                </div>
-                                <div id="coach-insights-content" class="hidden space-y-4">
-                                    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-3 border border-purple-700/30">
-                                        <div class="text-xs text-gray-400 mb-1">Trading Personality</div>
-                                        <div id="trading-personality" class="text-lg font-bold text-purple-400">--</div>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div class="bg-gray-900 rounded-lg p-3 text-center">
-                                            <div id="discipline-score" class="text-2xl font-bold text-blue-400">--</div>
-                                            <div class="text-xs text-gray-500">Discipline</div>
-                                        </div>
-                                        <div class="bg-gray-900 rounded-lg p-3 text-center">
-                                            <div id="consistency-score" class="text-2xl font-bold text-green-400">--</div>
-                                            <div class="text-xs text-gray-500">Consistency</div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div class="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                                            <i class="fas fa-check-circle text-green-400"></i> Strengths
-                                        </div>
-                                        <ul id="ai-strengths-list" class="space-y-1">
-                                            <li class="text-sm text-gray-300 flex items-start gap-2">
-                                                <span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span>
-                                                <span>Loading...</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <div class="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                                            <i class="fas fa-exclamation-triangle text-yellow-400"></i> Focus Areas
-                                        </div>
-                                        <ul id="ai-weaknesses-list" class="space-y-1">
-                                            <li class="text-sm text-gray-300 flex items-start gap-2">
-                                                <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span>
-                                                <span>Loading...</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div class="flex justify-between items-center text-sm border-t border-gray-700 pt-3">
-                                        <span class="text-gray-400">Risk Profile:</span>
-                                        <span id="risk-profile" class="px-2 py-1 bg-gray-700 rounded text-white text-xs">--</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="flex items-center gap-2">
-                                        <i class="fas fa-lightbulb text-yellow-400"></i>
-                                        <h4 class="font-bold text-white">Recommended</h4>
-                                    </div>
-                                    <span id="rec-count" class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">0</span>
-                                </div>
-                                <div id="recommendations-list" class="space-y-3">
-                                    <div class="text-center text-gray-500 text-sm py-4">
-                                        Ask the AI for personalized recommendations
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="mentor-help-panel" class="hidden bg-gray-800 rounded-xl p-5 border border-gray-700">
-                                <h4 class="font-bold text-white mb-3">Quick Commands</h4>
-                                <div class="space-y-2 text-sm">
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/review-trades</code>
-                                        <span class="text-gray-400">Analyze performance</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/strategy</code>
-                                        <span class="text-gray-400">Check consistency</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/signals</code>
-                                        <span class="text-gray-400">Best active signals</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/help</code>
-                                        <span class="text-gray-400">Show commands</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ANALYSIS SECTION -->
-            <section id="section-analysis" class="section hidden">
-                <div class="max-w-6xl mx-auto">
-                    <div id="chart-analysis-container"></div>
-                </div>
-            </section>
-
-        </div>
-    </main>
-
-    <script>
-        const API_BASE = window.location.origin;
-
-        // Auth & error helpers
-        async function _parseApiError(response) {
-            const text = await response.text().catch(() => '');
-            try {
-                const json = JSON.parse(text);
-                if (json.detail) return json.detail;
-                if (json.message) return json.message;
-            } catch (_) { }
-            return text || `HTTP ${response.status}`;
-        }
-
-        function _handleAuthError() {
-            localStorage.removeItem('pipways_token');
-            localStorage.removeItem('pipways_user');
-            alert('Your session has expired. Please log in again.');
-            window.location.href = '/';
-        }
-
-        // Main Dashboard Controller Class
-        const DashboardController = class {
-            constructor() {
-                this.user = null;
-                this.currentJournalFormat = null;
-                this.manualTrades = [];
-                this.charts = {};
-                this.lastAnalysisResults = null;
-                this.init();
-            }
-
-            init() {
-                this.checkAuth();
-                this.setupNavigation();
-                this.setupMobileMenu();
-                this.loadDashboardStats();
-                this.navigate('dashboard');
-            }
-
-            checkAuth() {
-                const token = localStorage.getItem('pipways_token');
-                const userStr = localStorage.getItem('pipways_user');
-                if (!token || !userStr) {
-                    window.location.href = '/';
-                    return;
-                }
-                try {
-                    this.user = JSON.parse(userStr);
-                    this.updateUserDisplay();
-                    setTimeout(() => this.renderAdminMenu(), 200);
-                    setTimeout(() => this._refreshUserFromServer(), 500);
-                } catch (e) {
-                    window.location.href = '/';
-                }
-            }
-
-            updateUserDisplay() {
-                const user = this.user || {};
-                const name = user.full_name || user.email || 'User';
-                const nameEl = document.getElementById('user-name');
-                const emailEl = document.getElementById('user-email');
-                if (nameEl) nameEl.textContent = name;
-                if (emailEl) emailEl.textContent = user.email || '';
-                const nameSpan = document.getElementById('header-user-name');
-                if (nameSpan) nameSpan.textContent = user.full_name?.split(' ')[0] || user.email || 'Trader';
-            }
-
-            renderAdminMenu() {
-                const user = this.user || {};
-                const isAdmin = this._isAdminUser(user);
-                const adminMenu = document.getElementById('admin-menu-container');
-                if (adminMenu) {
-                    adminMenu.style.display = isAdmin ? 'block' : 'none';
-                }
-            }
-
-            _isAdminUser(user) {
-                if (!user) return false;
-                if (user.is_admin === true) return true;
-                if (user.role === 'admin') return true;
-                if (user.is_superuser === true) return true;
-                const email = (user.email || '').toLowerCase();
-                if (email === 'admin@pipways.com' || email.startsWith('admin+')) return true;
-                return false;
-            }
-
-            async _refreshUserFromServer() {
-                try {
-                    const fresh = await this.apiRequest('/auth/me');
-                    if (fresh && fresh.email) {
-                        this.user = { ...this.user, ...fresh };
-                        localStorage.setItem('pipways_user', JSON.stringify(this.user));
-                        this.updateUserDisplay();
-                        this.renderAdminMenu();
-                    }
-                } catch (_) { }
-            }
-
-            setupNavigation() {
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        const section = e.currentTarget.dataset.section;
-                        const href = e.currentTarget.getAttribute('href');
-                        if (!section && href && href !== '#') return;
-                        e.preventDefault();
-                        if (section) this.navigate(section);
-                    });
-                });
-            }
-
-            setupMobileMenu() {
-                const btn = document.getElementById('mobile-menu-btn');
-                const sidebar = document.getElementById('sidebar');
-                const overlay = document.getElementById('sidebar-overlay');
-                const openSidebar = () => { sidebar?.classList.remove('-translate-x-full'); overlay?.classList.remove('hidden'); };
-                const closeSidebar = () => { sidebar?.classList.add('-translate-x-full'); overlay?.classList.add('hidden'); };
-
-                if (btn) btn.addEventListener('click', () => {
-                    sidebar?.classList.contains('-translate-x-full') ? openSidebar() : closeSidebar();
-                });
-                overlay?.addEventListener('click', closeSidebar);
-                document.addEventListener('keydown', e => {
-                    if (e.key === 'Escape' && sidebar && !sidebar.classList.contains('-translate-x-full')) closeSidebar();
-                });
-            }
-
-            navigate(section) {
-                document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-                const activeLink = document.querySelector(`[data-section="${section}"]`);
-                if (activeLink) activeLink.classList.add('active');
-
-                document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
-                const target = document.getElementById(`section-${section}`);
-                if (target) {
-                    target.classList.remove('hidden');
-                    target.style.animation = 'none';
-                    target.offsetHeight;
-                    target.style.animation = 'fadeIn 0.35s ease-out both';
-                    this.loadSectionData(section);
-                }
-
-                const meta = {
-                    'dashboard': { title: 'Dashboard', sub: 'Your learning & research command centre' },
-                    'courses': { title: 'Trading Academy', sub: 'Structured courses from beginner to advanced' },
-                    'webinars': { title: 'Live Webinars', sub: 'Expert-led sessions and market walkthroughs' },
-                    'blog': { title: 'Research & Blog', sub: 'Market analysis, insights and education' },
-                    'analysis': { title: 'Chart Analysis', sub: 'AI-powered SMC and technical analysis' },
-                    'stocks': { title: 'AI Stock Research', sub: 'Fundamental and sentiment research' },
-                    'signals': { title: 'Market Signals', sub: 'Active trading opportunities' },
-                    'journal': { title: 'Performance Analytics', sub: 'Import trades, track performance and get AI coaching' },
-                    'mentor': { title: 'AI Mentor', sub: '24/7 personal trading coach' },
-                    'admin': { title: 'Admin Panel', sub: 'Platform administration' },
-                    'cms': { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
-                };
-                const m = meta[section] || { title: 'Dashboard', sub: '' };
-                const titleEl = document.getElementById('page-title');
-                const subEl = document.getElementById('header-subtitle');
-                if (titleEl) titleEl.textContent = m.title;
-                if (subEl) {
-                    const firstName = this.user?.full_name?.split(' ')[0] || this.user?.email || 'Trader';
-                    if (section === 'dashboard') {
-                        subEl.innerHTML = `Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">${firstName}</span>`;
-                    } else {
-                        subEl.innerHTML = `<span class="text-gray-500">${m.sub}</span>`;
-                    }
-                }
-
-                const bc = document.getElementById('header-breadcrumb');
-                if (bc) {
-                    if (section === 'dashboard') {
-                        bc.classList.add('hidden');
-                        bc.innerHTML = '';
-                    } else {
-                        bc.classList.remove('hidden');
-                        bc.innerHTML = `<a href="#" onclick="dashboard.navigate('dashboard');return false;">Home</a><span class="pw-breadcrumb-sep">›</span><span class="text-gray-400">${m.title}</span>`;
-                    }
-                }
-
-                document.getElementById('sidebar')?.classList.add('-translate-x-full');
-                document.getElementById('sidebar-overlay')?.classList.add('hidden');
-                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-
-            async loadSectionData(section) {
-                try {
-                    switch(section) {
-                        case 'dashboard': this.loadDashboardStats(); break;
-                        case 'signals': await this.loadSignals(); break;
-                        case 'courses': await this.loadCourses(); break;
-                        case 'webinars': await this.loadWebinars(); break;
-                        case 'blog': await this.loadBlog(); break;
-                        case 'journal': this.setupJournalUpload(); break;
-                        case 'mentor': await this.loadMentor(); break;
-                        case 'admin': {
-                            const container = document.getElementById('admin-container');
-                            if (!container) break;
-                            if (typeof AdminPage !== 'undefined') {
-                                await AdminPage.render(container);
-                            } else {
-                                container.innerHTML = '<div class="text-center py-12 text-gray-500">Admin module loading...</div>';
-                            }
-                            break;
-                        }
-                        case 'cms': {
-                            const container = document.getElementById('cms-container');
-                            if (!container) break;
-                            if (typeof CMSPage !== 'undefined') {
-                                await CMSPage.render(container);
-                            } else {
-                                container.innerHTML = '<div class="text-center py-12 text-gray-500">CMS module loading...</div>';
-                            }
-                            break;
-                        }
-                        case 'analysis': {
-                            if (typeof ChartAnalysisPage !== 'undefined') {
-                                await ChartAnalysisPage.render('chart-analysis-container');
-                            } else {
-                                const container = document.getElementById('chart-analysis-container');
-                                if (container) container.innerHTML = '<div class="text-center py-12 text-gray-500">Chart analysis module loading...</div>';
-                            }
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    console.error(`[Dashboard] Error loading section ${section}:`, err);
-                }
-            }
-
-            async loadDashboardStats() {
-                this._initClock();
-                this._initTicker();
-                this._setGreeting();
-                await this._loadDashboardCards();
-            }
-
-            _initClock() {
-                const tick = () => {
-                    const now = new Date();
-                    const clockEl = document.getElementById('live-clock');
-                    if (clockEl) clockEl.textContent = now.toLocaleTimeString('en-US', { hour12: false });
-                    
-                    const day = now.getUTCDay();
-                    const hours = now.getUTCHours();
-                    const mins = now.getUTCMinutes();
-                    const timeInMins = hours * 60 + mins;
-                    const isOpen = !(day === 6 || (day === 5 && timeInMins >= 21*60) || (day === 0 && timeInMins < 21*60));
-                    
-                    const statusEl = document.getElementById('market-status-text');
-                    const dotEl = document.getElementById('market-status-dot');
-                    if (statusEl) {
-                        statusEl.textContent = isOpen ? 'Markets Open' : 'Markets Closed';
-                        statusEl.className = isOpen ? 'text-green-400 font-medium' : 'text-red-400 font-medium';
-                    }
-                    if (dotEl) dotEl.style.background = isOpen ? '#4ade80' : '#f87171';
-                    
-                    const dashDot = document.getElementById('dash-market-dot');
-                    const dashText = document.getElementById('dash-market-text');
-                    if (dashDot) dashDot.style.background = isOpen ? '#4ade80' : '#f87171';
-                    if (dashText) dashText.textContent = isOpen ? 'Markets Open' : 'Markets Closed';
-                };
-                tick();
-                this._clockTimer = setInterval(tick, 1000);
-            }
-
-            _initTicker() {
-                const pairs = [
-                    { sym: 'EUR/USD', price: '1.0847', pct: '+0.11%', up: true },
-                    { sym: 'GBP/USD', price: '1.2634', pct: '-0.22%', up: false },
-                    { sym: 'USD/JPY', price: '149.82', pct: '+0.23%', up: true },
-                    { sym: 'XAU/USD', price: '3,024.5', pct: '+0.27%', up: true },
-                    { sym: 'BTC/USD', price: '83,412', pct: '-1.47%', up: false },
-                    { sym: 'ETH/USD', price: '1,894.3', pct: '-1.67%', up: false },
-                    { sym: 'US30', price: '41,850', pct: '+0.29%', up: true },
-                    { sym: 'US100', price: '18,240', pct: '-0.46%', up: false },
-                ];
-                const html = pairs.map(p => `
-                    <div class="ticker-item">
-                        <span class="ticker-sym">${p.sym}</span>
-                        <span class="ticker-price">${p.price}</span>
-                        <span class="${p.up ? 'ticker-up' : 'ticker-dn'}">${p.pct}</span>
-                    </div>
-                `).join('');
-                const track = document.getElementById('ticker-track');
-                if (track) track.innerHTML = html + html;
-            }
-
-            _setGreeting() {
-                const h = new Date().getHours();
-                const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-                const emoji = h < 12 ? '☀️' : h < 17 ? '📈' : '🌙';
-                const el = document.getElementById('greeting-text');
-                const sub = document.getElementById('greeting-sub');
-                const name = this.user?.full_name?.split(' ')[0] || 'Trader';
-                if (el) el.textContent = `${greet}, ${name} ${emoji}`;
-                if (sub) sub.textContent = 'Your learning and research hub';
-            }
-
-            async _loadDashboardCards() {
-                const safe = fn => fn.catch(() => null);
-                const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
                 
-                const [courses, webinars, blog, signals, progress] = await Promise.all([
-                    safe(this.apiRequest('/courses/list')),
-                    safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
-                    safe(this.apiRequest('/blog/posts')),
-                    safe(this.apiRequest('/signals/active')),
-                    safe(this.apiRequest('/courses/enhanced/progress')),
-                ]);
-
-                const count = d => Array.isArray(d) ? d.length : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
-                
-                set('stat-courses', courses ? count(courses) : '—');
-                set('stat-webinars', webinars ? count(webinars) : '—');
-                set('stat-blog', blog ? count(blog) : '—');
-                set('stat-signals', signals ? count(signals) : '—');
-
-                // Learning body
-                const learningEl = document.getElementById('dash-learning-body');
-                if (learningEl) {
-                    const inProgress = progress?.in_progress || [];
-                    const completed = progress?.completed || [];
-                    const overall = progress?.overall_progress || 0;
-                    
-                    if (!progress || (inProgress.length === 0 && completed.length === 0)) {
-                        const courseList = Array.isArray(courses) ? courses : [];
-                        if (courseList.length > 0) {
-                            const c = courseList[0];
-                            learningEl.innerHTML = `
-                                <div class="flex flex-col items-center text-center py-4">
-                                    <div class="w-16 h-16 rounded-full flex items-center justify-center mb-3" style="background:rgba(124,58,237,.12);border:2px dashed rgba(124,58,237,.3);">
-                                        <i class="fas fa-graduation-cap text-2xl" style="color:#a78bfa;"></i>
-                                    </div>
-                                    <p class="font-semibold text-white mb-1">Ready to start learning?</p>
-                                    <p class="text-xs text-gray-500 mb-4">You have ${courseList.length} course${courseList.length>1?'s':''} waiting.</p>
-                                    <button onclick="dashboard.navigate('courses')" class="px-5 py-2 rounded-lg text-sm font-semibold" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">Browse Courses →</button>
-                                </div>`;
-                        } else {
-                            learningEl.innerHTML = '<div class="text-center py-4 text-gray-500">No courses available yet.</div>';
-                        }
-                    } else {
-                        const items = [...inProgress.slice(0,3), ...completed.slice(0,1)];
-                        const courseRows = items.map((c, i) => {
-                            const pct = c.progress_percent || 0;
-                            const isDone = c.is_completed;
-                            const barCol = isDone ? '#34d399' : i === 0 ? '#a78bfa' : '#6d28d9';
-                            return `
-                                <div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);" onclick="dashboard.navigate('courses')">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-xs font-semibold text-white truncate pr-2">${c.title}</span>
-                                        <span class="text-xs flex-shrink-0 font-bold" style="color:${barCol};">${isDone ? '✓ Done' : pct+'%'}</span>
-                                    </div>
-                                    <div class="pw-progress-bar mb-1">
-                                        <div class="pw-progress-fill" style="width:${pct}%;background:${barCol};"></div>
-                                    </div>
-                                </div>`;
-                        }).join('');
-                        
-                        learningEl.innerHTML = `
-                            <div class="flex items-center justify-between mb-3">
-                                <div>
-                                    <span class="text-xs text-gray-500">Your Learning Progress</span>
-                                    <div class="flex items-center gap-2 mt-0.5">
-                                        <div class="pw-progress-bar" style="width:80px;">
-                                            <div class="pw-progress-fill" style="width:${overall}%;"></div>
-                                        </div>
-                                        <span class="text-xs font-bold" style="color:#a78bfa;">${overall}% overall</span>
-                                    </div>
-                                </div>
-                                <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">${completed.length} completed</span>
-                            </div>
-                            <div class="space-y-3 mb-4">${courseRows}</div>
-                            <button onclick="dashboard.navigate('courses')" class="w-full py-2 rounded-lg text-sm font-semibold" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">Continue Learning →</button>`;
-                    }
-                }
-
-                // Courses body
-                const coursesEl = document.getElementById('dash-courses-body');
-                if (coursesEl) {
-                    const list = Array.isArray(courses) ? courses.slice(0,4) : [];
-                    if (!list.length) {
-                        coursesEl.innerHTML = '<div class="text-center py-6 text-gray-600 text-sm">No courses yet.</div>';
-                    } else {
-                        coursesEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            ${list.map(c => `
-                                <div class="rounded-xl overflow-hidden cursor-pointer transition-all duration-200 hover:scale-[1.01]" style="border:1px solid #1f2937;background:#0d1321;" onclick="dashboard.navigate('courses')">
-                                    <div class="h-28 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-                                        <i class="fas fa-graduation-cap text-4xl text-white/20"></i>
-                                    </div>
-                                    <div class="p-3">
-                                        <div class="text-sm font-semibold text-white mb-1 truncate">${c.title}</div>
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-xs text-gray-600">${c.lesson_count||0} lessons</span>
-                                            <span class="text-xs font-medium text-purple-400">View →</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>`;
-                    }
-                }
-
-                // Blog body
-                const blogEl = document.getElementById('dash-blog-body');
-                if (blogEl) {
-                    const posts = Array.isArray(blog) ? blog : (blog?.posts || []);
-                    const list = posts.slice(0,4);
-                    if (!list.length) {
-                        blogEl.innerHTML = '<div class="text-center py-6 text-gray-600 text-sm">No articles yet.</div>';
-                    } else {
-                        blogEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            ${list.map(p => {
-                                const date = p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
-                                return `
-                                <div class="rounded-xl cursor-pointer transition-all duration-200 overflow-hidden" style="border:1px solid #1f2937;background:#0d1321;" onclick="dashboard.navigate('blog')">
-                                    <div class="h-24 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
-                                        <i class="fas fa-newspaper text-3xl text-white/20"></i>
-                                    </div>
-                                    <div class="p-3">
-                                        <div class="text-sm font-medium text-white line-clamp-2 mb-1 leading-snug">${p.title}</div>
-                                        <div class="text-xs text-gray-600">${date}</div>
-                                    </div>
-                                </div>`;
-                            }).join('')}
-                        </div>`;
-                    }
-                }
-            }
-
-            async apiRequest(endpoint, options = {}) {
-                const token = localStorage.getItem('pipways_token');
-                const headers = {
-                    'Content-Type': 'application/json',
-                    ...(token && { 'Authorization': `Bearer ${token}` }),
-                    ...options.headers
-                };
-                if (options.body instanceof FormData) delete headers['Content-Type'];
-                const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-
-                if (res.status === 401) {
-                    _handleAuthError();
-                    throw new Error('Session expired. Please log in again.');
-                }
-
-                if (!res.ok) {
-                    let msg = `HTTP ${res.status}`;
-                    try {
-                        const body = await res.json();
-                        if (body.detail) msg = body.detail;
-                        else if (body.message) msg = body.message;
-                    } catch (_) { }
-                    throw new Error(msg);
-                }
-
-                return res.json();
-            }
-
-            // Journal methods
-            setJournalFormat(format) {
-                this.currentJournalFormat = format;
-                document.querySelectorAll('.format-btn').forEach(btn => {
-                    btn.classList.remove('border-purple-500', 'bg-purple-600');
-                    btn.classList.add('border-gray-600', 'bg-gray-700');
-                });
-                const activeBtn = document.querySelector(`[data-format="${format}"]`);
-                if (activeBtn) {
-                    activeBtn.classList.remove('border-gray-600', 'bg-gray-700');
-                    activeBtn.classList.add('border-purple-500', 'bg-purple-600');
-                }
-                const configs = {
-                    mt4: { accept: '.html,.htm', label: 'MT4 Statement selected' },
-                    mt5: { accept: '.html,.htm', label: 'MT5 Statement selected' },
-                    csv: { accept: '.csv', label: 'CSV File selected' },
-                    excel: { accept: '.xlsx,.xls', label: 'Excel File selected' },
-                    screenshot: { accept: '.png,.jpg,.jpeg', label: 'Screenshot for OCR selected' }
-                };
-                const config = configs[format];
-                if (config) {
-                    document.getElementById('journal-file-input').accept = config.accept;
-                    document.getElementById('selected-format').textContent = config.label;
-                }
-            }
-
-            setupJournalUpload() {
-                const dropZone = document.getElementById('journal-dropzone');
-                const fileInput = document.getElementById('journal-file-input');
-                if (!dropZone || !fileInput) return;
-
-                dropZone.addEventListener('click', () => fileInput.click());
-                dropZone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.add('border-purple-500', 'bg-purple-900/20');
-                });
-                dropZone.addEventListener('dragleave', () => {
-                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
-                });
-                dropZone.addEventListener('drop', async (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('border-purple-500', 'bg-purple-900/20');
-                    if (e.dataTransfer.files[0]) await this.handleJournalFile(e.dataTransfer.files[0]);
-                });
-                fileInput.addEventListener('change', async (e) => {
-                    if (e.target.files[0]) await this.handleJournalFile(e.target.files[0]);
-                });
-            }
-
-            async handleJournalFile(file) {
-                const statusEl = document.getElementById('upload-status');
-                const loadingEl = document.getElementById('journal-upload-loading');
-
-                if (!this.currentJournalFormat) {
-                    statusEl.classList.remove('hidden');
-                    statusEl.innerHTML = '<span class="text-yellow-400">Please select a format first</span>';
-                    return;
-                }
-
-                statusEl.classList.remove('hidden');
-                statusEl.innerHTML = '<span class="text-blue-400"><i class="fas fa-spinner fa-spin mr-2"></i>Uploading...</span>';
-                loadingEl.classList.remove('hidden');
-
-                try {
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('format', this.currentJournalFormat);
-
-                    const token = localStorage.getItem('pipways_token');
-                    const response = await fetch(`${API_BASE}/ai/performance/upload-journal`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` },
-                        body: formData
-                    });
-
-                    const result = await response.json();
-                    if (!response.ok) throw new Error(result.detail || 'Upload failed');
-
-                    if (result.trades && result.trades.length > 0) {
-                        this.lastAnalysisResults = result;
-                        this.displayJournalAnalysis(result);
-                        statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analyzed ${result.trades_parsed} trades</span>`;
-                        this._toast(`Trade data imported successfully — ${result.trades_parsed} trades analysed`, 'success', 4000);
-                    } else {
-                        throw new Error('No trades detected');
-                    }
-                } catch (error) {
-                    statusEl.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
-                } finally {
-                    loadingEl.classList.add('hidden');
-                }
-            }
-
-            displayJournalAnalysis(result) {
-                document.getElementById('performance-overview').classList.remove('hidden');
-                document.getElementById('analytics-charts').classList.remove('hidden');
-                document.getElementById('ai-coach-section').classList.remove('hidden');
-                document.getElementById('trade-history').classList.remove('hidden');
-
-                const stats = result.statistics || {};
-                document.getElementById('stat-total-trades').textContent = stats.total_trades || 0;
-                document.getElementById('stat-win-rate').textContent = (stats.win_rate || 0) + '%';
-                document.getElementById('stat-profit-factor').textContent = stats.profit_factor || 0;
-                document.getElementById('stat-expectancy').textContent = '$' + (stats.expectancy || 0);
-                document.getElementById('stat-max-drawdown').textContent = '$' + (stats.max_drawdown || 0);
-                document.getElementById('stat-winning-streak').textContent = stats.winning_streak || 0;
-                document.getElementById('stat-losing-streak').textContent = stats.losing_streak || 0;
-                document.getElementById('stat-net-pnl').textContent = '$' + Math.abs(stats.net_pnl || 0).toFixed(2);
-                document.getElementById('stat-net-pnl').className = 'text-2xl font-bold ' + ((stats.net_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400');
-                document.getElementById('overall-grade-badge').textContent = result.overall_grade || 'N/A';
-
-                const aiCoach = result.ai_coach || {};
-                document.getElementById('ai-discipline-score').textContent = aiCoach.discipline_score || '--';
-                document.getElementById('ai-risk-score').textContent = aiCoach.risk_management_score || '--';
-                document.getElementById('ai-consistency-score').textContent = aiCoach.strategy_consistency || '--';
-                document.getElementById('ai-main-mistake').textContent = aiCoach.main_mistake || 'None detected';
-                document.getElementById('ai-recommendation').textContent = aiCoach.recommendation || 'Keep maintaining your trading journal';
-
-                const strengthsList = document.getElementById('ai-strengths');
-                strengthsList.innerHTML = (aiCoach.strengths || ['Consistent trading']).map(s => `<li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-1"></i> ${s}</li>`).join('');
-
-                this.renderEquityCurve(result.equity_curve || []);
-                this.renderTradeDistribution(result.trade_distribution || {});
-                this.renderMonthlyPerformance(result.monthly_performance || []);
-
-                const tbody = document.getElementById('trades-table-body');
-                tbody.innerHTML = (result.trades || []).slice(0, 20).map(trade => `
-                    <tr class="border-b border-gray-700 hover:bg-gray-800/50">
-                        <td class="px-4 py-3">${trade.entry_date || '--'}</td>
-                        <td class="px-4 py-3 font-medium">${trade.symbol || 'N/A'}</td>
-                        <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${trade.direction === 'BUY' ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">${trade.direction}</span></td>
-                        <td class="px-4 py-3 font-mono">${trade.entry_price || '--'}</td>
-                        <td class="px-4 py-3 font-mono">${trade.exit_price || '--'}</td>
-                        <td class="px-4 py-3 font-mono ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}">${trade.pnl >= 0 ? '+' : ''}${trade.pnl}</td>
-                    </tr>
-                `).join('');
-            }
-
-            renderEquityCurve(equityData) {
-                const ctx = document.getElementById('equity-curve-chart');
-                if (!ctx) return;
-                if (this.charts.equity) this.charts.equity.destroy();
-
-                const labels = equityData.map(d => d.trade_number);
-                const data = equityData.map(d => d.equity);
-
-                this.charts.equity = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Equity',
-                            data: data,
-                            borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af' } },
-                            x: { display: false }
-                        }
-                    }
-                });
-            }
-
-            renderTradeDistribution(distribution) {
-                const ctx = document.getElementById('trade-distribution-chart');
-                if (!ctx) return;
-                if (this.charts.distribution) this.charts.distribution.destroy();
-
-                this.charts.distribution = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Wins', 'Losses', 'Breakeven'],
-                        datasets: [{
-                            data: [distribution.wins || 0, distribution.losses || 0, distribution.breakeven || 0],
-                            backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'bottom', labels: { color: '#9ca3af', padding: 20 } }
-                        }
-                    }
-                });
-            }
-
-            renderMonthlyPerformance(monthlyData) {
-                const ctx = document.getElementById('monthly-performance-chart');
-                if (!ctx) return;
-                if (this.charts.monthly) this.charts.monthly.destroy();
-
-                const labels = monthlyData.map(d => d.month);
-                const data = monthlyData.map(d => d.pnl);
-                const colors = data.map(v => v >= 0 ? '#10b981' : '#ef4444');
-
-                this.charts.monthly = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'P&L',
-                            data: data,
-                            backgroundColor: colors,
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af', callback: v => '$' + v } },
-                            x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
-                        }
-                    }
-                });
-            }
-
-            showManualEntry() {
-                document.getElementById('manual-entry-form').classList.remove('hidden');
-            }
-
-            addManualTrade() {
-                const trade = {
-                    entry_date: new Date().toISOString().split('T')[0],
-                    symbol: document.getElementById('manual-symbol').value.toUpperCase(),
-                    direction: document.getElementById('manual-direction').value,
-                    entry_price: parseFloat(document.getElementById('manual-entry').value),
-                    pnl: parseFloat(document.getElementById('manual-pnl').value),
-                };
-                this.manualTrades.push(trade);
-                this.apiRequest('/ai/performance/analyze-journal', {
-                    method: 'POST',
-                    body: JSON.stringify({ trades: this.manualTrades })
-                }).then(result => {
-                    this.lastAnalysisResults = result;
-                    this.displayJournalAnalysis(result);
-                }).catch(err => {
-                    alert('Analysis failed: ' + err.message);
-                });
-            }
-
-            // Content loading methods
-            async loadSignals() {
-                const container = document.getElementById('signals-container');
-                if (!container) return;
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading signals...</div>';
-                try {
-                    const data = await this.apiRequest('/signals/active');
-                    const signals = Array.isArray(data) ? data : (data.signals || []);
-                    if (!signals.length) {
-                        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">No active signals right now. Check back soon.</div>';
-                        return;
-                    }
-                    container.innerHTML = signals.map(s => `
-                        <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 hover:border-purple-600/50 transition-colors">
-                            <div class="flex justify-between items-start mb-3">
-                                <h4 class="font-bold text-white text-lg">${s.symbol || '—'}</h4>
-                                <span class="px-2.5 py-1 rounded-full text-xs font-bold ${s.direction === 'BUY' ? 'bg-green-900/60 text-green-300 border border-green-700' : 'bg-red-900/60 text-red-300 border border-red-700'}">${s.direction || '—'}</span>
-                            </div>
-                            <div class="text-sm text-gray-400 space-y-1.5">
-                                <div class="flex justify-between"><span>Entry</span><span class="text-white font-mono">${s.entry_price ?? '—'}</span></div>
-                                <div class="flex justify-between"><span>Stop Loss</span><span class="text-red-400 font-mono">${s.stop_loss ?? '—'}</span></div>
-                                <div class="flex justify-between"><span>Take Profit</span><span class="text-green-400 font-mono">${s.take_profit ?? '—'}</span></div>
-                            </div>
-                        </div>
-                    `).join('');
-                } catch (error) {
-                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load signals. Please try again.</div>';
-                }
-            }
-
-            async loadCourses() {
-                const container = document.getElementById('courses-container');
-                if (!container) return;
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses...</div>';
-                try {
-                    const data = await this.apiRequest('/courses/list');
-                    const courses = Array.isArray(data) ? data : (data.courses || []);
-                    if (!courses.length) {
-                        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">No courses available yet.</div>';
-                        return;
-                    }
-                    container.innerHTML = courses.map(c => `
-                        <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors cursor-pointer" onclick="dashboard.navigate('courses')">
-                            <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-                                <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
-                            </div>
-                            <div class="p-4">
-                                <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
-                                <h4 class="font-bold text-white mt-1 mb-2">${c.title}</h4>
-                                <p class="text-sm text-gray-400 line-clamp-2 mb-2">${c.description || ''}</p>
-                                <div class="text-xs text-gray-500">${c.lesson_count || 0} lessons</div>
-                            </div>
-                        </div>
-                    `).join('');
-                } catch (error) {
-                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load courses.</div>';
-                }
-            }
-
-            async loadWebinars() {
-                const container = document.getElementById('webinars-container');
-                if (!container) return;
-                container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading webinars...</div>';
-                try {
-                    const data = await this.apiRequest('/webinars/upcoming?upcoming=true');
-                    const webinars = Array.isArray(data) ? data : (data.webinars || []);
-                    if (!webinars.length) {
-                        container.innerHTML = '<div class="text-center py-12 text-gray-500">No webinars scheduled yet. Check back soon.</div>';
-                        return;
-                    }
-                    container.innerHTML = webinars.map(w => {
-                        const date = w.scheduled_at ? new Date(w.scheduled_at) : null;
-                        return `
-                        <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-yellow-600/40 transition-colors">
-                            <div class="flex gap-4 items-start">
-                                ${date ? `<div class="text-center min-w-[56px] bg-gray-700 rounded-lg p-2 flex-shrink-0"><div class="text-2xl font-bold text-yellow-400">${date.getDate()}</div><div class="text-xs text-gray-400 uppercase">${date.toLocaleString('default',{month:'short'})}</div></div>` : ''}
-                                <div>
-                                    <h4 class="font-bold text-white">${w.title}</h4>
-                                    <p class="text-sm text-gray-400 mt-0.5">${w.description || ''}</p>
-                                </div>
-                            </div>
-                            ${w.meeting_link ? `<a href="${w.meeting_link}" target="_blank" class="px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap flex-shrink-0 transition-colors" style="background:rgba(124,58,237,.2);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">Join Now →</a>` : '<span class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-500 border border-gray-700 flex-shrink-0">Coming Soon</span>'}
-                        </div>`;
-                    }).join('');
-                } catch (error) {
-                    container.innerHTML = '<div class="text-center py-8 text-gray-500">Failed to load webinars.</div>';
-                }
-            }
-
-            async loadBlog() {
-                const container = document.getElementById('blog-container');
-                if (!container) return;
-                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading articles...</div>';
-                try {
-                    const data = await this.apiRequest('/blog/posts');
-                    const posts = Array.isArray(data) ? data : (data.posts || []);
-                    if (!posts.length) {
-                        container.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">No articles published yet.</div>';
-                        return;
-                    }
-                    container.innerHTML = posts.map(p => `
-                        <article class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/40 transition-colors cursor-pointer group">
-                            ${p.featured_image ? `<img src="${p.featured_image}" class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.style.display='none'">` : '<div class="h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-5xl text-white/20 group-hover:scale-110 transition-transform"></i></div>'}
-                            <div class="p-4">
-                                <div class="text-xs text-purple-400 font-semibold uppercase tracking-wide mb-1">${p.category || 'General'}</div>
-                                <h4 class="font-bold text-white mb-2 group-hover:text-purple-300 transition-colors">${p.title}</h4>
-                                <p class="text-sm text-gray-400 line-clamp-3 mb-3">${p.excerpt || ''}</p>
-                                <div class="flex justify-between items-center text-xs text-gray-500">
-                                    <span>${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</span>
-                                    <span class="text-purple-400">Read more →</span>
-                                </div>
-                            </div>
-                        </article>
-                    `).join('');
-                } catch (error) {
-                    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load articles.</div>';
-                }
-            }
-
-            // MENTOR METHODS - WITH RECOMMENDATION FIX
-            async loadMentor() {
-                await this.loadCoachInsights();
-                this.loadMentorHistory();
-            }
-
-            async loadCoachInsights() {
-                try {
-                    const data = await this.apiRequest('/ai/mentor/insights');
-                    document.getElementById('coach-insights-loading').classList.add('hidden');
-                    document.getElementById('coach-insights-content').classList.remove('hidden');
-
-                    document.getElementById('trading-personality').textContent = data.trading_personality || 'Developing Trader';
-                    document.getElementById('discipline-score').textContent = (data.discipline_score || 0) + '%';
-                    document.getElementById('consistency-score').textContent = (data.consistency_score || 0) + '%';
-                    
-                    const strengthsList = document.getElementById('ai-strengths-list');
-                    strengthsList.innerHTML = (data.strengths || []).map(s => `
-                        <li class="text-sm text-gray-300 flex items-start gap-2">
-                            <span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span>
-                            <span>${s}</span>
-                        </li>
-                    `).join('');
-
-                    const weaknessesList = document.getElementById('ai-weaknesses-list');
-                    weaknessesList.innerHTML = (data.weaknesses || []).map(w => `
-                        <li class="text-sm text-gray-300 flex items-start gap-2">
-                            <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span>
-                            <span>${w}</span>
-                        </li>
-                    `).join('');
-
-                    document.getElementById('risk-profile').textContent = data.risk_profile || 'Moderate';
-                    this.updateRecommendationsList(data.recommended_resources || []);
-                } catch (e) {
-                    console.error('Failed to load coach insights:', e);
-                    document.getElementById('coach-insights-loading').innerHTML = '<span class="text-gray-500">Upload journal to see insights</span>';
-                }
-            }
-
-            // CRITICAL FIX: Renders lesson recommendation cards
-            renderLessonRecommendations(recommendations) {
-                const container = document.getElementById('mentor-recommendations');
-                if (!container) return;
-
-                container.innerHTML = '';
-                
-                if (!recommendations || recommendations.length === 0) {
-                    container.style.display = 'none';
-                    return;
-                }
-
-                container.style.display = 'block';
-                
-                const header = document.createElement('div');
-                header.className = 'recommendations-header';
-                header.innerHTML = '<span>📚</span> Recommended Lessons';
-                container.appendChild(header);
-
-                const grid = document.createElement('div');
-                grid.className = 'recommendations-grid';
-                grid.id = 'recommendations-grid-container';
-
-                recommendations.forEach((rec) => {
-                    const lessonId = rec.metadata?.lesson_id;
-                    const card = this.createLessonCard(rec, lessonId);
-                    grid.appendChild(card);
-                });
-
-                container.appendChild(grid);
-                container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-
-            createLessonCard(rec, lessonId) {
-                const card = document.createElement('div');
-                card.className = 'lesson-card';
-                
-                card.innerHTML = `
-                    <div class="lesson-badge">Trading Academy</div>
-                    <h4 class="lesson-title">${this._escapeHtml(rec.title)}</h4>
-                    <p class="lesson-description">${this._escapeHtml(rec.description)}</p>
-                    <button class="lesson-cta-btn" type="button">Start Lesson →</button>
-                `;
-
-                card.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.handleLessonClick(lessonId, rec.url);
-                });
-
-                return card;
-            }
-
-            async handleLessonClick(lessonId, url) {
-                if (lessonId) {
-                    try {
-                        await this.apiRequest('/mentor/track-lesson-click', {
-                            method: 'POST',
-                            body: JSON.stringify({ lesson_id: lessonId })
-                        });
-                    } catch (e) {
-                        console.error('[Mentor] Click tracking failed:', e);
-                    }
-                }
-                if (url) {
-                    window.open(url, '_blank');
-                }
-            }
-
-            _escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-
-            async sendMentorMessage() {
-                const input = document.getElementById('mentor-input');
-                const message = input.value.trim();
-                if (!message) return;
-
-                this.appendMentorMessage(message, 'user');
-                input.value = '';
-
-                document.getElementById('mentor-typing').classList.remove('hidden');
-
-                try {
-                    const response = await this.apiRequest('/mentor/ask', {
-                        method: 'POST',
-                        body: JSON.stringify({ 
-                            message: message, 
-                            context: { timestamp: new Date().toISOString() }
-                        })
-                    });
-
-                    document.getElementById('mentor-typing').classList.add('hidden');
-                    await this.typeMentorResponse(response.response);
-
-                    // CRITICAL FIX: Render lesson recommendations if present
-                    if (response.recommendations && response.recommendations.length > 0) {
-                        this.renderLessonRecommendations(response.recommendations);
-                    } else {
-                        const recContainer = document.getElementById('mentor-recommendations');
-                        if (recContainer) recContainer.style.display = 'none';
-                    }
-
-                    this.saveMentorHistory();
-
-                } catch (e) {
-                    document.getElementById('mentor-typing').classList.add('hidden');
-                                    this.appendMentorMessage('Sorry, I encountered an error. Please try again.', 'ai');
-            }
-        }
-
-        async askMentor(question) {
-            const input = document.getElementById('mentor-input');
-            if (input) {
-                input.value = question;
-                await this.sendMentorMessage();
-            }
-        }
-
-        async typeMentorResponse(text) {
-            const messagesContainer = document.getElementById('mentor-messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'flex gap-3 animate-fade-in';
-            
-            messageDiv.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-robot text-xs text-white"></i>
-                </div>
-                <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
-                    <p class="text-gray-200 text-sm leading-relaxed typewriter-text"></p>
-                </div>
-            `;
-            
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            
-            const textElement = messageDiv.querySelector('.typewriter-text');
-            const words = text.split(' ');
-            
-            for (let i = 0; i < words.length; i++) {
-                textElement.textContent += (i > 0 ? ' ' : '') + words[i];
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                await new Promise(resolve => setTimeout(resolve, 30));
-            }
-        }
-
-        appendMentorMessage(text, sender) {
-            const messagesContainer = document.getElementById('mentor-messages');
-            const isUser = sender === 'user';
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `flex gap-3 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`;
-            
-            messageDiv.innerHTML = `
-                <div class="w-8 h-8 rounded-full ${isUser ? 'bg-gray-600' : 'bg-gradient-to-br from-blue-500 to-purple-600'} flex items-center justify-center flex-shrink-0">
-                    <i class="fas ${isUser ? 'fa-user' : 'fa-robot'} text-xs text-white"></i>
-                </div>
-                <div class="${isUser ? 'bg-purple-600' : 'bg-gray-700'} p-4 rounded-2xl ${isUser ? 'rounded-tr-none' : 'rounded-tl-none'} max-w-[85%] border ${isUser ? 'border-purple-500' : 'border-gray-600'}">
-                    <p class="text-gray-200 text-sm leading-relaxed">${this._escapeHtml(text)}</p>
-                </div>
-            `;
-            
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        clearMentorChat() {
-            const messagesContainer = document.getElementById('mentor-messages');
-            messagesContainer.innerHTML = `
-                <div class="flex gap-3 animate-fade-in">
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-robot text-xs text-white"></i>
-                    </div>
-                    <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
-                        <p class="text-gray-200 text-sm leading-relaxed">
-                            👋 Chat cleared! How can I help you today?
-                        </p>
-                    </div>
-                </div>
-            `;
-            localStorage.removeItem('mentor_history');
-        }
-
-        toggleMentorHelp() {
-            const helpPanel = document.getElementById('mentor-help-panel');
-            helpPanel.classList.toggle('hidden');
-        }
-
-        saveMentorHistory() {
-            const messages = document.getElementById('mentor-messages').innerHTML;
-            localStorage.setItem('mentor_history', messages);
-        }
-
-        loadMentorHistory() {
-            const history = localStorage.getItem('mentor_history');
-            if (history) {
-                document.getElementById('mentor-messages').innerHTML = history;
-            }
-        }
-
-        updateRecommendationsList(recommendations) {
-            const list = document.getElementById('recommendations-list');
-            const count = document.getElementById('rec-count');
-            
-            if (!recommendations || recommendations.length === 0) {
-                list.innerHTML = '<div class="text-center text-gray-500 text-sm py-4">Ask the AI for personalized recommendations</div>';
-                count.textContent = '0';
-                return;
-            }
-            
-            count.textContent = recommendations.length;
-            list.innerHTML = recommendations.map(r => `
-                <div class="bg-gray-700 rounded-lg p-3 border border-gray-600 hover:border-purple-500 transition-colors cursor-pointer" onclick="window.open('${r.url || '#'}', '_blank')">
-                    <div class="text-xs text-purple-400 font-semibold mb-1">${r.type || 'Resource'}</div>
-                    <div class="text-sm text-white font-medium mb-1">${r.title}</div>
-                    <div class="text-xs text-gray-400 line-clamp-2">${r.description || ''}</div>
-                </div>
-            `).join('');
-        }
-
-        // Notification system
-        _toggleNotifPanel() {
-            const panel = document.getElementById('notif-panel');
-            panel.classList.toggle('hidden');
-        }
-
-        _toast(message, type = 'info', duration = 3000) {
-            const toast = document.createElement('div');
-            toast.className = `fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-y-0`;
-            
-            const colors = {
-                success: 'bg-green-600 text-white',
-                error: 'bg-red-600 text-white',
-                warning: 'bg-yellow-600 text-white',
-                info: 'bg-blue-600 text-white'
-            };
-            
-            toast.className += ` ${colors[type] || colors.info}`;
-            toast.innerHTML = `
-                <div class="flex items-center gap-2">
-                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
-                    <span class="text-sm">${message}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(20px)';
-                setTimeout(() => toast.remove(), 300);
-            }, duration);
-        }
-
-        // Logout
-        logout() {
-            localStorage.removeItem('pipways_token');
-            localStorage.removeItem('pipways_user');
-            localStorage.removeItem('mentor_history');
-            window.location.href = '/';
-        }
-    };
-
-    // Initialize dashboard when DOM is ready
-    document.addEventListener('DOMContentLoaded', () => {
-        window.dashboard = new DashboardController();
-    });
-</script>
-
-<style>
-    /* CSS Variables */
-    :root {
-        --purple-primary: #7c3aed;
-        --purple-dark: #6d28d9;
-        --purple-light: #a78bfa;
-        --bg-dark: #0f172a;
-        --bg-card: #1e293b;
-        --border-color: #334155;
-    }
-
-    /* Base styles */
-    * {
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: var(--bg-dark);
-        color: #e2e8f0;
-        line-height: 1.6;
-    }
-
-    /* Animations */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes pulse-dot {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-
-    @keyframes ticker {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); }
-    }
-
-    .animate-fade-in {
-        animation: fadeIn 0.35s ease-out both;
-    }
-
-    /* Ticker styles */
-    .ticker-wrap {
-        background: #111827;
-        border-bottom: 1px solid #1f2937;
-        overflow: hidden;
-        height: 40px;
-        display: flex;
-        align-items: center;
-    }
-
-    .ticker-track {
-        display: flex;
-        animation: ticker 30s linear infinite;
-        white-space: nowrap;
-    }
-
-    .ticker-item {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 24px;
-        font-size: 13px;
-    }
-
-    .ticker-sym {
-        color: #9ca3af;
-        font-weight: 600;
-    }
-
-    .ticker-price {
-        color: #e5e7eb;
-        font-weight: 500;
-    }
-
-    .ticker-up {
-        color: #34d399;
-    }
-
-    .ticker-dn {
-        color: #f87171;
-    }
-
-    /* Card styles */
-    .pw-card {
-        background: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 12px;
-        overflow: hidden;
-        transition: all 0.2s ease;
-    }
-
-    .pw-card:hover {
-        border-color: #374151;
-    }
-
-    .pw-card-hdr {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 20px;
-        border-bottom: 1px solid #1f2937;
-    }
-
-    .pw-card-body {
-        padding: 20px;
-    }
-
-    /* Progress bar */
-    .pw-progress-bar {
-        height: 6px;
-        background: #1f2937;
-        border-radius: 3px;
-        overflow: hidden;
-    }
-
-    .pw-progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #7c3aed, #6d28d9);
-        border-radius: 3px;
-        transition: width 0.3s ease;
-    }
-
-    /* Navigation */
-    .nav-link {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 14px;
-        margin: 2px 8px;
-        border-radius: 8px;
-        color: #9ca3af;
-        text-decoration: none;
-        font-size: 14px;
-        transition: all 0.2s ease;
-    }
-
-    .nav-link:hover {
-        background: #1f2937;
-        color: #e5e7eb;
-    }
-
-    .nav-link.active {
-        background: rgba(124, 58, 237, 0.15);
-        color: #a78bfa;
-        font-weight: 500;
-    }
-
-    .nav-icon {
-        width: 20px;
-        text-align: center;
-    }
-
-    .nav-section-label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #6b7280;
-        padding: 16px 16px 8px;
-        font-weight: 600;
-    }
-
-    /* Upload area */
-    .upload-area {
-        border: 2px dashed #374151;
-        border-radius: 12px;
-        padding: 40px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .upload-area:hover {
-        border-color: #7c3aed;
-        background: rgba(124, 58, 237, 0.05);
-    }
-
-    /* Chart container */
-    .chart-container {
-        position: relative;
-        height: 250px;
-        width: 100%;
-    }
-
-    /* Breadcrumb */
-    .pw-breadcrumb-sep {
-        color: #4b5563;
-        margin: 0 4px;
-    }
-
-    /* Recommendation cards in mentor */
-    .recommendations-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 16px;
-        background: linear-gradient(90deg, #1e1b4b, #312e81);
-        border-top: 1px solid #4338ca;
-        border-bottom: 1px solid #4338ca;
-        font-size: 14px;
-        font-weight: 600;
-        color: #c7d2fe;
-    }
-
-    .recommendations-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 12px;
-        padding: 16px;
-        background: #0f172a;
-        max-height: 300px;
-        overflow-y: auto;
-    }
-
-    .lesson-card {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 16px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .lesson-card:hover {
-        border-color: #7c3aed;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
-    }
-
-    .lesson-badge {
-        display: inline-block;
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #a78bfa;
-        background: rgba(124, 58, 237, 0.15);
-        padding: 4px 10px;
-        border-radius: 20px;
-        margin-bottom: 10px;
-    }
-
-    .lesson-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: #f1f5f9;
-        margin-bottom: 8px;
-        line-height: 1.4;
-    }
-
-    .lesson-description {
-        font-size: 13px;
-        color: #94a3b8;
-        line-height: 1.5;
-        margin-bottom: 12px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .lesson-cta-btn {
-        width: 100%;
-        padding: 10px;
-        background: linear-gradient(90deg, #7c3aed, #6d28d9);
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .lesson-cta-btn:hover {
-        background: linear-gradient(90deg, #6d28d9, #5b21b6);
-    }
-
-    /* Mobile sidebar hint */
-    .sidebar-tap-hint {
-        font-size: 10px;
-        color: #4b5563;
-        text-align: center;
-        display: none;
-    }
-
-    @media (max-width: 768px) {
-        .sidebar-tap-hint {
-            display: block;
-        }
-    }
-
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-        background: #0f172a;
-    }
-
-    ::-webkit-scrollbar-thumb {
-        background: #374151;
-        border-radius: 3px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: #4b5563;
-    }
-
-    /* Utility classes */
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-    }
-
-    .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-    }
-</style>
-
-</body>
-</html>

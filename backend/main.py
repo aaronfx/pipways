@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from .database import database, init_database, metadata, run_migrations
 from sqlalchemy import create_engine
 
-# ── Core routers ──────────────────────────────────────────────────────────────
+# Import all routers
 from . import auth
 from . import signals
 from . import courses
@@ -26,18 +26,15 @@ from . import ai_services
 from . import chart_analysis
 from . import performance
 from . import ai_mentor
-from . import ai_insights
+from . import ai_insights   
 from . import cms
 
 # ── Trading Academy ───────────────────────────────────────────────────────────
-# academy_routes owns:
-#   GET  /academy.html     → serves academy.html (primary, like dashboard.html)
-#   GET  /academy          → 301 redirect to /academy.html
-#   ALL  /learning/*       → full LMS API
+# academy_routes owns: GET /academy.html, GET /academy, ALL /learning/*
 from .academy_routes import router as academy_router
 print("[IMPORT] Academy router loaded", flush=True)
 
-# ── LMS table initialisation + curriculum seed ────────────────────────────────
+# LMS Initialization
 try:
     from .lms_init import init_lms_tables, upsert_curriculum
     _HAS_LMS_INIT = True
@@ -45,10 +42,10 @@ except ImportError:
     _HAS_LMS_INIT = False
     async def init_lms_tables():
         print("[LMS INIT] lms_init.py not found — skipping LMS table setup", flush=True)
+    
     async def upsert_curriculum():
         print("[LMS INIT] Cannot upsert curriculum without lms_init.py", flush=True)
 
-# ── Stock terminal ────────────────────────────────────────────────────────────
 from . import stock_terminal_backend as stock_module
 stock_router = stock_module.router
 
@@ -60,21 +57,13 @@ print("[IMPORT] All modules loaded successfully", flush=True)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 APP_VERSION = "2.4.0"
 
-# ══════════════════════════════════════════════════════════════════════════════
-# LIFESPAN
-# ══════════════════════════════════════════════════════════════════════════════
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         await init_database()
-
+        
         try:
-            database_url = (
-                os.getenv("DATABASE_URL", "")
-                .replace("postgresql://",        "postgresql+psycopg2://")
-                .replace("postgresql+asyncpg://","postgresql+psycopg2://")
-            )
+            database_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+psycopg2://").replace("postgresql+asyncpg://", "postgresql+psycopg2://")
             if database_url:
                 engine = create_engine(database_url)
                 metadata.create_all(engine)
@@ -90,13 +79,8 @@ async def lifespan(app: FastAPI):
         if _HAS_LMS_INIT:
             try:
                 print("[LMS] Initializing tables...", flush=True)
-                await init_lms_tables()
+                await init_lms_tables()  # internally calls seed_academy()
                 print("[LMS] Tables ready", flush=True)
-                try:
-                    await upsert_curriculum()
-                    print("[LMS] Curriculum seeded", flush=True)
-                except Exception as e:
-                    print(f"[LMS] Curriculum seeding error: {e}", flush=True)
             except Exception as e:
                 print(f"[LMS] Initialization error: {e}", flush=True)
 
@@ -150,14 +134,10 @@ async def lifespan(app: FastAPI):
         pass
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# APP
-# ══════════════════════════════════════════════════════════════════════════════
-
 app = FastAPI(
     title="Pipways Trading Platform",
     version=APP_VERSION,
-    lifespan=lifespan,
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -168,21 +148,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Health ────────────────────────────────────────────────────────────────────
-
 @app.get("/health")
 async def health_check():
     return {
-        "status":  "healthy",
+        "status": "healthy",
         "version": APP_VERSION,
-        "lms_available":   _HAS_LMS_INIT,
-        "academy_router":  True,
+        "lms_available": _HAS_LMS_INIT,
+        "academy_router": True,
         "stock_terminal": {
             "anthropic_ready": stock_module._anthropic is not None,
             "data_source": "yfinance (free)",
         },
         "chart_analysis": {
-            "http_pooling": chart_analysis._http_client is not None,
+            "http_pooling": chart_analysis._http_client is not None
         },
         "features": [
             "multi_format_journal",
@@ -193,27 +171,21 @@ async def health_check():
             "ai_stock_research",
             "chart_analysis_caching",
             "proactive_ai_insights",
-            "trading_academy_lms",
-            "academy_standalone_page",
-        ],
+            "trading_academy_lms"
+        ]
     }
-
-# ── Admin: manual curriculum seed ─────────────────────────────────────────────
 
 @app.post("/admin/init-academy")
 async def init_academy():
-    """Manually re-seed the Academy curriculum (admin only)."""
+    """Manually initialize academy curriculum (admin only)"""
     if not _HAS_LMS_INIT:
         raise HTTPException(status_code=503, detail="LMS module not available")
+    
     try:
         await upsert_curriculum()
         return {"status": "success", "message": "Academy curriculum initialized"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ROUTERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 app.include_router(auth.router,             prefix="/auth",           tags=["Authentication"])
 app.include_router(signals.router,          prefix="/signals",        tags=["Trading Signals"])
@@ -231,13 +203,9 @@ app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI 
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
 
-# Academy: no prefix — router self-registers /academy, /academy.html, /learning/*
-app.include_router(academy_router,                                    tags=["Academy"])
-print("[ROUTES] Academy router mounted (/academy.html, /learning/*)", flush=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# STATIC FILES
-# ══════════════════════════════════════════════════════════════════════════════
+# Academy: no prefix — router owns /academy.html, /academy, /learning/*, /admin/academy/*
+app.include_router(academy_router, tags=["Academy"])
+print("[ROUTES] Academy router mounted (/academy.html + /academy + /learning/* + /admin/academy/*)", flush=True)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -256,10 +224,6 @@ if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     print(f"[STATIC] Mounted /static from {STATIC_DIR}", flush=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE ROUTES
-# ══════════════════════════════════════════════════════════════════════════════
-
 @app.get("/")
 async def serve_index():
     for path in [
@@ -271,10 +235,11 @@ async def serve_index():
         if path and os.path.exists(path):
             return FileResponse(path)
     return JSONResponse({
-        "message": "Pipways API Server",
-        "status":  "running",
-        "version": APP_VERSION,
-        "docs":    "/docs",
+        "message": "Pipways API Server", 
+        "status": "running", 
+        "version": APP_VERSION, 
+        "docs": "/docs",
+        "academy_status": "configured"
     })
 
 @app.get("/dashboard.html")
@@ -309,8 +274,8 @@ async def serve_spa(full_path: str):
         return FileResponse(index_path)
 
     return JSONResponse({
-        "message": "Pipways API Server",
-        "status":  "running",
-        "version": APP_VERSION,
-        "path":    full_path,
+        "message": "Pipways API Server", 
+        "status": "running", 
+        "version": APP_VERSION, 
+        "path": full_path
     })

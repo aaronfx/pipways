@@ -15,7 +15,7 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -488,6 +488,11 @@
     <script>
     /* ── Config ── */
     const API_BASE = window.location.origin;
+
+    /* ── Configure marked ── */
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({ breaks: true, gfm: true });
+    }
 
     /* ── Auth helpers ── */
     function _handleAuthError() {
@@ -1098,12 +1103,21 @@
         /* ── Content processing ── */
         _processContent(content) {
             if (!content) return '';
+            // Strip consistent leading whitespace (from Python triple-quoted strings)
+            const lines = content.split('\n');
+            const minIndent = lines
+                .filter(l => l.trim().length > 0)
+                .reduce((min, l) => Math.min(min, l.match(/^(\s*)/)[1].length), Infinity);
+            const cleaned = lines.map(l => l.slice(minIndent === Infinity ? 0 : minIndent)).join('\n');
             const md = (typeof marked!=='undefined'&&marked.parse)
                 ? t => marked.parse(t,{breaks:true,gfm:true})
                 : t => t.replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^### (.+)$/gm,'<h3>$1</h3>')
                         .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code>$1</code>')
                         .replace(/^- (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^/,'<p>').replace(/$/,'</p>');
-            let html = md(content);
+            let html = md(cleaned);
+            // Replace any remaining [VISUAL:X] and [CHART:X] markers with placeholder
+            html = html.replace(/\[VISUAL:[^\]]+\]/g, '<div style="padding:.75rem;border-radius:.5rem;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);color:#a78bfa;font-size:.8rem;text-align:center;margin:.75rem 0;">📊 Chart diagram — update lesson content to see inline SVG</div>');
+            html = html.replace(/\[CHART:[^\]]+\]/g, '<div style="padding:.75rem;border-radius:.5rem;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-size:.8rem;text-align:center;margin:.75rem 0;">📈 Interactive chart — update lesson content to see inline SVG</div>');
             html = html.replace(/<svg([^>]*)>([\s\S]*?)<\/svg>/g, (m,attrs,inner)=>{
                 const dm=inner.match(/<defs>[\s\S]*?<\/defs>/); const defs=dm?dm[0]:'';
                 return `<svg${attrs}>${defs}${inner.replace(/<defs>[\s\S]*?<\/defs>/,'')}</svg>`;
@@ -1139,6 +1153,58 @@
     };
 
 
+    /* ── DEBUG PANEL (remove after testing) ── */
+    async function _runDebug() {
+        const token = localStorage.getItem('pipways_token');
+        const h = { 'Authorization': 'Bearer ' + token };
+        const panel = document.createElement('div');
+        panel.style.cssText = 'position:fixed;bottom:80px;left:0;right:0;z-index:99999;background:#0d1117;border-top:2px solid #7c3aed;padding:1rem;font-size:.75rem;font-family:monospace;max-height:40vh;overflow-y:auto;';
+        panel.id = 'debug-panel';
+        document.body.appendChild(panel);
+
+        const log = (msg, color='#9ca3af') => {
+            const d = document.createElement('div');
+            d.style.color = color;
+            d.style.marginBottom = '4px';
+            d.textContent = msg;
+            panel.appendChild(d);
+        };
+
+        log('=== ACADEMY DEBUG ===', '#a78bfa');
+        log('Token: ' + (token ? token.substring(0,20)+'...' : 'MISSING'), token ? '#34d399' : '#f87171');
+
+        try {
+            const r1 = await fetch('/learning/levels', {headers:h});
+            const d1 = await r1.json();
+            log('GET /learning/levels → ' + r1.status + ' → ' + JSON.stringify(d1).substring(0,120), r1.ok ? '#34d399' : '#f87171');
+
+            if (Array.isArray(d1) && d1.length > 0) {
+                const id = d1[0].id;
+                const r2 = await fetch('/learning/modules/' + id, {headers:h});
+                const d2 = await r2.json();
+                log('GET /learning/modules/' + id + ' → ' + r2.status + ' → ' + JSON.stringify(d2).substring(0,200), r2.ok ? '#34d399' : '#f87171');
+
+                if (Array.isArray(d2) && d2.length > 0) {
+                    log('✅ Modules loaded: ' + d2.length + ' modules', '#34d399');
+                    log('First module: ' + JSON.stringify(d2[0]).substring(0,100), '#60a5fa');
+                } else {
+                    log('❌ Modules empty or not array: ' + typeof d2, '#f87171');
+                }
+            } else {
+                log('❌ Levels empty: ' + JSON.stringify(d1), '#f87171');
+            }
+
+            const r3 = await fetch('/learning/progress/' + (JSON.parse(localStorage.getItem('pipways_user')||'{}').id||0), {headers:h});
+            const d3 = await r3.json();
+            log('GET /learning/progress → ' + r3.status + ' total_lessons:' + (d3.total_lessons||0) + ' completed:' + (d3.completed_lessons||0), r3.ok ? '#34d399' : '#f87171');
+
+        } catch(e) {
+            log('FETCH ERROR: ' + e.message, '#f87171');
+        }
+        log('Close: tap here', '#6b7280');
+        panel.onclick = () => panel.remove();
+    }
+    setTimeout(_runDebug, 1500);
 
     /* ── Boot ── */
     document.addEventListener('DOMContentLoaded', () => academy.init());

@@ -59,7 +59,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Forex Basics Chart](/static/charts/forex_basics_example.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">EUR/USD — Entry Example (1:2 Risk:Reward)</text><polyline points="20,160 60,150 100,155 140,130 180,120 220,110 260,125 300,100 340,85 380,90 440,70" fill="none" stroke="#34d399" stroke-width="2.5"/><circle cx="140" cy="130" r="5" fill="#fbbf24"/><text x="148" y="126" fill="#fbbf24" font-size="10">BUY 1.0850</text><line x1="140" y1="148" x2="420" y2="148" stroke="#f87171" stroke-width="1" stroke-dasharray="4"/><text x="422" y="152" fill="#f87171" font-size="9">SL 1.0830</text><line x1="140" y1="112" x2="420" y2="112" stroke="#34d399" stroke-width="1" stroke-dasharray="4"/><text x="422" y="116" fill="#34d399" font-size="9">TP 1.0890</text><text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Risk: 20 pips ($20) | Reward: 40 pips ($40) | R:R = 1:2</text></svg>
     
     ---
     
@@ -137,8 +137,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Market Participants](/static/charts/market_hierarchy_diagram.png)
-    
+        
     <svg class="ac-svg-diagram" viewBox="0 0 400 200">
       <rect x="50" y="20" width="300" height="40" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" rx="5"/>
       <text x="200" y="45" text-anchor="middle" fill="#f59e0b" font-size="14">Central Banks (Biggest Impact)</text>
@@ -237,7 +236,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Currency Pair Categories](/static/charts/currency_pair_types.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="20" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">Currency Pair Categories</text><rect x="20" y="35" width="130" height="145" fill="rgba(52,211,153,0.08)" stroke="#34d399" rx="6"/><text x="85" y="55" text-anchor="middle" fill="#34d399" font-size="11" font-weight="bold">MAJORS</text><text x="85" y="72" text-anchor="middle" fill="#9ca3af" font-size="9">Tightest spreads</text><text x="85" y="90" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/USD</text><text x="85" y="108" text-anchor="middle" fill="#e5e7eb" font-size="10">GBP/USD</text><text x="85" y="126" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/JPY</text><text x="85" y="144" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/CHF</text><text x="85" y="168" text-anchor="middle" fill="#34d399" font-size="9">Best for beginners</text><rect x="170" y="35" width="130" height="145" fill="rgba(96,165,250,0.08)" stroke="#60a5fa" rx="6"/><text x="235" y="55" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="bold">MINORS</text><text x="235" y="72" text-anchor="middle" fill="#9ca3af" font-size="9">No USD involved</text><text x="235" y="90" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/GBP</text><text x="235" y="108" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/JPY</text><text x="235" y="126" text-anchor="middle" fill="#e5e7eb" font-size="10">GBP/JPY</text><text x="235" y="144" text-anchor="middle" fill="#e5e7eb" font-size="10">AUD/JPY</text><text x="235" y="168" text-anchor="middle" fill="#60a5fa" font-size="9">Good for variety</text><rect x="320" y="35" width="140" height="145" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" rx="6"/><text x="390" y="55" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">EXOTICS</text><text x="390" y="72" text-anchor="middle" fill="#9ca3af" font-size="9">Emerging markets</text><text x="390" y="90" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/TRY</text><text x="390" y="108" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/ZAR</text><text x="390" y="126" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/MXN</text><text x="390" y="144" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/TRY</text><text x="390" y="168" text-anchor="middle" fill="#f59e0b" font-size="9">Wide spreads — avoid</text></svg>
     
     ---
     
@@ -413,7 +412,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Leverage Explanation](/static/charts/leverage_visualization.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="20" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Leverage: Amplifies Both Gains AND Losses</text><text x="30" y="55" fill="#9ca3af" font-size="10">No Leverage (1:1)</text><rect x="30" y="62" width="60" height="16" fill="#34d399" rx="3"/><text x="95" y="74" fill="#34d399" font-size="10">$1,000 controls $1,000</text><text x="30" y="100" fill="#9ca3af" font-size="10">1:10 Leverage</text><rect x="30" y="107" width="120" height="16" fill="#fbbf24" rx="3"/><text x="155" y="119" fill="#fbbf24" font-size="10">$1,000 controls $10,000</text><text x="30" y="145" fill="#9ca3af" font-size="10">1:100 Leverage ⚠️</text><rect x="30" y="152" width="300" height="16" fill="#f87171" rx="3"/><text x="335" y="164" fill="#f87171" font-size="10">$1,000 controls $100,000</text><text x="240" y="192" text-anchor="middle" fill="#6b7280" font-size="9">Higher leverage = bigger position = risk of account wipeout on small moves</text></svg>
     
     ---
     
@@ -486,7 +485,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Position Sizing Formula](/static/charts/position_sizing_formula.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="20" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">Position Sizing Formula</text><rect x="30" y="32" width="420" height="40" fill="rgba(124,58,237,0.15)" stroke="#7c3aed" rx="6"/><text x="240" y="50" text-anchor="middle" fill="#c4b5fd" font-size="11">Lot Size = (Account × Risk%) ÷ (Stop Loss pips × Pip Value)</text><text x="240" y="65" text-anchor="middle" fill="#9ca3af" font-size="9">Max risk = 1–2% of account per trade</text><text x="30" y="95" fill="#fbbf24" font-size="11" font-weight="bold">Example:</text><text x="30" y="113" fill="#e5e7eb" font-size="10">Account: $10,000 | Risk: 1% = $100 | SL: 20 pips | Pip Value: $1</text><text x="30" y="133" fill="#34d399" font-size="12" font-weight="bold">Lot Size = $100 ÷ (20 × $1) = 0.5 mini lots</text><text x="30" y="162" fill="#9ca3af" font-size="9">Safe:</text><rect x="70" y="152" width="60" height="12" fill="#34d399" rx="2"/><text x="100" y="162" text-anchor="middle" fill="#0d1117" font-size="9">1–2%</text><rect x="145" y="152" width="60" height="12" fill="#f59e0b" rx="2"/><text x="175" y="162" text-anchor="middle" fill="#0d1117" font-size="9">3–5%</text><rect x="220" y="152" width="60" height="12" fill="#f87171" rx="2"/><text x="250" y="162" text-anchor="middle" fill="#0d1117" font-size="9">5%+ danger</text><text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Never risk more than 2% on a single trade</text></svg>
     
     ---
     
@@ -570,8 +569,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Trading Sessions](/static/charts/trading_sessions_timeline.png)
-    
+        
     <svg class="ac-svg-diagram" viewBox="0 0 600 150">
       <rect x="20" y="50" width="160" height="50" fill="rgba(251,191,36,0.2)" stroke="#fbbf24" rx="5"/>
       <text x="100" y="78" text-anchor="middle" fill="#fbbf24" font-size="12">Asian (00-09 UTC)</text>
@@ -658,7 +656,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Best Trading Times](/static/charts/optimal_trading_hours.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="180" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Best Trading Hours (GMT)</text><text x="30" y="38" fill="#6b7280" font-size="8">00:00</text><text x="105" y="38" fill="#6b7280" font-size="8">06:00</text><text x="175" y="38" fill="#6b7280" font-size="8">08:00</text><text x="280" y="38" fill="#6b7280" font-size="8">13:00</text><text x="365" y="38" fill="#6b7280" font-size="8">17:00</text><text x="435" y="38" fill="#6b7280" font-size="8">22:00</text><rect x="30" y="46" width="75" height="22" fill="rgba(96,165,250,0.3)" stroke="#60a5fa" rx="3"/><text x="67" y="62" text-anchor="middle" fill="#60a5fa" font-size="9">Tokyo</text><rect x="170" y="46" width="145" height="22" fill="rgba(167,139,250,0.3)" stroke="#a78bfa" rx="3"/><text x="242" y="62" text-anchor="middle" fill="#a78bfa" font-size="9">London</text><rect x="270" y="46" width="160" height="22" fill="rgba(52,211,153,0.3)" stroke="#34d399" rx="3"/><text x="350" y="62" text-anchor="middle" fill="#34d399" font-size="9">New York</text><rect x="270" y="46" width="75" height="22" fill="rgba(251,191,36,0.5)" stroke="#fbbf24" rx="3"/><text x="307" y="62" text-anchor="middle" fill="#fbbf24" font-size="9">OVERLAP ⭐</text><text x="30" y="100" fill="#fbbf24" font-size="10" font-weight="bold">⭐ London–NY Overlap (13:00–17:00 GMT) = Highest volume and volatility</text><text x="30" y="118" fill="#9ca3af" font-size="9">EUR/USD and GBP/USD most active during London–NY overlap</text><text x="30" y="136" fill="#6b7280" font-size="9">Avoid Asian session for major pairs — low volume, wide spreads</text><text x="30" y="162" fill="#34d399" font-size="9">Rule: Trade during sessions that match your currency pair</text></svg>
     
     ---
     
@@ -739,7 +737,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Risk Comparison](/static/charts/risk_percentage_comparison.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="190" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Account Survival After 10 Consecutive Losses ($10,000 start)</text><text x="30" y="48" fill="#9ca3af" font-size="10">1% risk:</text><rect x="100" y="38" width="260" height="16" fill="#34d399" rx="3"/><text x="365" y="50" fill="#34d399" font-size="10">$9,044 remaining ✅</text><text x="30" y="80" fill="#9ca3af" font-size="10">2% risk:</text><rect x="100" y="70" width="230" height="16" fill="#fbbf24" rx="3"/><text x="335" y="82" fill="#fbbf24" font-size="10">$8,171 remaining ✅</text><text x="30" y="112" fill="#9ca3af" font-size="10">5% risk:</text><rect x="100" y="102" width="160" height="16" fill="#fb923c" rx="3"/><text x="265" y="114" fill="#fb923c" font-size="10">$5,987 remaining ⚠️</text><text x="30" y="144" fill="#9ca3af" font-size="10">10% risk:</text><rect x="100" y="134" width="75" height="16" fill="#f87171" rx="3"/><text x="180" y="146" fill="#f87171" font-size="10">$3,487 remaining ❌</text><text x="240" y="175" text-anchor="middle" fill="#34d399" font-size="9">Professional traders risk 0.5–2% max. Consistency beats home runs.</text></svg>
     
     ---
     
@@ -819,7 +817,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Stop Loss Placement](/static/charts/stop_loss_placement_example.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Stop Loss Placement — Below Support</text><polyline points="30,170 70,155 100,162 140,140 170,148 210,125 240,132 280,110 310,118 350,95 390,102 430,80" fill="none" stroke="#60a5fa" stroke-width="2"/><line x1="30" y1="148" x2="460" y2="148" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5"/><text x="33" y="143" fill="#34d399" font-size="9">Support Zone</text><circle cx="210" cy="125" r="5" fill="#fbbf24"/><text x="215" y="120" fill="#fbbf24" font-size="9">Entry (buy at support)</text><line x1="30" y1="163" x2="460" y2="163" stroke="#f87171" stroke-width="1.5" stroke-dasharray="3"/><text x="33" y="175" fill="#f87171" font-size="9">Stop Loss (below support — avoids stop hunts)</text><line x1="30" y1="95" x2="460" y2="95" stroke="#34d399" stroke-width="1" stroke-dasharray="3"/><text x="33" y="90" fill="#34d399" font-size="9">Take Profit</text><text x="240" y="195" text-anchor="middle" fill="#6b7280" font-size="9">Place stop BELOW support (not at it). Target minimum 1:2 risk:reward.</text></svg>
     
     ---
     
@@ -902,7 +900,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Candlestick Patterns](/static/charts/candlestick_basics.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Candlestick Anatomy</text><text x="100" y="38" text-anchor="middle" fill="#34d399" font-size="11" font-weight="bold">Bullish (Green)</text><line x1="100" y1="48" x2="100" y2="68" stroke="#34d399" stroke-width="2"/><rect x="75" y="68" width="50" height="80" fill="rgba(52,211,153,0.3)" stroke="#34d399" stroke-width="2" rx="2"/><line x1="100" y1="148" x2="100" y2="168" stroke="#34d399" stroke-width="2"/><text x="140" y="63" fill="#9ca3af" font-size="9">High (upper wick)</text><text x="140" y="85" fill="#34d399" font-size="9">Close (top of body)</text><text x="140" y="138" fill="#34d399" font-size="9">Open (bottom)</text><text x="140" y="162" fill="#9ca3af" font-size="9">Low (lower wick)</text><text x="340" y="38" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold">Bearish (Red)</text><line x1="340" y1="48" x2="340" y2="68" stroke="#f87171" stroke-width="2"/><rect x="315" y="68" width="50" height="80" fill="rgba(239,68,68,0.3)" stroke="#f87171" stroke-width="2" rx="2"/><line x1="340" y1="148" x2="340" y2="168" stroke="#f87171" stroke-width="2"/><text x="255" y="85" text-anchor="end" fill="#f87171" font-size="9">Open (top)</text><text x="255" y="138" text-anchor="end" fill="#f87171" font-size="9">Close (bottom)</text><text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Green = buyers dominated | Red = sellers dominated | Body size = conviction</text></svg>
     
     ---
     
@@ -977,7 +975,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Support and Resistance](/static/charts/support_resistance_basic.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Support &amp; Resistance Levels</text><polyline points="30,165 70,148 100,162 140,135 180,148 220,125 250,142 290,118 320,135 360,108 400,122 440,100" fill="none" stroke="#60a5fa" stroke-width="2"/><line x1="30" y1="122" x2="460" y2="122" stroke="#f87171" stroke-width="1.5" stroke-dasharray="6"/><text x="35" y="117" fill="#f87171" font-size="10" font-weight="bold">RESISTANCE — sellers push price down here</text><line x1="30" y1="162" x2="460" y2="162" stroke="#34d399" stroke-width="1.5" stroke-dasharray="6"/><text x="35" y="178" fill="#34d399" font-size="10" font-weight="bold">SUPPORT — buyers push price up here</text><text x="148" y="114" fill="#f87171" font-size="14">↓</text><text x="228" y="114" fill="#f87171" font-size="14">↓</text><text x="68" y="158" fill="#34d399" font-size="14">↑</text><text x="178" y="158" fill="#34d399" font-size="14">↑</text></svg>
     
     ---
     
@@ -1065,7 +1063,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Trend Analysis](/static/charts/trend_identification.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Trend Structure: Higher Highs/Lows vs Lower Highs/Lows</text><text x="80" y="35" text-anchor="middle" fill="#34d399" font-size="10" font-weight="bold">UPTREND</text><polyline points="20,170 50,152 80,162 110,132 140,148 170,112" fill="none" stroke="#34d399" stroke-width="2"/><circle cx="50" cy="152" r="4" fill="#fbbf24"/><text x="45" y="147" fill="#fbbf24" font-size="8">HL</text><circle cx="110" cy="132" r="4" fill="#34d399"/><text x="114" y="128" fill="#34d399" font-size="8">HH</text><circle cx="140" cy="148" r="4" fill="#fbbf24"/><text x="144" y="158" fill="#fbbf24" font-size="8">HL</text><circle cx="170" cy="112" r="4" fill="#34d399"/><text x="174" y="108" fill="#34d399" font-size="8">HH</text><line x1="240" y1="30" x2="240" y2="180" stroke="#374151" stroke-width="1" stroke-dasharray="4"/><text x="360" y="35" text-anchor="middle" fill="#f87171" font-size="10" font-weight="bold">DOWNTREND</text><polyline points="260,80 290,100 320,90 350,118 380,106 410,135 440,122 460,148" fill="none" stroke="#f87171" stroke-width="2"/><circle cx="290" cy="100" r="4" fill="#f87171"/><text x="286" y="95" fill="#f87171" font-size="8">LH</text><circle cx="380" cy="106" r="4" fill="#f87171"/><text x="376" y="101" fill="#f87171" font-size="8">LH</text><circle cx="440" cy="122" r="4" fill="#fbbf24"/><text x="444" y="138" fill="#fbbf24" font-size="8">LL</text><text x="240" y="188" text-anchor="middle" fill="#6b7280" font-size="9">Trade WITH the trend — HH+HL = buy setups | LH+LL = sell setups</text></svg>
     
     ---
     
@@ -1141,7 +1139,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Multiple Timeframes](/static/charts/multi_timeframe_analysis.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Multi-Timeframe Analysis (Top-Down Approach)</text><rect x="130" y="30" width="220" height="34" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" rx="6"/><text x="240" y="48" text-anchor="middle" fill="#f59e0b" font-size="11">Monthly / Weekly</text><text x="240" y="60" text-anchor="middle" fill="#9ca3af" font-size="9">Overall trend direction</text><line x1="240" y1="64" x2="240" y2="76" stroke="#374151" stroke-width="2"/><rect x="90" y="76" width="300" height="34" fill="rgba(96,165,250,0.15)" stroke="#60a5fa" rx="6"/><text x="240" y="94" text-anchor="middle" fill="#60a5fa" font-size="11">Daily / 4-Hour</text><text x="240" y="106" text-anchor="middle" fill="#9ca3af" font-size="9">Key levels, structure, context</text><line x1="240" y1="110" x2="240" y2="122" stroke="#374151" stroke-width="2"/><rect x="50" y="122" width="380" height="34" fill="rgba(52,211,153,0.15)" stroke="#34d399" rx="6"/><text x="240" y="140" text-anchor="middle" fill="#34d399" font-size="11">1-Hour / 15-Minute</text><text x="240" y="152" text-anchor="middle" fill="#9ca3af" font-size="9">Entry timing and precise stop placement</text><text x="240" y="180" text-anchor="middle" fill="#fbbf24" font-size="9">Rule: Only enter trades where all 3 timeframes agree on direction</text></svg>
     
     ---
     
@@ -1224,7 +1222,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Dynamic S/R](/static/charts/dynamic_support_resistance.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Dynamic S&amp;R — Moving Averages as Support</text><polyline points="20,130 60,115 90,125 130,100 160,115 200,90 240,105 280,80 320,95 360,70 400,85 440,60" fill="none" stroke="#60a5fa" stroke-width="2"/><polyline points="20,135 60,120 90,128 130,105 160,118 200,95 240,108 280,85 320,98 360,75 400,88 440,65" fill="none" stroke="#34d399" stroke-width="1.5"/><polyline points="20,150 60,143 90,140 130,128 160,132 200,120 240,122 280,110 320,114 360,102 400,108 440,94" fill="none" stroke="#f59e0b" stroke-width="1.5"/><rect x="25" y="155" width="55" height="12" fill="rgba(96,165,250,0.15)" rx="2"/><text x="52" y="165" text-anchor="middle" fill="#60a5fa" font-size="9">Price</text><rect x="90" y="155" width="65" height="12" fill="rgba(52,211,153,0.15)" rx="2"/><text x="122" y="165" text-anchor="middle" fill="#34d399" font-size="9">MA20 (Fast)</text><rect x="165" y="155" width="65" height="12" fill="rgba(245,158,11,0.15)" rx="2"/><text x="197" y="165" text-anchor="middle" fill="#f59e0b" font-size="9">MA50 (Slow)</text><text x="240" y="185" text-anchor="middle" fill="#6b7280" font-size="9">Price bouncing off MA = dynamic support. MA20 above MA50 = uptrend.</text></svg>
     
     ---
     
@@ -1303,7 +1301,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Chart Patterns](/static/charts/chart_patterns_formation.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Key Chart Patterns</text><text x="80" y="35" text-anchor="middle" fill="#f87171" font-size="9" font-weight="bold">Head &amp; Shoulders (Bearish)</text><polyline points="20,120 40,100 60,110 80,78 100,110 120,100 140,120" fill="none" stroke="#f87171" stroke-width="2"/><line x1="20" y1="120" x2="140" y2="120" stroke="#f87171" stroke-width="1" stroke-dasharray="3"/><text x="80" y="138" text-anchor="middle" fill="#9ca3af" font-size="8">Neckline break → sell</text><text x="240" y="35" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">Double Bottom (Bullish)</text><polyline points="175,80 195,120 215,102 235,120 255,80" fill="none" stroke="#34d399" stroke-width="2"/><line x1="175" y1="102" x2="255" y2="102" stroke="#34d399" stroke-width="1" stroke-dasharray="3"/><text x="215" y="138" text-anchor="middle" fill="#9ca3af" font-size="8">Break above → buy</text><text x="390" y="35" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Bull Flag (Continuation)</text><line x1="320" y1="125" x2="320" y2="78" stroke="#60a5fa" stroke-width="2"/><polyline points="320,78 340,100 360,105 380,100 400,106 420,100" fill="none" stroke="#60a5fa" stroke-width="2"/><text x="380" y="138" text-anchor="middle" fill="#9ca3af" font-size="8">Break up → continuation</text><text x="240" y="162" text-anchor="middle" fill="#9ca3af" font-size="9">Patterns repeat because human psychology repeats across all markets</text><text x="240" y="180" text-anchor="middle" fill="#fbbf24" font-size="9">Always wait for CONFIRMATION (breakout candle) before entering</text></svg>
     
     ---
     
@@ -1387,7 +1385,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Moving Averages](/static/charts/moving_average_strategies.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Moving Average Crossover (Golden Cross / Death Cross)</text><polyline points="20,150 60,140 100,145 140,120 180,130 220,100 260,90 300,80 340,85 380,70 420,65 460,55" fill="none" stroke="#9ca3af" stroke-width="1.5" opacity="0.4"/><polyline points="20,155 60,148 100,148 140,126 180,133 220,105 260,94 300,83 340,87 380,73 420,67 460,57" fill="none" stroke="#34d399" stroke-width="2"/><polyline points="20,165 60,160 100,158 140,150 180,148 220,138 260,128 300,115 340,108 380,100 420,92 460,85" fill="none" stroke="#f59e0b" stroke-width="2"/><circle cx="220" cy="138" r="10" fill="none" stroke="#fbbf24" stroke-width="2"/><text x="225" y="128" fill="#fbbf24" font-size="8">Golden</text><text x="225" y="138" fill="#fbbf24" font-size="8">Cross</text><text x="225" y="150" fill="#34d399" font-size="8">BUY ↑</text><rect x="25" y="168" width="55" height="12" fill="rgba(52,211,153,0.2)" rx="2"/><text x="52" y="178" text-anchor="middle" fill="#34d399" font-size="9">MA20 Fast</text><rect x="90" y="168" width="55" height="12" fill="rgba(245,158,11,0.2)" rx="2"/><text x="117" y="178" text-anchor="middle" fill="#f59e0b" font-size="9">MA50 Slow</text><text x="320" y="178" fill="#6b7280" font-size="9">MA20 crosses MA50 upward = trend shift</text></svg>
     
     ---
     
@@ -1467,7 +1465,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    ![Momentum Indicators](/static/charts/rsi_macd_indicators.png)
+    <svg class="ac-svg-diagram" viewBox="0 0 480 210" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="210" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">RSI &amp; MACD Momentum Indicators</text><text x="30" y="35" fill="#60a5fa" font-size="10" font-weight="bold">RSI (14)</text><rect x="20" y="40" width="200" height="70" fill="rgba(0,0,0,0.3)" rx="4"/><line x1="20" y1="58" x2="220" y2="58" stroke="#f87171" stroke-width="1" stroke-dasharray="3" opacity="0.7"/><text x="224" y="62" fill="#f87171" font-size="8">70 Overbought</text><line x1="20" y1="90" x2="220" y2="90" stroke="#34d399" stroke-width="1" stroke-dasharray="3" opacity="0.7"/><text x="224" y="94" fill="#34d399" font-size="8">30 Oversold</text><polyline points="30,82 55,72 80,58 105,52 130,65 155,76 180,90 205,82" fill="none" stroke="#60a5fa" stroke-width="2"/><text x="110" y="120" text-anchor="middle" fill="#9ca3af" font-size="8">Above 70 = sell signal | Below 30 = buy signal</text><text x="270" y="35" fill="#f59e0b" font-size="10" font-weight="bold">MACD (12,26,9)</text><rect x="260" y="40" width="200" height="70" fill="rgba(0,0,0,0.3)" rx="4"/><line x1="260" y1="75" x2="460" y2="75" stroke="#374151" stroke-width="1"/><rect x="270" y="68" width="7" height="7" fill="#34d399" opacity="0.8"/><rect x="282" y="65" width="7" height="10" fill="#34d399" opacity="0.8"/><rect x="294" y="62" width="7" height="13" fill="#34d399" opacity="0.8"/><rect x="306" y="67" width="7" height="8" fill="#34d399" opacity="0.8"/><rect x="330" y="75" width="7" height="6" fill="#f87171" opacity="0.8"/><rect x="342" y="75" width="7" height="10" fill="#f87171" opacity="0.8"/><rect x="354" y="75" width="7" height="8" fill="#f87171" opacity="0.8"/><polyline points="270,70 295,63 318,75 342,79 368,74 392,70" fill="none" stroke="#fbbf24" stroke-width="1.5"/><text x="360" y="120" text-anchor="middle" fill="#9ca3af" font-size="8">Green=bullish | Red=bearish momentum</text><text x="240" y="145" text-anchor="middle" fill="#fbbf24" font-size="9">⭐ RSI oversold + MACD bullish cross = strong buy confluence</text><text x="240" y="163" text-anchor="middle" fill="#9ca3af" font-size="9">Never use indicators alone — confirm with price action and structure</text><text x="240" y="180" text-anchor="middle" fill="#6b7280" font-size="8">RSI period: 14 | MACD: 12, 26, 9 (default settings on all platforms)</text></svg>
     
     ---
     

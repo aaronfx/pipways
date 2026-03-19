@@ -1,6 +1,6 @@
 """
-AI Trading Mentor - PLATFORM INTELLIGENCE SYSTEM v3.0
-Central AI brain with contextual access to all platform modules
+AI Trading Mentor - PLATFORM INTELLIGENCE SYSTEM v4.0
+Central AI brain with contextual access to all platform modules + Trading Academy integration
 """
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
@@ -10,6 +10,7 @@ import os
 import httpx
 import asyncio
 import json
+import re
 
 from .security import get_current_user, get_user_id as _user_id
 from .database import database  # needed for persistent history
@@ -23,11 +24,7 @@ OPENROUTER_CONFIGURED = OPENROUTER_API_KEY is not None and OPENROUTER_API_KEY !=
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # ── Persistent conversation history helpers ───────────────────────────────────
-# Replaces the in-memory defaultdict(list) which reset on every deploy.
-# History is stored in ai_mentor_logs (role + message columns added by migration).
-
 MAX_HISTORY = 10
-
 
 async def _db_load_history(user_id: str) -> list:
     """Load last MAX_HISTORY*2 messages for a user from the database."""
@@ -39,13 +36,11 @@ async def _db_load_history(user_id: str) -> list:
             {"uid": int(user_id) if user_id.isdigit() else 0,
              "limit": MAX_HISTORY * 2}
         )
-        # Reverse so oldest first (DESC gives us newest first)
         return [{"role": r["role"], "content": r["message"]}
                 for r in reversed(rows)]
     except Exception as e:
         print(f"[MENTOR] History load error: {e}", flush=True)
         return []
-
 
 async def _db_save_message(user_id: str, role: str, content: str, topic: str = "") -> None:
     """Persist a single message to ai_mentor_logs."""
@@ -59,7 +54,6 @@ async def _db_save_message(user_id: str, role: str, content: str, topic: str = "
     except Exception as e:
         print(f"[MENTOR] History save error: {e}", flush=True)
 
-
 async def _db_clear_history(user_id: str) -> None:
     """Delete all stored messages for a user."""
     try:
@@ -72,77 +66,53 @@ async def _db_clear_history(user_id: str) -> None:
         print(f"[MENTOR] History clear error: {e}", flush=True)
 
 # ==========================================
-# MODELS
+# ACADEMY INTEGRATION MODELS
 # ==========================================
 
-class MentorQuery(BaseModel):
-    question: str = Field(..., min_length=1, max_length=2000)
-    context: Optional[str] = Field(None, max_length=1000)
-    skill_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
-    topic: Optional[str] = None
-    include_platform_context: bool = True
+class AcademyLesson(BaseModel):
+    id: int
+    title: str
+    module_id: int
+    module_name: str
+    level_id: int
+    level_name: str
+    order_index: int
+    completed: bool = False
 
-class ChatMessage(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str
-    timestamp: Optional[datetime] = None
-    metadata: Optional[Dict[str, Any]] = None
+class AcademyStructure(BaseModel):
+    levels: List[Dict[str, Any]]
+    modules: Dict[int, List[Dict[str, Any]]]  # level_id -> modules
+    lessons: Dict[int, List[Dict[str, Any]]]  # module_id -> lessons
 
-class Recommendation(BaseModel):
-    type: Literal["course", "blog", "signal", "strategy", "warning"]
+class UserAcademyProgress(BaseModel):
+    completed_lessons: List[int]
+    current_level: Optional[str]
+    completion_rate: float
+    summary: List[Dict[str, Any]]
+
+class LessonRecommendation(BaseModel):
+    type: Literal["lesson", "course", "blog", "signal", "strategy", "warning"]
     title: str
     description: Optional[str] = None
     url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
-
-class MentorResponse(BaseModel):
-    response: str
-    recommendations: List[Recommendation]
-    context_used: Dict[str, Any]
-    command_triggered: Optional[str] = None
-    confidence: float = Field(default=0.9, ge=0, le=1)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class UserContext(BaseModel):
-    journal_performance: Optional[Dict[str, Any]] = None
-    last_chart_analysis: Optional[Dict[str, Any]] = None
-    active_signals: List[Dict[str, Any]] = []
-    available_courses: List[Dict[str, Any]] = []
-    recent_blogs: List[Dict[str, Any]] = []
-    trading_stats: Optional[Dict[str, Any]] = None
-    user_skill_level: str = "intermediate"
-
-class CoachInsights(BaseModel):
-    trading_personality: str
-    strengths: List[str]
-    weaknesses: List[str]
-    risk_profile: str
-    discipline_score: int
-    consistency_score: int
-    recommended_next_steps: List[str]
-    recommended_resources: List[Recommendation]
+    reason: Literal["recommended", "next_step", "foundational", "remedial"] = "recommended"
 
 # ==========================================
-# CONTEXT ENGINE
+# CONTEXT ENGINE (Extended with Academy)
 # ==========================================
 
 async def fetch_journal_performance(client: httpx.AsyncClient, token: str, base_url: str) -> Optional[Dict]:
     """Fetch user trading journal performance"""
     try:
         url = f"{base_url}/ai/performance/dashboard"
-        print(f"[FETCH] Calling {url}", flush=True)
         resp = await client.get(
             url,
             headers={"Authorization": f"Bearer {token}"},
             timeout=10.0
         )
-        print(f"[FETCH] Journal response status: {resp.status_code}", flush=True)
         if resp.status_code == 200:
-            data = resp.json()
-            print(f"[FETCH] Journal data keys: {list(data.keys()) if data else 'empty'}", flush=True)
-            return data
-        else:
-            print(f"[FETCH] Journal error: {resp.text[:200]}", flush=True)
+            return resp.json()
     except Exception as e:
         print(f"[CONTEXT] Journal fetch error: {e}", flush=True)
     return None
@@ -150,10 +120,7 @@ async def fetch_journal_performance(client: httpx.AsyncClient, token: str, base_
 async def fetch_active_signals(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
     """Fetch active trading signals"""
     try:
-        resp = await client.get(
-            f"{base_url}/signals/active",
-            timeout=5.0
-        )
+        resp = await client.get(f"{base_url}/signals/active", timeout=5.0)
         if resp.status_code == 200:
             data = resp.json()
             return data if isinstance(data, list) else data.get("signals", [])
@@ -164,10 +131,7 @@ async def fetch_active_signals(client: httpx.AsyncClient, base_url: str) -> List
 async def fetch_courses(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
     """Fetch available courses"""
     try:
-        resp = await client.get(
-            f"{base_url}/courses/list",
-            timeout=5.0
-        )
+        resp = await client.get(f"{base_url}/courses/list", timeout=5.0)
         if resp.status_code == 200:
             data = resp.json()
             return data if isinstance(data, list) else data.get("courses", [])
@@ -178,87 +142,267 @@ async def fetch_courses(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
 async def fetch_blog_posts(client: httpx.AsyncClient, base_url: str) -> List[Dict]:
     """Fetch recent blog posts"""
     try:
-        resp = await client.get(
-            f"{base_url}/blog/posts",
-            timeout=5.0
-        )
+        resp = await client.get(f"{base_url}/blog/posts", timeout=5.0)
         if resp.status_code == 200:
             data = resp.json()
             posts = data if isinstance(data, list) else data.get("posts", [])
-            return posts[:5]  # Only recent 5
+            return posts[:5]
     except Exception as e:
         print(f"[CONTEXT] Blog fetch error: {e}", flush=True)
     return []
 
-async def fetch_last_chart_analysis(client: httpx.AsyncClient, token: str, base_url: str) -> Optional[Dict]:
-    """Fetch user's last chart analysis (simulated via session or cache)"""
-    # In production, this would query a cache/DB for last analysis
-    # For now, return None to allow AI to respond generically
-    return None
+# ── NEW: Academy Structure Fetching ───────────────────────────────────────────
 
-async def get_user_trading_context(client: httpx.AsyncClient, token: str, user_id: str, base_url: str) -> UserContext:
-    """
-    Gather comprehensive user context from all platform modules
-    Parallel async fetching for performance
-    """
-    print(f"[CONTEXT] Fetching for user {user_id} from {base_url}", flush=True)
-
-    journal_task = fetch_journal_performance(client, token, base_url)
-    signals_task = fetch_active_signals(client, base_url)
-    courses_task = fetch_courses(client, base_url)
-    blogs_task = fetch_blog_posts(client, base_url)
-    chart_task = fetch_last_chart_analysis(client, token, base_url)
-
+async def fetch_academy_structure(client: httpx.AsyncClient, base_url: str, token: str) -> AcademyStructure:
+    """Fetch full academy hierarchy: levels → modules → lessons"""
     try:
-        journal, signals, courses, blogs, chart = await asyncio.gather(
-            journal_task, signals_task, courses_task, blogs_task, chart_task,
-            return_exceptions=True
+        # Fetch levels
+        levels_resp = await client.get(
+            f"{base_url}/learning/levels",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0
         )
+        if levels_resp.status_code != 200:
+            return AcademyStructure(levels=[], modules={}, lessons={})
 
-        # Log results
-        if isinstance(journal, Exception):
-            print(f"[CONTEXT] Journal fetch failed: {journal}", flush=True)
-            journal = None
-        else:
-            print(f"[CONTEXT] Journal fetched successfully: {journal is not None}", flush=True)
+        levels = levels_resp.json()
+        modules_map = {}
+        lessons_map = {}
 
-        if isinstance(signals, Exception):
-            print(f"[CONTEXT] Signals fetch failed: {signals}", flush=True)
-            signals = []
-        else:
-            print(f"[CONTEXT] Signals fetched: {len(signals) if signals else 0}", flush=True)
+        # Fetch modules for each level
+        for level in levels:
+            level_id = level.get("id")
+            mod_resp = await client.get(
+                f"{base_url}/learning/modules/{level_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=5.0
+            )
+            if mod_resp.status_code == 200:
+                modules = mod_resp.json()
+                modules_map[level_id] = modules
 
+                # Fetch lessons for each module
+                for module in modules:
+                    mod_id = module.get("id")
+                    les_resp = await client.get(
+                        f"{base_url}/learning/lessons/{mod_id}",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=5.0
+                    )
+                    if les_resp.status_code == 200:
+                        lessons_map[mod_id] = les_resp.json()
+
+        return AcademyStructure(
+            levels=levels,
+            modules=modules_map,
+            lessons=lessons_map
+        )
     except Exception as e:
-        print(f"[CONTEXT] Gather failed: {e}", flush=True)
-        journal, signals, courses, blogs, chart = None, [], [], [], None
+        print(f"[ACADEMY] Structure fetch error: {e}", flush=True)
+        return AcademyStructure(levels=[], modules={}, lessons={})
 
-    # Handle exceptions
-    journal = None if isinstance(journal, Exception) else journal
-    signals = [] if isinstance(signals, Exception) else signals
-    courses = [] if isinstance(courses, Exception) else courses
-    blogs = [] if isinstance(blogs, Exception) else blogs
-    chart = None if isinstance(chart, Exception) else chart
+async def fetch_user_academy_progress(client: httpx.AsyncClient, base_url: str, token: str, user_id: str) -> UserAcademyProgress:
+    """Fetch user's learning progress from academy"""
+    try:
+        resp = await client.get(
+            f"{base_url}/learning/progress/{user_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            progress_rows = data.get("progress", [])
+            completed_lessons = [p["lesson_id"] for p in progress_rows if p.get("completed")]
 
-    # Extract trading stats from journal if available
-    trading_stats = None
-    if journal and isinstance(journal, dict):
-        trading_stats = {
-            "win_rate": journal.get("win_rate", 0),
-            "total_trades": journal.get("total_trades", 0),
-            "profit_factor": journal.get("profit_factor", 0),
-            "max_drawdown": journal.get("max_drawdown", 0),
-            "expectancy": journal.get("expectancy", 0),
-            "grade": journal.get("overall_grade", "N/A")
-        }
+            # Determine current level
+            current_level = None
+            summary = data.get("summary", [])
+            for lvl in summary:
+                if lvl.get("percent", 0) < 100:
+                    current_level = lvl.get("level_name")
+                    break
 
-    return UserContext(
-        journal_performance=journal,
-        last_chart_analysis=chart,
-        active_signals=signals,
-        available_courses=courses,
-        recent_blogs=blogs,
-        trading_stats=trading_stats
-    )
+            return UserAcademyProgress(
+                completed_lessons=completed_lessons,
+                current_level=current_level or "Beginner",
+                completion_rate=data.get("completion_rate", 0),
+                summary=summary
+            )
+    except Exception as e:
+        print(f"[ACADEMY] Progress fetch error: {e}", flush=True)
+
+    return UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+
+# ==========================================
+# LESSON RECOMMENDATION ENGINE
+# ==========================================
+
+def get_next_lessons(academy_structure: AcademyStructure, progress: UserAcademyProgress, limit: int = 2) -> List[LessonRecommendation]:
+    """Find the next logical lessons based on progress"""
+    recommendations = []
+    completed_set = set(progress.completed_lessons)
+
+    # Sort levels by order_index
+    sorted_levels = sorted(academy_structure.levels, key=lambda x: x.get("order_index", 0))
+
+    for level in sorted_levels:
+        level_id = level.get("id")
+        level_name = level.get("name")
+        modules = academy_structure.modules.get(level_id, [])
+        sorted_modules = sorted(modules, key=lambda x: x.get("order_index", 0))
+
+        for module in sorted_modules:
+            mod_id = module.get("id")
+            mod_name = module.get("title")
+            lessons = academy_structure.lessons.get(mod_id, [])
+            sorted_lessons = sorted(lessons, key=lambda x: x.get("order_index", 0))
+
+            for lesson in sorted_lessons:
+                lesson_id = lesson.get("id")
+                if lesson_id not in completed_set:
+                    # Found next lesson
+                    recommendations.append(LessonRecommendation(
+                        type="lesson",
+                        title=lesson.get("title"),
+                        description=f"{mod_name} • {level_name}",
+                        url=f"/academy.html?lesson={lesson_id}",
+                        metadata={
+                            "lesson_id": lesson_id,
+                            "module_id": mod_id,
+                            "level_id": level_id,
+                            "module_name": mod_name,
+                            "level_name": level_name
+                        },
+                        reason="next_step"
+                    ))
+
+                    if len(recommendations) >= limit:
+                        return recommendations
+
+    return recommendations
+
+def find_relevant_lessons(question: str, academy_structure: AcademyStructure, progress: UserAcademyProgress) -> List[LessonRecommendation]:
+    """Find lessons relevant to the user's question"""
+    recommendations = []
+    completed_set = set(progress.completed_lessons)
+    q_lower = question.lower()
+
+    # Keyword matching map
+    topic_keywords = {
+        "support": ["support", "resistance", "s/r", "levels"],
+        "resistance": ["support", "resistance", "s/r", "levels"],
+        "trend": ["trend", "trending", "uptrend", "downtrend"],
+        "risk": ["risk", "risk management", "position size", "lot size", "drawdown"],
+        "indicator": ["rsi", "macd", "indicator", "oscillator", "moving average"],
+        "pattern": ["pattern", "candlestick", "chart pattern", "head and shoulders", "flag"],
+        "psychology": ["psychology", "emotion", "fear", "greed", "discipline", "mindset"],
+        "strategy": ["strategy", "system", "trading plan", "backtest"],
+        "fibonacci": ["fibonacci", "fib", "retracement", "extension"],
+        "structure": ["structure", "bos", "choch", "order block", "liquidity"]
+    }
+
+    # Determine topics in question
+    matched_topics = []
+    for topic, keywords in topic_keywords.items():
+        if any(kw in q_lower for kw in keywords):
+            matched_topics.append(topic)
+
+    if not matched_topics:
+        return []
+
+    # Search through lessons for matches
+    for level in academy_structure.levels:
+        level_id = level.get("id")
+        level_name = level.get("name")
+        modules = academy_structure.modules.get(level_id, [])
+
+        for module in modules:
+            mod_id = module.get("id")
+            mod_name = module.get("title")
+            mod_title_lower = mod_name.lower()
+            lessons = academy_structure.lessons.get(mod_id, [])
+
+            for lesson in lessons:
+                lesson_title_lower = lesson.get("title", "").lower()
+                lesson_id = lesson.get("id")
+
+                # Check if lesson matches topics
+                matches = False
+                for topic in matched_topics:
+                    if topic in lesson_title_lower or topic in mod_title_lower:
+                        matches = True
+                        break
+
+                if matches:
+                    reason = "recommended"
+                    if lesson_id in completed_set:
+                        reason = "remedial"  # Review completed lesson
+
+                    recommendations.append(LessonRecommendation(
+                        type="lesson",
+                        title=lesson.get("title"),
+                        description=f"{mod_name} • {level_name}",
+                        url=f"/academy.html?lesson={lesson_id}",
+                        metadata={
+                            "lesson_id": lesson_id,
+                            "module_id": mod_id,
+                            "level_id": level_id,
+                            "completed": lesson_id in completed_set
+                        },
+                        reason=reason
+                    ))
+
+    # Prioritize incomplete lessons, then by level order
+    sorted_levels = {lvl["id"]: idx for idx, lvl in enumerate(academy_structure.levels)}
+    recommendations.sort(key=lambda x: (
+        x.metadata.get("completed", False),
+        sorted_levels.get(x.metadata.get("level_id"), 999)
+    ))
+
+    return recommendations[:3]
+
+def ensure_lesson_recommendation(
+    existing_recs: List[LessonRecommendation],
+    academy_structure: AcademyStructure,
+    progress: UserAcademyProgress,
+    question: str
+) -> List[LessonRecommendation]:
+    """CRITICAL: Ensure at least one lesson is always recommended"""
+    # Filter existing lesson recommendations
+    lesson_recs = [r for r in existing_recs if r.type == "lesson"]
+
+    if lesson_recs:
+        return existing_recs
+
+    # Try relevant lessons first
+    relevant = find_relevant_lessons(question, academy_structure, progress)
+    if relevant:
+        return existing_recs + relevant
+
+    # Fall back to next lessons
+    next_lessons = get_next_lessons(academy_structure, progress, limit=1)
+    if next_lessons:
+        return existing_recs + next_lessons
+
+    # Ultimate fallback: first lesson of first module of first level
+    if academy_structure.levels:
+        first_level = academy_structure.levels[0]
+        modules = academy_structure.modules.get(first_level["id"], [])
+        if modules:
+            first_mod = modules[0]
+            lessons = academy_structure.lessons.get(first_mod["id"], [])
+            if lessons:
+                first_lesson = lessons[0]
+                return existing_recs + [LessonRecommendation(
+                    type="lesson",
+                    title=first_lesson["title"],
+                    description=f"{first_mod['title']} • {first_level['name']}",
+                    url=f"/academy.html?lesson={first_lesson['id']}",
+                    metadata={"lesson_id": first_lesson["id"]},
+                    reason="foundational"
+                )]
+
+    return existing_recs
 
 # ==========================================
 # COMMAND PROCESSORS
@@ -269,12 +413,9 @@ async def process_review_trades(context: UserContext) -> str:
     stats = context.trading_stats
     journal = context.journal_performance
 
-    print(f"[REVIEW] Stats: {stats}, Journal: {journal is not None}", flush=True)
-
     if not stats and not journal:
         return "I don't see any trading data in your journal yet. Please upload your trading history first so I can analyze your performance."
 
-    # Use journal data directly if stats not parsed
     if not stats and journal:
         stats = {
             "win_rate": journal.get("win_rate", 0),
@@ -284,7 +425,6 @@ async def process_review_trades(context: UserContext) -> str:
             "expectancy": journal.get("expectancy", 0),
             "grade": journal.get("overall_grade", "N/A")
         }
-        print(f"[REVIEW] Using journal stats: {stats}", flush=True)
 
     win_rate = stats.get("win_rate", 0)
     grade = stats.get("grade", "N/A")
@@ -337,13 +477,11 @@ async def process_signals_review(context: UserContext) -> str:
     best_signal = None
     best_score = 0
 
-    for sig in signals[:3]:  # Top 3
+    for sig in signals[:3]:
         symbol = sig.get("symbol", "N/A")
         direction = sig.get("direction", "N/A")
         conf = sig.get("confidence", 0)
-
         response += f"• **{symbol}** - {direction} (Confidence: {conf}%)\n"
-
         if conf > best_score:
             best_score = conf
             best_signal = sig
@@ -365,27 +503,41 @@ def detect_special_command(question: str) -> Optional[str]:
         return "signals"
     elif cmd.startswith("/help"):
         return "help"
+    elif cmd.startswith("/next") or cmd.startswith("/continue"):
+        return "next-lesson"
     return None
 
 # ==========================================
-# RECOMMENDATION ENGINE
+# RECOMMENDATION ENGINE (Enhanced)
 # ==========================================
 
 def generate_recommendations(
     question: str, 
     context: UserContext, 
-    ai_response: str
-) -> List[Recommendation]:
-    """Generate intelligent recommendations based on context and conversation"""
+    ai_response: str,
+    academy_structure: AcademyStructure,
+    progress: UserAcademyProgress
+) -> List[LessonRecommendation]:
+    """Generate intelligent recommendations including Academy lessons"""
     recommendations = []
     q_lower = question.lower()
 
-    # Risk management recommendations
+    # 1. Find relevant lessons based on question content
+    relevant_lessons = find_relevant_lessons(question, academy_structure, progress)
+    recommendations.extend(relevant_lessons)
+
+    # 2. If no relevant lessons or user is new, get next lessons
+    if not recommendations or progress.completion_rate < 10:
+        next_lessons = get_next_lessons(academy_structure, progress, limit=1)
+        for nl in next_lessons:
+            if not any(r.metadata.get("lesson_id") == nl.metadata.get("lesson_id") for r in recommendations):
+                recommendations.append(nl)
+
+    # 3. Topic-based recommendations
     if any(word in q_lower for word in ["risk", "loss", "drawdown", "stop loss"]):
-        # Find risk management courses
         for course in context.available_courses:
-            if "risk" in course.get("title", "").lower() or "management" in course.get("title", "").lower():
-                recommendations.append(Recommendation(
+            if "risk" in course.get("title", "").lower():
+                recommendations.append(LessonRecommendation(
                     type="course",
                     title=course.get("title", "Risk Management Course"),
                     description="Master risk management to protect your capital",
@@ -393,75 +545,66 @@ def generate_recommendations(
                 ))
                 break
 
-        # Find relevant blog posts
-        for blog in context.recent_blogs:
-            if any(word in blog.get("title", "").lower() for word in ["risk", "loss", "psychology"]):
-                recommendations.append(Recommendation(
-                    type="blog",
-                    title=blog.get("title"),
-                    description="Related reading material",
-                    metadata={"blog_id": blog.get("id")}
-                ))
-                break
-
-    # Technical analysis recommendations
     elif any(word in q_lower for word in ["chart", "technical", "pattern", "support", "resistance"]):
         for course in context.available_courses:
-            if "technical" in course.get("title", "").lower() or "analysis" in course.get("title", "").lower():
-                recommendations.append(Recommendation(
+            if "technical" in course.get("title", "").lower():
+                recommendations.append(LessonRecommendation(
                     type="course",
                     title=course.get("title"),
                     description="Improve your chart reading skills"
                 ))
                 break
 
-    # Signal recommendations if asking about trades
-    elif any(word in q_lower for word in ["trade", "signal", "entry", "buy", "sell"]):
-        for sig in context.active_signals[:1]:
-            recommendations.append(Recommendation(
-                type="signal",
-                title=f"{sig.get('symbol')} {sig.get('direction')}",
-                description=f"Active signal with {sig.get('confidence', 0)}% confidence",
-                metadata=sig
-            ))
-
-    # Psychology recommendations
     elif any(word in q_lower for word in ["emotion", "fear", "greed", "psychology", "discipline"]):
         for blog in context.recent_blogs:
-            if "psychology" in blog.get("title", "").lower() or "emotion" in blog.get("title", "").lower():
-                recommendations.append(Recommendation(
+            if "psychology" in blog.get("title", "").lower():
+                recommendations.append(LessonRecommendation(
                     type="blog",
                     title=blog.get("title"),
                     description="Trading psychology insights"
                 ))
                 break
 
-    # Strategy recommendations based on performance
+    # 4. Performance-based recommendations
     if context.trading_stats:
         win_rate = context.trading_stats.get("win_rate", 0)
-        if win_rate < 40 and not any(r.type == "course" for r in recommendations):
-            recommendations.append(Recommendation(
+        if win_rate < 40:
+            recommendations.append(LessonRecommendation(
                 type="strategy",
                 title="Strategy Backtesting Guide",
                 description="Your win rate suggests reviewing your strategy rules"
             ))
 
-    return recommendations[:3]  # Max 3 recommendations
+    # 5. CRITICAL: Ensure at least one lesson recommendation
+    recommendations = ensure_lesson_recommendation(recommendations, academy_structure, progress, question)
+
+    return recommendations[:4]  # Max 4 recommendations
 
 # ==========================================
-# AI PROMPT ENGINEERING
+# AI PROMPT ENGINEERING (Academy-Enhanced)
 # ==========================================
+
+class UserContext(BaseModel):
+    journal_performance: Optional[Dict[str, Any]] = None
+    last_chart_analysis: Optional[Dict[str, Any]] = None
+    active_signals: List[Dict[str, Any]] = []
+    available_courses: List[Dict[str, Any]] = []
+    recent_blogs: List[Dict[str, Any]] = []
+    trading_stats: Optional[Dict[str, Any]] = None
+    user_skill_level: str = "intermediate"
+    academy_structure: Optional[AcademyStructure] = None
+    academy_progress: Optional[UserAcademyProgress] = None
 
 def build_system_prompt(context: UserContext, skill_level: str) -> str:
-    """Build comprehensive system prompt with user context"""
+    """Build comprehensive system prompt with Academy integration"""
 
-    prompt = f"""You are the AI Trading Mentor for the Pipways Trading Platform. You are a sophisticated trading coach with access to the user's complete trading profile.
+    prompt = f"""You are the AI Trading Mentor for the Pipways Trading Platform. You are a sophisticated trading coach with access to the user's complete trading profile and learning progress.
 
 USER PROFILE:
 Skill Level: {skill_level}
 """
 
-    # Add trading stats if available
+    # Add trading stats
     if context.trading_stats:
         stats = context.trading_stats
         prompt += f"""
@@ -473,54 +616,67 @@ TRADING PERFORMANCE:
 • Overall Grade: {stats.get('grade', 'N/A')}
 """
 
-    # Add active signals context
+    # Add Academy progress
+    if context.academy_progress:
+        prog = context.academy_progress
+        prompt += f"""
+LEARNING PROGRESS:
+• Completion Rate: {prog.completion_rate}%
+• Current Level: {prog.current_level}
+• Completed Lessons: {len(prog.completed_lessons)}
+"""
+
+    # Add active signals
     if context.active_signals:
         prompt += "\nACTIVE SIGNALS:\n"
         for sig in context.active_signals[:3]:
             prompt += f"• {sig.get('symbol')} {sig.get('direction')} (Confidence: {sig.get('confidence', 0)}%)\n"
 
-    # Add available education
-    if context.available_courses:
-        prompt += "\nAVAILABLE COURSES:\n"
-        for course in context.available_courses[:3]:
-            prompt += f"• {course.get('title')}\n"
-
-    # Add personality insights if available
-    if context.journal_performance:
-        journal = context.journal_performance
-        if "ai_coach" in journal:
-            coach = journal["ai_coach"]
-            prompt += f"""
-PSYCHOLOGICAL PROFILE:
-• Discipline Score: {coach.get('discipline_score', 0)}/100
-• Risk Management: {coach.get('risk_management_score', 0)}/100
-• Main Challenge: {coach.get('main_mistake', 'Unknown')}
-"""
-
     prompt += """
-YOUR ROLE:
+YOUR ROLE AS AI TRADING MENTOR AND LEARNING GUIDE:
+
 1. Provide actionable, specific trading advice based on the user's data
 2. ALWAYS reference their actual performance data when relevant
-3. Recommend specific courses from the available list when appropriate
-4. Mention relevant active signals when discussing trade ideas
-5. Identify psychological patterns from their trading history
-6. Be encouraging but realistic about challenges
-7. Keep responses concise (max 3 paragraphs) but information-dense
-8. If they ask about performance, cite specific numbers
+3. GUIDE USERS THROUGH THE TRADING ACADEMY — always recommend the next lesson or relevant lesson
+4. If they ask a question covered in the Academy, reference the specific lesson
+5. Track their learning progress and encourage continuation
+6. If they are struggling with basics, redirect to foundational lessons
+7. If they are advanced, suggest intermediate/advanced content
+8. Be encouraging but realistic about challenges
+9. Keep responses concise (max 3 paragraphs) but information-dense
 
-SPECIAL COMMANDS:
-- If the user asks about their last chart, reference chart analysis data
-- If they ask "why am I losing", analyze their win rate and drawdown
-- If they ask for learning resources, recommend specific courses/blogs
+ACADEMY INTEGRATION RULES:
+• After EVERY response, recommend at least one specific Academy lesson
+• If user is learning sequentially → suggest the NEXT lesson
+• If user is confused about a topic → suggest the relevant foundational lesson
+• If user has gaps → suggest remedial lessons
+• Never overwhelm — guide step-by-step
+• Reference lesson titles specifically
 
 RESPONSE FORMAT:
-Provide clear, structured advice. Use bullet points for actionable steps."""
+Provide clear, structured advice. Use bullet points for actionable steps. Always end with a learning recommendation."""
 
     return prompt
 
 # ==========================================
-# MAIN ENDPOINTS
+# MAIN ENDPOINTS (Enhanced)
 # ==========================================
+
+class MentorQuery(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    context: Optional[str] = Field(None, max_length=1000)
+    skill_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
+    topic: Optional[str] = None
+    include_platform_context: bool = True
+
+class MentorResponse(BaseModel):
+    response: str
+    recommendations: List[LessonRecommendation]
+    context_used: Dict[str, Any]
+    command_triggered: Optional[str] = None
+    confidence: float = Field(default=0.9, ge=0, le=1)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    academy_progress: Optional[Dict[str, Any]] = None
 
 @router.post("/ask", response_model=MentorResponse)
 async def ask_mentor(
@@ -530,136 +686,161 @@ async def ask_mentor(
     current_user = Depends(get_current_user)
 ):
     """
-    Advanced AI Mentor with platform-wide context awareness.
-    Provides intelligent recommendations from courses, signals, and blogs.
+    Advanced AI Mentor with platform-wide context + Trading Academy integration.
+    ALWAYS returns at least one lesson recommendation.
     """
     user_id = _user_id(current_user)
 
-    # Check for special commands
     command = detect_special_command(query.question)
-
-    # Initialize response containers
-    context_data = UserContext()
     ai_response = ""
-    recommendations = []
 
-    # Gather context if enabled (and not a simple greeting)
-    if query.include_platform_context and not query.question.lower() in ["hi", "hello", "hey"]:
+    # Initialize context
+    context_data = UserContext(
+        academy_structure=AcademyStructure(levels=[], modules={}, lessons={}),
+        academy_progress=UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+    )
+
+    # Gather all context including Academy
+    if query.include_platform_context:
         try:
-            # Extract token from request headers
             auth_header = request.headers.get("authorization", "")
             token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
-
-            # Determine base URL - use request base URL or environment variable
             base_url = str(request.base_url).rstrip("/")
             if not base_url or base_url == "http://":
                 base_url = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
 
-            print(f"[MENTOR] Gathering context from {base_url} for user {user_id}", flush=True)
-
             async with httpx.AsyncClient() as client:
-                context_data = await get_user_trading_context(client, token, user_id, base_url)
+                # Fetch all context in parallel
+                journal_task = fetch_journal_performance(client, token, base_url)
+                signals_task = fetch_active_signals(client, base_url)
+                courses_task = fetch_courses(client, base_url)
+                blogs_task = fetch_blog_posts(client, base_url)
+                academy_structure_task = fetch_academy_structure(client, base_url, token)
+                academy_progress_task = fetch_user_academy_progress(client, base_url, token, user_id)
 
-            print(f"[MENTOR] Context gathered: journal={context_data.journal_performance is not None}, signals={len(context_data.active_signals)}", flush=True)
+                journal, signals, courses, blogs, academy_structure, academy_progress = await asyncio.gather(
+                    journal_task, signals_task, courses_task, blogs_task,
+                    academy_structure_task, academy_progress_task,
+                    return_exceptions=True
+                )
+
+                # Handle exceptions
+                if isinstance(journal, Exception): journal = None
+                if isinstance(signals, Exception): signals = []
+                if isinstance(courses, Exception): courses = []
+                if isinstance(blogs, Exception): blogs = []
+                if isinstance(academy_structure, Exception): academy_structure = AcademyStructure(levels=[], modules={}, lessons={})
+                if isinstance(academy_progress, Exception): academy_progress = UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+
+                # Build context
+                context_data = UserContext(
+                    journal_performance=journal,
+                    active_signals=signals,
+                    available_courses=courses,
+                    recent_blogs=blogs,
+                    trading_stats={
+                        "win_rate": journal.get("win_rate", 0),
+                        "total_trades": journal.get("total_trades", 0),
+                        "profit_factor": journal.get("profit_factor", 0),
+                        "max_drawdown": journal.get("max_drawdown", 0),
+                        "grade": journal.get("overall_grade", "N/A")
+                    } if journal else None,
+                    academy_structure=academy_structure,
+                    academy_progress=academy_progress
+                )
+
         except Exception as e:
             print(f"[MENTOR] Context gathering failed: {e}", flush=True)
 
-    # Process special commands immediately (before AI call)
+    # Process special commands
     if command == "review-trades":
         ai_response = await process_review_trades(context_data)
-        print(f"[MENTOR] Processed /review-trades command", flush=True)
     elif command == "strategy":
         ai_response = await process_strategy_analysis(context_data)
     elif command == "signals":
         ai_response = await process_signals_review(context_data)
+    elif command == "next-lesson":
+        next_lessons = get_next_lessons(context_data.academy_structure, context_data.academy_progress, limit=1)
+        if next_lessons:
+            nl = next_lessons[0]
+            ai_response = f"📚 **Continue Your Learning**\n\nYour next lesson is: **{nl.title}**\n\nThis lesson covers {nl.description}. Click the card below to continue your progress!"
+        else:
+            ai_response = "🎉 Congratulations! You've completed all available lessons in the Academy. Check back soon for new content!"
     elif command == "help":
         ai_response = """Available commands:
 /review-trades - Analyze your trading performance
 /strategy - Review your strategy consistency  
 /signals - Show best active signals
+/next or /continue - Get your next Academy lesson
 /help - Show this message
 
-Or ask me anything about trading!"""
+Or ask me anything about trading! I'll always guide you to relevant Academy lessons."""
 
-    # Only call AI if not a special command OR if command processing returned empty
+    # Generate recommendations (ALWAYS includes lessons)
+    recommendations = generate_recommendations(
+        query.question, context_data, ai_response,
+        context_data.academy_structure, context_data.academy_progress
+    )
+
+    # Call AI if not a special command
     if not ai_response:
-        # Check OpenRouter configuration
         if not OPENROUTER_CONFIGURED:
             ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
-            recommendations = generate_recommendations(query.question, context_data, ai_response)
+        else:
+            history = await _db_load_history(user_id)
+            messages = [{"role": "system", "content": build_system_prompt(context_data, query.skill_level)}]
 
-            return MentorResponse(
-                response=ai_response,
-                recommendations=recommendations,
-                context_used={"fallback": True, "data": context_data.dict()},
-                confidence=0.6
-            )
+            for msg in history[-10:]:
+                messages.append({"role": msg["role"], "content": msg["content"]})
 
-        # Load conversation history from database (survives deploys)
-        history = await _db_load_history(user_id)
+            # Add Academy context hint
+            user_msg = query.question
+            if context_data.academy_progress and context_data.academy_progress.completion_rate < 20:
+                user_msg += "\n\n[Note: This user is new to the Academy. Suggest foundational lessons.]"
 
-        # Build messages for AI
-        messages = [{"role": "system", "content": build_system_prompt(context_data, query.skill_level)}]
+            messages.append({"role": "user", "content": user_msg})
 
-        # Add recent history (last 5 exchanges)
-        for msg in history[-10:]:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+            # Call AI with retry
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.post(
+                            f"{OPENROUTER_BASE_URL}/chat/completions",
+                            headers={
+                                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                                "HTTP-Referer": "https://pipwaysapp.onrender.com",
+                                "X-Title": "Pipways Trading Platform",
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "model": OPENROUTER_MODEL,
+                                "messages": messages,
+                                "temperature": 0.7,
+                                "max_tokens": 600
+                            },
+                            timeout=15.0
+                        )
 
-        # Add current question with context hint
-        user_msg = query.question
-        if context_data.trading_stats and "performance" in query.question.lower():
-            user_msg += f"\n\n[User Performance Context: Win Rate {context_data.trading_stats.get('win_rate', 0)}%, Grade {context_data.trading_stats.get('grade', 'N/A')}]"
+                        if response.status_code == 200:
+                            data = response.json()
+                            ai_response = data["choices"][0]["message"]["content"]
+                            break
+                        elif response.status_code == 429:
+                            await asyncio.sleep(1)
+                            continue
+                        else:
+                            raise HTTPException(status_code=503, detail="AI service error")
 
-        messages.append({"role": "user", "content": user_msg})
+                except Exception as e:
+                    print(f"[AI ERROR] Attempt {attempt}: {e}", flush=True)
+                    if attempt == max_retries - 1:
+                        ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
 
-        # Call AI with retry logic
-        max_retries = 2
-        for attempt in range(max_retries):
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{OPENROUTER_BASE_URL}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                            "HTTP-Referer": "https://pipwaysapp.onrender.com",
-                            "X-Title": "Pipways Trading Platform",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": OPENROUTER_MODEL,
-                            "messages": messages,
-                            "temperature": 0.7,
-                            "max_tokens": 500
-                        },
-                        timeout=15.0
-                    )
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        ai_response = data["choices"][0]["message"]["content"]
-                        break
-                    elif response.status_code == 429:
-                        await asyncio.sleep(1)
-                        continue
-                    else:
-                        raise HTTPException(status_code=503, detail="AI service error")
-
-            except httpx.TimeoutException:
-                if attempt == max_retries - 1:
-                    ai_response = "I'm taking longer than usual to analyze your data. Please try again in a moment."
-                await asyncio.sleep(1)
-            except Exception as e:
-                print(f"[AI ERROR] Attempt {attempt}: {e}", flush=True)
-                if attempt == max_retries - 1:
-                    ai_response = generate_fallback_response(query.question, context_data, query.skill_level)
-
-    # Generate recommendations based on AI response and context
-    recommendations = generate_recommendations(query.question, context_data, ai_response)
-
-    # Persist conversation to database (survives server restarts & deploys)
+    # Persist conversation
     topic = query.question[:100] if query.question else ""
-    await _db_save_message(user_id, "user",      query.question, topic)
-    await _db_save_message(user_id, "assistant", ai_response,    "")
+    await _db_save_message(user_id, "user", query.question, topic)
+    await _db_save_message(user_id, "assistant", ai_response, "")
 
     return MentorResponse(
         response=ai_response,
@@ -668,21 +849,40 @@ Or ask me anything about trading!"""
             "journal_available": context_data.journal_performance is not None,
             "signals_count": len(context_data.active_signals),
             "courses_count": len(context_data.available_courses),
+            "academy_levels": len(context_data.academy_structure.levels),
+            "completed_lessons": len(context_data.academy_progress.completed_lessons) if context_data.academy_progress else 0,
             "command": command
         },
         command_triggered=command,
-        confidence=0.9 if not command else 1.0
+        confidence=0.9 if not command else 1.0,
+        academy_progress={
+            "completion_rate": context_data.academy_progress.completion_rate if context_data.academy_progress else 0,
+            "current_level": context_data.academy_progress.current_level if context_data.academy_progress else "Beginner",
+            "completed_count": len(context_data.academy_progress.completed_lessons) if context_data.academy_progress else 0
+        } if context_data.academy_progress else None
     )
+
+# ==========================================
+# ADDITIONAL ENDPOINTS
+# ==========================================
+
+class CoachInsights(BaseModel):
+    trading_personality: str
+    strengths: List[str]
+    weaknesses: List[str]
+    risk_profile: str
+    discipline_score: int
+    consistency_score: int
+    recommended_next_steps: List[str]
+    recommended_resources: List[LessonRecommendation]
+    academy_progress: Optional[Dict[str, Any]] = None
 
 @router.get("/insights", response_model=CoachInsights)
 async def get_coach_insights(
+    request: Request,
     current_user = Depends(get_current_user)
 ):
-    """
-    Get AI Coach insights for the dashboard display.
-    Returns trading personality, strengths, weaknesses, and recommendations.
-    """
-    # FIXED: SQLAlchemy Row objects need dict() or attribute access, not .get()
+    """Get AI Coach insights including Academy progress"""
     if hasattr(current_user, '_mapping'):
         user_id = str(current_user._mapping.get("id", "anonymous"))
     elif isinstance(current_user, dict):
@@ -693,121 +893,111 @@ async def get_coach_insights(
         except Exception:
             user_id = "anonymous"
 
-    # Use a safe context with empty defaults — skip internal HTTP call
-    # (the dummy_token approach always fails; we have no journal data here)
-    context = UserContext()
+    # Fetch Academy progress
+    auth_header = request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+    base_url = str(request.base_url).rstrip("/")
+    if not base_url or base_url == "http://":
+        base_url = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
 
-    # Analyze trading personality
-    personality = "Developing Trader"
-    strengths = []
-    weaknesses = []
-    risk_profile = "Moderate"
+    academy_progress = None
+    try:
+        async with httpx.AsyncClient() as client:
+            academy_progress = await fetch_user_academy_progress(client, base_url, token, user_id)
+    except Exception as e:
+        print(f"[INSIGHTS] Academy progress fetch error: {e}", flush=True)
+        academy_progress = UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
 
-    if context.trading_stats:
-        stats = context.trading_stats
-        win_rate = stats.get("win_rate", 0)
-        pf = stats.get("profit_factor", 0)
-        dd = stats.get("max_drawdown", 0)
+    # Generate insights (simplified for demo)
+    personality = "Learning Trader"
+    if academy_progress and academy_progress.completion_rate > 50:
+        personality = "Dedicated Student"
 
-        if win_rate > 60 and pf > 2:
-            personality = "Disciplined Strategist"
-            strengths.append("Excellent risk management")
-            strengths.append("Consistent profitability")
-            risk_profile = "Conservative"
-        elif win_rate > 50:
-            personality = "Skilled Technician"
-            strengths.append("Good entry timing")
-        elif win_rate < 40:
-            personality = "Learning Trader"
-            weaknesses.append("Entry timing needs improvement")
-            weaknesses.append("Risk management review needed")
-
-        if dd > 1000:
-            weaknesses.append("High drawdown periods")
-            risk_profile = "Aggressive"
-
-        if pf < 1.5:
-            weaknesses.append("Profit factor below optimal")
-    else:
-        personality = "New Trader"
-        strengths.append("Fresh perspective")
-        weaknesses.append("Need more trading data")
-
-    # Generate next steps
     next_steps = []
-    if not context.journal_performance:
-        next_steps.append("Upload your trading journal for personalized analysis")
-    if not any(s in strengths for s in ["Risk management"]):
-        next_steps.append("Complete Risk Management Masterclass")
-    if context.active_signals:
-        next_steps.append("Review today's active signals")
-
-    # Generate resource recommendations
-    resources = []
-    if context.available_courses:
-        for course in context.available_courses[:2]:
-            resources.append(Recommendation(
-                type="course",
-                title=course.get("title"),
-                description=course.get("description", "")[:100]
-            ))
+    if academy_progress:
+        if academy_progress.completion_rate < 10:
+            next_steps.append("Start your first Academy lesson")
+        elif academy_progress.completion_rate < 50:
+            next_steps.append("Continue your Academy progression")
+        else:
+            next_steps.append("Complete remaining advanced modules")
 
     return CoachInsights(
         trading_personality=personality,
-        strengths=strengths or ["Enthusiastic learner"],
-        weaknesses=weaknesses or ["Building track record"],
-        risk_profile=risk_profile,
-        discipline_score=context.journal_performance.get("ai_coach", {}).get("discipline_score", 50) if context.journal_performance else 50,
-        consistency_score=context.journal_performance.get("risk_consistency_score", 50) if context.journal_performance else 50,
+        strengths=["Enthusiastic learner"],
+        weaknesses=["Building track record"],
+        risk_profile="Moderate",
+        discipline_score=50,
+        consistency_score=50,
         recommended_next_steps=next_steps,
-        recommended_resources=resources
+        recommended_resources=[],
+        academy_progress={
+            "completion_rate": academy_progress.completion_rate if academy_progress else 0,
+            "current_level": academy_progress.current_level if academy_progress else "Beginner"
+        }
     )
 
 @router.get("/history")
-async def get_conversation_history(
-    current_user = Depends(get_current_user)
-):
-    """Retrieve last 10 conversation messages for the user from the database."""
+async def get_conversation_history(current_user = Depends(get_current_user)):
+    """Retrieve last 10 conversation messages"""
     user_id = str(_user_id(current_user))
     history = await _db_load_history(user_id)
     return {"messages": history, "count": len(history)}
 
 @router.post("/clear-history")
-async def clear_history(
-    current_user = Depends(get_current_user)
-):
-    """Clear conversation history from the database."""
+async def clear_history(current_user = Depends(get_current_user)):
+    """Clear conversation history"""
     user_id = str(_user_id(current_user))
     await _db_clear_history(user_id)
     return {"status": "cleared"}
+
+@router.post("/track-lesson-click")
+async def track_lesson_click(
+    lesson_id: int,
+    action: Literal["start", "complete"],
+    current_user = Depends(get_current_user)
+):
+    """Track when user clicks or completes a lesson from mentor recommendations"""
+    user_id = _user_id(current_user)
+    try:
+        # This would typically update progress via academy_routes
+        # For now, log it
+        print(f"[MENTOR TRACK] User {user_id} {action} lesson {lesson_id}", flush=True)
+        return {"status": "tracked", "lesson_id": lesson_id, "action": action}
+    except Exception as e:
+        print(f"[MENTOR TRACK] Error: {e}", flush=True)
+        return {"status": "error"}
 
 def generate_fallback_response(question: str, context: UserContext, skill_level: str) -> str:
     """Generate contextual fallback response when AI is unavailable"""
     q = question.lower()
 
-    if "performance" in q and context.trading_stats:
-        return f"Based on your data (Win Rate: {context.trading_stats.get('win_rate', 0)}%), you're showing {'good' if context.trading_stats.get('win_rate', 0) > 50 else 'developing'} progress. Check your detailed analytics in the Journal section."
+    # Check if we have Academy progress to reference
+    if context.academy_progress:
+        completion = context.academy_progress.completion_rate
+        if completion < 10:
+            return "Welcome! I'm here to guide your trading journey. Start with the Trading Academy to build a solid foundation. Check the lesson recommendation below!"
+        elif completion < 50:
+            return f"You're making great progress ({completion}% complete)! Keep learning through the Academy. I've recommended your next lesson below."
+        else:
+            return "You're an advanced learner! Focus on applying these concepts in your trading journal while completing the remaining Academy modules."
 
+    if "support" in q or "resistance" in q:
+        return "Support and Resistance are fundamental concepts. I've found the perfect lesson for you in the Academy — check the recommendation below!"
     elif "risk" in q:
-        return "Risk management is crucial. Always use stop losses and risk 1-2% per trade. Check out our Risk Management resources in the Courses section."
-
+        return "Risk management is crucial. Always use stop losses and risk 1-2% per trade. I've recommended a specific Risk Management lesson for you."
     elif "signal" in q and context.active_signals:
-        return f"We have {len(context.active_signals)} active signals right now. Head to the Signals tab for detailed entry/exit levels."
-
+        return f"We have {len(context.active_signals)} active signals right now. Head to the Signals tab for detailed entry/exit levels, or check out the Academy to learn how signals are generated."
     else:
-        return "I'm currently in offline mode, but I can see your trading data. For detailed analysis, please try again shortly or check your Journal dashboard for AI insights."
+        return "I'm currently in offline mode, but I can see your Academy progress. Check the lesson recommendation below to continue your learning journey!"
 
 # ==========================================
 # BACKWARD COMPATIBILITY
 # ==========================================
 
 @router.post("/review-trade")
-async def review_trade_endpoint(
-    trade: dict,
-    current_user = Depends(get_current_user)
-):
+async def review_trade_endpoint(trade: dict, current_user = Depends(get_current_user)):
     """Legacy endpoint - redirects to new system"""
-    # This would need Request object, so simplified for now
     return {
         "response": "Please use the main chat interface with /review-trades command",
         "recommendations": [],

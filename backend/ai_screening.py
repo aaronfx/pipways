@@ -1,4 +1,6 @@
-"""AI Screening & Analysis Services - PRODUCTION READY
+"""
+AI Screening & Analysis Services - PRODUCTION READY v2.0
+Updated: Integrated Trading Academy lesson recommendations
 Fixed: Removed duplicate routes (now in dedicated performance router), cleaned imports
 """
 import os
@@ -6,9 +8,10 @@ import base64
 import json
 import httpx
 import re
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from .security import get_current_user
 
 router = APIRouter()
@@ -30,7 +33,33 @@ COMMON_SYMBOLS = [
     "BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "US30", "US100", "DE30"
 ]
 
-# Request models (unique to this module)
+# ==========================================
+# ACADEMY INTEGRATION MODELS
+# ==========================================
+
+class AcademyStructure(BaseModel):
+    levels: List[Dict[str, Any]]
+    modules: Dict[int, List[Dict[str, Any]]]
+    lessons: Dict[int, List[Dict[str, Any]]]
+
+class UserAcademyProgress(BaseModel):
+    completed_lessons: List[int]
+    current_level: Optional[str]
+    completion_rate: float
+    summary: List[Dict[str, Any]]
+
+class LessonRecommendation(BaseModel):
+    type: Literal["lesson", "course", "blog", "signal", "strategy", "warning"]
+    title: str
+    description: Optional[str] = None
+    url: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    reason: Literal["recommended", "next_step", "foundational", "remedial"] = "recommended"
+
+# ==========================================
+# REQUEST MODELS
+# ==========================================
+
 class MentorRequest(BaseModel):
     question: str
     skill_level: str = "intermediate"
@@ -56,6 +85,243 @@ class ChartAnalyzeRequest(BaseModel):
     symbol: str
     description: str
     timeframe: Optional[str] = "1H"
+
+# ==========================================
+# ACADEMY INTEGRATION HELPERS
+# ==========================================
+
+async def fetch_academy_structure(client: httpx.AsyncClient, base_url: str, token: str) -> AcademyStructure:
+    """Fetch full academy hierarchy: levels → modules → lessons"""
+    try:
+        levels_resp = await client.get(
+            f"{base_url}/learning/levels",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0
+        )
+        if levels_resp.status_code != 200:
+            return AcademyStructure(levels=[], modules={}, lessons={})
+
+        levels = levels_resp.json()
+        modules_map = {}
+        lessons_map = {}
+
+        for level in levels:
+            level_id = level.get("id")
+            mod_resp = await client.get(
+                f"{base_url}/learning/modules/{level_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=5.0
+            )
+            if mod_resp.status_code == 200:
+                modules = mod_resp.json()
+                modules_map[level_id] = modules
+
+                for module in modules:
+                    mod_id = module.get("id")
+                    les_resp = await client.get(
+                        f"{base_url}/learning/lessons/{mod_id}",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=5.0
+                    )
+                    if les_resp.status_code == 200:
+                        lessons_map[mod_id] = les_resp.json()
+
+        return AcademyStructure(levels=levels, modules=modules_map, lessons=lessons_map)
+    except Exception as e:
+        print(f"[ACADEMY] Structure error: {e}", flush=True)
+        return AcademyStructure(levels=[], modules={}, lessons={})
+
+async def fetch_user_academy_progress(client: httpx.AsyncClient, base_url: str, token: str, user_id: str) -> UserAcademyProgress:
+    """Fetch user's learning progress from academy"""
+    try:
+        resp = await client.get(
+            f"{base_url}/learning/progress/{user_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            progress_rows = data.get("progress", [])
+            completed_lessons = [p["lesson_id"] for p in progress_rows if p.get("completed")]
+
+            current_level = None
+            summary = data.get("summary", [])
+            for lvl in summary:
+                if lvl.get("percent", 0) < 100:
+                    current_level = lvl.get("level_name")
+                    break
+
+            return UserAcademyProgress(
+                completed_lessons=completed_lessons,
+                current_level=current_level or "Beginner",
+                completion_rate=data.get("completion_rate", 0),
+                summary=summary
+            )
+    except Exception as e:
+        print(f"[ACADEMY] Progress error: {e}", flush=True)
+
+    return UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+
+def get_next_lessons(academy_structure: AcademyStructure, progress: UserAcademyProgress, limit: int = 2) -> List[LessonRecommendation]:
+    """Find next sequential lessons"""
+    recommendations = []
+    completed_set = set(progress.completed_lessons)
+
+    sorted_levels = sorted(academy_structure.levels, key=lambda x: x.get("order_index", 0))
+
+    for level in sorted_levels:
+        level_id = level.get("id")
+        level_name = level.get("name")
+        modules = academy_structure.modules.get(level_id, [])
+        sorted_modules = sorted(modules, key=lambda x: x.get("order_index", 0))
+
+        for module in sorted_modules:
+            mod_id = module.get("id")
+            mod_name = module.get("title")
+            lessons = academy_structure.lessons.get(mod_id, [])
+            sorted_lessons = sorted(lessons, key=lambda x: x.get("order_index", 0))
+
+            for lesson in sorted_lessons:
+                lesson_id = lesson.get("id")
+                if lesson_id not in completed_set:
+                    recommendations.append(LessonRecommendation(
+                        type="lesson",
+                        title=lesson.get("title"),
+                        description=f"{mod_name} • {level_name}",
+                        url=f"/academy.html?lesson={lesson_id}",
+                        metadata={
+                            "lesson_id": lesson_id,
+                            "module_id": mod_id,
+                            "level_id": level_id
+                        },
+                        reason="next_step"
+                    ))
+                    if len(recommendations) >= limit:
+                        return recommendations
+    return recommendations
+
+def find_relevant_lessons(question: str, academy_structure: AcademyStructure, progress: UserAcademyProgress) -> List[LessonRecommendation]:
+    """Find lessons matching question keywords"""
+    recommendations = []
+    completed_set = set(progress.completed_lessons)
+    q_lower = question.lower()
+
+    topic_keywords = {
+        "support": ["support", "resistance", "s/r", "levels"],
+        "trend": ["trend", "uptrend", "downtrend"],
+        "risk": ["risk", "position size", "lot size", "drawdown", "money management"],
+        "indicator": ["rsi", "macd", "indicator", "oscillator", "moving average", "ma "],
+        "pattern": ["pattern", "candlestick", "head and shoulders", "flag", "pennant"],
+        "psychology": ["psychology", "emotion", "fear", "greed", "discipline", "mindset"],
+        "strategy": ["strategy", "system", "trading plan", "backtest"],
+        "fibonacci": ["fibonacci", "fib", "retracement", "extension"],
+        "structure": ["structure", "bos", "choch", "order block", "liquidity", "smart money"],
+        "foundation": ["foundation", "basics", "beginner", "forex", "intro", "start"],
+        "entry": ["entry", "entry point", "setup"],
+        "exit": ["exit", "take profit", "tp", "close trade"]
+    }
+
+    matched_topics = []
+    for topic, keywords in topic_keywords.items():
+        if any(kw in q_lower for kw in keywords):
+            matched_topics.append(topic)
+
+    if not matched_topics:
+        return []
+
+    for level in academy_structure.levels:
+        level_id = level.get("id")
+        level_name = level.get("name")
+        modules = academy_structure.modules.get(level_id, [])
+
+        for module in modules:
+            mod_id = module.get("id")
+            mod_name = module.get("title")
+            mod_title_lower = mod_name.lower()
+            lessons = academy_structure.lessons.get(mod_id, [])
+
+            for lesson in lessons:
+                lesson_title_lower = lesson.get("title", "").lower()
+                lesson_id = lesson.get("id")
+
+                matches = False
+                for topic in matched_topics:
+                    if topic in lesson_title_lower or topic in mod_title_lower:
+                        matches = True
+                        break
+
+                if matches:
+                    reason = "recommended"
+                    if lesson_id in completed_set:
+                        reason = "remedial"
+
+                    recommendations.append(LessonRecommendation(
+                        type="lesson",
+                        title=lesson.get("title"),
+                        description=f"{mod_name} • {level_name}",
+                        url=f"/academy.html?lesson={lesson_id}",
+                        metadata={
+                            "lesson_id": lesson_id,
+                            "module_id": mod_id,
+                            "level_id": level_id,
+                            "completed": lesson_id in completed_set
+                        },
+                        reason=reason
+                    ))
+
+    # Sort: incomplete first, then by level
+    sorted_levels = {lvl["id"]: idx for idx, lvl in enumerate(academy_structure.levels)}
+    recommendations.sort(key=lambda x: (x.metadata.get("completed", False), sorted_levels.get(x.metadata.get("level_id"), 999)))
+
+    return recommendations[:3]
+
+def generate_lesson_recommendations(
+    question: str, 
+    academy_structure: AcademyStructure,
+    progress: UserAcademyProgress
+) -> List[LessonRecommendation]:
+    """Generate lesson recommendations - ALWAYS returns at least one"""
+    # Try relevant lessons first
+    relevant = find_relevant_lessons(question, academy_structure, progress)
+    if relevant:
+        return relevant
+
+    # Try next sequential lessons
+    next_lessons = get_next_lessons(academy_structure, progress, limit=1)
+    if next_lessons:
+        return next_lessons
+
+    # Ultimate fallback - first available lesson
+    if academy_structure.levels:
+        first_level = academy_structure.levels[0]
+        modules = academy_structure.modules.get(first_level["id"], [])
+        if modules:
+            first_mod = modules[0]
+            lessons = academy_structure.lessons.get(first_mod["id"], [])
+            if lessons:
+                first_lesson = lessons[0]
+                return [LessonRecommendation(
+                    type="lesson",
+                    title=first_lesson["title"],
+                    description=f"{first_mod['title']} • {first_level['name']}",
+                    url=f"/academy.html?lesson={first_lesson['id']}",
+                    metadata={"lesson_id": first_lesson["id"]},
+                    reason="foundational"
+                )]
+
+    # Empty academy fallback
+    return [LessonRecommendation(
+        type="lesson",
+        title="Trading Academy",
+        description="Start your learning journey",
+        url="/academy.html",
+        metadata={},
+        reason="foundational"
+    )]
+
+# ==========================================
+# HELPER FUNCTIONS
+# ==========================================
 
 def extract_symbol_from_text(text: str) -> Optional[str]:
     """Extract trading symbol from AI response text"""
@@ -156,16 +422,18 @@ def calculate_quality_score(structure_valid: bool, rr_ratio: float, structure_qu
     return score, probability, grade
 
 # ==========================================
-# AI MENTOR ENDPOINTS
+# AI MENTOR ENDPOINTS (Updated with Academy)
 # ==========================================
 
 @router.post("/mentor/ask")
 async def ask_mentor(
     request: MentorRequest,
+    req: Request,
     current_user = Depends(get_current_user)
 ):
     """
-    AI Trading Mentor - Provides educational trading guidance.
+    AI Trading Mentor - Provides educational trading guidance with Academy lesson recommendations.
+    ALWAYS returns at least one lesson recommendation.
     """
     question = request.question
     skill_level = request.skill_level
@@ -173,21 +441,82 @@ async def ask_mentor(
     if not question or len(question.strip()) < 2:
         raise HTTPException(400, "Question too short")
 
+    # Gather Academy context
+    auth_header = req.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+    base_url = str(req.base_url).rstrip("/")
+    if not base_url or base_url == "http://":
+        base_url = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+
+    user_id = str(current_user.get("id", "anonymous")) if isinstance(current_user, dict) else str(getattr(current_user, "id", "anonymous"))
+
+    # Fetch Academy data
+    academy_structure = AcademyStructure(levels=[], modules={}, lessons={})
+    academy_progress = UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+
+    try:
+        async with httpx.AsyncClient() as client:
+            academy_structure, academy_progress = await asyncio.gather(
+                fetch_academy_structure(client, base_url, token),
+                fetch_user_academy_progress(client, base_url, token, user_id),
+                return_exceptions=True
+            )
+            if isinstance(academy_structure, Exception):
+                academy_structure = AcademyStructure(levels=[], modules={}, lessons={})
+            if isinstance(academy_progress, Exception):
+                academy_progress = UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+    except Exception as e:
+        print(f"[MENTOR] Academy fetch error: {e}", flush=True)
+
+    # Generate lesson recommendations (ALWAYS)
+    recommendations = generate_lesson_recommendations(question, academy_structure, academy_progress)
+
     if not OPENROUTER_CONFIGURED:
+        # Fallback response - short and lesson-focused
+        q_lower = question.lower()
+        if any(w in q_lower for w in ["support", "resistance"]):
+            response_text = "Support and Resistance are key levels where price reverses. Learn the exact strategy in the lesson below! 👇"
+        elif any(w in q_lower for w in ["risk", "drawdown", "loss"]):
+            response_text = "Risk management protects your account. Master position sizing in the lesson below! 👇"
+        elif any(w in q_lower for w in ["foundation", "beginner", "start", "forex"]):
+            response_text = "Welcome! Start with the Forex Foundations lesson below to build your trading base. 👇"
+        elif any(w in q_lower for w in ["pattern", "candlestick", "chart"]):
+            response_text = "Chart patterns reveal market psychology. Learn to read them in the lesson below! 👇"
+        else:
+            response_text = "Great question! I've found the perfect lesson for you below. Click to learn this strategy step-by-step! 👇"
+
         return {
-            "response": """I apologize, but the AI Mentor is currently in setup mode.
-
-To enable full AI capabilities, please ensure OPENROUTER_API_KEY is set in your environment variables.
-
-**Quick Trading Tips:**
-• Risk max 1-2% per trade
-• Always use stop losses
-• Keep a trading journal
-• Don't revenge trade""",
-            "suggested_resources": ["Risk Management", "Position Sizing", "Trading Psychology"],
+            "response": response_text,
+            "recommendations": [rec.dict() for rec in recommendations],
+            "suggested_resources": [],
             "mode": "fallback",
-            "configured": False
+            "configured": False,
+            "academy_progress": {
+                "completion_rate": academy_progress.completion_rate,
+                "current_level": academy_progress.current_level
+            }
         }
+
+    # Build strict system prompt
+    system_prompt = f"""You are the AI Trading Mentor for Pipways. Guide users to specific Trading Academy lessons.
+
+STRICT RULES:
+1. Keep responses under 150 words (2-3 short paragraphs MAX)
+2. NEVER provide long explanations - reference the specific lesson shown below
+3. Briefly acknowledge the question, give one actionable tip, then direct to the lesson
+4. ALWAYS mention that lesson recommendations appear below your message
+5. Be concise and direct
+
+USER: {skill_level} level | PROGRESS: {academy_progress.completion_rate}% complete
+
+RESPONSE FORMAT:
+[1 sentence acknowledging question]
+[1 sentence with specific actionable tip] 
+[1 sentence directing to lesson card below]
+
+Example: "Great question about support levels! The key is looking for 2+ touches. Click the lesson card below to learn the full strategy!"
+
+REMEMBER: User will see specific lesson cards below your response. Just guide them there."""
 
     try:
         async with httpx.AsyncClient() as client:
@@ -202,19 +531,10 @@ To enable full AI capabilities, please ensure OPENROUTER_API_KEY is set in your 
                 json={
                     "model": OPENROUTER_MODEL,
                     "messages": [
-                        {
-                            "role": "system",
-                            "content": f"""You are an expert trading mentor with 20+ years of experience. 
-User skill level: {skill_level}.
-Provide clear, actionable trading education with specific examples.
-Emphasize risk management and trading psychology. No specific financial advice."""
-                        },
-                        {
-                            "role": "user",
-                            "content": question
-                        }
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question}
                     ],
-                    "max_tokens": 1500,
+                    "max_tokens": 300,  # Force brevity
                     "temperature": 0.7
                 },
                 timeout=30.0
@@ -238,12 +558,21 @@ Emphasize risk management and trading psychology. No specific financial advice."
 
             ai_response = data["choices"][0]["message"]["content"]
 
+            # Truncate if still too long
+            if len(ai_response) > 600:
+                ai_response = ai_response[:597] + "..."
+
             return {
                 "response": ai_response,
+                "recommendations": [rec.dict() for rec in recommendations],
                 "suggested_resources": [],
                 "mode": "ai",
                 "model": OPENROUTER_MODEL,
-                "configured": True
+                "configured": True,
+                "academy_progress": {
+                    "completion_rate": academy_progress.completion_rate,
+                    "current_level": academy_progress.current_level
+                }
             }
 
     except httpx.TimeoutException:
@@ -252,19 +581,31 @@ Emphasize risk management and trading psychology. No specific financial advice."
         raise
     except Exception as e:
         print(f"[AI ERROR] Unexpected error: {e}", flush=True)
-        raise HTTPException(500, f"AI service error: {str(e)}")
+        # Fallback with recommendations
+        return {
+            "response": "I'm currently in offline mode, but I've found a great lesson for you below! Check it out to learn more. 👇",
+            "recommendations": [rec.dict() for rec in recommendations],
+            "suggested_resources": [],
+            "mode": "error_fallback",
+            "configured": True,
+            "academy_progress": {
+                "completion_rate": academy_progress.completion_rate,
+                "current_level": academy_progress.current_level
+            }
+        }
 
 @router.post("/mentor/ask-legacy")
 async def ask_mentor_legacy(
     question: str = Form(...),
     skill_level: str = Form("intermediate"),
+    req: Request = None,
     current_user = Depends(get_current_user)
 ):
     """Legacy form-data endpoint for compatibility"""
-    return await ask_mentor(MentorRequest(question=question, skill_level=skill_level), current_user)
+    return await ask_mentor(MentorRequest(question=question, skill_level=skill_level), req, current_user)
 
 # ==========================================
-# TRADE VALIDATOR ENDPOINTS
+# TRADE VALIDATOR ENDPOINTS (Unchanged)
 # ==========================================
 
 @router.post("/trade/validate")
@@ -428,7 +769,7 @@ async def validate_trade(
         }
 
 # ==========================================
-# SIGNAL MANAGEMENT ENDPOINTS
+# SIGNAL MANAGEMENT ENDPOINTS (Unchanged)
 # ==========================================
 
 @router.post("/signal/save")
@@ -464,8 +805,7 @@ async def save_signal(
         raise HTTPException(500, f"Failed to save signal: {str(e)}")
 
 # ==========================================
-# CHART ANALYSIS (Lightweight version)
-# Full chart analysis moved to chart_analysis.py
+# CHART ANALYSIS (Unchanged)
 # ==========================================
 
 @router.post("/chart/analyze-text")
@@ -572,5 +912,3 @@ async def analyze_chart_text(
 # - /chart/analyze (image) -> chart_analysis.py
 # 
 # This avoids route collisions and maintains clean separation of concerns.
-# The imports above ensure calculate_performance_metrics is still available
-# for any legacy code that needs it.

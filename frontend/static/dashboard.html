@@ -1119,15 +1119,6 @@
                                         <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
                                             <i class="fas fa-robot text-xs text-white"></i>
                                         </div>
-                                           <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50">
-                                    <div class="flex gap-3 animate-fade-in">
-                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                            <i class="fas fa-robot text-xs text-white"></i>
-                                        </div>
-                                        <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
-                                            <p class="text-gray-200 text-sm leading-relaxed">
-                                                👋 Welcome! I'm your <strong>Pipways Trading Copilot</strong>. I have access to your:
-                                            </p>
                                         <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
                                             <p class="text-gray-200 text-sm leading-relaxed">
                                                 👋 Welcome! I'm your <strong>Pipways Trading Copilot</strong>. I have access to your:
@@ -1142,6 +1133,12 @@
                                         </div>
                                     </div>
                                 </div>
+                                                    </div> <!-- closes mentor-messages -->
+                    
+                    <!-- ADD HERE: After mentor-messages closes, before mentor-typing -->
+                    <div id="mentor-recommendations" style="display: none; margin: 0 1rem 1rem; padding: 16px; background: rgba(17, 24, 39, 0.9); border-radius: 12px; border: 1px solid rgba(55, 65, 81, 0.6);"></div>
+                    
+                    <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700">
 
                                 <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700">
                                     <div class="flex items-center gap-2 text-gray-400 text-sm">

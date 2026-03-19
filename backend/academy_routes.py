@@ -840,6 +840,75 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
                 "chart_practice": fallback, **fallback}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ADMIN — Seed health + reseed
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/admin/academy/status")
+async def academy_status(current_user=Depends(get_current_user)):
+    """Returns DB row counts for all academy tables."""
+    try:
+        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
+        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
+        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
+        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
+        levels  = r_lv["c"] if r_lv else 0
+        modules = r_mo["c"] if r_mo else 0
+        lessons = r_le["c"] if r_le else 0
+        quizzes = r_qu["c"] if r_qu else 0
+        return {
+            "levels":    levels,
+            "modules":   modules,
+            "lessons":   lessons,
+            "quizzes":   quizzes,
+            "is_seeded": levels > 0 and modules > 0 and lessons > 0,
+            "orphaned":  levels > 0 and modules == 0,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Status check failed: {e}")
+
+
+@router.post("/admin/academy/reseed")
+async def academy_reseed(current_user=Depends(get_current_user)):
+    """
+    Admin only. Wipes curriculum tables and re-seeds from ACADEMY_CURRICULUM.
+    Does NOT touch user_learning_progress, user_badges, or user_quiz_results.
+    """
+    is_admin = current_user.get("is_admin") if current_user else False
+    if not is_admin:
+        raise HTTPException(403, "Admin only")
+
+    try:
+        from .lms_init import seed_academy
+
+        print("[RESEED] Admin triggered full reseed — clearing curriculum...", flush=True)
+        # Delete in reverse FK order; preserve user data
+        await database.execute("DELETE FROM lesson_quizzes")
+        await database.execute("DELETE FROM learning_lessons")
+        await database.execute("DELETE FROM learning_modules")
+        await database.execute("DELETE FROM learning_levels")
+        print("[RESEED] Curriculum cleared. Seeding now...", flush=True)
+
+        await seed_academy()
+
+        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
+        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
+        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
+        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
+
+        return {
+            "status":  "success",
+            "message": "Academy curriculum reseeded successfully",
+            "levels":  r_lv["c"] if r_lv else 0,
+            "modules": r_mo["c"] if r_mo else 0,
+            "lessons": r_le["c"] if r_le else 0,
+            "quizzes": r_qu["c"] if r_qu else 0,
+        }
+    except Exception as e:
+        print(f"[RESEED ERROR] {e}", flush=True)
+        raise HTTPException(500, f"Reseed failed: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # INTERNAL HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 

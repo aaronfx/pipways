@@ -4,22 +4,18 @@ Responsibilities:
   1. GET  /academy.html     → serve academy.html (primary, mirrors dashboard.html)
   2. GET  /academy          → 301 redirect to /academy.html
   3. All  /learning/*       → full LMS API (moved from learning.py / main.py)
-
-Wire into main.py:
-    from .academy_routes import router as academy_router
-    app.include_router(academy_router, tags=["Academy"])
-
-Remove from main.py:
-    - app.include_router(LEARNING_ROUTER_MAIN, prefix="/learning", ...)
-    - app.include_router(LEARNING_ROUTER_FALLBACK, prefix="/learning", ...)
-    - The `from . import learning` / `from . import academy_routes` imports
-    - The `_HAS_ACADEMY` guard and fallback stubs
+  4. AI Diagram Generation System — Fully Integrated
 """
 
 import os
 import json
+import re
+import xml.etree.ElementTree as ET
+import asyncio
 import traceback
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse
@@ -44,53 +40,475 @@ def _user_get(user, key, default=None):
         except AttributeError:
             return default
 
-# ── Locate academy.html ───────────────────────────────────────────────────────
-# Checks: frontend/static/ → static/ → same dir as this file
-_BASE = Path(__file__).parent
+# ══════════════════════════════════════════════════════════════════════════════
+# AI DIAGRAM GENERATION SYSTEM — INTEGRATED
+# ══════════════════════════════════════════════════════════════════════════════
 
-def _find_academy_html() -> Optional[Path]:
-    candidates = [
-        _BASE.parent / "frontend" / "static" / "academy.html",
-        _BASE.parent / "static" / "academy.html",
-        _BASE / "academy.html",
-    ]
-    for p in candidates:
-        if p.exists():
-            return p
-    return None
-
-# ── AI (OpenRouter) ───────────────────────────────────────────────────────────
-OPENROUTER_API_KEY  = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL    = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_DIAGRAM_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
-    if not OPENROUTER_API_KEY:
-        return "Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            res = await client.post(
-                f"{OPENROUTER_BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://pipways.com",
-                    "X-Title": "Pipways Trading Academy",
-                },
-                json={
-                    "model": OPENROUTER_MODEL,
-                    "max_tokens": max_tokens,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user",   "content": user_msg},
-                    ],
-                }
-            )
-            data = res.json()
-            return data["choices"][0]["message"]["content"]
-    except Exception as e:
-        print(f"[TRADING COACH] Error: {e}", flush=True)
-        return "I'm having trouble connecting right now. Please try again shortly."
+COLOR_SCHEME = {
+    "background": "#0d1117",
+    "bullish": "#34d399",
+    "bearish": "#f87171",
+    "accent": "#a78bfa",
+    "entry": "#fbbf24",
+    "text": "#e5e7eb",
+    "subtext": "#9ca3af",
+    "grid": "#374151",
+    "support": "#22c55e",
+    "resistance": "#ef4444"
+}
+
+DIAGRAM_TYPES = {
+    "price_action": "Candlestick charts, trend lines, support/resistance with entry/exit points",
+    "risk_management": "Risk/reward ratios, position sizing, stop loss visualization",
+    "indicator": "RSI, MACD, Moving Average panels with overbought/oversold zones",
+    "pattern": "Chart patterns: Head & Shoulders, Double Tops, Flags, Triangles",
+    "structure": "Order blocks, liquidity pools, market structure breaks",
+    "concept": "Abstract concepts: correlation, session times, market hierarchy"
+}
+
+@dataclass
+class DiagramContext:
+    concept: str
+    diagram_type: str
+    elements: List[str]
+    values: Dict[str, str]
+    trend_direction: Optional[str] = None
+    timeframe: Optional[str] = None
+
+
+class LessonClassifier:
+    """Rule-based lesson classification engine"""
+    
+    KEYWORD_PATTERNS = {
+        "price_action": [
+            r"candlestick", r"support", r"resistance", r"trend", r"swing", r"pullback",
+            r"higher high", r"lower low", r"bounce", r"rejection", r"breakout",
+            r"consolidation", r"range", r"wick", r"body", r"engulfing", r"pin bar"
+        ],
+        "risk_management": [
+            r"risk", r"reward", r"r:r", r"stop loss", r"take profit", r"position size",
+            r"lot", r"leverage", r"margin", r"drawdown", r"1-2%", r"portfolio heat",
+            r"expectancy", r"profit factor", r"consecutive loss"
+        ],
+        "indicator": [
+            r"rsi", r"macd", r"moving average", r"ema", r"sma", r"adx", r"bollinger",
+            r"stochastic", r"overbought", r"oversold", r"divergence", r"crossover",
+            r"momentum", r"oscillator", r"golden cross", r"death cross"
+        ],
+        "pattern": [
+            r"pattern", r"head and shoulders", r"double top", r"double bottom",
+            r"flag", r"pennant", r"triangle", r"wedge", r"rectangle", r"cup and handle",
+            r"ascending", r"descending", r"symmetrical", r"breakout", r"reversal"
+        ],
+        "structure": [
+            r"order block", r"liquidity", r"sweep", r"inducement", r"break of structure",
+            r"bos", r"choch", r"fvg", r"fair value gap", r"imbalance", r"mitigation",
+            r"institutional", r"smart money", r"footprint"
+        ],
+        "concept": [
+            r"session", r"correlation", r"spread", r"pip", r"lot", r"leverage",
+            r"participant", r"central bank", r"market structure", r"timeframe",
+            r"confluence", r"fundamental"
+        ]
+    }
+    
+    def classify(self, title: str, content: str) -> str:
+        text = f"{title} {content}".lower()
+        scores = {}
+        
+        for diagram_type, patterns in self.KEYWORD_PATTERNS.items():
+            score = sum(1 for pattern in patterns if pattern in text)
+            title_score = sum(2 for pattern in patterns if pattern in title.lower())
+            scores[diagram_type] = score + title_score
+        
+        best_match = max(scores, key=scores.get)
+        return best_match if scores[best_match] > 0 else "concept"
+
+
+class ContentExtractor:
+    """Extract structured context from lesson content"""
+    
+    PRICE_PATTERN = r'(\d+\.\d{3,})'
+    PIP_PATTERN = r'(\d+)\s*pips?'
+    PERCENTAGE_PATTERN = r'(\d+(?:\.\d+)?)%'
+    RATIO_PATTERN = r'(\d+):\s*(\d+)'
+    
+    def extract(self, title: str, content: str) -> DiagramContext:
+        concept_match = re.search(r'##\s*(.+?)(?=\n|$)', content)
+        if concept_match:
+            concept = concept_match.group(1).strip()
+        else:
+            sentences = re.split(r'(?<=[.!?])\s+', content)
+            concept = sentences[0][:120] if sentences else title
+        
+        prices = re.findall(self.PRICE_PATTERN, content)
+        pips = re.findall(self.PIP_PATTERN, content, re.IGNORECASE)
+        percentages = re.findall(self.PERCENTAGE_PATTERN, content)
+        ratios = re.findall(self.RATIO_PATTERN, content)
+        
+        values = {}
+        
+        if prices:
+            for i, price in enumerate(prices[:3]):
+                context = self._get_value_context(content, price)
+                if any(word in context for word in ['entry', 'buy', 'sell', 'at']):
+                    values['entry'] = price
+                elif any(word in context for word in ['stop', 'sl', 'loss']):
+                    values['stop_loss'] = price
+                elif any(word in context for word in ['target', 'tp', 'profit', 'take']):
+                    values['take_profit'] = price
+        
+        if ratios:
+            values['risk_reward'] = f"{ratios[0][0]}:{ratios[0][1]}"
+        
+        if pips:
+            values['pip_distance'] = pips[0]
+        
+        trend = None
+        if any(word in content.lower() for word in ['uptrend', 'bullish', 'buy', 'support', 'higher']):
+            trend = 'bullish'
+        elif any(word in content.lower() for word in ['downtrend', 'bearish', 'sell', 'resistance', 'lower']):
+            trend = 'bearish'
+        
+        elements = []
+        element_keywords = {
+            'Entry': ['entry', 'buy at', 'sell at', 'open position'],
+            'Stop Loss': ['stop loss', 'stop', 'sl'],
+            'Take Profit': ['take profit', 'target', 'tp'],
+            'Support': ['support level', 'support zone'],
+            'Resistance': ['resistance level', 'resistance zone'],
+            'Trend Line': ['trend line', 'trendline'],
+            'Moving Average': ['moving average', 'ema', 'sma'],
+            'RSI': ['rsi', 'relative strength'],
+            'MACD': ['macd'],
+            'Candlestick': ['candle', 'wick', 'body']
+        }
+        
+        for element, keywords in element_keywords.items():
+            if any(kw in content.lower() for kw in keywords):
+                elements.append(element)
+        
+        classifier = LessonClassifier()
+        diagram_type = classifier.classify(title, content)
+        
+        return DiagramContext(
+            concept=concept,
+            diagram_type=diagram_type,
+            elements=elements,
+            values=values,
+            trend_direction=trend
+        )
+    
+    def _get_value_context(self, content: str, value: str, window: int = 50) -> str:
+        idx = content.find(value)
+        if idx == -1:
+            return ""
+        start = max(0, idx - window)
+        end = min(len(content), idx + len(value) + window)
+        return content[start:end].lower()
+
+
+class PromptTemplateEngine:
+    """Generate structured prompts based on diagram type"""
+    
+    def build_prompt(self, context: DiagramContext) -> Tuple[str, str]:
+        type_template = self._get_type_template(context)
+        system_prompt = self._get_system_prompt()
+        
+        user_prompt = f"""Generate a professional SVG diagram for a Forex trading lesson.
+
+CONCEPT: {context.concept}
+
+DIAGRAM TYPE: {context.diagram_type}
+
+KEY ELEMENTS: {', '.join(context.elements) if context.elements else 'Basic chart structure'}
+
+TREND: {context.trend_direction or 'neutral'}
+
+VALUES: {json.dumps(context.values, indent=2) if context.values else 'Use realistic example values'}
+
+SPECIFIC REQUIREMENTS:
+{self._get_specific_requirements(context)}
+
+OUTPUT: Return ONLY the SVG code. No markdown, no explanation, no code fences."""
+        
+        return system_prompt, user_prompt
+    
+    def _get_system_prompt(self) -> str:
+        return f"""You are an expert SVG diagram generator for financial education. Your task is to create clean, professional SVG diagrams for Forex trading lessons.
+
+STRICT RULES:
+1. Return ONLY SVG code - no markdown, no text, no explanation
+2. SVG must start with <svg and end with </svg>
+3. Use dark theme with these EXACT colors:
+   - Background: {COLOR_SCHEME['background']}
+   - Bullish/Profit: {COLOR_SCHEME['bullish']}
+   - Bearish/Loss: {COLOR_SCHEME['bearish']}
+   - Labels/Title: {COLOR_SCHEME['accent']}
+   - Entry Points: {COLOR_SCHEME['entry']}
+   - Text: {COLOR_SCHEME['text']}
+   - Subtext: {COLOR_SCHEME['subtext']}
+   - Grid: {COLOR_SCHEME['grid']}
+4. Max width: 480px, height: 200px (viewBox="0 0 480 200")
+5. Font: system-ui, sans-serif
+6. Include clear labels with text elements
+7. Professional, minimalist style
+8. Educational focus - make concepts visually clear
+
+SVG STRUCTURE:
+- <rect> for background and zones
+- <line> or <polyline> for price action
+- <circle> for entry/exit points
+- <text> for labels (font-size 9-12)
+- <path> for complex shapes
+
+DO NOT include:
+- JavaScript
+- CSS animations
+- External images
+- Interactive elements"""
+    
+    def _get_specific_requirements(self, context: DiagramContext) -> str:
+        templates = {
+            "price_action": self._price_action_template,
+            "risk_management": self._risk_management_template,
+            "indicator": self._indicator_template,
+            "pattern": self._pattern_template,
+            "structure": self._structure_template,
+            "concept": self._concept_template
+        }
+        return templates.get(context.diagram_type, self._concept_template)(context)
+    
+    def _price_action_template(self, context: DiagramContext) -> str:
+        return """
+Price Action Chart Requirements:
+- Show candlestick or line chart showing price movement
+- Mark entry point with yellow circle
+- Show stop loss (red line below entry for long, above for short)
+- Show take profit (green line)
+- Label with realistic price levels
+- Include brief trend indication
+- Show 1-2 support/resistance levels if relevant
+"""
+    
+    def _risk_management_template(self, context: DiagramContext) -> str:
+        values = context.values
+        rr = values.get('risk_reward', '1:2')
+        return f"""
+Risk Management Visualization:
+- Split view: Risk zone (red) vs Reward zone (green)
+- Show R:R ratio prominently ({rr})
+- Dollar/pip amounts labeled clearly
+- Position size calculation example if space permits
+- Account percentage indicator (1-2%)
+- Visual balance between risk and reward areas
+"""
+    
+    def _indicator_template(self, context: DiagramContext) -> str:
+        indicator = "RSI" if "RSI" in context.elements else "MACD"
+        return f"""
+Indicator Panel Requirements ({indicator}):
+- Show indicator line(s) in main color
+- Mark overbought zone (70+) in red tint
+- Mark oversold zone (30-) in green tint
+- Show current value marker
+- Midline at 50 (gray)
+- Simple histogram or line representation
+- Clean, readable scale
+"""
+    
+    def _pattern_template(self, context: DiagramContext) -> str:
+        return """
+Chart Pattern Requirements:
+- Clear pattern structure (Head & Shoulders, Double Top, Flag, etc.)
+- Label key points (Left Shoulder, Head, Right Shoulder, Neckline)
+- Entry trigger point marked
+- Target projection based on pattern height
+- Breakout/breakdown point highlighted
+"""
+    
+    def _structure_template(self, context: DiagramContext) -> str:
+        return """
+Market Structure Diagram:
+- Show price swing structure (highs and lows)
+- Mark order block zone (rectangle)
+- Show liquidity sweep (wick beyond level)
+- Break of Structure (BOS) indicator
+- Return to order block (mitigation)
+- Clean labeling of each phase
+"""
+    
+    def _concept_template(self, context: DiagramContext) -> str:
+        return """
+Concept Diagram:
+- Simplified visual representation
+- Key components labeled clearly
+- Flow or hierarchy if applicable
+- Minimalist design
+- Focus on clarity over complexity
+"""
+
+
+class SVGValidator:
+    """Validate generated SVG for security and structure"""
+    
+    MAX_SIZE = 20000
+    ALLOWED_TAGS = {
+        'svg', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+        'path', 'text', 'g', 'defs', 'linearGradient', 'stop', 'title', 'desc',
+        'animate', 'animateTransform'  # Allow SMIL animations for loaders
+    }
+    FORBIDDEN_PATTERNS = [
+        r'<script',
+        r'javascript:',
+        r'on\w+\s*=',
+        r'href\s*=\s*["\'][^"\']*javascript',
+        r'xlink:href',
+        r'foreignObject',
+        r'embed',
+        r'iframe'
+    ]
+    
+    def validate(self, svg: str) -> Tuple[bool, Optional[str]]:
+        if not svg or not svg.strip():
+            return False, "Empty SVG"
+        
+        svg = svg.strip()
+        
+        if not svg.startswith('<svg'):
+            return False, "Does not start with <svg"
+        
+        if not svg.endswith('</svg>'):
+            return False, "Does not end with </svg>"
+        
+        if len(svg) > self.MAX_SIZE:
+            return False, f"SVG too large ({len(svg)} > {self.MAX_SIZE})"
+        
+        svg_lower = svg.lower()
+        for pattern in self.FORBIDDEN_PATTERNS:
+            if re.search(pattern, svg_lower):
+                return False, f"Forbidden pattern detected: {pattern}"
+        
+        try:
+            root = ET.fromstring(svg)
+            for elem in root.iter():
+                tag = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+                if tag not in self.ALLOWED_TAGS:
+                    return False, f"Disallowed tag: {tag}"
+        except ET.ParseError as e:
+            return False, f"XML parsing error: {str(e)}"
+        
+        if 'viewBox' not in svg and ('width' not in svg or 'height' not in svg):
+            return False, "Missing viewBox or width/height"
+        
+        return True, None
+
+
+class DiagramGenerator:
+    """Main orchestrator for diagram generation"""
+    
+    def __init__(self):
+        self.classifier = LessonClassifier()
+        self.extractor = ContentExtractor()
+        self.templater = PromptTemplateEngine()
+        self.validator = SVGValidator()
+        self.max_retries = 2
+    
+    async def generate(self, title: str, content: str, lesson_id: int) -> Tuple[str, bool]:
+        context = self.extractor.extract(title, content)
+        system_prompt, user_prompt = self.templater.build_prompt(context)
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                svg = await self._call_ai(system_prompt, user_prompt, attempt)
+                
+                if svg:
+                    svg = self._clean_svg(svg)
+                    is_valid, error = self.validator.validate(svg)
+                    
+                    if is_valid:
+                        return svg, True
+                    else:
+                        print(f"[DIAGRAM] Validation failed (attempt {attempt+1}): {error}")
+                        if attempt < self.max_retries:
+                            user_prompt += "\n\nSIMPLIFY: Create a simpler diagram with fewer elements."
+                
+            except Exception as e:
+                print(f"[DIAGRAM] Generation error (attempt {attempt+1}): {e}")
+                if attempt == self.max_retries:
+                    break
+        
+        return self._generate_fallback(context), False
+    
+    async def _call_ai(self, system: str, user: str, attempt: int) -> Optional[str]:
+        if not OPENROUTER_API_KEY:
+            print("[DIAGRAM] No API key configured")
+            return None
+        
+        try:
+            async with httpx.AsyncClient(timeout=45) as client:
+                res = await client.post(
+                    f"{OPENROUTER_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://pipways.com",
+                        "X-Title": "Pipways Trading Academy",
+                    },
+                    json={
+                        "model": OPENROUTER_MODEL,
+                        "max_tokens": 2500,
+                        "temperature": 0.2 if attempt == 0 else 0.1,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                    }
+                )
+                
+                if res.status_code != 200:
+                    print(f"[DIAGRAM] API error {res.status_code}: {res.text[:200]}")
+                    return None
+                
+                data = res.json()
+                content = data["choices"][0]["message"]["content"]
+                
+                svg_match = re.search(r'<svg[\s\S]*?</svg>', content)
+                if svg_match:
+                    return svg_match.group(0)
+                
+                return None
+                
+        except Exception as e:
+            print(f"[DIAGRAM] API call failed: {e}")
+            return None
+    
+    def _clean_svg(self, svg: str) -> str:
+        svg = re.sub(r'```svg\s*', '', svg)
+        svg = re.sub(r'```\s*$', '', svg)
+        
+        if 'xmlns=' not in svg:
+            svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+        
+        svg = re.sub(r'>\s+<', '><', svg)
+        return svg.strip()
+    
+    def _generate_fallback(self, context: DiagramContext) -> str:
+        colors = COLOR_SCHEME
+        return f'''<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" class="ac-svg-diagram">
+  <rect width="480" height="200" fill="{colors['background']}" rx="8"/>
+  <text x="240" y="80" text-anchor="middle" fill="{colors['accent']}" font-size="14" font-weight="bold">Diagram: {context.concept[:40]}</text>
+  <text x="240" y="110" text-anchor="middle" fill="{colors['subtext']}" font-size="11">{context.diagram_type.replace('_', ' ').title()} Visualization</text>
+  <rect x="180" y="130" width="120" height="30" fill="{colors['bullish']}" opacity="0.2" rx="4"/>
+  <text x="240" y="150" text-anchor="middle" fill="{colors['bullish']}" font-size="10">Interactive Diagram Loading...</text>
+</svg>'''
+
+# Initialize singleton
+diagram_generator = DiagramGenerator()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PYDANTIC MODELS
@@ -107,6 +525,13 @@ class QuizSubmission(BaseModel):
 class LessonCompleteRequest(BaseModel):
     lesson_id: int
     quiz_score: float = 0.0
+
+class DiagramResponse(BaseModel):
+    lesson_id: int
+    svg: str
+    diagram_type: str
+    generated: bool
+    elements: List[str]
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BADGE SYSTEM
@@ -219,36 +644,38 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
 # PAGE ROUTES
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ── Locate academy.html ───────────────────────────────────────────────────────
+_BASE = Path(__file__).parent
+
+def _find_academy_html() -> Optional[Path]:
+    candidates = [
+        _BASE.parent / "frontend" / "static" / "academy.html",
+        _BASE.parent / "static" / "academy.html",
+        _BASE / "academy.html",
+        _BASE / "academy (1).html",  # Handle uploaded filename
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
 @router.get("/academy.html")
 async def serve_academy(request: Request):
-    """
-    Serve academy.html at /academy.html — mirrors how dashboard.html is served.
-    Auth is enforced client-side (JS checks localStorage token and redirects
-    to / on 401 from any API call), consistent with how dashboard.html works.
-    """
     p = _find_academy_html()
     if p:
         return FileResponse(str(p), media_type="text/html")
-    # Graceful fallback — tells the developer where to put the file
     raise HTTPException(
         status_code=404,
-        detail=(
-            "academy.html not found. "
-            "Place it in frontend/static/academy.html or static/academy.html."
-        )
+        detail="academy.html not found. Place it in frontend/static/academy.html or static/academy.html."
     )
 
 @router.get("/academy")
 async def academy_clean_url_redirect():
-    """Redirect /academy → /academy.html to match the canonical URL pattern."""
     return RedirectResponse(url="/academy.html", status_code=301)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LMS API — /learning/*
-# (These were previously mounted via main.py; they now live here exclusively)
 # ══════════════════════════════════════════════════════════════════════════════
-
-# ── READ ──────────────────────────────────────────────────────────────────────
 
 @router.get("/learning/levels")
 async def get_levels(current_user=Depends(get_current_user)):
@@ -356,7 +783,7 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
 async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
     try:
         lesson = await database.fetch_one(
-            """SELECT l.id, l.title, l.content, l.order_index, l.module_id,
+            """SELECT l.id, l.title, l.content, l.order_index, l.module_id, l.diagram_svg,
                       m.title AS module_title, m.level_id, lv.name AS level_name
                FROM learning_lessons l
                JOIN learning_modules m  ON m.id  = l.module_id
@@ -393,6 +820,100 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
     except Exception as e:
         print(f"[API ERROR] get_lesson: {e}", flush=True)
         raise HTTPException(500, "Failed to load lesson data")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DIAGRAM GENERATION ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/learning/lesson/{lesson_id}/diagram", response_model=DiagramResponse)
+async def get_lesson_diagram(
+    lesson_id: int, 
+    force_regenerate: bool = Query(False, description="Force regeneration even if cached"),
+    current_user=Depends(get_current_user)
+):
+    """
+    Get or generate diagram for a lesson.
+    Returns cached SVG if available, otherwise generates new one asynchronously.
+    """
+    try:
+        lesson = await database.fetch_one(
+            "SELECT id, title, content, diagram_svg, diagram_status FROM learning_lessons WHERE id=:lid",
+            {"lid": lesson_id}
+        )
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+        
+        # Return cached if available and valid
+        if not force_regenerate and lesson.get("diagram_svg") and lesson.get("diagram_status") == "complete":
+            context = ContentExtractor().extract(lesson["title"], lesson["content"] or "")
+            return DiagramResponse(
+                lesson_id=lesson_id,
+                svg=lesson["diagram_svg"],
+                diagram_type=context.diagram_type,
+                generated=False,
+                elements=context.elements
+            )
+        
+        # If currently generating, return status
+        if lesson.get("diagram_status") == "generating" and not force_regenerate:
+            return DiagramResponse(
+                lesson_id=lesson_id,
+                svg=_get_generating_placeholder(),
+                diagram_type="loading",
+                generated=False,
+                elements=["Generating..."]
+            )
+        
+        # Mark as generating
+        await database.execute(
+            "UPDATE learning_lessons SET diagram_status='generating' WHERE id=:lid",
+            {"lid": lesson_id}
+        )
+        
+        # Generate diagram
+        svg, success = await diagram_generator.generate(
+            lesson["title"], 
+            lesson.get("content", ""), 
+            lesson_id
+        )
+        
+        # Update database
+        status = "complete" if success else "failed"
+        await database.execute(
+            """UPDATE learning_lessons 
+               SET diagram_svg=:svg, diagram_status=:status, diagram_generated_at=NOW() 
+               WHERE id=:lid""",
+            {"lid": lesson_id, "svg": svg, "status": status}
+        )
+        
+        context = ContentExtractor().extract(lesson["title"], lesson["content"] or "")
+        
+        return DiagramResponse(
+            lesson_id=lesson_id,
+            svg=svg,
+            diagram_type=context.diagram_type,
+            generated=True,
+            elements=context.elements
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API ERROR] get_lesson_diagram: {e}", flush=True)
+        await database.execute(
+            "UPDATE learning_lessons SET diagram_status='failed' WHERE id=:lid",
+            {"lid": lesson_id}
+        )
+        raise HTTPException(500, f"Diagram generation failed: {str(e)}")
+
+def _get_generating_placeholder() -> str:
+    return '''<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" class="ac-svg-diagram">
+  <rect width="480" height="200" fill="#0d1117" rx="8"/>
+  <circle cx="240" cy="100" r="20" fill="none" stroke="#7c3aed" stroke-width="3" stroke-dasharray="60" stroke-linecap="round">
+    <animateTransform attributeName="transform" type="rotate" from="0 240 100" to="360 240 100" dur="1s" repeatCount="indefinite"/>
+  </circle>
+  <text x="240" y="140" text-anchor="middle" fill="#9ca3af" font-size="12">Generating diagram...</text>
+</svg>'''
 
 @router.get("/learning/quiz/{lesson_id}")
 async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
@@ -712,6 +1233,34 @@ async def mark_first_visit_complete(current_user=Depends(get_current_user)):
 
 # ── AI MENTOR endpoints ───────────────────────────────────────────────────────
 
+async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
+    if not OPENROUTER_API_KEY:
+        return "Trading Coach is currently unavailable. Please configure OPENROUTER_API_KEY."
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://pipways.com",
+                    "X-Title": "Pipways Trading Academy",
+                },
+                json={
+                    "model": OPENROUTER_MODEL,
+                    "max_tokens": max_tokens,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user",   "content": user_msg},
+                    ],
+                }
+            )
+            data = res.json()
+            return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"[TRADING COACH] Error: {e}", flush=True)
+        return "I'm having trouble connecting right now. Please try again shortly."
+
 @router.post("/learning/mentor/teach")
 async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
@@ -829,7 +1378,6 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
             "lesson_title":  lesson["title"],
             "level":         lesson["level_name"],
             "chart_practice": data,
-            # surface keys the JS already expects:
             "question":    data.get("question", ""),
             "options":     data.get("options",  []),
             "correct":     data.get("correct",  "A"),
@@ -853,7 +1401,7 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ADMIN — Seed health + reseed
+# ADMIN — Seed health + reseed + Diagram Status
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/admin/academy/status")
@@ -864,21 +1412,117 @@ async def academy_status(current_user=Depends(get_current_user)):
         r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
         r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
         r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
+        r_dia = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons WHERE diagram_status='complete'")
         levels  = r_lv["c"] if r_lv else 0
         modules = r_mo["c"] if r_mo else 0
         lessons = r_le["c"] if r_le else 0
         quizzes = r_qu["c"] if r_qu else 0
+        diagrams = r_dia["c"] if r_dia else 0
         return {
             "levels":    levels,
             "modules":   modules,
             "lessons":   lessons,
             "quizzes":   quizzes,
+            "diagrams_complete": diagrams,
             "is_seeded": levels > 0 and modules > 0 and lessons > 0,
             "orphaned":  levels > 0 and modules == 0,
         }
     except Exception as e:
         raise HTTPException(500, f"Status check failed: {e}")
 
+@router.get("/admin/academy/diagram-status")
+async def diagram_generation_status(current_user=Depends(get_current_user)):
+    """Get statistics on diagram generation across all lessons"""
+    is_admin = _user_get(current_user, "is_admin", False)
+    if not is_admin:
+        raise HTTPException(403, "Admin only")
+    
+    try:
+        stats = await database.fetch_all("""
+            SELECT 
+                diagram_status,
+                COUNT(*) as count
+            FROM learning_lessons
+            GROUP BY diagram_status
+        """)
+        
+        total_lessons = await database.fetch_val("SELECT COUNT(*) FROM learning_lessons") or 0
+        complete = sum(r["count"] for r in stats if r["diagram_status"] == "complete")
+        
+        return {
+            "total_lessons": total_lessons,
+            "complete": complete,
+            "pending": sum(r["count"] for r in stats if r["diagram_status"] == "pending" or r["diagram_status"] is None),
+            "generating": sum(r["count"] for r in stats if r["diagram_status"] == "generating"),
+            "failed": sum(r["count"] for r in stats if r["diagram_status"] == "failed"),
+            "completion_rate": round(complete / total_lessons * 100, 1) if total_lessons else 0,
+            "breakdown": [dict(r) for r in stats]
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Status check failed: {e}")
+
+@router.post("/admin/academy/regenerate-diagrams")
+async def regenerate_all_diagrams(
+    lesson_ids: Optional[List[int]] = None,
+    current_user=Depends(get_current_user)
+):
+    """Admin endpoint to batch regenerate diagrams."""
+    is_admin = _user_get(current_user, "is_admin", False)
+    if not is_admin:
+        raise HTTPException(403, "Admin only")
+    
+    try:
+        if lesson_ids:
+            rows = await database.fetch_all(
+                "SELECT id, title, content FROM learning_lessons WHERE id = ANY(:ids)",
+                {"ids": lesson_ids}
+            )
+        else:
+            rows = await database.fetch_all(
+                """SELECT id, title, content FROM learning_lessons 
+                   WHERE diagram_status != 'complete' OR diagram_svg IS NULL
+                   LIMIT 50"""
+            )
+        
+        results = []
+        for lesson in rows:
+            try:
+                svg, success = await diagram_generator.generate(
+                    lesson["title"],
+                    lesson.get("content", ""),
+                    lesson["id"]
+                )
+                
+                status = "complete" if success else "failed"
+                await database.execute(
+                    """UPDATE learning_lessons 
+                       SET diagram_svg=:svg, diagram_status=:status, diagram_generated_at=NOW()
+                       WHERE id=:lid""",
+                    {"lid": lesson["id"], "svg": svg, "status": status}
+                )
+                
+                results.append({
+                    "lesson_id": lesson["id"],
+                    "success": success,
+                    "status": status
+                })
+                
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                results.append({
+                    "lesson_id": lesson["id"],
+                    "success": False,
+                    "error": str(e)
+                })
+        
+        return {
+            "processed": len(results),
+            "results": results
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Batch regeneration failed: {e}")
 
 @router.post("/admin/academy/reseed")
 async def academy_reseed(current_user=Depends(get_current_user)):

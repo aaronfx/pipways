@@ -6,41 +6,81 @@
     <title>AI Mentor - Pipways</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <style>
+        :root {
+            --bg-primary: #0B0F19;
+            --bg-secondary: #111827;
+            --bg-card: #1F2937;
+            --bg-hover: #374151;
+            --border-color: #374151;
+            --text-primary: #F9FAFB;
+            --text-secondary: #9CA3AF;
+            --accent-primary: #8B5CF6;
+            --accent-secondary: #7C3AED;
+            --accent-gradient: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            --success: #10B981;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+
         /* Page-specific layout */
         .mentor-page {
-            max-width: 900px;
-            margin: 2rem auto;
-            padding: 0 1rem;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
             display: grid;
-            grid-template-columns: 1fr 280px;
+            grid-template-columns: 1fr 300px;
             gap: 2rem;
+            height: calc(100vh - 80px);
         }
 
         .chat-container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            height: 70vh;
+            height: 100%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
         }
 
         .chat-header {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-            padding: 1.25rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .chat-header-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
         }
 
         .chat-header h2 {
             margin: 0;
-            color: white;
+            color: var(--text-primary);
             font-size: 1.25rem;
+            font-weight: 700;
         }
 
         .chat-header p {
             margin: 0.25rem 0 0 0;
-            opacity: 0.9;
+            color: var(--text-secondary);
             font-size: 0.875rem;
         }
 
@@ -48,10 +88,10 @@
             flex: 1;
             overflow-y: auto;
             padding: 1.5rem;
-            background: #f8fafc;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.25rem;
+            background: var(--bg-secondary);
         }
 
         .message {
@@ -80,71 +120,84 @@
             justify-content: center;
             font-size: 1.125rem;
             flex-shrink: 0;
-            background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
         }
 
         .message.ai .message-avatar {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
         }
 
         .message-content {
-            padding: 0.875rem 1.125rem;
+            padding: 1rem 1.25rem;
             border-radius: 1rem;
-            line-height: 1.5;
+            line-height: 1.6;
             font-size: 0.9375rem;
         }
 
         .message.ai .message-content {
-            background: white;
-            color: #1f2937;
+            background: var(--bg-card);
+            color: var(--text-primary);
             border-bottom-left-radius: 0.25rem;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
         }
 
         .message.user .message-content {
-            background: #3b82f6;
+            background: var(--accent-gradient);
             color: white;
             border-bottom-right-radius: 0.25rem;
+            font-weight: 500;
         }
 
         .chat-input-container {
-            padding: 1rem 1.5rem;
-            background: white;
-            border-top: 1px solid #e5e7eb;
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
             display: flex;
             gap: 0.75rem;
         }
 
         #message-input {
             flex: 1;
-            padding: 0.75rem 1rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
+            padding: 0.875rem 1.25rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
             font-size: 0.9375rem;
             outline: none;
-            transition: border-color 0.2s;
-        }
-
-        #message-input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        #send-btn {
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 0.75rem 1.25rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            font-weight: 600;
             transition: all 0.2s;
         }
 
+        #message-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+
+        #message-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        #send-btn {
+            background: var(--accent-gradient);
+            color: white;
+            border: none;
+            padding: 0.875rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
         #send-btn:hover {
-            background: #2563eb;
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
         }
 
         /* Quick Commands */
@@ -152,69 +205,73 @@
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
-            padding: 0.75rem 1.5rem;
-            background: #f9fafb;
-            border-top: 1px solid #e5e7eb;
+            padding: 1rem 1.25rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
         }
 
         .quick-cmd-btn {
-            background: white;
-            border: 1px solid #d1d5db;
-            color: #6b7280;
-            padding: 0.375rem 0.875rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
             border-radius: 9999px;
             font-size: 0.8125rem;
             cursor: pointer;
             transition: all 0.2s;
+            font-weight: 500;
         }
 
         .quick-cmd-btn:hover {
-            background: #3b82f6;
+            background: var(--accent-primary);
             color: white;
-            border-color: #3b82f6;
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
         }
 
         /* Sidebar */
         .mentor-sidebar {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.25rem;
         }
 
         .progress-card, .stats-card {
-            background: white;
+            background: var(--bg-card);
             border-radius: 12px;
-            padding: 1.25rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
         }
 
         .progress-card h3, .stats-card h3 {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #6b7280;
-            margin-bottom: 0.75rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin: 0 0 1rem 0;
+            font-weight: 600;
         }
 
         .progress-bar-bg {
             height: 8px;
-            background: #e5e7eb;
+            background: var(--bg-secondary);
             border-radius: 9999px;
             overflow: hidden;
-            margin: 0.5rem 0;
+            margin: 0.75rem 0;
         }
 
         .progress-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+            background: var(--accent-gradient);
             transition: width 0.5s ease;
+            border-radius: 9999px;
         }
 
         .typing-indicator {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            color: #6b7280;
+            color: var(--text-secondary);
             font-size: 0.875rem;
             padding: 0.5rem 0;
         }
@@ -227,7 +284,7 @@
         .typing-dots span {
             width: 6px;
             height: 6px;
-            background: #3b82f6;
+            background: var(--accent-primary);
             border-radius: 50%;
             animation: bounce 1.4s infinite ease-in-out both;
         }
@@ -240,16 +297,16 @@
             40% { transform: scale(1); }
         }
 
-        /* Lesson Cards - Dark Theme for contrast */
+        /* Lesson Cards */
         .lesson-recommendations {
             margin-top: 1rem;
             padding-top: 1rem;
-            border-top: 1px dashed #e5e7eb;
+            border-top: 1px dashed var(--border-color);
         }
 
         .recommendations-label {
             font-size: 0.75rem;
-            color: #6b7280;
+            color: var(--accent-primary);
             margin-bottom: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
@@ -267,7 +324,7 @@
 
         .lesson-card {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            border: 1px solid #334155;
+            border: 1px solid var(--border-color);
             border-radius: 10px;
             padding: 1rem;
             cursor: pointer;
@@ -288,15 +345,16 @@
 
         .lesson-card:hover {
             transform: translateX(4px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-color: var(--accent-primary);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
         }
 
         .lesson-card-next::before {
-            background: #10b981;
+            background: var(--success);
         }
 
         .lesson-card-recommended::before {
-            background: #3b82f6;
+            background: var(--accent-primary);
         }
 
         .lesson-card-header {
@@ -321,8 +379,8 @@
         }
 
         .lesson-card-recommended .lesson-badge {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
+            background: rgba(139, 92, 246, 0.2);
+            color: #A78BFA;
         }
 
         .lesson-icon {
@@ -332,20 +390,20 @@
         .lesson-title {
             font-size: 0.9375rem;
             font-weight: 600;
-            color: #f1f5f9;
+            color: var(--text-primary);
             margin: 0 0 0.25rem 0;
         }
 
         .lesson-description {
             font-size: 0.8125rem;
-            color: #94a3b8;
+            color: var(--text-secondary);
             margin: 0 0 0.75rem 0;
         }
 
         .lesson-cta-btn {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
             padding: 0.5rem 1rem;
             border-radius: 6px;
             font-size: 0.8125rem;
@@ -356,21 +414,24 @@
         }
 
         .lesson-card:hover .lesson-cta-btn {
-            background: rgba(255,255,255,0.2);
-        }
-
-        .lesson-card-next .lesson-cta-btn {
-            background: #10b981;
-            border-color: #10b981;
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: white;
         }
 
         .lesson-card-next:hover .lesson-cta-btn {
-            background: #059669;
+            background: var(--success);
+            border-color: var(--success);
         }
 
         @media (max-width: 768px) {
             .mentor-page {
                 grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .chat-container {
+                height: 70vh;
             }
 
             .mentor-sidebar {
@@ -382,14 +443,16 @@
             }
         }
     </style>
-<base target="_blank">
 </head>
 <body>
     <div class="mentor-page">
         <div class="chat-container">
             <div class="chat-header">
-                <h2>🤖 AI Trading Mentor</h2>
-                <p>Your personal 24/7 trading coach</p>
+                <div class="chat-header-icon">🤖</div>
+                <div>
+                    <h2>AI Trading Mentor</h2>
+                    <p>Your personal 24/7 trading coach</p>
+                </div>
             </div>
 
             <div id="chat-messages" class="chat-messages">
@@ -404,7 +467,7 @@
             </div>
 
             <div class="chat-input-container">
-                <input type="text" id="message-input" placeholder="Ask about trading, risk, or strategies..." autocomplete="off">
+                <input type="text" id="message-input" placeholder="Ask about your trading, signals, or type /help..." autocomplete="off">
                 <button id="send-btn">Send</button>
             </div>
         </div>
@@ -413,7 +476,7 @@
             <div class="progress-card">
                 <h3>Your Progress</h3>
                 <div id="academy-progress">
-                    <p style="color: #6b7280; font-size: 0.875rem;">Loading...</p>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Loading...</p>
                 </div>
             </div>
 
@@ -421,12 +484,12 @@
                 <h3>Quick Stats</h3>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
-                        <span style="color: #6b7280;">Questions Asked</span>
-                        <span style="font-weight: 600;" id="questions-count">0</span>
+                        <span style="color: var(--text-secondary);">Questions Asked</span>
+                        <span style="font-weight: 600; color: var(--accent-primary);" id="questions-count">0</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
-                        <span style="color: #6b7280;">Lessons Started</span>
-                        <span style="font-weight: 600;" id="lessons-count">0</span>
+                        <span style="color: var(--text-secondary);">Lessons Started</span>
+                        <span style="font-weight: 600; color: var(--accent-primary);" id="lessons-count">0</span>
                     </div>
                 </div>
             </div>
@@ -700,13 +763,13 @@
 
                 container.innerHTML = `
                     <div style="margin-bottom: 0.5rem;">
-                        <span style="font-weight: 600; color: #1f2937;">${level}</span>
-                        <span style="float: right; font-weight: 600; color: #3b82f6;">${rate}%</span>
+                        <span style="font-weight: 600; color: var(--text-primary);">${level}</span>
+                        <span style="float: right; font-weight: 600; color: var(--accent-primary);">${rate}%</span>
                     </div>
                     <div class="progress-bar-bg">
                         <div class="progress-bar-fill" style="width: ${rate}%"></div>
                     </div>
-                    <p style="font-size: 0.8125rem; color: #6b7280; margin-top: 0.5rem; margin-bottom: 0;">
+                    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 0;">
                         ${progress.completed_lessons || 0} of ${progress.total_lessons || 0} lessons completed
                     </p>
                 `;

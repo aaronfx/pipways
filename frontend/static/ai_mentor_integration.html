@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Mentor - Pipways</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        /* Page-specific layout */
+        .mentor-page {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 2rem;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 70vh;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 1.25rem;
+        }
+
+        .chat-header h2 {
+            margin: 0;
+            color: white;
+            font-size: 1.25rem;
+        }
+
+        .chat-header p {
+            margin: 0.25rem 0 0 0;
+            opacity: 0.9;
+            font-size: 0.875rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            display: flex;
+            gap: 0.75rem;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.125rem;
+            flex-shrink: 0;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .message.ai .message-avatar {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        }
+
+        .message-content {
+            padding: 0.875rem 1.125rem;
+            border-radius: 1rem;
+            line-height: 1.5;
+            font-size: 0.9375rem;
+        }
+
+        .message.ai .message-content {
+            background: white;
+            color: #1f2937;
+            border-bottom-left-radius: 0.25rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .message.user .message-content {
+            background: #3b82f6;
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .chat-input-container {
+            padding: 1rem 1.5rem;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.9375rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #message-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        #send-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        #send-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        /* Quick Commands */
+        .quick-commands {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            padding: 0.75rem 1.5rem;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .quick-cmd-btn {
+            background: white;
+            border: 1px solid #d1d5db;
+            color: #6b7280;
+            padding: 0.375rem 0.875rem;
+            border-radius: 9999px;
+            font-size: 0.8125rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-cmd-btn:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        /* Sidebar */
+        .mentor-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .progress-card, .stats-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .progress-card h3, .stats-card h3 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin-bottom: 0.75rem;
+        }
+
+        .progress-bar-bg {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+            transition: width 0.5s ease;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+            padding: 0.5rem 0;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            background: #3b82f6;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Lesson Cards - Dark Theme for contrast */
+        .lesson-recommendations {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px dashed #e5e7eb;
+        }
+
+        .recommendations-label {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .lesson-cards-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .lesson-card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .lesson-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: width 0.2s;
+        }
+
+        .lesson-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .lesson-card-next::before {
+            background: #10b981;
+        }
+
+        .lesson-card-recommended::before {
+            background: #3b82f6;
+        }
+
+        .lesson-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .lesson-badge {
+            font-size: 0.6875rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .lesson-card-next .lesson-badge {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .lesson-card-recommended .lesson-badge {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .lesson-icon {
+            font-size: 1.25rem;
+        }
+
+        .lesson-title {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin: 0 0 0.25rem 0;
+        }
+
+        .lesson-description {
+            font-size: 0.8125rem;
+            color: #94a3b8;
+            margin: 0 0 0.75rem 0;
+        }
+
+        .lesson-cta-btn {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .lesson-card:hover .lesson-cta-btn {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .lesson-card-next .lesson-cta-btn {
+            background: #10b981;
+            border-color: #10b981;
+        }
+
+        .lesson-card-next:hover .lesson-cta-btn {
+            background: #059669;
+        }
+
+        @media (max-width: 768px) {
+            .mentor-page {
+                grid-template-columns: 1fr;
+            }
+
+            .mentor-sidebar {
+                order: -1;
+            }
+
+            .message {
+                max-width: 95%;
+            }
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="mentor-page">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>🤖 AI Trading Mentor</h2>
+                <p>Your personal 24/7 trading coach</p>
+            </div>
+
+            <div id="chat-messages" class="chat-messages">
+                <!-- Messages appear here -->
+            </div>
+
+            <div class="quick-commands">
+                <button class="quick-cmd-btn" data-cmd="/next">📚 Next Lesson</button>
+                <button class="quick-cmd-btn" data-cmd="risk management">🛡️ Risk Tips</button>
+                <button class="quick-cmd-btn" data-cmd="technical analysis">📊 Technical</button>
+                <button class="quick-cmd-btn" data-cmd="help">❓ Help</button>
+            </div>
+
+            <div class="chat-input-container">
+                <input type="text" id="message-input" placeholder="Ask about trading, risk, or strategies..." autocomplete="off">
+                <button id="send-btn">Send</button>
+            </div>
+        </div>
+
+        <aside class="mentor-sidebar">
+            <div class="progress-card">
+                <h3>Your Progress</h3>
+                <div id="academy-progress">
+                    <p style="color: #6b7280; font-size: 0.875rem;">Loading...</p>
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <h3>Quick Stats</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                        <span style="color: #6b7280;">Questions Asked</span>
+                        <span style="font-weight: 600;" id="questions-count">0</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                        <span style="color: #6b7280;">Lessons Started</span>
+                        <span style="font-weight: 600;" id="lessons-count">0</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // AI Mentor JavaScript - Complete Implementation
+        class AIMentor {
+            constructor() {
+                this.apiBaseUrl = '/api/ai';
+                this.chatContainer = document.getElementById('chat-messages');
+                this.inputField = document.getElementById('message-input');
+                this.sendButton = document.getElementById('send-btn');
+                this.messageCount = 0;
+                this.lessonCount = 0;
+
+                this.init();
+            }
+
+            init() {
+                // Event listeners
+                this.sendButton?.addEventListener('click', () => this.sendMessage());
+                this.inputField?.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendMessage();
+                });
+
+                // Quick command buttons
+                document.querySelectorAll('.quick-cmd-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const cmd = e.target.dataset.cmd;
+                        this.inputField.value = cmd;
+                        this.sendMessage();
+                    });
+                });
+
+                // Load progress
+                this.loadProgress();
+
+                // Welcome message
+                this.addWelcomeMessage();
+            }
+
+            addWelcomeMessage() {
+                this.addMessage(
+                    "Welcome! I'm your AI Trading Mentor. Ask me about Forex strategies, risk management, or specific concepts and I'll recommend the best Academy lessons for you.",
+                    'ai',
+                    [
+                        {
+                            type: 'lesson',
+                            title: 'Start with Fundamentals',
+                            description: 'Beginner • Introduction to Forex',
+                            url: '/academy.html?lesson=1',
+                            metadata: { lesson_id: 1 },
+                            reason: 'recommended'
+                        }
+                    ]
+                );
+            }
+
+            async sendMessage() {
+                const message = this.inputField?.value.trim();
+                if (!message) return;
+
+                // Add user message
+                this.addMessage(message, 'user');
+                this.inputField.value = '';
+                this.messageCount++;
+                this.updateStats();
+
+                // Show typing
+                this.showTyping();
+
+                try {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        this.hideTyping();
+                        this.addMessage("Please log in to use the AI Mentor.", 'ai');
+                        return;
+                    }
+
+                    const response = await fetch(`${this.apiBaseUrl}/mentor/ask`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            message: message,
+                            context: { timestamp: new Date().toISOString() }
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    console.log('[AI Mentor] Response:', data);
+
+                    this.hideTyping();
+
+                    // Ensure recommendations exist
+                    const recommendations = data.recommendations || [];
+                    if (recommendations.length === 0) {
+                        console.warn('[AI Mentor] No recommendations in response');
+                    }
+
+                    this.addMessage(data.response, 'ai', recommendations);
+
+                    if (data.academy_progress) {
+                        this.updateProgressSidebar(data.academy_progress);
+                    }
+
+                } catch (error) {
+                    console.error('[AI Mentor] Error:', error);
+                    this.hideTyping();
+                    this.addMessage(
+                        "I'm having trouble connecting. Please try again.",
+                        'ai',
+                        [
+                            {
+                                type: 'lesson',
+                                title: 'Browse Academy',
+                                description: 'View all available lessons',
+                                url: '/academy.html',
+                                reason: 'recommended'
+                            }
+                        ]
+                    );
+                }
+            }
+
+            addMessage(text, sender, recommendations = []) {
+                const isAI = sender === 'ai';
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${isAI ? 'ai' : 'user'}`;
+
+                let html = `
+                    <div class="message-avatar">${isAI ? '🤖' : '👤'}</div>
+                    <div class="message-content">
+                        <div class="message-text">${this.escapeHtml(text)}</div>
+                `;
+
+                // Add lesson cards if AI message and has recommendations
+                if (isAI && recommendations && recommendations.length > 0) {
+                    html += this.renderLessonCards(recommendations);
+                    this.lessonCount += recommendations.length;
+                    this.updateStats();
+                }
+
+                html += `</div>`;
+                messageDiv.innerHTML = html;
+
+                this.chatContainer.appendChild(messageDiv);
+                this.scrollToBottom();
+            }
+
+            renderLessonCards(recommendations) {
+                if (!recommendations || recommendations.length === 0) {
+                    console.log('[AI Mentor] No cards to render');
+                    return '';
+                }
+
+                console.log(`[AI Mentor] Rendering ${recommendations.length} cards`);
+
+                const cardsHTML = recommendations.map((rec, index) => {
+                    const isNextStep = rec.reason === 'next_step';
+                    const cardClass = isNextStep ? 'lesson-card-next' : 'lesson-card-recommended';
+                    const badgeText = isNextStep ? 'Continue Learning' : 'Recommended';
+                    const lessonId = rec.metadata?.lesson_id || '';
+                    const url = rec.url || `/academy.html?lesson=${lessonId}`;
+
+                    return `
+                        <div class="lesson-card ${cardClass}" 
+                             onclick="window.open('${url}', '_blank')"
+                             style="margin-top: 0.75rem;">
+                            <div class="lesson-card-header">
+                                <span class="lesson-badge">${badgeText}</span>
+                                <span class="lesson-icon">📚</span>
+                            </div>
+                            <div class="lesson-card-body">
+                                <h4 class="lesson-title">${this.escapeHtml(rec.title)}</h4>
+                                <p class="lesson-description">${this.escapeHtml(rec.description)}</p>
+                            </div>
+                            <button class="lesson-cta-btn">
+                                ${isNextStep ? '▶ Continue' : '🎯 Start Lesson'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="lesson-recommendations">
+                        <div class="recommendations-label">📖 Recommended for you</div>
+                        <div class="lesson-cards-container">
+                            ${cardsHTML}
+                        </div>
+                    </div>
+                `;
+            }
+
+            showTyping() {
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'message ai';
+                typingDiv.id = 'typing-indicator';
+                typingDiv.innerHTML = `
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <div class="typing-indicator">
+                            <div class="typing-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                this.chatContainer.appendChild(typingDiv);
+                this.scrollToBottom();
+            }
+
+            hideTyping() {
+                const indicator = document.getElementById('typing-indicator');
+                if (indicator) {
+                    indicator.remove();
+                }
+            }
+
+            scrollToBottom() {
+                if (this.chatContainer) {
+                    this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+                }
+            }
+
+            escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            async loadProgress() {
+                try {
+                    const token = localStorage.getItem('token');
+                    if (!token) return;
+
+                    // Decode JWT to get user ID (simplified)
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const userId = payload.sub || payload.user_id;
+
+                    const response = await fetch(`/api/learning/progress/${userId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.updateProgressSidebar(data);
+                    }
+                } catch (e) {
+                    console.log('[AI Mentor] Could not load progress');
+                }
+            }
+
+            updateProgressSidebar(progress) {
+                const container = document.getElementById('academy-progress');
+                if (!container || !progress) return;
+
+                const rate = progress.completion_rate || 0;
+                const level = progress.current_level || 'Beginner';
+
+                container.innerHTML = `
+                    <div style="margin-bottom: 0.5rem;">
+                        <span style="font-weight: 600; color: #1f2937;">${level}</span>
+                        <span style="float: right; font-weight: 600; color: #3b82f6;">${rate}%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: ${rate}%"></div>
+                    </div>
+                    <p style="font-size: 0.8125rem; color: #6b7280; margin-top: 0.5rem; margin-bottom: 0;">
+                        ${progress.completed_lessons || 0} of ${progress.total_lessons || 0} lessons completed
+                    </p>
+                `;
+            }
+
+            updateStats() {
+                const qEl = document.getElementById('questions-count');
+                const lEl = document.getElementById('lessons-count');
+                if (qEl) qEl.textContent = this.messageCount;
+                if (lEl) lEl.textContent = this.lessonCount;
+            }
+        }
+
+        // Initialize
+        let mentor;
+        document.addEventListener('DOMContentLoaded', () => {
+            mentor = new AIMentor();
+        });
+    </script>
+</body>
+</html>

@@ -16,7 +16,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>if(typeof marked!=="undefined"){marked.setOptions({breaks:true,gfm:true});}</script>
+    <script>if (typeof marked !== 'undefined') { marked.setOptions({ breaks: true, gfm: true }); }</script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -96,8 +96,7 @@
         .ac-hero-title { font-size:clamp(1.3rem,3vw,1.8rem); font-weight:800; letter-spacing:-.02em;
             color:white; line-height:1.2; margin-bottom:.5rem; }
         .ac-hero-sub   { font-size:.85rem; color:#6b7280; line-height:1.5; }
-        .ac-hero-stats { display:flex; gap:.75rem; margin-top:1rem; flex-wrap:wrap; }
-        @media (max-width:400px) { .ac-hero-stats { gap:.5rem; } .ac-hero-stat-val { font-size:1rem; } }
+        .ac-hero-stats { display:flex; gap:1.5rem; margin-top:1.25rem; flex-wrap:wrap; }
         .ac-hero-stat  { display:flex; flex-direction:column; gap:.1rem; }
         .ac-hero-stat-val { font-size:1.25rem; font-weight:700; color:white; }
         .ac-hero-stat-lbl { font-size:.7rem; color:#4b5563; text-transform:uppercase; letter-spacing:.06em; }
@@ -120,7 +119,7 @@
             transition:transform .2s, box-shadow .2s, border-color .2s; }
         .ac-level-card:hover { transform:translateY(-3px); box-shadow:0 12px 32px -8px rgba(0,0,0,.6); border-color:#374151; }
         .ac-level-card-top  { height:5px; }
-        .ac-level-card-body { padding:1.2rem 1.2rem 1rem; }
+        .ac-level-card-body { padding:1.4rem 1.4rem 1.2rem; }
         .ac-level-icon { width:44px; height:44px; border-radius:.75rem;
             display:flex; align-items:center; justify-content:center; font-size:1.1rem; margin-bottom:1rem; }
         .ac-level-tag  { font-size:.65rem; font-weight:700; letter-spacing:.1em;
@@ -136,8 +135,8 @@
         /* Module cards */
         .ac-module-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:.85rem; }
         .ac-module-card { background:#111827; border:1px solid #1f2937; border-radius:.85rem;
-            padding:1rem 1.1rem; cursor:pointer; transition:all .2s;
-            display:flex; flex-direction:column; gap:.5rem; }
+            padding:1.1rem 1.25rem; cursor:pointer; transition:all .2s;
+            display:flex; flex-direction:column; gap:.6rem; }
         .ac-module-card:hover { border-color:#374151; transform:translateY(-2px); box-shadow:0 8px 24px -6px rgba(0,0,0,.5); }
         .ac-module-card.complete { border-left:3px solid #10b981; }
 
@@ -258,44 +257,24 @@
         .ac-mobile-btn.accent { background:rgba(124,58,237,.15); border-color:rgba(124,58,237,.3); color:#a78bfa; }
         .ac-mobile-btn:disabled { opacity:.45; pointer-events:none; }
 
-
-        /* ── AI Diagram ── */
-        .ac-diagram-wrap { margin: 1rem 0; }
-        .ac-diagram-loading { display:flex; align-items:center; gap:.75rem;
-            padding:.85rem 1rem; background:rgba(124,58,237,.08);
-            border:1px solid rgba(124,58,237,.2); border-radius:.65rem;
-            font-size:.8rem; color:#a78bfa; }
-        .ac-diagram-loading .ac-spin { width:16px; height:16px; border:2px solid rgba(167,139,250,.3);
-            border-top-color:#a78bfa; border-radius:50%; animation:spin .8s linear infinite; flex-shrink:0; }
-        .ac-diagram-btn { display:inline-flex; align-items:center; gap:.4rem;
-            padding:.4rem .85rem; border-radius:.5rem; font-size:.78rem; font-weight:600;
-            cursor:pointer; border:1px solid rgba(124,58,237,.4);
-            background:rgba(124,58,237,.1); color:#a78bfa; transition:all .2s; margin-top:.5rem; }
-        .ac-diagram-btn:hover { background:rgba(124,58,237,.2); border-color:#7c3aed; }
-        .ac-diagram-section { margin:1.25rem 0; }
-        .ac-diagram-section h3 { font-size:.82rem; font-weight:700; color:#a78bfa;
-            letter-spacing:.05em; text-transform:uppercase; margin-bottom:.5rem; 
-            display:flex; align-items:center; gap:.4rem; }
+        /* Diagram specific styles */
+        .ac-diagram-loading { text-align:center; padding:2rem; background:#111827; border-radius:.5rem; border:1px dashed #374151; }
+        .ac-diagram-error { padding:1rem; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2); border-radius:.5rem; text-align:center; }
+        .ac-diagram-container { margin:1.5rem 0; }
+        
         /* Responsive */
         @media (max-width:767px) {
-            .ac-hero { padding:1rem .85rem; }
-            .ac-hero-title { font-size:1.2rem; }
-            .ac-hero-sub { font-size:.78rem; }
-            .ac-lesson-content { padding:.9rem; }
-            .ac-quiz-card { padding:1rem; }
-            .ac-action-bar { padding:.75rem; gap:.45rem; }
-            .ac-action-btn { padding:.45rem .7rem; font-size:.76rem; }
+            .ac-hero { padding:1.25rem 1rem; }
+            .ac-lesson-content { padding:1.1rem; }
+            .ac-quiz-card { padding:1.1rem; }
             .ac-mobile-bar { display:flex !important; }
             main { padding-bottom:70px !important; }
             .ac-level-grid  { grid-template-columns:1fr !important; }
             .ac-module-grid { grid-template-columns:1fr !important; }
-            .ac-lesson-text h2 { font-size:.95rem; }
-            .ac-lesson-text p  { font-size:.82rem; }
-            .ac-lesson-title { font-size:1.1rem; }
-            .pw-breadcrumb { font-size:.68rem; }
         }
         @media (min-width:768px) { .ac-mobile-bar { display:none !important; } }
     </style>
+<base target="_blank">
 </head>
 
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
@@ -414,12 +393,12 @@
     <main class="flex-1 h-screen overflow-y-auto">
 
         <!-- Page header -->
-        <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-4 md:px-6 py-2.5 md:py-3 flex justify-between items-center">
-            <div class="md:hidden" style="width:52px;"></div>
+        <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-3 flex justify-between items-center">
+            <div class="md:hidden" style="width:60px;"></div>
             <div>
-                <nav id="header-breadcrumb" class="pw-breadcrumb mb-0.5 hidden" style="font-size:.68rem;"></nav>
-                <h2 id="page-title" class="font-bold text-white leading-tight" style="font-size:clamp(.95rem,3vw,1.2rem);">Trading Academy</h2>
-                <p class="text-xs text-gray-500 hidden md:block">Structured AI-powered forex education</p>
+                <nav id="header-breadcrumb" class="pw-breadcrumb mb-0.5 hidden"></nav>
+                <h2 id="page-title" class="text-xl font-bold text-white leading-tight">Trading Academy</h2>
+                <p class="text-xs text-gray-500">Structured AI-powered forex education</p>
             </div>
             <a href="/dashboard.html"
                class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
@@ -498,8 +477,8 @@
                 </div>
             </div>
 
-            <!-- Breadcrumb (desktop only — mobile uses header breadcrumb) -->
-            <div id="ac-breadcrumb" class="pw-breadcrumb mb-4 hidden md:flex" style="display:none;"></div>
+            <!-- Breadcrumb -->
+            <div id="ac-breadcrumb" class="pw-breadcrumb mb-4" style="display:none;"></div>
 
             <!-- Coach / mentor banner -->
             <div id="ac-mentor-banner"></div>
@@ -658,6 +637,7 @@
         _quiz:      null,
         _badges:    [],
         _lessonNav: { prev: null, next: null },
+        _diagramCache: {},  // Frontend cache for diagrams
 
         async render() {
             try { this._uid = JSON.parse(localStorage.getItem('pipways_user') || '{}').id ?? null; } catch (_) {}
@@ -799,12 +779,11 @@
             main.innerHTML = this._loading('Loading lesson…');
             try {
                 const lesson = await API.request(`/learning/lesson/${lessonId}`);
-                const html = this._processContent(lesson.content);
+                
+                // Process content but preserve existing SVGs while adding dynamic diagram section
+                const html = this._processContent(lesson.content, lesson.diagram_svg);
                 this._lessonNav = { prev: lesson.prev_lesson || null, next: lesson.next_lesson || null };
                 this._renderMobileBar(lesson);
-
-                // Check if lesson already has a diagram in content
-                const hasDiagram = lesson.content && (lesson.content.includes('<svg') || lesson.content.includes('ac-svg-diagram'));
 
                 main.innerHTML = `<div class="ac-lesson-container">
                     <div class="mb-1">
@@ -813,14 +792,9 @@
                             <div class="ac-lesson-meta">${_es(lesson.level_name)} &rsaquo; ${_es(lesson.module_title)}</div>
                             <h2 class="ac-lesson-title">${_es(lesson.title)}</h2>
                             <div class="ac-lesson-text mt-4">${html}</div>
-                            <div id="ac-diagram-zone" class="ac-diagram-section" style="${hasDiagram ? 'display:none' : ''}">
-                                <div id="ac-diagram-content">
-                                    <div class="ac-diagram-loading">
-                                        <div class="ac-spin"></div>
-                                        <span>Generating AI diagram for this lesson…</span>
-                                    </div>
-                                </div>
-                            </div>
+                            
+                            <!-- Dynamic Diagram Container -->
+                            <div id="ac-dynamic-diagram" class="ac-diagram-container" style="display:none;"></div>
                         </div>
                     </div>
                     <div class="ac-action-bar">
@@ -828,6 +802,7 @@
                         <button id="ac-btn-coach" class="ac-action-btn ac-action-btn-ghost" onclick="AcademyPage._showCoach(${lessonId})"><i class="fas fa-chalkboard-teacher" style="color:#a78bfa;"></i> Trading Coach</button>
                         <button id="ac-btn-practice" class="ac-action-btn ac-action-btn-ghost" onclick="AcademyPage._showPractice(${lessonId})"><i class="fas fa-dumbbell" style="color:#fbbf24;"></i> Practice</button>
                         <button id="ac-btn-chart" class="ac-action-btn ac-action-btn-ghost" onclick="AcademyPage._showChart(${lessonId})"><i class="fas fa-chart-bar" style="color:#60a5fa;"></i> Chart Exercise</button>
+                        <button class="ac-action-btn ac-action-btn-ghost" onclick="AcademyPage._loadDiagram(${lessonId})"><i class="fas fa-sync" style="color:#34d399;"></i> Refresh Diagram</button>
                     </div>
                     <div id="ac-ai-panel" style="display:none;"></div>
                     <div class="hidden md:flex justify-between items-center py-4 border-t mt-2" style="border-color:#1f2937;">
@@ -835,39 +810,72 @@
                         ${lesson.next_lesson ? `<button onclick="AcademyPage._openLesson(${lesson.next_lesson.id},'${_es(lesson.next_lesson.title)}')" style="font-size:.82rem;color:#a78bfa;display:flex;align-items:center;gap:.4rem;cursor:pointer;background:none;border:none;padding:0;">${_es(lesson.next_lesson.title)} <i class="fas fa-arrow-right"></i></button>` : `<span></span>`}
                     </div>
                 </div>`;
-
-                setTimeout(() => this._initTradingView(), 150);
-
-                // Fetch diagram asynchronously — don't block lesson render
-                if (!hasDiagram) {
-                    this._fetchDiagram(lessonId);
+                
+                // Load diagram if not already in content or if we want to ensure fresh diagram
+                if (!lesson.diagram_svg) {
+                    this._loadDiagram(lessonId);
                 }
-
+                
+                setTimeout(() => this._initTradingView(), 150);
             } catch (e) { main.innerHTML = this._error('Could not load lesson', e.message); }
         },
 
-        async _fetchDiagram(lessonId) {
-            try {
-                const data = await API.request(`/learning/lesson/${lessonId}/diagram`);
-                const zone = document.getElementById('ac-diagram-zone');
-                const container = document.getElementById('ac-diagram-content');
-                if (!zone || !container) return;
+        /* ── Diagram Loading System ── */
+        _diagramCache: {},
 
-                if (data.svg) {
-                    // Show the diagram with a header
-                    zone.style.display = '';
-                    container.innerHTML = `
-                        <h3><i class="fas fa-chart-line" style="color:#a78bfa;font-size:.75rem;"></i> AI-Generated Diagram</h3>
-                        <div class="ac-diagram-wrap">${data.svg}</div>
-                        ${!data.cached ? '<p style="font-size:.7rem;color:#4b5563;margin-top:.25rem;">Generated by Claude AI · Saved for future visits</p>' : ''}
-                    `;
+        async _loadDiagram(lessonId, forceRefresh = false) {
+            const container = document.getElementById('ac-dynamic-diagram');
+            if (!container) return;
+            
+            // Show container
+            container.style.display = 'block';
+            
+            // Check frontend cache
+            if (!forceRefresh && this._diagramCache[lessonId]) {
+                container.innerHTML = this._diagramCache[lessonId];
+                return;
+            }
+            
+            // Show loading state
+            container.innerHTML = `
+                <div class="ac-diagram-loading">
+                    <div style="width:40px;height:40px;border:3px solid #1f2937;border-top-color:#7c3aed;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 1rem;"></div>
+                    <p style="font-size:0.875rem;color:#6b7280;">Generating AI diagram...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await API.request(`/learning/lesson/${lessonId}/diagram${forceRefresh ? '?force_regenerate=true' : ''}`);
+                
+                if (response.svg) {
+                    // Cache in frontend memory
+                    const svgHtml = `<div class="animate-fade-in">${response.svg}</div>`;
+                    this._diagramCache[lessonId] = svgHtml;
+                    
+                    // Render
+                    container.innerHTML = svgHtml;
+                    
+                    // Log for debugging
+                    console.log(`[Diagram] Loaded ${response.diagram_type} for lesson ${lessonId} (generated: ${response.generated})`);
+                    
+                    // Show type badge
+                    if (response.elements && response.elements.length > 0) {
+                        const badge = document.createElement('div');
+                        badge.style.cssText = 'text-align:center;margin-top:0.5rem;font-size:0.7rem;color:#6b7280;';
+                        badge.innerHTML = `<span style="background:rgba(124,58,237,0.2);padding:0.2rem 0.6rem;border-radius:9999px;">${response.diagram_type.replace('_', ' ')} • ${response.elements.slice(0,3).join(', ')}</span>`;
+                        container.appendChild(badge);
+                    }
                 } else {
-                    // No diagram available — hide the zone silently
-                    zone.style.display = 'none';
+                    throw new Error('No SVG returned');
                 }
-            } catch (e) {
-                const zone = document.getElementById('ac-diagram-zone');
-                if (zone) zone.style.display = 'none';
+            } catch (error) {
+                console.error('[Diagram] Failed to load:', error);
+                container.innerHTML = `
+                    <div class="ac-diagram-error">
+                        <i class="fas fa-exclamation-triangle" style="color:#f87171;margin-bottom:0.5rem;"></i>
+                        <p style="font-size:0.875rem;color:#9ca3af;margin:0;">Diagram generation failed. <button onclick="AcademyPage._loadDiagram(${lessonId}, true)" style="background:none;border:none;color:#a78bfa;cursor:pointer;text-decoration:underline;">Retry</button></p>
+                    </div>
+                `;
             }
         },
 
@@ -1137,7 +1145,6 @@
                 document.getElementById('page-title').textContent = 'Trading Academy';
                 return;
             }
-            // Drilling into a level/module/lesson — hide hero and banner
             if (hero) hero.style.display = 'none';
             if (banner) banner.style.display = 'none';
             const sep = `<span class="pw-breadcrumb-sep">›</span>`;
@@ -1164,23 +1171,30 @@
         _mobNav(dir) { const t = dir==='prev'?this._lessonNav.prev:this._lessonNav.next; if(t) this._openLesson(t.id,t.title); },
 
         /* ── Content processing ── */
-        _processContent(content) {
+        _processContent(content, cachedDiagramSvg = null) {
             if (!content) return '';
-            // Dedent: strip consistent Python triple-quote indentation
-            // Only look at lines that HAVE indentation to find the common indent
-            const lines = content.split('\n');
+            
+            // If we have a cached diagram from backend, inject it
+            let processedContent = content;
+            if (cachedDiagramSvg) {
+                // Replace [VISUAL:X] markers with the actual SVG if present, or prepend it
+                processedContent = processedContent.replace(/\[VISUAL:[^\]]+\]/g, '');
+                processedContent = cachedDiagramSvg + processedContent;
+            }
+
+            const lines = processedContent.split('\n');
             const indentedLines = lines.filter(l => l.trim().length > 0 && /^ +/.test(l));
             const minIndent = indentedLines.length > 0
                 ? Math.min(...indentedLines.map(l => l.match(/^( *)/)[1].length))
                 : 0;
             const dedented = minIndent > 0
                 ? lines.map(l => l.startsWith(' '.repeat(minIndent)) ? l.slice(minIndent) : l).join('\n')
-                : content;
-            // Strip any [VISUAL:X] or [CHART:X] placeholder markers
-            const cleaned = dedented
+                : processedContent;
+
+            const withMarkers = dedented
                 .replace(/\[VISUAL:[^\]]+\]/g, '')
                 .replace(/\[CHART:[^\]]+\]/g, '');
-            // Parse markdown
+
             const parse = (typeof marked !== 'undefined' && marked.parse)
                 ? t => marked.parse(t, { breaks: true, gfm: true })
                 : t => t
@@ -1188,11 +1202,16 @@
                     .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
                     .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
                     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g,    '<em>$1</em>')
                     .replace(/`([^`]+)`/g,    '<code>$1</code>')
                     .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+                    .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
                     .replace(/^---$/gm,       '<hr>')
-                    .replace(/\n\n/g,         '</p><p>');
-            return parse(cleaned);
+                    .replace(/\n\n/g,         '</p><p>')
+                    .replace(/^(?!<)/,        '<p>')
+                    .replace(/(?!>)$/,        '</p>');
+
+            return parse(withMarkers);
         },
 
         /* ── TradingView ── */
@@ -1221,7 +1240,6 @@
         _emptyState: (t,s) => `<div style="text-align:center;padding:4rem 1rem;"><div style="width:56px;height:56px;border-radius:50%;border:2px dashed #374151;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;"><i class="fas fa-graduation-cap" style="color:#4b5563;"></i></div><div style="font-size:.9rem;font-weight:600;color:#6b7280;margin-bottom:.35rem;">${t}</div><div style="font-size:.78rem;color:#4b5563;">${s}</div></div>`,
         _error: (t,d) => `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#f87171;padding:1rem 1.25rem;border-radius:.75rem;font-size:.875rem;max-width:540px;"><i class="fas fa-exclamation-triangle mr-2"></i><strong>${_es(t)}</strong>${d?`<p style="margin:.5rem 0 0;font-size:.78rem;color:#fca5a5;">${_es(d)}</p>`:''}</div>`,
     };
-
 
     /* ── Boot ── */
     document.addEventListener('DOMContentLoaded', () => academy.init());

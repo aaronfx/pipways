@@ -495,9 +495,10 @@ EXACT ELEMENTS:
    stroke=#f59e0b stroke-width=2 fill=none
 
 5. GOLDEN CROSS (where MA20 crosses above MA50):
-   Circle cx=270 cy=143 r=8 fill=none stroke=#fbbf24 stroke-width=2
-   Label "Golden Cross" x=282 y=140 fill=#fbbf24 font-size=9 font-weight=bold
-   Arrow pointing up at cx=270 cy=130
+   Circle: cx=270 cy=143 r=8 fill=none stroke=#fbbf24 stroke-width=2
+   Label "Golden Cross": x=282 y=136 fill=#fbbf24 font-size=9 font-weight=bold
+   Label "BUY ↑": x=282 y=150 fill=#34d399 font-size=9
+   NOTE: "Golden Cross" at y=136 and "BUY ↑" at y=150 — 14px apart, NO overlap
 
 6. LEGEND (bottom-left, y=175 and y=190 — 15px apart):
    Green line + "MA20 (Fast)" x=55 y=178 fill=#34d399 font-size=9
@@ -739,10 +740,15 @@ EXACT COORDINATES:
    Circle cx=290 cy=125 r=7 fill=none stroke=#34d399 stroke-width=2
    Label "Entry After Sweep" x=298 y=120 fill=#34d399 font-size=9
 
-5. STOP LOSS MARKERS below sweep:
-   "×" markers: x=235 y=185, x=248 y=185, x=260 y=185 fill=#f87171 font-size=10
+5. STOP LOSS MARKERS (SVG text elements INSIDE the SVG, above footer):
+   <text x="232" y="182" fill="#f87171" font-size="10" font-family="Inter, sans-serif">×</text>
+   <text x="244" y="182" fill="#f87171" font-size="10" font-family="Inter, sans-serif">×</text>
+   <text x="256" y="182" fill="#f87171" font-size="10" font-family="Inter, sans-serif">×</text>
+   <text x="244" y="193" text-anchor="middle" fill="#f87171" font-size="8" font-family="Inter, sans-serif">Stop Losses</text>
 
-Footer: "Price sweeps stop-losses below lows, then reverses. Enter AFTER the wick recovers above."{simplify}"""
+6. ALL labels must be INSIDE the SVG — nothing after </svg>
+
+Footer text (inside SVG at y=213): "Price sweeps stops below lows then reverses — enter after recovery"{simplify}"""
 
         if any(k in tl for k in ["bos", "choch", "break of structure", "change of character", "market structure"]):
             return f"""Create an SVG Market Structure (BOS/CHoCH) diagram. Title: "{title}"
@@ -869,7 +875,14 @@ QUALITY STANDARDS:
 - Show actual price numbers or percentages where relevant
 - Use arrows to show direction of price movement
 - Annotate every key element
-- Minimum 6 elements, maximum 20 elements"""
+- Minimum 6 elements, maximum 20 elements
+
+CRITICAL — CONTENT CONTAINMENT:
+- ALL elements (text, shapes, lines) MUST be placed INSIDE <svg>...</svg> tags
+- NEVER output any characters, labels, or text AFTER the closing </svg> tag
+- Special symbols like × must use <text> SVG elements with explicit x/y coordinates
+- Keep all content within y=10 to y=215 (footer at y=215 max)
+- Overlapping labels: if two labels share x±30px range, offset vertically by minimum 14px"""
 
 
 # ── 5. SVG VALIDATION LAYER ───────────────────────────────────────────────────
@@ -1331,10 +1344,15 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
         if not lesson:
             raise HTTPException(404, "Lesson not found")
 
+        # DISTINCT ON question prevents duplicate questions from multiple seed runs.
+        # LIMIT 5 enforces max 5 questions per lesson — standard across all levels.
         questions = await database.fetch_all(
-            """SELECT id, question, option_a, option_b, option_c, option_d,
+            """SELECT DISTINCT ON (question) id, question, option_a, option_b, option_c, option_d,
                       correct_answer, explanation, topic_slug
-               FROM lesson_quizzes WHERE lesson_id=:lid ORDER BY id""",
+               FROM lesson_quizzes
+               WHERE lesson_id=:lid
+               ORDER BY question, id
+               LIMIT 5""",
             {"lid": lesson_id}
         )
         return {

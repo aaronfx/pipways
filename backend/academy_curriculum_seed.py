@@ -59,7 +59,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">EUR/USD — Entry Example (1:2 Risk:Reward)</text><polyline points="20,160 60,150 100,155 140,130 180,120 220,110 260,125 300,100 340,85 380,90 440,70" fill="none" stroke="#34d399" stroke-width="2.5"/><circle cx="140" cy="130" r="5" fill="#fbbf24"/><text x="148" y="126" fill="#fbbf24" font-size="10">BUY 1.0850</text><line x1="140" y1="148" x2="420" y2="148" stroke="#f87171" stroke-width="1" stroke-dasharray="4"/><text x="422" y="152" fill="#f87171" font-size="9">SL 1.0830</text><line x1="140" y1="112" x2="420" y2="112" stroke="#34d399" stroke-width="1" stroke-dasharray="4"/><text x="422" y="116" fill="#34d399" font-size="9">TP 1.0890</text><text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Risk: 20 pips ($20) | Reward: 40 pips ($40) | R:R = 1:2</text></svg>
+    ![Forex Basics Chart](/static/charts/forex_basics_example.png)
     
     ---
     
@@ -137,7 +137,8 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-        
+    ![Market Participants](/static/charts/market_hierarchy_diagram.png)
+    
     <svg class="ac-svg-diagram" viewBox="0 0 400 200">
       <rect x="50" y="20" width="300" height="40" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" rx="5"/>
       <text x="200" y="45" text-anchor="middle" fill="#f59e0b" font-size="14">Central Banks (Biggest Impact)</text>
@@ -236,7 +237,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="20" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">Currency Pair Categories</text><rect x="20" y="35" width="130" height="145" fill="rgba(52,211,153,0.08)" stroke="#34d399" rx="6"/><text x="85" y="55" text-anchor="middle" fill="#34d399" font-size="11" font-weight="bold">MAJORS</text><text x="85" y="72" text-anchor="middle" fill="#9ca3af" font-size="9">Tightest spreads</text><text x="85" y="90" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/USD</text><text x="85" y="108" text-anchor="middle" fill="#e5e7eb" font-size="10">GBP/USD</text><text x="85" y="126" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/JPY</text><text x="85" y="144" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/CHF</text><text x="85" y="168" text-anchor="middle" fill="#34d399" font-size="9">Best for beginners</text><rect x="170" y="35" width="130" height="145" fill="rgba(96,165,250,0.08)" stroke="#60a5fa" rx="6"/><text x="235" y="55" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="bold">MINORS</text><text x="235" y="72" text-anchor="middle" fill="#9ca3af" font-size="9">No USD involved</text><text x="235" y="90" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/GBP</text><text x="235" y="108" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/JPY</text><text x="235" y="126" text-anchor="middle" fill="#e5e7eb" font-size="10">GBP/JPY</text><text x="235" y="144" text-anchor="middle" fill="#e5e7eb" font-size="10">AUD/JPY</text><text x="235" y="168" text-anchor="middle" fill="#60a5fa" font-size="9">Good for variety</text><rect x="320" y="35" width="140" height="145" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" rx="6"/><text x="390" y="55" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="bold">EXOTICS</text><text x="390" y="72" text-anchor="middle" fill="#9ca3af" font-size="9">Emerging markets</text><text x="390" y="90" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/TRY</text><text x="390" y="108" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/ZAR</text><text x="390" y="126" text-anchor="middle" fill="#e5e7eb" font-size="10">USD/MXN</text><text x="390" y="144" text-anchor="middle" fill="#e5e7eb" font-size="10">EUR/TRY</text><text x="390" y="168" text-anchor="middle" fill="#f59e0b" font-size="9">Wide spreads — avoid</text></svg>
+    ![Currency Pair Categories](/static/charts/currency_pair_types.png)
     
     ---
     
@@ -412,7 +413,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="20" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Leverage: Amplifies Both Gains AND Losses</text><text x="30" y="55" fill="#9ca3af" font-size="10">No Leverage (1:1)</text><rect x="30" y="62" width="60" height="16" fill="#34d399" rx="3"/><text x="95" y="74" fill="#34d399" font-size="10">$1,000 controls $1,000</text><text x="30" y="100" fill="#9ca3af" font-size="10">1:10 Leverage</text><rect x="30" y="107" width="120" height="16" fill="#fbbf24" rx="3"/><text x="155" y="119" fill="#fbbf24" font-size="10">$1,000 controls $10,000</text><text x="30" y="145" fill="#9ca3af" font-size="10">1:100 Leverage ⚠️</text><rect x="30" y="152" width="300" height="16" fill="#f87171" rx="3"/><text x="335" y="164" fill="#f87171" font-size="10">$1,000 controls $100,000</text><text x="240" y="192" text-anchor="middle" fill="#6b7280" font-size="9">Higher leverage = bigger position = risk of account wipeout on small moves</text></svg>
+    ![Leverage Explanation](/static/charts/leverage_visualization.png)
     
     ---
     
@@ -440,8 +441,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "1:100 leverage, $1,000 controls?", "option_a": "$1,000", "option_b": "$10,000", "option_c": "$100,000", "option_d": "$1,000,000", "correct_answer": "C", "explanation": "$1,000 × 100 = $100,000 maximum position size.", "topic_slug": "leverage"},
                                 {"question": "Effect of leverage on losses?", "option_a": "Decrease", "option_b": "Stay same", "option_c": "Amplify equally with gains", "option_d": "Disappear", "correct_answer": "C", "explanation": "Leverage amplifies both gains AND losses equally.", "topic_slug": "leverage"},
-                                {"question": "Calculate: $10,000 account, 1:50 leverage. Position size?", "option_a": "$5,000", "option_b": "$50,000", "option_c": "$500,000", "option_d": "$20,000", "correct_answer": "C", "explanation": "$10,000 × 50 = $500,000 maximum theoretical position.", "topic_slug": "leverage"}
-                            ]
+                                {"question": "Calculate: $10,000 account, 1:50 leverage. Position size?", "option_a": "$5,000", "option_b": "$50,000", "option_c": "$500,000", "option_d": "$20,000", "correct_answer": "C", "explanation": "$10,000 × 50 = $500,000 maximum theoretical position.", "topic_slug": "leverage"},
+                                {"question": 'A standard lot is how many units?', "option_a": '1,000', "option_b": '10,000', "option_c": '100,000', "option_d": '1,000,000', "correct_answer": 'C', "explanation": '1 standard lot = 100,000 units. Mini lot = 10,000. Micro lot = 1,000.', "topic_slug": 'lots_leverage'},
+                                {"question": 'With 1:50 leverage and $2,000 account, maximum position size?', "option_a": '$2,000', "option_b": '$50,000', "option_c": '$100,000', "option_d": '$200,000', "correct_answer": 'C', "explanation": '$2,000 × 50 = $100,000 maximum position. Leverage multiplies your buying power.', "topic_slug": 'lots_leverage'}]
                         },
                         {
                             "title": "Position Sizing Calculation",
@@ -485,7 +487,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="20" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="bold">Position Sizing Formula</text><rect x="30" y="32" width="420" height="40" fill="rgba(124,58,237,0.15)" stroke="#7c3aed" rx="6"/><text x="240" y="50" text-anchor="middle" fill="#c4b5fd" font-size="11">Lot Size = (Account × Risk%) ÷ (Stop Loss pips × Pip Value)</text><text x="240" y="65" text-anchor="middle" fill="#9ca3af" font-size="9">Max risk = 1–2% of account per trade</text><text x="30" y="95" fill="#fbbf24" font-size="11" font-weight="bold">Example:</text><text x="30" y="113" fill="#e5e7eb" font-size="10">Account: $10,000 | Risk: 1% = $100 | SL: 20 pips | Pip Value: $1</text><text x="30" y="133" fill="#34d399" font-size="12" font-weight="bold">Lot Size = $100 ÷ (20 × $1) = 0.5 mini lots</text><text x="30" y="162" fill="#9ca3af" font-size="9">Safe:</text><rect x="70" y="152" width="60" height="12" fill="#34d399" rx="2"/><text x="100" y="162" text-anchor="middle" fill="#0d1117" font-size="9">1–2%</text><rect x="145" y="152" width="60" height="12" fill="#f59e0b" rx="2"/><text x="175" y="162" text-anchor="middle" fill="#0d1117" font-size="9">3–5%</text><rect x="220" y="152" width="60" height="12" fill="#f87171" rx="2"/><text x="250" y="162" text-anchor="middle" fill="#0d1117" font-size="9">5%+ danger</text><text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Never risk more than 2% on a single trade</text></svg>
+    ![Position Sizing Formula](/static/charts/position_sizing_formula.png)
     
     ---
     
@@ -513,8 +515,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Position sizing formula?", "option_a": "Account × leverage", "option_b": "Risk ÷ (stop × pip value)", "option_c": "Maximum lots", "option_d": "Random", "correct_answer": "B", "explanation": "Size = Account Risk ($) ÷ (Stop (pips) × Pip Value ($)).", "topic_slug": "position_sizing"},
                                 {"question": "$10,000 account, 2% risk. Risk amount?", "option_a": "$20", "option_b": "$200", "option_c": "$2,000", "option_d": "$200,000", "correct_answer": "B", "explanation": "$10,000 × 2% = $200 maximum risk per trade.", "topic_slug": "position_sizing"},
-                                {"question": "Calculate: $5,000, 1% risk, 40-pip stop. Pip value needed?", "option_a": "$1.25", "option_b": "$12.50", "option_c": "$125", "option_d": "$1,250", "correct_answer": "A", "explanation": "$5,000 × 1% = $50. $50 ÷ 40 pips = $1.25/pip.", "topic_slug": "position_sizing"}
-                            ]
+                                {"question": "Calculate: $5,000, 1% risk, 40-pip stop. Pip value needed?", "option_a": "$1.25", "option_b": "$12.50", "option_c": "$125", "option_d": "$1,250", "correct_answer": "A", "explanation": "$5,000 × 1% = $50. $50 ÷ 40 pips = $1.25/pip.", "topic_slug": "position_sizing"},
+                                {"question": 'Account $5,000, risk 2%, stop loss 25 pips, pip value $1. Lot size?', "option_a": '0.2 lots', "option_b": '0.4 lots', "option_c": '1.0 lots', "option_d": '2.0 lots', "correct_answer": 'B', "explanation": '$5,000 × 2% = $100 risk. $100 ÷ (25 × $1) = 4 mini lots = 0.4 standard lots.', "topic_slug": 'position_sizing'},
+                                {"question": 'Why must position size change when stop loss distance changes?', "option_a": 'To maintain the same dollar risk', "option_b": 'To increase profit potential', "option_c": 'To reduce spread costs', "option_d": 'Broker requirement', "correct_answer": 'A', "explanation": 'A wider stop needs a smaller lot size to keep the same dollar risk. Risk = pips × pip value × lots.', "topic_slug": 'position_sizing'}]
                         }
                     ]
                 },
@@ -569,7 +572,8 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-        
+    ![Trading Sessions](/static/charts/trading_sessions_timeline.png)
+    
     <svg class="ac-svg-diagram" viewBox="0 0 600 150">
       <rect x="20" y="50" width="160" height="50" fill="rgba(251,191,36,0.2)" stroke="#fbbf24" rx="5"/>
       <text x="100" y="78" text-anchor="middle" fill="#fbbf24" font-size="12">Asian (00-09 UTC)</text>
@@ -656,7 +660,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="180" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Best Trading Hours (GMT)</text><text x="30" y="38" fill="#6b7280" font-size="8">00:00</text><text x="105" y="38" fill="#6b7280" font-size="8">06:00</text><text x="175" y="38" fill="#6b7280" font-size="8">08:00</text><text x="280" y="38" fill="#6b7280" font-size="8">13:00</text><text x="365" y="38" fill="#6b7280" font-size="8">17:00</text><text x="435" y="38" fill="#6b7280" font-size="8">22:00</text><rect x="30" y="46" width="75" height="22" fill="rgba(96,165,250,0.3)" stroke="#60a5fa" rx="3"/><text x="67" y="62" text-anchor="middle" fill="#60a5fa" font-size="9">Tokyo</text><rect x="170" y="46" width="145" height="22" fill="rgba(167,139,250,0.3)" stroke="#a78bfa" rx="3"/><text x="242" y="62" text-anchor="middle" fill="#a78bfa" font-size="9">London</text><rect x="270" y="46" width="160" height="22" fill="rgba(52,211,153,0.3)" stroke="#34d399" rx="3"/><text x="350" y="62" text-anchor="middle" fill="#34d399" font-size="9">New York</text><rect x="270" y="46" width="75" height="22" fill="rgba(251,191,36,0.5)" stroke="#fbbf24" rx="3"/><text x="307" y="62" text-anchor="middle" fill="#fbbf24" font-size="9">OVERLAP ⭐</text><text x="30" y="100" fill="#fbbf24" font-size="10" font-weight="bold">⭐ London–NY Overlap (13:00–17:00 GMT) = Highest volume and volatility</text><text x="30" y="118" fill="#9ca3af" font-size="9">EUR/USD and GBP/USD most active during London–NY overlap</text><text x="30" y="136" fill="#6b7280" font-size="9">Avoid Asian session for major pairs — low volume, wide spreads</text><text x="30" y="162" fill="#34d399" font-size="9">Rule: Trade during sessions that match your currency pair</text></svg>
+    ![Best Trading Times](/static/charts/optimal_trading_hours.png)
     
     ---
     
@@ -737,7 +741,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="190" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Account Survival After 10 Consecutive Losses ($10,000 start)</text><text x="30" y="48" fill="#9ca3af" font-size="10">1% risk:</text><rect x="100" y="38" width="260" height="16" fill="#34d399" rx="3"/><text x="365" y="50" fill="#34d399" font-size="10">$9,044 remaining ✅</text><text x="30" y="80" fill="#9ca3af" font-size="10">2% risk:</text><rect x="100" y="70" width="230" height="16" fill="#fbbf24" rx="3"/><text x="335" y="82" fill="#fbbf24" font-size="10">$8,171 remaining ✅</text><text x="30" y="112" fill="#9ca3af" font-size="10">5% risk:</text><rect x="100" y="102" width="160" height="16" fill="#fb923c" rx="3"/><text x="265" y="114" fill="#fb923c" font-size="10">$5,987 remaining ⚠️</text><text x="30" y="144" fill="#9ca3af" font-size="10">10% risk:</text><rect x="100" y="134" width="75" height="16" fill="#f87171" rx="3"/><text x="180" y="146" fill="#f87171" font-size="10">$3,487 remaining ❌</text><text x="240" y="175" text-anchor="middle" fill="#34d399" font-size="9">Professional traders risk 0.5–2% max. Consistency beats home runs.</text></svg>
+    ![Risk Comparison](/static/charts/risk_percentage_comparison.png)
     
     ---
     
@@ -765,8 +769,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Maximum recommended risk per trade?", "option_a": "10%", "option_b": "5%", "option_c": "1-2%", "option_d": "25%", "correct_answer": "C", "explanation": "Never risk more than 1-2% per trade to survive losing streaks.", "topic_slug": "risk_management"},
                                 {"question": "With 2% risk, consecutive losses to blow account?", "option_a": "10", "option_b": "20", "option_c": "50", "option_d": "5", "correct_answer": "C", "explanation": "2% × 50 = 100%. Requires 50 consecutive losses.", "topic_slug": "risk_management"},
-                                {"question": "Calculate: $5,000 account, 2% risk. Max loss?", "option_a": "$10", "option_b": "$100", "option_c": "$1,000", "option_d": "$10,000", "correct_answer": "B", "explanation": "$5,000 × 2% = $100 maximum risk per trade.", "topic_slug": "risk_management"}
-                            ]
+                                {"question": "Calculate: $5,000 account, 2% risk. Max loss?", "option_a": "$10", "option_b": "$100", "option_c": "$1,000", "option_d": "$10,000", "correct_answer": "B", "explanation": "$5,000 × 2% = $100 maximum risk per trade.", "topic_slug": "risk_management"},
+                                {"question": 'You have 10 consecutive losses risking 5% each. Approximate account remaining?', "option_a": '50%', "option_b": '60%', "option_c": '40%', "option_d": '75%', "correct_answer": 'B', "explanation": '0.95^10 ≈ 0.60 (60%). Even 10 losses at 5% still leaves 60% — but at 10% it drops to 35%.', "topic_slug": 'risk_management'},
+                                {"question": 'What is the maximum recommended risk per trade for a professional trader?', "option_a": '5%', "option_b": '10%', "option_c": '1-2%', "option_d": '0.1%', "correct_answer": 'C', "explanation": 'Professional traders rarely risk more than 1-2% per trade. This allows surviving long losing streaks.', "topic_slug": 'risk_management'}]
                         },
                         {
                             "title": "Stop Loss and Take Profit",
@@ -817,7 +822,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Stop Loss Placement — Below Support</text><polyline points="30,170 70,155 100,162 140,140 170,148 210,125 240,132 280,110 310,118 350,95 390,102 430,80" fill="none" stroke="#60a5fa" stroke-width="2"/><line x1="30" y1="148" x2="460" y2="148" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5"/><text x="33" y="143" fill="#34d399" font-size="9">Support Zone</text><circle cx="210" cy="125" r="5" fill="#fbbf24"/><text x="215" y="120" fill="#fbbf24" font-size="9">Entry (buy at support)</text><line x1="30" y1="163" x2="460" y2="163" stroke="#f87171" stroke-width="1.5" stroke-dasharray="3"/><text x="33" y="175" fill="#f87171" font-size="9">Stop Loss (below support — avoids stop hunts)</text><line x1="30" y1="95" x2="460" y2="95" stroke="#34d399" stroke-width="1" stroke-dasharray="3"/><text x="33" y="90" fill="#34d399" font-size="9">Take Profit</text><text x="240" y="195" text-anchor="middle" fill="#6b7280" font-size="9">Place stop BELOW support (not at it). Target minimum 1:2 risk:reward.</text></svg>
+    ![Stop Loss Placement](/static/charts/stop_loss_placement_example.png)
     
     ---
     
@@ -845,8 +850,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Where is SL for BUY trade?", "option_a": "Above resistance", "option_b": "Below support", "option_c": "At entry", "option_d": "Random", "correct_answer": "B", "explanation": "Buy stops go below support.", "topic_slug": "risk_management"},
                                 {"question": "Minimum recommended R:R ratio?", "option_a": "1:1", "option_b": "1:2", "option_c": "1:0.5", "option_d": "2:1", "correct_answer": "B", "explanation": "Minimum 1:2 R:R allows 40% win rate to be profitable.", "topic_slug": "risk_management"},
-                                {"question": "Calculate: Entry 1.1000, SL 1.0980, TP 1.1040. R:R?", "option_a": "1:1", "option_b": "1:2", "option_c": "2:1", "option_d": "4:1", "correct_answer": "B", "explanation": "20 pips risk, 40 pips reward = 1:2 ratio.", "topic_slug": "risk_management"}
-                            ]
+                                {"question": "Calculate: Entry 1.1000, SL 1.0980, TP 1.1040. R:R?", "option_a": "1:1", "option_b": "1:2", "option_c": "2:1", "option_d": "4:1", "correct_answer": "B", "explanation": "20 pips risk, 40 pips reward = 1:2 ratio.", "topic_slug": "risk_management"},
+                                {"question": 'A stop loss placed too close to entry will likely cause what?', "option_a": 'Higher profit', "option_b": 'Premature exit from normal price noise', "option_c": 'Lower spreads', "option_d": 'Better risk:reward', "correct_answer": 'B', "explanation": 'Normal market noise (random price movement) will trigger a tight stop before the trade direction plays out.', "topic_slug": 'stop_loss'},
+                                {"question": 'If risk is 30 pips and target is 90 pips, what is the R:R ratio?', "option_a": '1:1', "option_b": '1:2', "option_c": '1:3', "option_d": '3:1', "correct_answer": 'C', "explanation": 'R:R = reward ÷ risk = 90 ÷ 30 = 3. You risk 1 to potentially make 3.', "topic_slug": 'stop_loss'}]
                         }
                     ]
                 },
@@ -900,7 +906,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="200" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Candlestick Anatomy</text><text x="100" y="38" text-anchor="middle" fill="#34d399" font-size="11" font-weight="bold">Bullish (Green)</text><line x1="100" y1="48" x2="100" y2="68" stroke="#34d399" stroke-width="2"/><rect x="75" y="68" width="50" height="80" fill="rgba(52,211,153,0.3)" stroke="#34d399" stroke-width="2" rx="2"/><line x1="100" y1="148" x2="100" y2="168" stroke="#34d399" stroke-width="2"/><text x="140" y="63" fill="#9ca3af" font-size="9">High (upper wick)</text><text x="140" y="85" fill="#34d399" font-size="9">Close (top of body)</text><text x="140" y="138" fill="#34d399" font-size="9">Open (bottom)</text><text x="140" y="162" fill="#9ca3af" font-size="9">Low (lower wick)</text><text x="340" y="38" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold">Bearish (Red)</text><line x1="340" y1="48" x2="340" y2="68" stroke="#f87171" stroke-width="2"/><rect x="315" y="68" width="50" height="80" fill="rgba(239,68,68,0.3)" stroke="#f87171" stroke-width="2" rx="2"/><line x1="340" y1="148" x2="340" y2="168" stroke="#f87171" stroke-width="2"/><text x="255" y="85" text-anchor="end" fill="#f87171" font-size="9">Open (top)</text><text x="255" y="138" text-anchor="end" fill="#f87171" font-size="9">Close (bottom)</text><text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Green = buyers dominated | Red = sellers dominated | Body size = conviction</text></svg>
+    ![Candlestick Patterns](/static/charts/candlestick_basics.png)
     
     ---
     
@@ -928,8 +934,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Green candle indicates?", "option_a": "Closed lower than open", "option_b": "Closed higher than open", "option_c": "No movement", "option_d": "Market closed", "correct_answer": "B", "explanation": "Green candles mean Close > Open.", "topic_slug": "candlestick_patterns"},
                                 {"question": "Long upper wick shows?", "option_a": "Strong buying", "option_b": "Rejection of higher prices", "option_c": "Closed high", "option_d": "Low volatility", "correct_answer": "B", "explanation": "Long upper wick means price rejected from higher levels.", "topic_slug": "candlestick_patterns"},
-                                {"question": "Open 1.1000, Close 1.1020, High 1.1030, Low 1.0990. Body size?", "option_a": "10 pips", "option_b": "20 pips", "option_c": "40 pips", "option_d": "30 pips", "correct_answer": "B", "explanation": "Body = Close - Open = 20 pips.", "topic_slug": "candlestick_patterns"}
-                            ]
+                                {"question": "Open 1.1000, Close 1.1020, High 1.1030, Low 1.0990. Body size?", "option_a": "10 pips", "option_b": "20 pips", "option_c": "40 pips", "option_d": "30 pips", "correct_answer": "B", "explanation": "Body = Close - Open = 20 pips.", "topic_slug": "candlestick_patterns"},
+                                {"question": 'What does a single Japanese candlestick represent?', "option_a": 'One minute of trading', "option_b": 'Open, high, low, and close for a chosen time period', "option_c": 'Only the closing price', "option_d": 'Average price over a week', "correct_answer": 'B', "explanation": 'Each candlestick shows the open, high, low, and close (OHLC) for whatever timeframe is selected.', "topic_slug": 'charts'},
+                                {"question": 'A long upper wick on a candle indicates what?', "option_a": 'Strong buying pressure', "option_b": 'Price tried to go higher but sellers pushed it back down', "option_c": 'Strong downtrend', "option_d": 'Market closed early', "correct_answer": 'B', "explanation": 'A long upper wick means price moved up during the period but sellers dominated, pushing price back to close near the open.', "topic_slug": 'charts'}]
                         },
                         {
                             "title": "Support and Resistance Basics",
@@ -975,7 +982,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Support &amp; Resistance Levels</text><polyline points="30,165 70,148 100,162 140,135 180,148 220,125 250,142 290,118 320,135 360,108 400,122 440,100" fill="none" stroke="#60a5fa" stroke-width="2"/><line x1="30" y1="122" x2="460" y2="122" stroke="#f87171" stroke-width="1.5" stroke-dasharray="6"/><text x="35" y="117" fill="#f87171" font-size="10" font-weight="bold">RESISTANCE — sellers push price down here</text><line x1="30" y1="162" x2="460" y2="162" stroke="#34d399" stroke-width="1.5" stroke-dasharray="6"/><text x="35" y="178" fill="#34d399" font-size="10" font-weight="bold">SUPPORT — buyers push price up here</text><text x="148" y="114" fill="#f87171" font-size="14">↓</text><text x="228" y="114" fill="#f87171" font-size="14">↓</text><text x="68" y="158" fill="#34d399" font-size="14">↑</text><text x="178" y="158" fill="#34d399" font-size="14">↑</text></svg>
+    ![Support and Resistance](/static/charts/support_resistance_basic.png)
     
     ---
     
@@ -1003,8 +1010,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Support represents?", "option_a": "Selling pressure", "option_b": "Buying overcoming selling", "option_c": "Market top", "option_d": "Random price", "correct_answer": "B", "explanation": "Support is where buyers step in.", "topic_slug": "support_resistance"},
                                 {"question": "What is 'role reversal'?", "option_a": "Traders swapping", "option_b": "Broken resistance becomes support", "option_c": "Trend reversal", "option_d": "Price gaps", "correct_answer": "B", "explanation": "Once resistance breaks, it often becomes support.", "topic_slug": "support_resistance"},
-                                {"question": "Touches needed to validate level?", "option_a": "1", "option_b": "2 or more", "option_c": "10", "option_d": "None", "correct_answer": "B", "explanation": "Need at least 2-3 clear touches with reversals.", "topic_slug": "support_resistance"}
-                            ]
+                                {"question": "Touches needed to validate level?", "option_a": "1", "option_b": "2 or more", "option_c": "10", "option_d": "None", "correct_answer": "B", "explanation": "Need at least 2-3 clear touches with reversals.", "topic_slug": "support_resistance"},
+                                {"question": 'When does a support level become resistance?', "option_a": 'When price bounces off it 3 times', "option_b": 'When price breaks decisively below it', "option_c": 'At the start of a new week', "option_d": 'When volume is low', "correct_answer": 'B', "explanation": 'Role reversal: once price breaks below support, that level becomes resistance on future pullbacks. Buyers become trapped and sell at breakeven.', "topic_slug": 'support_resistance'},
+                                {"question": 'Round numbers (1.1000, 1.2000) are significant in forex because:', "option_a": 'They appear on news reports', "option_b": 'Brokers set spreads there', "option_c": 'Large stop orders and limit orders cluster at psychological levels', "option_d": 'Price always bounces there', "correct_answer": 'C', "explanation": 'Traders place orders at round numbers — buy limits just below, sell stops just below support. This creates high-liquidity zones.', "topic_slug": 'support_resistance'}]
                         }
                     ]
                 }
@@ -1063,7 +1071,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Trend Structure: Higher Highs/Lows vs Lower Highs/Lows</text><text x="80" y="35" text-anchor="middle" fill="#34d399" font-size="10" font-weight="bold">UPTREND</text><polyline points="20,170 50,152 80,162 110,132 140,148 170,112" fill="none" stroke="#34d399" stroke-width="2"/><circle cx="50" cy="152" r="4" fill="#fbbf24"/><text x="45" y="147" fill="#fbbf24" font-size="8">HL</text><circle cx="110" cy="132" r="4" fill="#34d399"/><text x="114" y="128" fill="#34d399" font-size="8">HH</text><circle cx="140" cy="148" r="4" fill="#fbbf24"/><text x="144" y="158" fill="#fbbf24" font-size="8">HL</text><circle cx="170" cy="112" r="4" fill="#34d399"/><text x="174" y="108" fill="#34d399" font-size="8">HH</text><line x1="240" y1="30" x2="240" y2="180" stroke="#374151" stroke-width="1" stroke-dasharray="4"/><text x="360" y="35" text-anchor="middle" fill="#f87171" font-size="10" font-weight="bold">DOWNTREND</text><polyline points="260,80 290,100 320,90 350,118 380,106 410,135 440,122 460,148" fill="none" stroke="#f87171" stroke-width="2"/><circle cx="290" cy="100" r="4" fill="#f87171"/><text x="286" y="95" fill="#f87171" font-size="8">LH</text><circle cx="380" cy="106" r="4" fill="#f87171"/><text x="376" y="101" fill="#f87171" font-size="8">LH</text><circle cx="440" cy="122" r="4" fill="#fbbf24"/><text x="444" y="138" fill="#fbbf24" font-size="8">LL</text><text x="240" y="188" text-anchor="middle" fill="#6b7280" font-size="9">Trade WITH the trend — HH+HL = buy setups | LH+LL = sell setups</text></svg>
+    ![Trend Analysis](/static/charts/trend_identification.png)
     
     ---
     
@@ -1091,8 +1099,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "What defines an uptrend?", "option_a": "Lower highs, lower lows", "option_b": "Higher highs, higher lows", "option_c": "Equal highs, equal lows", "option_d": "Random movement", "correct_answer": "B", "explanation": "Higher highs and higher lows = uptrend.", "topic_slug": "trend_analysis"},
                                 {"question": "Best trading practice in strong uptrend?", "option_a": "Short every rally", "option_b": "Buy pullbacks", "option_c": "Trade opposite direction", "option_d": "Avoid trading", "correct_answer": "B", "explanation": "Buy dips in uptrends, sell rallies in downtrends.", "topic_slug": "trend_analysis"},
-                                {"question": "Price above 200-day MA indicates?", "option_a": "Bear market", "option_b": "Long-term uptrend", "option_c": "Sideways market", "option_d": "Reversal coming", "correct_answer": "B", "explanation": "200-day MA acts as long-term trend filter.", "topic_slug": "trend_analysis"}
-                            ]
+                                {"question": "Price above 200-day MA indicates?", "option_a": "Bear market", "option_b": "Long-term uptrend", "option_c": "Sideways market", "option_d": "Reversal coming", "correct_answer": "B", "explanation": "200-day MA acts as long-term trend filter.", "topic_slug": "trend_analysis"},
+                                {"question": 'In a downtrend, which of the following defines the structure?', "option_a": 'Higher highs and higher lows', "option_b": 'Lower highs and lower lows', "option_c": 'Equal highs and equal lows', "option_d": 'Higher highs and lower lows', "correct_answer": 'B', "explanation": 'A downtrend = series of lower highs (LH) and lower lows (LL). Each rally fails at a lower point and each drop reaches a lower bottom.', "topic_slug": 'trend_analysis'},
+                                {"question": 'The 200-period moving average is commonly used to:', "option_a": 'Identify intraday entries', "option_b": 'Determine the long-term trend direction', "option_c": 'Calculate spread costs', "option_d": 'Set take profit levels', "correct_answer": 'B', "explanation": 'Price above 200 MA = long-term uptrend. Price below = long-term downtrend. Used by institutions to filter trade direction.', "topic_slug": 'trend_analysis'}]
                         },
                         {
                             "title": "Multiple Timeframe Analysis",
@@ -1139,7 +1148,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Multi-Timeframe Analysis (Top-Down Approach)</text><rect x="130" y="30" width="220" height="34" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" rx="6"/><text x="240" y="48" text-anchor="middle" fill="#f59e0b" font-size="11">Monthly / Weekly</text><text x="240" y="60" text-anchor="middle" fill="#9ca3af" font-size="9">Overall trend direction</text><line x1="240" y1="64" x2="240" y2="76" stroke="#374151" stroke-width="2"/><rect x="90" y="76" width="300" height="34" fill="rgba(96,165,250,0.15)" stroke="#60a5fa" rx="6"/><text x="240" y="94" text-anchor="middle" fill="#60a5fa" font-size="11">Daily / 4-Hour</text><text x="240" y="106" text-anchor="middle" fill="#9ca3af" font-size="9">Key levels, structure, context</text><line x1="240" y1="110" x2="240" y2="122" stroke="#374151" stroke-width="2"/><rect x="50" y="122" width="380" height="34" fill="rgba(52,211,153,0.15)" stroke="#34d399" rx="6"/><text x="240" y="140" text-anchor="middle" fill="#34d399" font-size="11">1-Hour / 15-Minute</text><text x="240" y="152" text-anchor="middle" fill="#9ca3af" font-size="9">Entry timing and precise stop placement</text><text x="240" y="180" text-anchor="middle" fill="#fbbf24" font-size="9">Rule: Only enter trades where all 3 timeframes agree on direction</text></svg>
+    ![Multiple Timeframes](/static/charts/multi_timeframe_analysis.png)
     
     ---
     
@@ -1167,8 +1176,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Purpose of higher timeframe?", "option_a": "Precise entries", "option_b": "Trend direction", "option_c": "Stop placement", "option_d": "Exit timing", "correct_answer": "B", "explanation": "Higher TF identifies primary trend direction.", "topic_slug": "trend_analysis"},
                                 {"question": "Timeframe conflict resolution?", "option_a": "Trade lower TF", "option_b": "Higher TF wins", "option_c": "Average both", "option_d": "Increase size", "correct_answer": "B", "explanation": "Higher timeframe trend supersedes lower TF signals.", "topic_slug": "trend_analysis"},
-                                {"question": "Best practice when timeframes conflict?", "option_a": "Trade anyway", "option_b": "Stay out or reduce size", "option_c": "Trade both directions", "option_d": "Use maximum leverage", "correct_answer": "B", "explanation": "Conflicting signals = reduced probability. Stay out or size down.", "topic_slug": "trend_analysis"}
-                            ]
+                                {"question": "Best practice when timeframes conflict?", "option_a": "Trade anyway", "option_b": "Stay out or reduce size", "option_c": "Trade both directions", "option_d": "Use maximum leverage", "correct_answer": "B", "explanation": "Conflicting signals = reduced probability. Stay out or size down.", "topic_slug": "trend_analysis"},
+                                {"question": 'What is the correct top-down approach order?', "option_a": 'M1 → H1 → D1', "option_b": 'D1 → H4 → H1', "option_c": 'W1 → D1 → H4 → H1', "option_d": 'H4 → M15 → M1', "correct_answer": 'C', "explanation": 'Start with the highest timeframe for trend context (W1/D1), then zoom into H4 for structure, then H1/M15 for entry timing.', "topic_slug": 'multi_timeframe'},
+                                {"question": 'Why avoid entering a trade when higher timeframe shows opposite direction?', "option_a": 'Spreads are wider against trend', "option_b": 'You are fighting larger institutional flow increasing losing probability', "option_c": 'Technical indicators fail against trend', "option_d": 'Brokers block counter-trend trades', "correct_answer": 'B', "explanation": 'Institutions trade with the higher timeframe trend. Counter-trend trades face selling pressure from larger players. Trading with all timeframes aligned dramatically improves win rate.', "topic_slug": 'multi_timeframe'}]
                         }
                     ]
                 },
@@ -1222,7 +1232,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Dynamic S&amp;R — Moving Averages as Support</text><polyline points="20,130 60,115 90,125 130,100 160,115 200,90 240,105 280,80 320,95 360,70 400,85 440,60" fill="none" stroke="#60a5fa" stroke-width="2"/><polyline points="20,135 60,120 90,128 130,105 160,118 200,95 240,108 280,85 320,98 360,75 400,88 440,65" fill="none" stroke="#34d399" stroke-width="1.5"/><polyline points="20,150 60,143 90,140 130,128 160,132 200,120 240,122 280,110 320,114 360,102 400,108 440,94" fill="none" stroke="#f59e0b" stroke-width="1.5"/><rect x="25" y="155" width="55" height="12" fill="rgba(96,165,250,0.15)" rx="2"/><text x="52" y="165" text-anchor="middle" fill="#60a5fa" font-size="9">Price</text><rect x="90" y="155" width="65" height="12" fill="rgba(52,211,153,0.15)" rx="2"/><text x="122" y="165" text-anchor="middle" fill="#34d399" font-size="9">MA20 (Fast)</text><rect x="165" y="155" width="65" height="12" fill="rgba(245,158,11,0.15)" rx="2"/><text x="197" y="165" text-anchor="middle" fill="#f59e0b" font-size="9">MA50 (Slow)</text><text x="240" y="185" text-anchor="middle" fill="#6b7280" font-size="9">Price bouncing off MA = dynamic support. MA20 above MA50 = uptrend.</text></svg>
+    ![Dynamic S/R](/static/charts/dynamic_support_resistance.png)
     
     ---
     
@@ -1250,8 +1260,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Dynamic support example?", "option_a": "Horizontal level", "option_b": "20 EMA", "option_c": "Round number", "option_d": "Previous high", "correct_answer": "B", "explanation": "Moving averages act as dynamic, evolving support.", "topic_slug": "support_resistance"},
                                 {"question": "Trendline validation requires?", "option_a": "1 touch", "option_b": "2 touches", "option_c": "3+ touches", "option_d": "No touches", "correct_answer": "C", "explanation": "3+ touches validate a trendline as significant.", "topic_slug": "support_resistance"},
-                                {"question": "200 SMA typically acts as?", "option_a": "Day trading support", "option_b": "Long-term trend filter", "option_c": "Scalping tool", "option_d": "Entry trigger", "correct_answer": "B", "explanation": "200 SMA defines long-term trend direction.", "topic_slug": "support_resistance"}
-                            ]
+                                {"question": "200 SMA typically acts as?", "option_a": "Day trading support", "option_b": "Long-term trend filter", "option_c": "Scalping tool", "option_d": "Entry trigger", "correct_answer": "B", "explanation": "200 SMA defines long-term trend direction.", "topic_slug": "support_resistance"},
+                                {"question": 'What makes a support or resistance level stronger?', "option_a": 'It was formed on a 1-minute chart', "option_b": 'Price has tested it multiple times and respected it', "option_c": 'It occurred during low volume', "option_d": 'It is between round numbers', "correct_answer": 'B', "explanation": 'Multiple tests of a level confirm its significance. Each test uses up orders at that level — eventually the level breaks when orders are exhausted.', "topic_slug": 'support_resistance'},
+                                {"question": 'A support zone is better described as:', "option_a": 'An exact price point', "option_b": 'A 1-pip level', "option_c": 'A price range where buying interest emerges', "option_d": 'The daily low', "correct_answer": 'C', "explanation": 'Support is a zone, not a line. Institutional orders are spread across a range. Looking for exact touches creates missed trades.', "topic_slug": 'support_resistance'}]
                         },
                         {
                             "title": "Chart Patterns",
@@ -1301,7 +1312,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Key Chart Patterns</text><text x="80" y="35" text-anchor="middle" fill="#f87171" font-size="9" font-weight="bold">Head &amp; Shoulders (Bearish)</text><polyline points="20,120 40,100 60,110 80,78 100,110 120,100 140,120" fill="none" stroke="#f87171" stroke-width="2"/><line x1="20" y1="120" x2="140" y2="120" stroke="#f87171" stroke-width="1" stroke-dasharray="3"/><text x="80" y="138" text-anchor="middle" fill="#9ca3af" font-size="8">Neckline break → sell</text><text x="240" y="35" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">Double Bottom (Bullish)</text><polyline points="175,80 195,120 215,102 235,120 255,80" fill="none" stroke="#34d399" stroke-width="2"/><line x1="175" y1="102" x2="255" y2="102" stroke="#34d399" stroke-width="1" stroke-dasharray="3"/><text x="215" y="138" text-anchor="middle" fill="#9ca3af" font-size="8">Break above → buy</text><text x="390" y="35" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Bull Flag (Continuation)</text><line x1="320" y1="125" x2="320" y2="78" stroke="#60a5fa" stroke-width="2"/><polyline points="320,78 340,100 360,105 380,100 400,106 420,100" fill="none" stroke="#60a5fa" stroke-width="2"/><text x="380" y="138" text-anchor="middle" fill="#9ca3af" font-size="8">Break up → continuation</text><text x="240" y="162" text-anchor="middle" fill="#9ca3af" font-size="9">Patterns repeat because human psychology repeats across all markets</text><text x="240" y="180" text-anchor="middle" fill="#fbbf24" font-size="9">Always wait for CONFIRMATION (breakout candle) before entering</text></svg>
+    ![Chart Patterns](/static/charts/chart_patterns_formation.png)
     
     ---
     
@@ -1329,8 +1340,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Head and shoulders pattern type?", "option_a": "Continuation", "option_b": "Reversal", "option_c": "Consolidation", "option_d": "Trend", "correct_answer": "B", "explanation": "Head and shoulders signals trend reversal.", "topic_slug": "chart_patterns"},
                                 {"question": "Bull flag target calculation?", "option_a": "Flag width", "option_b": "Pole height added to breakout", "option_c": "Half pole height", "option_d": "Double pole height", "correct_answer": "B", "explanation": "Measure pole, add to breakout point for target.", "topic_slug": "chart_patterns"},
-                                {"question": "Key mistake with patterns?", "option_a": "Waiting for confirmation", "option_b": "Using volume", "option_c": "Entering before completion", "option_d": "Setting stops", "correct_answer": "C", "explanation": "Never enter before pattern completes and confirms.", "topic_slug": "chart_patterns"}
-                            ]
+                                {"question": "Key mistake with patterns?", "option_a": "Waiting for confirmation", "option_b": "Using volume", "option_c": "Entering before completion", "option_d": "Setting stops", "correct_answer": "C", "explanation": "Never enter before pattern completes and confirms.", "topic_slug": "chart_patterns"},
+                                {"question": 'What is the measured move target for a Head and Shoulders pattern?', "option_a": 'Equal to the right shoulder height', "option_b": 'Distance from head to neckline, projected below neckline break', "option_c": 'The previous swing low', "option_d": '50% of the entire pattern height', "correct_answer": 'B', "explanation": 'Measured move = height of the head to neckline. This distance is projected downward from the neckline break point.', "topic_slug": 'chart_patterns'},
+                                {"question": 'A bull flag pattern represents:', "option_a": 'Trend reversal to downside', "option_b": 'Brief consolidation before continuation of uptrend', "option_c": 'Sideways market with no direction', "option_d": 'End of bullish momentum', "correct_answer": 'B', "explanation": 'A bull flag = strong move up (pole) + brief downward consolidation (flag). The pattern completes when price breaks above the flag — continuing the original uptrend.', "topic_slug": 'chart_patterns'}]
                         }
                     ]
                 },
@@ -1385,7 +1397,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 195" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="195" fill="#0d1117" rx="8"/><text x="240" y="18" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Moving Average Crossover (Golden Cross / Death Cross)</text><polyline points="20,150 60,140 100,145 140,120 180,130 220,100 260,90 300,80 340,85 380,70 420,65 460,55" fill="none" stroke="#9ca3af" stroke-width="1.5" opacity="0.4"/><polyline points="20,155 60,148 100,148 140,126 180,133 220,105 260,94 300,83 340,87 380,73 420,67 460,57" fill="none" stroke="#34d399" stroke-width="2"/><polyline points="20,165 60,160 100,158 140,150 180,148 220,138 260,128 300,115 340,108 380,100 420,92 460,85" fill="none" stroke="#f59e0b" stroke-width="2"/><circle cx="220" cy="138" r="10" fill="none" stroke="#fbbf24" stroke-width="2"/><text x="225" y="128" fill="#fbbf24" font-size="8">Golden</text><text x="225" y="138" fill="#fbbf24" font-size="8">Cross</text><text x="225" y="150" fill="#34d399" font-size="8">BUY ↑</text><rect x="25" y="168" width="55" height="12" fill="rgba(52,211,153,0.2)" rx="2"/><text x="52" y="178" text-anchor="middle" fill="#34d399" font-size="9">MA20 Fast</text><rect x="90" y="168" width="55" height="12" fill="rgba(245,158,11,0.2)" rx="2"/><text x="117" y="178" text-anchor="middle" fill="#f59e0b" font-size="9">MA50 Slow</text><text x="320" y="178" fill="#6b7280" font-size="9">MA20 crosses MA50 upward = trend shift</text></svg>
+    ![Moving Averages](/static/charts/moving_average_strategies.png)
     
     ---
     
@@ -1413,8 +1425,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "Golden Cross definition?", "option_a": "9 crosses 21 EMA", "option_b": "50 crosses 200 SMA upward", "option_c": "200 crosses 50 SMA", "option_d": "Price crosses MA", "correct_answer": "B", "explanation": "50 SMA crossing above 200 SMA = Golden Cross (bullish).", "topic_slug": "indicators"},
                                 {"question": "Best market condition for MAs?", "option_a": "Range-bound", "option_b": "Trending", "option_c": "High volatility", "option_d": "Low volume", "correct_answer": "B", "explanation": "Moving averages excel in trending markets, fail in ranges.", "topic_slug": "indicators"},
-                                {"question": "EMA vs SMA difference?", "option_a": "EMA is slower", "option_b": "EMA weights recent prices more", "option_c": "SMA is more accurate", "option_d": "No difference", "correct_answer": "B", "explanation": "EMA gives more weight to recent price data.", "topic_slug": "indicators"}
-                            ]
+                                {"question": "EMA vs SMA difference?", "option_a": "EMA is slower", "option_b": "EMA weights recent prices more", "option_c": "SMA is more accurate", "option_d": "No difference", "correct_answer": "B", "explanation": "EMA gives more weight to recent price data.", "topic_slug": "indicators"},
+                                {"question": 'What does a moving average crossover signal?', "option_a": 'Market is overbought', "option_b": 'A potential change in trend direction', "option_c": 'Volume is increasing', "option_d": 'Price has reached resistance', "correct_answer": 'B', "explanation": 'When a faster MA crosses a slower MA, it signals a potential trend shift. Golden cross (MA20 above MA50) = bullish. Death cross = bearish.', "topic_slug": 'indicators'},
+                                {"question": 'Why should indicators never be used alone for trade decisions?', "option_a": 'They are illegal in some markets', "option_b": 'They lag price and generate false signals without context', "option_c": 'They only work on 1-hour charts', "option_d": 'Brokers disable them', "correct_answer": 'B', "explanation": 'All indicators are derived from past price data — they lag. Combining with price action, structure, and confluence dramatically reduces false signals.', "topic_slug": 'indicators'}]
                         },
                         {
                             "title": "Momentum Indicators (RSI and MACD)",
@@ -1465,7 +1478,7 @@ ACADEMY_CURRICULUM = [
     
     ## 📊 Chart Example
     
-    <svg class="ac-svg-diagram" viewBox="0 0 480 210" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="210" fill="#0d1117" rx="8"/><text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">RSI &amp; MACD Momentum Indicators</text><text x="30" y="35" fill="#60a5fa" font-size="10" font-weight="bold">RSI (14)</text><rect x="20" y="40" width="200" height="70" fill="rgba(0,0,0,0.3)" rx="4"/><line x1="20" y1="58" x2="220" y2="58" stroke="#f87171" stroke-width="1" stroke-dasharray="3" opacity="0.7"/><text x="224" y="62" fill="#f87171" font-size="8">70 Overbought</text><line x1="20" y1="90" x2="220" y2="90" stroke="#34d399" stroke-width="1" stroke-dasharray="3" opacity="0.7"/><text x="224" y="94" fill="#34d399" font-size="8">30 Oversold</text><polyline points="30,82 55,72 80,58 105,52 130,65 155,76 180,90 205,82" fill="none" stroke="#60a5fa" stroke-width="2"/><text x="110" y="120" text-anchor="middle" fill="#9ca3af" font-size="8">Above 70 = sell signal | Below 30 = buy signal</text><text x="270" y="35" fill="#f59e0b" font-size="10" font-weight="bold">MACD (12,26,9)</text><rect x="260" y="40" width="200" height="70" fill="rgba(0,0,0,0.3)" rx="4"/><line x1="260" y1="75" x2="460" y2="75" stroke="#374151" stroke-width="1"/><rect x="270" y="68" width="7" height="7" fill="#34d399" opacity="0.8"/><rect x="282" y="65" width="7" height="10" fill="#34d399" opacity="0.8"/><rect x="294" y="62" width="7" height="13" fill="#34d399" opacity="0.8"/><rect x="306" y="67" width="7" height="8" fill="#34d399" opacity="0.8"/><rect x="330" y="75" width="7" height="6" fill="#f87171" opacity="0.8"/><rect x="342" y="75" width="7" height="10" fill="#f87171" opacity="0.8"/><rect x="354" y="75" width="7" height="8" fill="#f87171" opacity="0.8"/><polyline points="270,70 295,63 318,75 342,79 368,74 392,70" fill="none" stroke="#fbbf24" stroke-width="1.5"/><text x="360" y="120" text-anchor="middle" fill="#9ca3af" font-size="8">Green=bullish | Red=bearish momentum</text><text x="240" y="145" text-anchor="middle" fill="#fbbf24" font-size="9">⭐ RSI oversold + MACD bullish cross = strong buy confluence</text><text x="240" y="163" text-anchor="middle" fill="#9ca3af" font-size="9">Never use indicators alone — confirm with price action and structure</text><text x="240" y="180" text-anchor="middle" fill="#6b7280" font-size="8">RSI period: 14 | MACD: 12, 26, 9 (default settings on all platforms)</text></svg>
+    ![Momentum Indicators](/static/charts/rsi_macd_indicators.png)
     
     ---
     
@@ -1493,8 +1506,9 @@ ACADEMY_CURRICULUM = [
                             "quiz": [
                                 {"question": "RSI > 70 indicates?", "option_a": "Strong buy", "option_b": "Overbought, potential reversal", "option_c": "Undervalued", "option_d": "Trend continuation", "correct_answer": "B", "explanation": "RSI > 70 suggests overbought conditions.", "topic_slug": "indicators"},
                                 {"question": "Bearish divergence occurs when?", "option_a": "Price and RSI both rise", "option_b": "Price rises, RSI falls", "option_c": "Both fall", "option_d": "RSI rises, price falls", "correct_answer": "B", "explanation": "Price makes higher high while RSI makes lower high = bearish divergence.", "topic_slug": "indicators"},
-                                {"question": "MACD histogram shows?", "option_a": "Trend direction only", "option_b": "Momentum strength", "option_c": "Volume", "option_d": "Support levels", "correct_answer": "B", "explanation": "Histogram represents momentum strength and acceleration.", "topic_slug": "indicators"}
-                            ]
+                                {"question": "MACD histogram shows?", "option_a": "Trend direction only", "option_b": "Momentum strength", "option_c": "Volume", "option_d": "Support levels", "correct_answer": "B", "explanation": "Histogram represents momentum strength and acceleration.", "topic_slug": "indicators"},
+                                {"question": 'RSI shows 75 — what does this mean?', "option_a": 'Strong buy signal', "option_b": 'Asset is overbought — potential reversal zone', "option_c": 'Volume is high', "option_d": 'Price is at resistance', "correct_answer": 'B', "explanation": 'RSI above 70 = overbought. Selling pressure may emerge. However, in strong trends RSI can stay overbought — always confirm with price action.', "topic_slug": 'momentum_indicators'},
+                                {"question": 'MACD divergence occurs when:', "option_a": 'Price and MACD move in the same direction', "option_b": 'Price makes new high but MACD makes a lower high', "option_c": 'Both MACD lines cross zero', "option_d": 'RSI is also overbought', "correct_answer": 'B', "explanation": 'Bearish divergence: price makes higher high but MACD makes lower high = weakening momentum. Often precedes a reversal. Bullish divergence is the opposite.', "topic_slug": 'momentum_indicators'}]
                         }
                     ]
                 }
@@ -1511,150 +1525,201 @@ ACADEMY_CURRICULUM = [
                     {
                         "title": "Fibonacci Retracements and Extensions",
                         "content": """## Quick Definition
-
-Fibonacci retracements identify potential support and resistance levels based on key ratios (23.6%, 38.2%, 50%, 61.8%, 78.6%) derived from the Fibonacci sequence. They show where price may pause or reverse during a pullback.
-
----
-
-## Concept Explanation
-
-### Key Fibonacci Levels
-
-*   **23.6%** — Shallow retracement, strong trend
-*   **38.2%** — Common first pullback level
-*   **50.0%** — Psychological midpoint (not a Fib ratio but widely used)
-*   **61.8%** — The "Golden Ratio" — highest probability reversal zone
-*   **78.6%** — Deep retracement, trend may be weakening
-
-### Extensions (Profit Targets)
-
-*   **127.2%** — First extension target
-*   **161.8%** — Major extension target
-*   **261.8%** — Aggressive target in strong trends
-
----
-
-## Step-by-Step Breakdown
-
-1.  **Identify the swing** — Find a clear high and low
-2.  **Draw from swing low to swing high** (uptrend) or high to low (downtrend)
-3.  **Wait for pullback** — Price retraces toward key levels
-4.  **Look for confluence** — Fib level + support/resistance + candlestick pattern
-5.  **Enter at the confluence zone** — 61.8% is highest probability
-6.  **Set targets** — Use extensions (127.2%, 161.8%) for take profit
-
----
-
-## Real Trading Example
-
-**EUR/USD Fibonacci Trade:**
-*   Swing Low: 1.0700 | Swing High: 1.0900
-*   61.8% Retracement: 1.0776
-*   Price pulls back to 1.0778 with bullish engulfing
-*   Entry: 1.0780 | Stop: 1.0745 | Target: 1.0968 (127.2% extension)
-*   Result: 2.5 R:R achieved
-
----
-
-## 📊 Chart Example
-
-<svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="480" height="200" fill="#0d1117" rx="8"/>
-  <text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Fibonacci Retracement — EUR/USD</text>
-  <line x1="40" y1="170" x2="200" y2="50" stroke="#34d399" stroke-width="2"/>
-  <polyline points="200,50 240,90 260,80 280,100 300,88" fill="none" stroke="#60a5fa" stroke-width="2"/>
-  <line x1="30" y1="97" x2="420" y2="97" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4"/>
-  <text x="425" y="101" fill="#fbbf24" font-size="9">61.8%</text>
-  <line x1="30" y1="110" x2="420" y2="110" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3"/>
-  <text x="425" y="114" fill="#f59e0b" font-size="9">50.0%</text>
-  <line x1="30" y1="125" x2="420" y2="125" stroke="#f87171" stroke-width="1" stroke-dasharray="3"/>
-  <text x="425" y="129" fill="#f87171" font-size="9">38.2%</text>
-  <circle cx="280" cy="100" r="6" fill="none" stroke="#fbbf24" stroke-width="2"/>
-  <text x="285" y="93" fill="#fbbf24" font-size="9">Entry zone</text>
-  <text x="240" y="190" text-anchor="middle" fill="#6b7280" font-size="9">Enter at 61.8% with confluence confirmation.</text>
-</svg>
-
----
-
-## 💡 Pro Tip
-
-**Fib + S/R Confluence**: When a 61.8% retracement coincides with a previous support level AND a moving average, probability of a bounce increases significantly. Never trade Fibonacci alone.
-
----
-
-## Key Takeaway
-
-Fibonacci retracements are self-fulfilling — so many traders use them that price often respects these levels. Focus on the 38.2% and 61.8% with confluence for highest-probability entries.""",
+    
+    bonacci Retracements** measure pullback depth within trends using ratios derived from the Fibonacci sequence (23.6%, 38.2%, 50%, 61.8%). **Extensions** project profit targets beyond the 100% level (127.2%, 161.8%, 261.8%).
+    
+    
+    
+    oncept Explanation
+    
+    Key Fibonacci Levels
+    
+    vel | Significance |
+    ----|--------------|
+    38.2%** | Shallow retracement in strong trends |
+    50%** | Midpoint (not true Fibonacci but widely used) |
+    61.8%** | Golden Ratio—deepest healthy retracement |
+    78.6%** | Deep retracement, often last chance |
+    
+    Extension Targets
+    **127.2%** (1.272): First target, conservative
+    **161.8%** (1.618): Golden extension, primary target
+    **261.8%** (2.618): Extended target in strong trends
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    awing Fibonacci Retracement**:
+    Identify clear impulse move (swing low to high for uptrends)
+    Draw tool from swing start to swing end
+    Mark 38.2%, 50%, 61.8% levels
+    Wait for price to reach these zones
+    Look for confirmation signals at Fib levels
+    Enter with stop beyond 78.6% or swing extreme
+    
+    
+    
+    eal Trading Example
+    
+    R/USD Fibonacci Trade** (June 2024):
+    Impulse: 1.0700 → 1.0900 (200 pips)
+    Retracement: Pullback to 1.0820 (61.8% level)
+    Confirmation: Bullish hammer at 61.8%
+    Entry: 1.0825
+    Stop: 1.0785 (below 78.6%, 40 pips)
+    Target 1: 1.0924 (127.2% extension)
+    Target 2: 1.0956 (161.8% extension)
+    Result: Both targets hit over 5 days
+    
+     class="ac-svg-diagram" viewBox="0 0 400 200">
+    ine x1="50" y1="150" x2="350" y2="50" stroke="#60a5fa" stroke-width="2"/>
+    ext x="30" y="155" fill="#60a5fa" font-size="12">0%</text>
+    ext x="360" y="55" fill="#60a5fa" font-size="12">100%</text>
+    ine x1="150" y1="125" x2="170" y2="125" stroke="#f59e0b" stroke-width="3"/>
+    ext x="180" y="130" fill="#f59e0b" font-size="10">38.2%</text>
+    ine x1="200" y1="100" x2="220" y2="100" stroke="#f59e0b" stroke-width="3"/>
+    ext x="230" y="105" fill="#f59e0b" font-size="10">50%</text>
+    ine x1="250" y1="75" x2="270" y2="75" stroke="#22c55e" stroke-width="3"/>
+    ext x="280" y="80" fill="#22c55e" font-size="10">61.8%</text>
+    ircle cx="260" cy="75" r="5" fill="#22c55e"/>
+    ext x="260" y="60" text-anchor="middle" fill="#22c55e" font-size="10">Entry Zone</text>
+    g>
+    
+    
+    
+     Chart Example
+    
+    bonacci Levels](/static/charts/fibonacci_retracement_example.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    rcing Fibonacci Everywhere**: Drawing Fibonacci on every chart regardless of trend clarity. Fibonacci only works with clear impulse moves in established trends. Choppy, ranging markets produce random Fibonacci signals.
+    
+    
+    
+     Pro Tip
+    
+    e 61.8% Sweet Spot**: The 61.8% retracement (Golden Ratio) is the highest-probability entry zone in healthy trends. Price often respects this level before continuing. Combine with price action confirmation for best results.
+    
+    
+    
+    ey Takeaway
+    
+    nacci levels are self-fulfilling because institutions use them. The 38.2-61.8% zone offers the best risk/reward for entries. Extensions project logical profit targets. Always confirm with price action—Fibonacci alone is not enough.
+    
+    
+    
+    ractice Question
+    
+     strong uptrend, which Fibonacci retracement level typically offers the deepest "healthy" pullback entry?""",
                         "quiz": [
                             {"question": "Most significant Fibonacci retracement?", "option_a": "23.6%", "option_b": "38.2%", "option_c": "61.8%", "option_d": "78.6%", "correct_answer": "C", "explanation": "61.8% is the Golden Ratio and highest-probability retracement level.", "topic_slug": "fibonacci"},
                             {"question": "Fibonacci extension target for strong trends?", "option_a": "100%", "option_b": "127.2%", "option_c": "161.8%", "option_d": "261.8%", "correct_answer": "C", "explanation": "161.8% is the Golden extension, primary target in strong trends.", "topic_slug": "fibonacci"},
-                            {"question": "Fibonacci works best in?", "option_a": "Choppy markets", "option_b": "Clear trending markets", "option_c": "Range-bound markets", "option_d": "All markets equally", "correct_answer": "B", "explanation": "Fibonacci requires clear impulse moves found in trending markets.", "topic_slug": "fibonacci"}
-                        ]
+                            {"question": "Fibonacci works best in?", "option_a": "Choppy markets", "option_b": "Clear trending markets", "option_c": "Range-bound markets", "option_d": "All markets equally", "correct_answer": "B", "explanation": "Fibonacci requires clear impulse moves found in trending markets.", "topic_slug": "fibonacci"},
+                                {"question": 'The 61.8% Fibonacci level is called the Golden Ratio because:', "option_a": 'It was discovered by traders', "option_b": 'It appears throughout nature and markets tend to respect it most', "option_c": 'It guarantees a reversal', "option_d": 'It was set by central banks', "correct_answer": 'B', "explanation": '1.618 and 0.618 appear in nature (shells, galaxies, DNA). Markets show the same mathematical proportions in price corrections — making 61.8% the highest-probability retracement level.', "topic_slug": 'fibonacci'},
+                                {"question": 'Where should you set a take profit using Fibonacci extensions?', "option_a": 'At 50% of the move', "option_b": 'At the 127.2% or 161.8% extension levels', "option_c": 'At the previous swing high only', "option_d": 'At exactly 100 pips', "correct_answer": 'B', "explanation": 'Fibonacci extensions (127.2%, 161.8%, 261.8%) project how far price can move after a retracement completes. The 161.8% extension is the most widely used target.', "topic_slug": 'fibonacci'}]
                     },
                     {
                         "title": "Confluence Trading",
                         "content": """## Quick Definition
-
-Confluence is when **multiple technical factors align at the same price level**, dramatically increasing the probability of a trade working. The more confluences, the stronger the setup.
-
----
-
-## Concept Explanation
-
-### Types of Confluence Factors
-
-*   **Structure levels** — Support, resistance, previous highs/lows
-*   **Moving averages** — MA20, MA50, MA200
-*   **Fibonacci levels** — 38.2%, 61.8% retracements
-*   **Round numbers** — 1.1000, 1.0500, 1.2000 (psychological levels)
-*   **Candlestick patterns** — Pin bar, engulfing at the zone
-*   **Order blocks** — Institutional accumulation zones
-
-### Confluence Scoring System
-
-*   1-2 confluences — Skip the trade
-*   3 confluences — Acceptable setup
-*   4+ confluences — High probability, take the trade
-
----
-
-## Step-by-Step Breakdown
-
-1.  **Mark your levels** — Draw all S/R, MAs, and Fibonacci on the chart
-2.  **Find the cluster** — Look for a zone where 3+ factors converge
-3.  **Wait for price** — Let price come to your zone, do not chase
-4.  **Get entry confirmation** — Candlestick pattern at the confluence zone
-5.  **Execute** — Enter with tight stop below the zone
-6.  **Target next structure** — Use the next major level as take profit
-
----
-
-## Real Trading Example
-
-**GBP/USD Confluence Short:**
-*   Daily resistance at 1.2850
-*   61.8% Fibonacci retracement at 1.2848
-*   MA50 at 1.2845
-*   Round number 1.2850
-*   4 confluences — bearish pin bar forms
-*   Entry: 1.2848 | Stop: 1.2875 | Target: 1.2750 — Result: 3.7 R:R
-
----
-
-## 💡 Pro Tip
-
-**The Zone, Not the Line**: Price rarely respects exact levels. Define a 10-20 pip zone around your confluence area. Place limit orders throughout the zone rather than waiting for one exact price.
-
----
-
-## Key Takeaway
-
-Confluence transforms average setups into high-probability trades. Never enter on a single factor. Build a checklist: structure + indicator + pattern = trade. More confluences equals higher confidence.""",
+    
+    nfluence** occurs when multiple technical factors align at the same price zone, creating higher-probability trading setups. More confluence = higher probability + better risk/reward.
+    
+    
+    
+    oncept Explanation
+    
+    Types of Confluence
+    
+    rizontal Confluence**:
+    Previous support/resistance
+    Round numbers (1.1000, 1.2000)
+    Psychological levels
+    
+    namic Confluence**:
+    Moving averages (20, 50, 200 EMA/SMA)
+    Trendlines
+    Channels
+    
+    bonacci Confluence**:
+    Multiple Fibonacci levels align
+    Fibonacci + horizontal level
+    Fibonacci + dynamic level
+    
+    The Confluence Score
+    
+    nfluence Factors | Probability | Recommended Size |
+    ----------------|-------------|-------------------|
+    factor | 45-50% | 0.5% risk |
+    factors | 55-60% | 1% risk |
+     factors | 65-75% | 2% risk |
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    ilding Confluence Zones**:
+    Identify horizontal support/resistance
+    Check if Fibonacci retracement aligns
+    Check if moving average is nearby
+    Look for trendline confluence
+    Check for round numbers
+    Mark the zone where 3+ factors align
+    Wait for price action confirmation
+    
+    
+    
+    eal Trading Example
+    
+    P/USD Perfect Confluence** (May 2024):
+    **Horizontal**: Previous resistance at 1.2500
+    **Fibonacci**: 61.8% retracement at 1.2490
+    **Dynamic**: 50 EMA at 1.2505
+    **Psychological**: Round number 1.2500
+    **Confirmation**: Bullish pin bar at 1.2500
+    Entry: 1.2505
+    Stop: 1.2455 (50 pips)
+    Target: 1.2620 (115 pips)
+    Result: 2.3 R:R, target hit in 4 days
+    
+    
+    
+     Chart Example
+    
+    nfluence Trading](/static/charts/confluence_trading_zones.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    e-Factor Trading**: Taking trades based solely on one indicator or level. Single-factor setups have lower probability and require wider stops. Always seek minimum 2-3 confluence factors for A-grade setups.
+    
+    
+    
+     Pro Tip
+    
+    e Magnet Zone**: When 3+ factors align within 10-15 pips, you have found a "magnet zone." Price is drawn to these areas. Even if price overshoots, it often returns to respect these high-confluence zones.
+    
+    
+    
+    ey Takeaway
+    
+    luence stacks probability in your favor. Look for zones where horizontal, dynamic, and Fibonacci levels align. 3+ confluence factors = A-grade setups. Single-factor setups should be avoided or sized smaller.
+    
+    
+    
+    ractice Question
+    
+     is the minimum number of confluence factors recommended for A-grade setups?""",
                         "quiz": [
                             {"question": "Types of confluence include?", "option_a": "Only horizontal", "option_b": "Horizontal, dynamic, Fibonacci", "option_c": "Only Fibonacci", "option_d": "Only indicators", "correct_answer": "B", "explanation": "Three main types: horizontal (S/R), dynamic (MAs), and Fibonacci levels.", "topic_slug": "fibonacci"},
                             {"question": "Recommended risk for 3+ confluence factors?", "option_a": "0.5%", "option_b": "1%", "option_c": "2%", "option_d": "5%", "correct_answer": "C", "explanation": "High confluence (3+ factors) justifies standard 2% risk per trade.", "topic_slug": "fibonacci"},
-                            {"question": "Confluence zone definition?", "option_a": "Single indicator", "option_b": "Multiple factors aligning", "option_c": "Random price area", "option_d": "News event zone", "correct_answer": "B", "explanation": "Confluence is when multiple technical factors align at the same price.", "topic_slug": "fibonacci"}
-                        ]
+                            {"question": "Confluence zone definition?", "option_a": "Single indicator", "option_b": "Multiple factors aligning", "option_c": "Random price area", "option_d": "News event zone", "correct_answer": "B", "explanation": "Confluence is when multiple technical factors align at the same price.", "topic_slug": "fibonacci"},
+                                {"question": 'How many confluence factors minimum before taking a trade?', "option_a": '1', "option_b": '2', "option_c": '3+', "option_d": '5+', "correct_answer": 'C', "explanation": 'Professional traders require 3+ confluences. Single-factor trades have much lower probability. More confluences = higher confidence and larger position size.', "topic_slug": 'confluence'},
+                                {"question": 'EUR/USD is at a weekly resistance, 61.8% Fibonacci, AND MA200. This is:', "option_a": 'Coincidence — ignore it', "option_b": 'A high-confluence zone — look for sell setups', "option_c": 'A guaranteed short trade', "option_d": 'Only valid with 5 timeframes', "correct_answer": 'B', "explanation": 'Three major confluences at one level dramatically increases the probability of a reaction. This is a high-quality zone — wait for a bearish confirmation candle before shorting.', "topic_slug": 'confluence'}]
                     }
                 ]
             },
@@ -1665,156 +1730,196 @@ Confluence transforms average setups into high-probability trades. Never enter o
                     {
                         "title": "Order Blocks and Institutional Levels",
                         "content": """## Quick Definition
-
-**Order Blocks (OB)** are the last opposing candle before a strong impulsive move, representing where institutions accumulated or distributed positions. They act as magnets for future price action.
-
----
-
-## Concept Explanation
-
-### Types of Order Blocks
-
-**Bullish Order Block:**
-*   Last bearish candle before a strong bullish move
-*   Acts as support when price returns
-*   Often formed at market structure shifts
-
-**Bearish Order Block:**
-*   Last bullish candle before a strong bearish move
-*   Acts as resistance when price returns
-*   Validated by a Break of Structure (BOS)
-
-### Key Characteristics
-
-*   **Displacement** — Strong impulsive move away from the OB
-*   **Mitigation** — Price returns to OB to fill remaining institutional orders
-*   **Break of Structure** — Confirms directional intent before the OB forms
-
----
-
-## Step-by-Step Breakdown
-
-1.  Identify a clear impulse move (displacement)
-2.  Mark the last opposing candle — that is the Order Block
-3.  Wait for price to return to the OB zone
-4.  Confirm with a lower timeframe structure break
-5.  Enter with stop beyond the OB extreme
-6.  Target the next liquidity pool or swing high/low
-
----
-
-## Real Trading Example
-
-**EUR/USD Bullish Order Block:**
-*   Impulse: Strong bullish move from 1.0700 to 1.0850
-*   OB: Last bearish candle before impulse (1.0720-1.0735)
-*   Return: Price retraces to OB zone 5 days later
-*   Confirmation: 15m bullish engulfing at OB
-*   Entry: 1.0730 | Stop: 1.0705 (25 pips) | Target: 1.0820 (90 pips)
-*   Result: 3.6 R:R, target hit in 2 days
-
----
-
-## 📊 Chart Example
-
-<svg class="ac-svg-diagram" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="480" height="200" fill="#0d1117" rx="8"/>
-  <text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">Bullish Order Block — EUR/USD</text>
-  <rect x="80" y="120" width="30" height="40" fill="rgba(239,68,68,0.5)" stroke="#f87171" rx="2"/>
-  <text x="95" y="172" text-anchor="middle" fill="#f87171" font-size="9">OB</text>
-  <line x1="110" y1="135" x2="280" y2="55" stroke="#34d399" stroke-width="2.5"/>
-  <text x="200" y="82" text-anchor="middle" fill="#34d399" font-size="10">Displacement</text>
-  <path d="M 310 55 Q 340 100 300 130 Q 270 145 95 130" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="5" fill="none"/>
-  <text x="360" y="90" fill="#60a5fa" font-size="9">Return to OB</text>
-  <circle cx="95" cy="130" r="7" fill="none" stroke="#fbbf24" stroke-width="2"/>
-  <text x="95" y="190" text-anchor="middle" fill="#fbbf24" font-size="9">Entry Zone</text>
-  <text x="240" y="198" text-anchor="middle" fill="#6b7280" font-size="8">Last bearish candle before impulse = Order Block</text>
-</svg>
-
----
-
-## 🚫 Common Beginner Mistake
-
-**Marking Every Candle**: Drawing boxes around every pullback. Not every candle is a valid OB. Valid OBs require clear displacement and a Break of Structure. Focus on significant swing points only.
-
----
-
-## 💡 Pro Tip
-
-**The 50% Entry**: Institutions leave unfilled orders at OBs. The best entries are at the 50% of the OB body where most institutional orders remain unexecuted. Use a limit order at the midpoint.
-
----
-
-## Key Takeaway
-
-Order blocks reveal institutional footprints. Valid OBs need displacement and structure breaks. Price returns to OBs to fill institutional orders. Enter on the return with lower-timeframe confirmation.""",
+    
+    der Blocks (OB)** are the last opposing candle before a strong impulsive move, representing where institutions accumulated or distributed positions. They act as magnets for future price action.
+    
+    
+    
+    oncept Explanation
+    
+    Types of Order Blocks
+    
+    llish Order Block**:
+    Last bearish candle before strong bullish move
+    Acts as support when price returns
+    Often formed at market structure shifts
+    
+    arish Order Block**:
+    Last bullish candle before strong bearish move
+    Acts as resistance when price returns
+    Validated by Break of Structure (BOS)
+    
+    Key Characteristics
+    **Displacement**: Strong impulsive move away from OB
+    **Mitigation**: Price returns to OB to fill remaining orders
+    **Break of Structure**: Confirms directional intent
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    ading Order Blocks**:
+    Identify clear impulse move (displacement)
+    Mark the last opposing candle (the OB)
+    Wait for price to return to OB zone
+    Confirm with lower timeframe structure break
+    Enter with stop beyond OB extreme
+    Target next liquidity pool or extension
+    
+    
+    
+    eal Trading Example
+    
+    R/USD Bullish Order Block** (April 2024):
+    **Impulse**: Strong bullish move from 1.0700 → 1.0850
+    **OB**: Last bearish candle before impulse (1.0720-1.0735)
+    **Return**: Price retraces to OB zone 5 days later
+    **Confirmation**: 15m bullish engulfing at OB
+    Entry: 1.0730
+    Stop: 1.0705 (25 pips)
+    Target: 1.0820 (90 pips)
+    Result: 3.6 R:R, target hit in 2 days
+    
+     class="ac-svg-diagram" viewBox="0 0 400 200">
+    ect x="100" y="120" width="40" height="30" fill="#ef4444" opacity="0.6" rx="3"/>
+    ext x="120" y="140" text-anchor="middle" fill="white" font-size="10">OB</text>
+    ine x1="140" y1="135" x2="280" y2="60" stroke="#22c55e" stroke-width="3"/>
+    ext x="210" y="90" text-anchor="middle" fill="#22c55e" font-size="12">Displacement</text>
+    ath d="M 300 60 Q 320 100 280 120" stroke="#60a5fa" stroke-width="2" stroke-dasharray="5,5"/>
+    ext x="320" y="90" fill="#60a5fa" font-size="10">Return to OB</text>
+    ircle cx="120" cy="120" r="8" fill="none" stroke="#f59e0b" stroke-width="2"/>
+    ext x="120" y="175" text-anchor="middle" fill="#f59e0b" font-size="10">Entry Zone</text>
+    g>
+    
+    
+    
+     Chart Example
+    
+    der Blocks](/static/charts/order_block_example.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    rking Every Candle**: Drawing boxes around every pullback candle. Not every consolidation is an order block. Valid OBs require clear displacement and Break of Structure. Focus on significant swing points only.
+    
+    
+    
+     Pro Tip
+    
+     Mitigation Concept**: Institutions leave unfilled orders at OBs. When price returns, these orders get filled, creating the reaction. The best entries are at the 50% of the OB body—where most institutional orders remain unexecuted.
+    
+    
+    
+    ey Takeaway
+    
+    r blocks reveal institutional footprints. Valid OBs show displacement and structure breaks. Price returns to OBs to mitigate (fill) remaining orders. Trade the return with confirmation for high-probability entries.
+    
+    
+    
+    ractice Question
+    
+     validates an order block?""",
                         "quiz": [
                             {"question": "Order Block definition?", "option_a": "Any consolidation", "option_b": "Last opposing candle before displacement", "option_c": "Breakout candle", "option_d": "Random price level", "correct_answer": "B", "explanation": "OB is the last opposing candle before strong impulsive move.", "topic_slug": "market_structure"},
                             {"question": "OB validation requires?", "option_a": "Slow movement", "option_b": "Displacement and structure break", "option_c": "Range-bound price", "option_d": "High volume only", "correct_answer": "B", "explanation": "Valid OBs require strong displacement away and Break of Structure.", "topic_slug": "market_structure"},
-                            {"question": "Best entry in OB zone?", "option_a": "Top of OB", "option_b": "50% of OB body", "option_c": "Bottom of OB", "option_d": "Anywhere in zone", "correct_answer": "B", "explanation": "50% of OB body typically has most unfilled institutional orders.", "topic_slug": "market_structure"}
-                        ]
+                            {"question": "Best entry in OB zone?", "option_a": "Top of OB", "option_b": "50% of OB body", "option_c": "Bottom of OB", "option_d": "Anywhere in zone", "correct_answer": "B", "explanation": "50% of OB body typically has most unfilled institutional orders.", "topic_slug": "market_structure"},
+                                {"question": 'What validates a bearish order block?', "option_a": 'Three consecutive green candles', "option_b": 'A Break of Structure and strong displacement down from the OB', "option_c": 'Price is at round number', "option_d": 'RSI is overbought', "correct_answer": 'B', "explanation": 'A valid bearish OB needs: (1) a Break of Structure confirming downtrend, and (2) strong displacement (impulsive move) away from the OB. Without these, it is just a candle.', "topic_slug": 'order_blocks'},
+                                {"question": 'The best entry within an order block zone is typically at:', "option_a": 'The extreme wick of the OB candle', "option_b": '50% of the OB body — where most institutional orders remain', "option_c": 'The open of the next candle', "option_d": 'The daily high', "correct_answer": 'B', "explanation": 'Institutions left orders at the OB. Most unfilled orders concentrate at the 50% midpoint of the body. Entering there gets the best price with tightest stop.', "topic_slug": 'order_blocks'}]
                     },
                     {
                         "title": "Liquidity and Market Structure",
                         "content": """## Quick Definition
-
-**Liquidity** refers to clusters of stop-loss orders in the market. Institutions need liquidity to fill large orders — they hunt these levels before making their real directional move.
-
----
-
-## Concept Explanation
-
-### Where Liquidity Pools Exist
-
-*   **Above swing highs** — Buy-stop orders from breakout traders and stop-losses from short sellers
-*   **Below swing lows** — Sell-stop orders and stop-losses from long holders
-*   **Equal highs/lows** — Double tops and bottoms attract institutional stop hunting
-*   **Round numbers** — 1.1000, 1.2000 — dense stop-loss clustering
-
-### Types of Liquidity
-
-*   **Buy-side liquidity (BSL)** — Above highs where stops are clustered
-*   **Sell-side liquidity (SSL)** — Below lows where stops are clustered
-*   **Inducement** — A fake breakout to grab liquidity before the real move
-
----
-
-## Step-by-Step Breakdown
-
-1.  Mark all recent swing highs and lows — these are liquidity pools
-2.  Note equal highs or equal lows — prime targets for stop hunts
-3.  Watch for the sweep — price breaks the level briefly, then reverses fast
-4.  Enter after the sweep — the reversal after a liquidity grab is the trade
-5.  Place stop below the swept low (or above swept high)
-6.  Target the opposing liquidity pool
-
----
-
-## Real Trading Example
-
-**GBP/USD Liquidity Sweep:**
-*   Three equal lows at 1.2600 forming a sell-side liquidity pool
-*   Price spikes below to 1.2585, sweeping stops
-*   Immediate recovery back above 1.2600 — bullish rejection
-*   Entry: 1.2605 | Stop: 1.2580 | Target: 1.2720
-*   Result: 4.6 R:R — the classic stop hunt and reverse
-
----
-
-## 💡 Pro Tip
-
-**Do not be the liquidity** — Most retail traders place stops at obvious levels just below support. Institutions know this. Place stops at less obvious locations — below the wick, not the candle body.
-
----
-
-## Key Takeaway
-
-Markets move from liquidity pool to liquidity pool. Smart money sweeps stops before reversing. Understanding liquidity turns painful stop hunts into recognisable and profitable entry signals.""",
+    
+    quidity** refers to pools of orders (stop losses, breakout traders) that institutions target before major moves. **Market Structure** tracks highs and lows to determine trend direction and institutional intent.
+    
+    
+    
+    oncept Explanation
+    
+    Types of Liquidity
+    
+    y-Side Liquidity (BSL)**:
+    Cluster of buy stops above swing highs
+    Targets of breakout traders
+    Institutions sell into these pools
+    
+    ll-Side Liquidity (SSL)**:
+    Cluster of sell stops below swing lows
+    Targets of breakdown traders
+    Institutions buy from these pools
+    
+    Market Structure Shifts
+    
+    eak of Structure (BOS)**:
+    Price breaks previous high/low with momentum
+    Confirms trend continuation
+    Indicates institutional commitment
+    
+    ange of Character (CHoCH)**:
+    First sign of trend reversal
+    Breaks structure in opposite direction
+    Indicates institutional shift in bias
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    e AMD (Accumulation-Manipulation-Distribution) Cycle**:
+    **Accumulation**: Institutions build positions in range
+    **Manipulation**: Price sweeps liquidity (stops) to trap retail
+    **Distribution**: True move in institutional direction
+    **Mark**: OBs and Fair Value Gaps form during distribution
+    
+    
+    
+    eal Trading Example
+    
+    P/JPY Liquidity Sweep** (March 2024):
+    **Setup**: Price near 188.00 with swing highs at 188.50
+    **Accumulation**: Consolidation 187.80-188.20
+    **Manipulation**: Spike to 188.60 (sweeps BSL above 188.50)
+    **Distribution**: Sharp rejection back below 188.00
+    **Entry**: Break below 188.00 after sweep
+    Stop: 188.70 (above manipulation high)
+    Target: 186.50 (next SSL pool)
+    Result: 150-pip move captured
+    
+    
+    
+     Chart Example
+    
+    quidity Sweep](/static/charts/liquidity_sweep_example.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    ading the Sweep**: Entering when price breaks a level without waiting for manipulation completion. Retail traders get swept out at highs/lows while institutions enter on the reversal. Wait for the sweep + rejection.
+    
+    
+    
+     Pro Tip
+    
+    e Liquidity Magnet**: Price is drawn to liquidity pools like a magnet. Before any major move, price typically sweeps the nearest liquidity (taking out stops), then reverses in the true direction. Never place stops at obvious levels—they will be swept.
+    
+    
+    
+    ey Takeaway
+    
+    ets move to harvest liquidity. Institutions sweep retail stops before true moves. Understanding BOS and CHoCH reveals institutional intent. Wait for liquidity sweeps before entering—don't be the liquidity being harvested.
+    
+    
+    
+    ractice Question
+    
+     typically happens before a major trend reversal?""",
                         "quiz": [
                             {"question": "Buy-Side Liquidity (BSL) is found?", "option_a": "Below swing lows", "option_b": "Above swing highs", "option_c": "At moving averages", "option_d": "In the middle of ranges", "correct_answer": "B", "explanation": "BSL is above swing highs—where breakout traders place stops.", "topic_slug": "market_structure"},
                             {"question": "CHoCH indicates?", "option_a": "Trend continuation", "option_b": "Potential trend reversal", "option_c": "Consolidation", "option_d": "No significance", "correct_answer": "B", "explanation": "Change of Character signals shift in market structure.", "topic_slug": "market_structure"},
-                            {"question": "Liquidity sweep purpose?", "option_a": "Help retail traders", "option_b": "Harvest stops before true move", "option_c": "Random price action", "option_d": "Confirm trend", "correct_answer": "B", "explanation": "Institutions sweep liquidity to fill orders before reversing.", "topic_slug": "market_structure"}
-                        ]
+                            {"question": "Liquidity sweep purpose?", "option_a": "Help retail traders", "option_b": "Harvest stops before true move", "option_c": "Random price action", "option_d": "Confirm trend", "correct_answer": "B", "explanation": "Institutions sweep liquidity to fill orders before reversing.", "topic_slug": "market_structure"},
+                                {"question": 'Equal highs on a chart represent:', "option_a": 'A strong uptrend', "option_b": 'Buy-side liquidity — stop losses of short sellers cluster here', "option_c": 'A consolidation zone to avoid', "option_d": 'End of trend', "correct_answer": 'B', "explanation": 'Equal highs attract institutional players who sweep the stops above them before reversing. These are prime short-selling opportunities after the sweep.', "topic_slug": 'liquidity'},
+                                {"question": 'After a liquidity sweep, the optimal entry is:', "option_a": 'Immediately when price breaks the level', "option_b": 'After price has recovered back above the swept level with confirmation', "option_c": 'On the daily close', "option_d": 'Only when RSI crosses 50', "correct_answer": 'B', "explanation": 'Wait for the wick to form AND price to recover above the swept level. This confirms the stop hunt is complete and direction has reversed. Entering too early risks being the liquidity.', "topic_slug": 'liquidity'}]
                     }
                 ]
             },
@@ -1825,116 +1930,221 @@ Markets move from liquidity pool to liquidity pool. Smart money sweeps stops bef
                     {
                         "title": "Expectancy and Profit Factor",
                         "content": """## Quick Definition
-
-**Expectancy** measures the average profit or loss per trade, combining win rate and risk:reward. A positive expectancy means the strategy is profitable over many trades.
-
----
-
-## Concept Explanation
-
-### Expectancy Formula
-
-**Expectancy = (Win Rate x Avg Win) - (Loss Rate x Avg Loss)**
-
-Example with 40% win rate, $150 avg win, $100 avg loss:
-*   (0.40 x $150) - (0.60 x $100) = $60 - $60 = break-even
-
-### Profit Factor
-
-**Profit Factor = Total Gross Profit divided by Total Gross Loss**
-
-*   Above 1.5 — Good trading system
-*   Above 2.0 — Excellent trading system
-*   Below 1.0 — Losing system
-
-### Win Rate vs R:R Reality
-
-A 35% win rate with 3:1 R:R is more profitable than a 65% win rate with 0.5:1 R:R. Win rate alone means nothing without knowing the R:R.
-
----
-
-## Step-by-Step Breakdown
-
-1.  Track every trade — win/loss, entry, exit, P&L in pips and dollars
-2.  Calculate after 50 or more trades — smaller samples are misleading
-3.  Compute expectancy using the formula above
-4.  Calculate profit factor — total wins divided by total losses
-5.  Adjust if needed — improve R:R or tighten entry criteria
-6.  Review monthly — markets change and edges can degrade over time
-
----
-
-## 💡 Pro Tip
-
-**The 35% Win Rate Reality**: You can be consistently profitable with only a 35% win rate if your average winner is 3x your average loser. Focus on R:R quality, not on being right more often.
-
----
-
-## Key Takeaway
-
-Expectancy and profit factor define whether your system makes money long-term. Track your trades obsessively. The math never lies — if expectancy is negative, fix the system before going live.""",
+    
+    pectancy** measures the average profit/loss per trade over time—your true edge. **Profit Factor** compares total gains to total losses. These metrics determine if your system is profitable and sustainable.
+    
+    
+    
+    oncept Explanation
+    
+    Expectancy Formula
+    pectancy = (Win Rate × Avg Win) – (Loss Rate × Avg Loss)**
+    
+    ple:
+    Win Rate: 45%
+    Avg Win: 2.5R
+    Loss Rate: 55%
+    Avg Loss: 1R
+    Expectancy: (0.45 × 2.5) – (0.55 × 1) = 1.125 – 0.55 = **+0.575R per trade**
+    
+    Profit Factor
+    ofit Factor = Gross Profit / Gross Loss**
+    
+    1.0+ = Breakeven
+    1.3+ = Acceptable
+    1.5+ = Good
+    2.0+ = Excellent
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    lculating Your Edge**:
+    Track minimum 100 trades for statistical significance
+    Calculate win rate (wins / total trades)
+    Calculate average win in R-multiples
+    Calculate average loss in R-multiples
+    Apply expectancy formula
+    Positive expectancy = tradable edge
+    Negative expectancy = broken system or execution issues
+    
+    
+    
+    eal Trading Example
+    
+    ader A vs Trader B (100 trades each)**:
+    
+    ader A**:
+    Win Rate: 65%
+    Avg Win: 1.2R
+    Avg Loss: 1R
+    Expectancy: (0.65 × 1.2) – (0.35 × 1) = 0.78 – 0.35 = **+0.43R**
+    
+    ader B**:
+    Win Rate: 40%
+    Avg Win: 3R
+    Avg Loss: 1R
+    Expectancy: (0.40 × 3) – (0.60 × 1) = 1.2 – 0.6 = **+0.60R**
+    
+    sult**: Trader B makes more despite lower win rate due to better R:R!
+    
+     class="ac-svg-diagram" viewBox="0 0 400 150">
+    ect x="20" y="30" width="170" height="90" fill="rgba(96,165,250,0.2)" stroke="#60a5fa" rx="5"/>
+    ext x="105" y="55" text-anchor="middle" fill="#60a5fa" font-size="14">Trader A</text>
+    ext x="105" y="75" text-anchor="middle" fill="#9ca3af" font-size="12">65% Win Rate</text>
+    ext x="105" y="95" text-anchor="middle" fill="#9ca3af" font-size="12">1.2:1 R:R</text>
+    ext x="105" y="115" text-anchor="middle" fill="#22c55e" font-size="12">+0.43R</text>
+    
+    ect x="210" y="30" width="170" height="90" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" rx="5"/>
+    ext x="295" y="55" text-anchor="middle" fill="#f59e0b" font-size="14">Trader B</text>
+    ext x="295" y="75" text-anchor="middle" fill="#9ca3af" font-size="12">40% Win Rate</text>
+    ext x="295" y="95" text-anchor="middle" fill="#9ca3af" font-size="12">3:1 R:R</text>
+    ext x="295" y="115" text-anchor="middle" fill="#22c55e" font-size="12">+0.60R</text>
+    g>
+    
+    
+    
+     Chart Example
+    
+    pectancy](/static/charts/expectancy_calculation_example.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    cusing on Win Rate Alone**: A 70% win rate seems impressive, but if average win is 0.8R and average loss is 1.5R, the system loses money. Expectancy combines win rate AND R-multiples. Optimize for positive expectancy, not win rate.
+    
+    
+    
+     Pro Tip
+    
+    e R-Multiple Focus**: Track all trades in R-multiples (units of risk), not dollars. This normalizes results regardless of account size. A 2R win is always twice your risk—easy to compare across different position sizes.
+    
+    
+    
+    ey Takeaway
+    
+    ctancy is your true edge. Positive expectancy = profitable system over time. Win rate alone is meaningless—R-multiples matter more. Track minimum 100 trades before judging a system. Profit factor > 1.5 indicates good system health.
+    
+    
+    
+    ractice Question
+    
+    er has 50% win rate, 2:1 average R:R. Expectancy per trade?""",
                         "quiz": [
                             {"question": "Expectancy formula components?", "option_a": "Only win rate", "option_b": "Win rate and R-multiples", "option_c": "Only profit factor", "option_d": "Only drawdown", "correct_answer": "B", "explanation": "Expectancy = (Win Rate × Avg Win) – (Loss Rate × Avg Loss).", "topic_slug": "advanced_risk"},
                             {"question": "Good profit factor threshold?", "option_a": "0.5", "option_b": "1.0", "option_c": "1.5+", "option_d": "3.0", "correct_answer": "C", "explanation": "Profit factor above 1.5 indicates healthy system performance.", "topic_slug": "advanced_risk"},
-                            {"question": "50% win rate, 2:1 R:R expectancy?", "option_a": "0R", "option_b": "+0.5R", "option_c": "+1.0R", "option_d": "+1.5R", "correct_answer": "B", "explanation": "(0.5 × 2) – (0.5 × 1) = 1 – 0.5 = +0.5R per trade.", "topic_slug": "advanced_risk"}
-                        ]
+                            {"question": "50% win rate, 2:1 R:R expectancy?", "option_a": "0R", "option_b": "+0.5R", "option_c": "+1.0R", "option_d": "+1.5R", "correct_answer": "B", "explanation": "(0.5 × 2) – (0.5 × 1) = 1 – 0.5 = +0.5R per trade.", "topic_slug": "advanced_risk"},
+                                {"question": 'A system with 40% win rate and 2.5:1 R:R has what expectancy per $100 risk?', "option_a": '-$10', "option_b": '$25', "option_c": '+$40', "option_d": '$0', "correct_answer": 'C', "explanation": '(0.40 × $250) − (0.60 × $100) = $100 − $60 = $40 profit per trade on average. Win rate is irrelevant without knowing the R:R.', "topic_slug": 'expectancy'},
+                                {"question": 'Profit factor of 1.8 means:', "option_a": 'You win 80% of trades', "option_b": 'For every $1 lost you make $1.80 gross profit', "option_c": 'Account grows 80% per month', "option_d": 'Risk is 1.8% per trade', "correct_answer": 'B', "explanation": 'Profit factor = gross wins ÷ gross losses. PF of 1.8 means the system generates $1.80 for every $1.00 lost. Above 1.5 is considered a good system.', "topic_slug": 'expectancy'}]
                     },
                     {
                         "title": "Portfolio Heat and Correlation",
                         "content": """## Quick Definition
-
-**Portfolio heat** is the total percentage of your account at risk across all open trades simultaneously. **Correlation** measures how similarly two pairs move — trading correlated pairs multiplies your real risk without you realising it.
-
----
-
-## Concept Explanation
-
-### Portfolio Heat Rule
-
-*   Maximum total heat at any time: 5-6% of account
-*   If risking 1% per trade, maximum 5-6 simultaneous open trades
-*   Exceeding this means one bad news event can cause severe account drawdown
-
-### Currency Correlation Examples
-
-**Positively Correlated (move in the same direction):**
-*   EUR/USD and GBP/USD — approximately 85% correlated
-*   EUR/USD and AUD/USD — approximately 75% correlated
-
-**Negatively Correlated (move in opposite directions):**
-*   EUR/USD and USD/CHF — approximately -90% correlated
-*   EUR/USD and USD/JPY — approximately -60% correlated
-
-### The Hidden Risk Trap
-
-Buying EUR/USD AND GBP/USD simultaneously is effectively doubling your EUR position. If USD strengthens, both trades lose at the same time.
-
----
-
-## Step-by-Step Breakdown
-
-1.  List all open positions and their individual risk percentages
-2.  Sum total risk — it must stay below 5-6% at all times
-3.  Check correlations — avoid trading same-direction correlated pairs at full size
-4.  If trading correlated pairs, halve each position size to maintain real risk
-5.  Monitor total heat daily, especially before major news events
-
----
-
-## 💡 Pro Tip
-
-**News Event Risk**: During FOMC, NFP, or major central bank events, all correlated pairs move violently together. Close one leg of correlated pairs before these events to avoid double losses.
-
----
-
-## Key Takeaway
-
-Controlling portfolio heat and understanding correlation separates professional risk management from amateur trading. One event can destroy multiple positions simultaneously if correlation is ignored.""",
+    
+    rtfolio Heat** is total exposed risk across all open positions. **Correlation** measures how similarly different pairs move. Managing both prevents catastrophic drawdowns when markets move together.
+    
+    
+    
+    oncept Explanation
+    
+    Portfolio Heat Calculation
+    tal Heat = Sum of all position risks**
+    
+    ple:
+    Position 1: 2% risk
+    Position 2: 2% risk
+    Position 3: 1% risk
+    **Total Heat**: 5%
+    
+    essional limits:
+    Retail traders: Maximum 6-8% heat
+    Professional traders: Maximum 3-5% heat
+    
+    Correlation Risk
+    
+    ghly Correlated Pairs** (>0.80):
+    EUR/USD and GBP/USD
+    AUD/USD and NZD/USD
+    Gold (XAU/USD) and EUR/USD (often)
+    
+    fect**: Trading correlated pairs = doubling risk on same move
+    
+    Diversification Score
+    
+    tup | Correlation | Adjusted Risk |
+    ----|-------------|---------------|
+    R/USD only | N/A | 2% |
+    R/USD + GBP/USD | 0.90 | Effectively 3.8% |
+    R/USD + USD/JPY | 0.20 | Effectively 2.2% |
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    naging Portfolio Risk**:
+    Calculate individual position risk (1-2%)
+    Check correlation between all open positions
+    Adjust for correlation:
+    *   >0.80 correlation: Reduce each position by 50%
+    *   0.50-0.80: Reduce by 25%
+    Sum total portfolio heat
+    Ensure total heat < 6% (retail) or < 3% (pro)
+    Monitor heat daily; reduce if approaching limits
+    
+    
+    
+    eal Trading Example
+    
+    rtfolio Heat Mistake** (April 2024):
+    **Trader**: Long EUR/USD (2% risk), Long GBP/USD (2% risk), Long AUD/USD (2% risk)
+    **Correlation**: All positively correlated (~0.85)
+    **Effective Heat**: 5.1% (not 6%)
+    **USD News**: Strong NFP triggers USD rally
+    **Result**: All positions hit stops simultaneously
+    **Loss**: -5.1% in 1 hour (not acceptable -6%)
+    **Lesson**: Correlated positions compound risk
+    
+    
+    
+     Chart Example
+    
+    rrelation](/static/charts/correlation_matrix_example.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    rrelated Portfolio**: Taking 3 long positions on EUR/USD, GBP/USD, and AUD/USD simultaneously. These move together 85%+ of the time. A USD strengthening event hits all three stops at once. Diversify across uncorrelated pairs or reduce size per correlated trade.
+    
+    
+    
+     Pro Tip
+    
+    e Correlation Rotation**: Maintain a watchlist of 3 uncorrelated groups:
+    Group 1: EUR pairs (EUR/USD, EUR/JPY)
+    Group 2: USD/Commodity pairs (USD/CAD, USD/NOK)
+    Group 3: Safe havens (USD/JPY, USD/CHF)
+    
+    r have more than 1 position per group simultaneously.
+    
+    
+    
+    ey Takeaway
+    
+    folio heat management prevents catastrophic correlated losses. Maximum 6% total risk for retail traders. Highly correlated pairs should be treated as one position. True diversification requires uncorrelated markets.
+    
+    
+    
+    ractice Question
+    
+    trade EUR/USD and GBP/USD (0.90 correlation) with 2% each. Effective heat?""",
                         "quiz": [
                             {"question": "Portfolio heat definition?", "option_a": "Account balance", "option_b": "Total risk across all positions", "option_c": "Number of trades", "option_d": "Win rate", "correct_answer": "B", "explanation": "Heat = sum of all active position risks.", "topic_slug": "advanced_risk"},
                             {"question": "Maximum recommended heat for retail?", "option_a": "15%", "option_b": "6-8%", "option_c": "20%", "option_d": "2%", "correct_answer": "B", "explanation": "Retail traders should limit total portfolio heat to 6-8%.", "topic_slug": "advanced_risk"},
-                            {"question": "EUR/USD and GBP/USD correlation?", "option_a": "None", "option_b": "Negative", "option_c": "High positive (~0.90)", "option_d": "Random", "correct_answer": "C", "explanation": "These pairs are highly correlated—trading both doubles exposure.", "topic_slug": "advanced_risk"}
-                        ]
+                            {"question": "EUR/USD and GBP/USD correlation?", "option_a": "None", "option_b": "Negative", "option_c": "High positive (~0.90)", "option_d": "Random", "correct_answer": "C", "explanation": "These pairs are highly correlated—trading both doubles exposure.", "topic_slug": "advanced_risk"},
+                                {"question": 'You buy EUR/USD and GBP/USD simultaneously. Your actual USD exposure is:', "option_a": 'Split 50/50 between EUR and GBP', "option_b": 'Doubled — both positions move against you if USD strengthens', "option_c": 'Hedged because different base currencies', "option_d": 'Reduced because pairs are different', "correct_answer": 'B', "explanation": 'EUR/USD and GBP/USD are ~85% correlated. Both fall when USD strengthens. Two 1% risk trades on correlated pairs = effective 2% risk — doubling your actual exposure.', "topic_slug": 'correlation'},
+                                {"question": 'Maximum recommended total portfolio heat at any time?', "option_a": '20%', "option_b": '10%', "option_c": '5-6%', "option_d": '50%', "correct_answer": 'C', "explanation": 'Total open risk across all positions should not exceed 5-6%. At 1% risk per trade this means maximum 5-6 simultaneous positions. One major event cannot destroy the account.', "topic_slug": 'correlation'}]
                     }
                 ]
             },
@@ -1945,111 +2155,211 @@ Controlling portfolio heat and understanding correlation separates professional 
                     {
                         "title": "Backtesting Your Strategy",
                         "content": """## Quick Definition
-
-**Backtesting** is testing your trading strategy against historical data to evaluate performance before risking real money. It proves whether your edge is statistically real or just a recent coincidence.
-
----
-
-## Concept Explanation
-
-### Manual vs Automated Backtesting
-
-**Manual Backtesting:**
-*   Scroll back through charts and mark trades by hand
-*   More time-consuming but builds deeper chart reading skills
-*   Use TradingView replay mode for realistic simulation
-
-**Automated Backtesting:**
-*   Software tests rules-based systems on years of historical data
-*   Faster but requires precise, quantifiable rule definition
-*   Tools: MetaTrader Strategy Tester, Python with pandas
-
-### Key Metrics to Track
-
-*   **Win rate** — Percentage of profitable trades
-*   **Profit factor** — Gross profit divided by gross loss (target above 1.5)
-*   **Maximum drawdown** — Largest peak-to-trough equity decline
-*   **Expectancy** — Average profit per trade in dollars or R
-*   **Number of trades** — Minimum 200 for statistical significance
-
----
-
-## Step-by-Step Breakdown
-
-1.  Define exact entry and exit rules — every condition must be specific
-2.  Select at least 2 years of historical data
-3.  Record every qualifying trade in a spreadsheet with screenshot
-4.  Calculate all key metrics after completing the test
-5.  Analyse losing streaks — what market conditions cause them?
-6.  Refine rules based on data and re-test — avoid over-optimising
-
----
-
-## 💡 Pro Tip
-
-**Forward Test Before Going Live**: After backtesting shows positive results, paper trade for 1-2 months to confirm the edge holds in current market conditions before risking real capital.
-
----
-
-## Key Takeaway
-
-Backtesting builds statistical confidence in your approach. Without it, you are gambling on hope. A strategy showing positive expectancy across 200 or more historical trades has a genuine, measurable edge.""",
+    
+    cktesting** applies trading rules to historical data to measure performance. It validates your edge before risking real capital and reveals whether your system has positive expectancy.
+    
+    
+    
+    oncept Explanation
+    
+    Types of Backtesting
+    
+    nual Backtesting**:
+    Scroll through historical charts bar by bar
+    Apply your rules precisely as written
+    Record every trade outcome
+    Time-consuming but builds intuition
+    
+    tomated Backtesting**:
+    Code strategy in trading platform
+    Run on years of historical data
+    Instant results and statistics
+    Risk of overfitting (curve-fitting)
+    
+    Key Metrics to Track
+    
+    tric | Minimum Target | Notes |
+    -----|---------------|-------|
+    mple Size | 100+ trades | Statistical significance |
+    n Rate | 40%+ | With good R:R can be profitable |
+    ofit Factor | 1.3+ | Gross profit / gross loss |
+    x Drawdown | <20% | Worst peak-to-trough decline |
+    pectancy | >0.2R | Positive edge per trade |
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    nual Backtesting Process**:
+    Define precise entry/exit/stop rules (write them down)
+    Select 2-3 years of historical data
+    Start at beginning, scroll candle by candle
+    Mark every valid setup (even if not taking them)
+    Record: Entry, Stop, Target, Outcome (win/loss), R-multiple
+    Complete minimum 100 trades
+    Calculate win rate, expectancy, profit factor
+    If positive expectancy, proceed to demo trading
+    
+    
+    
+    eal Trading Example
+    
+    eakout Strategy Backtest Results** (EUR/USD, 2022-2024):
+    **Sample**: 156 trades over 2 years
+    **Win Rate**: 42.3%
+    **Avg Win**: 2.8R
+    **Avg Loss**: 1R
+    **Expectancy**: (0.423 × 2.8) – (0.577 × 1) = **+0.61R**
+    **Profit Factor**: 1.62
+    **Max Drawdown**: 18.4%
+    **Conclusion**: System has edge—proceed to forward testing
+    
+    
+    
+     Chart Example
+    
+    cktesting](/static/charts/backtesting_equity_curve.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    erry-Picking**: Only recording "perfect" setups and ignoring marginal ones. This inflates results unrealistically. Backtest ALL setups that meet your criteria—even ugly ones. Real trading includes ugly setups.
+    
+    
+    
+     Pro Tip
+    
+    e Blind Backtest**: Have someone else backtest your rules without knowing your preferred pairs or timeframes. If results are positive on multiple pairs/timeframes, your edge is robust (not curve-fitted).
+    
+    
+    
+    ey Takeaway
+    
+    testing proves your edge exists historically. Minimum 100 trades for statistical validity. Track expectancy, not just win rate. If backtest fails, system is broken—don't trade it live. Walk-forward testing validates backtest results.
+    
+    
+    
+    ractice Question
+    
+    mum sample size for statistically valid backtest?""",
                         "quiz": [
                             {"question": "Backtesting purpose?", "option_a": "Predict exact prices", "option_b": "Validate edge historically", "option_c": "Replace live trading", "option_d": "Eliminate risk", "correct_answer": "B", "explanation": "Backtesting validates whether your system has positive expectancy.", "topic_slug": "system_development"},
                             {"question": "Minimum trades for valid backtest?", "option_a": "10", "option_b": "50", "option_c": "100+", "option_d": "1000", "correct_answer": "C", "explanation": "Minimum 100 trades for statistical significance.", "topic_slug": "system_development"},
-                            {"question": "Danger of automated backtesting?", "option_a": "Too slow", "option_b": "Overfitting (curve-fitting)", "option_c": "No data available", "option_d": "Too expensive", "correct_answer": "B", "explanation": "Automated tests can overfit to past data—failing in live markets.", "topic_slug": "system_development"}
-                        ]
+                            {"question": "Danger of automated backtesting?", "option_a": "Too slow", "option_b": "Overfitting (curve-fitting)", "option_c": "No data available", "option_d": "Too expensive", "correct_answer": "B", "explanation": "Automated tests can overfit to past data—failing in live markets.", "topic_slug": "system_development"},
+                                {"question": 'How many historical trades minimum for statistically valid backtest results?', "option_a": '10', "option_b": '50', "option_c": '200+', "option_d": '1,000+', "correct_answer": 'C', "explanation": '200+ trades gives statistical significance. Fewer trades may show a profitable system that is just luck. More data = more reliable edge measurement.', "topic_slug": 'backtesting'},
+                                {"question": 'Over-optimisation (curve fitting) in backtesting means:', "option_a": 'The strategy works on all markets', "option_b": 'Rules were tweaked to fit historical data perfectly — will likely fail live', "option_c": 'Profits are maximised in all conditions', "option_d": 'Strategy runs faster on the computer', "correct_answer": 'B', "explanation": 'Over-optimised strategies are tailored too precisely to past data. They fail on new data because markets change. Robust strategies work across different market conditions with simple rules.', "topic_slug": 'backtesting'}]
                     },
                     {
                         "title": "Creating Your Trading System",
                         "content": """## Quick Definition
-
-A **trading system** is a complete, rules-based framework specifying exactly when to enter, exit, and manage every trade. Removing emotion from execution is the entire purpose.
-
----
-
-## Concept Explanation
-
-### The 10 Components of a Complete System
-
-1.  **Market selection** — Which pairs to trade and which to avoid
-2.  **Timeframe** — Higher timeframe for analysis, lower for entry
-3.  **Trend filter** — Direction requirement before any trade
-4.  **Setup criteria** — What structure or pattern must be present
-5.  **Entry trigger** — The exact condition that fires your entry
-6.  **Stop loss rule** — Where the stop goes and why
-7.  **Take profit rule** — Fixed R:R or structure-based target
-8.  **Position sizing** — Percentage risk per trade
-9.  **Trade management** — Breakeven rules, partial take profit rules
-10. **Session and news filter** — When not to trade
-
----
-
-## Step-by-Step Breakdown
-
-1.  Write every rule explicitly in plain language
-2.  Backtest the complete ruleset on 200 or more historical trades
-3.  Paper trade for 1-2 months to forward-test the rules
-4.  Review performance data and refine based on evidence, not feeling
-5.  Go live with minimum position sizes first
-6.  Review weekly — is the system performing within expected parameters?
-
----
-
-## 💡 Pro Tip
-
-**The One-Sentence Test**: If you cannot explain your entry rule in one clear sentence, it is too complex. Simple systems you can execute consistently under pressure outperform complex systems you second-guess.
-
----
-
-## Key Takeaway
-
-A trading system converts your edge into a repeatable, scalable process. The discipline to follow the system under pressure is worth more than any particular entry technique. Systems create professionals; discretion creates gamblers.""",
+    
+    Trading System** is a complete set of rules covering: setups, entries, exits, risk management, and position sizing. Good systems remove discretion and emotion from trading decisions.
+    
+    
+    
+    oncept Explanation
+    
+    System Components
+    
+     Market Selection**
+    Which pairs/instruments to trade
+    Minimum daily volume requirements
+    Preferred trading sessions
+    
+     Setup Criteria**
+    Precise conditions for valid trade
+    Confluence requirements (minimum factors)
+    Timeframe alignment rules
+    
+     Entry Rules**
+    Specific trigger conditions
+    Order types (market, limit, stop)
+    Confirmation requirements
+    
+     Exit Rules**
+    Stop loss placement (technical vs fixed)
+    Take profit targets (R-multiples)
+    Trailing stop conditions
+    
+     Risk Management**
+    Fixed % risk per trade
+    Maximum daily/weekly loss limits
+    Correlation adjustments
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    ilding Your System**:
+    Choose ONE setup to master (e.g., pin bars at S/R)
+    Write exact entry rules (no ambiguity)
+    Define stop loss rules (always technical)
+    Set minimum R:R (1:2 or better)
+    Fix risk per trade (1-2%)
+    Backtest 100+ trades
+    Paper trade for 20 trades
+    Go live with reduced size (0.5%)
+    Scale up after 50 successful live trades
+    
+    
+    
+    eal Trading Example
+    
+    e "London Breakout" System**:
+    
+    tup**:
+    Asian session range forms (20:00-08:00 UTC)
+    Price near session high or low
+    Minimum range: 30 pips
+    
+    try**:
+    Buy stop 5 pips above Asian high
+    Sell stop 5 pips below Asian low
+    
+    op**: Beyond opposite side of range
+    
+    rget**: 2R minimum
+    
+    sk**: 1% per trade, max 2 trades/day
+    
+    sult**: 38% win rate, 2.4:1 R:R, +0.41R expectancy
+    
+    
+    
+     Chart Example
+    
+    ading System](/static/charts/trading_system_flowchart.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    stem Hopping**: Abandoning a system after 10-20 losses. Even good systems have losing streaks. Backtest results showed 40% win rate—you should EXPECT 6 losses in a row occasionally. Stick to your system through variance.
+    
+    
+    
+     Pro Tip
+    
+    e "One Setup" Rule**: Master ONE setup completely before adding others. Most successful traders use 2-3 setups maximum. Specialization beats diversification in trading. Become the world's best pin bar trader rather than average at 10 patterns.
+    
+    
+    
+    ey Takeaway
+    
+    mplete trading system leaves no decisions to discretion. Every scenario is covered by rules. Backtest before trading live. Paper trade before sizing up. Master one setup before diversifying. Consistency comes from system discipline.
+    
+    
+    
+    ractice Question
+    
+    many setups should a beginner focus on initially?""",
                         "quiz": [
                             {"question": "Most important system component?", "option_a": "Complex indicators", "option_b": "Clear, unambiguous rules", "option_c": "High win rate", "option_d": "Many setups", "correct_answer": "B", "explanation": "Clear rules eliminate discretion and emotion.", "topic_slug": "system_development"},
                             {"question": "Beginner setup recommendation?", "option_a": "Master 10 setups", "option_b": "Master 1 setup first", "option_c": "No setup needed", "option_d": "Use all available patterns", "correct_answer": "B", "explanation": "Master one setup completely before adding complexity.", "topic_slug": "system_development"},
-                            {"question": "Before trading live?", "option_a": "Start immediately", "option_b": "Backtest then paper trade", "option_c": "Skip testing", "option_d": "Use maximum size", "correct_answer": "B", "explanation": "Validate with backtesting, then paper trade before risking capital.", "topic_slug": "system_development"}
-                        ]
+                            {"question": "Before trading live?", "option_a": "Start immediately", "option_b": "Backtest then paper trade", "option_c": "Skip testing", "option_d": "Use maximum size", "correct_answer": "B", "explanation": "Validate with backtesting, then paper trade before risking capital.", "topic_slug": "system_development"},
+                                {"question": 'The simplest test of whether your entry rule is good is:', "option_a": 'It works in all markets', "option_b": 'You can explain it in one sentence', "option_c": 'It uses 3 or more indicators', "option_d": 'It was backtested for 1 month', "correct_answer": 'B', "explanation": 'If you cannot describe your entry in one clear sentence, it is too complex to execute consistently under market pressure. Simplicity = consistency.', "topic_slug": 'trading_system'},
+                                {"question": 'Which component of a trading system is responsible for controlling position size?', "option_a": 'Entry trigger', "option_b": 'Timeframe selection', "option_c": 'Position sizing rule', "option_d": 'Session filter', "correct_answer": 'C', "explanation": 'Position sizing determines how many lots to trade based on account size and stop distance. It controls how much of the account is at risk per trade — the most critical risk control.', "topic_slug": 'trading_system'}]
                     }
                 ]
             },
@@ -2060,105 +2370,236 @@ A trading system converts your edge into a repeatable, scalable process. The dis
                     {
                         "title": "Creating Your Trading Plan",
                         "content": """## Quick Definition
-
-A **trading plan** is your personal operating manual — covering goals, risk parameters, psychology rules, and review processes. It is the difference between treating trading as a business versus gambling.
-
----
-
-## Concept Explanation
-
-### Trading System vs Trading Plan
-
-*   **Trading system** — The technical rules: when to enter and exit
-*   **Trading plan** — The business framework: how you operate as a trader
-
-### Core Sections of a Trading Plan
-
-1.  **Goals** — Monthly return target and maximum acceptable drawdown
-2.  **Risk parameters** — Max risk per trade, max daily loss, max weekly loss
-3.  **Trading hours** — Which sessions and days you will trade
-4.  **Pre-trade checklist** — Steps required before entering any position
-5.  **Post-trade review** — What to record and analyse after each trade
-6.  **Psychology rules** — What to do during and after a losing streak
-7.  **Monthly review** — Which performance metrics to evaluate
-
-### Example Non-Negotiable Rules
-
-*   Stop trading after 3 consecutive losses in one session
-*   Never risk more than 2% of account on one trade
-*   Never trade 30 minutes before major scheduled news
-*   Always place stop loss before entering a position
-*   Review trading journal every Sunday before the new week
-
----
-
-## 💡 Pro Tip
-
-**The Circuit Breaker**: Define in advance the conditions that trigger a trading halt. If you lose 4% in one day, close everything and do not trade for 24 hours. This single rule prevents account destruction during emotional states.
-
----
-
-## Key Takeaway
-
-Most traders fail not because their system is bad but because they abandon it under pressure. A written trading plan creates accountability and consistency. Review it weekly and hold yourself to it like a professional contract.""",
+    
+    Trading Plan** is your complete business blueprint covering goals, strategies, routines, and review processes. It transforms trading from gambling into a structured business operation.
+    
+    
+    
+    oncept Explanation
+    
+    Trading Plan Components
+    
+    ction 1: Goals and Objectives**
+    Monthly/Yearly return targets (realistic: 3-5% monthly)
+    Maximum acceptable drawdown (15-20%)
+    Timeline to profitability (6-12 months)
+    Account growth milestones
+    
+    ction 2: Trading Strategy**
+    Specific setups you will trade
+    Entry/exit rules (exact criteria)
+    Risk per trade (1-2%)
+    Maximum trades per day/week
+    
+    ction 3: Risk Management**
+    Daily loss limit (e.g., 3%)
+    Weekly loss limit (e.g., 6%)
+    Correlation rules
+    Portfolio heat maximum (6%)
+    
+    ction 4: Routine and Schedule**
+    Pre-market preparation time
+    Active trading hours
+    Post-market review time
+    Weekend analysis time
+    
+    ction 5: Review Process**
+    Weekly performance review
+    Monthly deep analysis
+    Quarterly strategy evaluation
+    Annual goal reassessment
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    iting Your Plan**:
+    Document your complete trading system
+    Set realistic 6-month and 1-year goals
+    Define daily routine (pre, during, post market)
+    Create risk limits and circuit breakers
+    Establish review schedule
+    Print and sign the plan (commitment)
+    Review weekly—track adherence
+    Update quarterly if needed
+    
+    
+    
+    eal Trading Example
+    
+    ofessional Trading Plan Snapshot**:
+    
+    als**:
+    Monthly target: 4% return
+    Max drawdown: 15%
+    12-month goal: 60% account growth
+    
+    rategy**:
+    Primary: Breakout system (H4)
+    Secondary: Pin bar reversals (Daily)
+    Risk: 1.5% per trade
+    
+    sk Limits**:
+    Daily max loss: 3%
+    Weekly max loss: 6%
+    Consecutive losses: Stop after 3
+    
+    utine**:
+    Pre-market: 7:00-8:00 UTC (analysis)
+    Trading: 8:00-12:00 UTC only
+    Review: 20:00 UTC daily
+    
+    sult**: 90% plan adherence = consistent profitability
+    
+    
+    
+     Chart Example
+    
+    ading Plan](/static/charts/trading_plan_template.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    e Mental Plan**: Having a "rough idea" but nothing written down. Written plans are 3x more likely to be followed. Write it, print it, post it by your monitor. Vague plans produce vague results.
+    
+    
+    
+     Pro Tip
+    
+    e Signature Rule**: Print your trading plan, sign it, and post it by your trading station. The physical act of signing creates psychological commitment. Refer to it when tempted to break rules.
+    
+    
+    
+    ey Takeaway
+    
+     trading plan is your business plan. It covers every aspect of your trading operation. Write it down. Review it weekly. Update it quarterly. Follow it religiously. Traders with written plans outperform those without by 3:1.
+    
+    
+    
+    ractice Question
+    
+    often should you review your trading plan performance?""",
                         "quiz": [
                             {"question": "Trading plan purpose?", "option_a": "Predict prices", "option_b": "Structure trading as business", "option_c": "Replace analysis", "option_d": "Guarantee profits", "correct_answer": "B", "explanation": "A trading plan is your complete business blueprint for trading.", "topic_slug": "trading_plan"},
                             {"question": "Key plan components?", "option_a": "Only entry rules", "option_b": "Goals, strategy, risk, routine, review", "option_c": "Only profit targets", "option_d": "Only stop losses", "correct_answer": "B", "explanation": "Complete plans cover goals, strategy, risk management, routine, and review process.", "topic_slug": "trading_plan"},
-                            {"question": "Realistic monthly return target?", "option_a": "50%", "option_b": "3-5%", "option_c": "20%", "option_d": "100%", "correct_answer": "B", "explanation": "Professional traders target 3-5% monthly—higher is unsustainable.", "topic_slug": "trading_plan"}
-                        ]
+                            {"question": "Realistic monthly return target?", "option_a": "50%", "option_b": "3-5%", "option_c": "20%", "option_d": "100%", "correct_answer": "B", "explanation": "Professional traders target 3-5% monthly—higher is unsustainable.", "topic_slug": "trading_plan"},
+                                {"question": 'What is a circuit breaker rule in a trading plan?', "option_a": 'A rule that increases position size after wins', "option_b": 'A predefined condition that forces you to stop trading for a period', "option_c": 'An indicator that identifies reversals', "option_d": 'A broker risk limit', "correct_answer": 'B', "explanation": "A circuit breaker defines when to stop: e.g. 'If I lose 4% in one day, I stop trading for 24 hours.' This prevents emotional revenge trading from destroying accounts.", "topic_slug": 'trading_plan'},
+                                {"question": 'Why must a trading plan be written down rather than memorised?', "option_a": 'Brokers require it', "option_b": 'Creates accountability and removes emotional decision-making under pressure', "option_c": 'Prevents strategy theft', "option_d": 'Required by regulators', "correct_answer": 'B', "explanation": 'Written rules create a reference you commit to before entering emotional trading states. Without written rules, traders rationalize exceptions during losses — destroying consistency.', "topic_slug": 'trading_plan'}]
                     },
                     {
                         "title": "Performance Review and Optimization",
                         "content": """## Quick Definition
-
-**Performance review** is the systematic analysis of your trading results to identify strengths, weaknesses, and specific improvements. Without it, the same mistakes repeat indefinitely.
-
----
-
-## Concept Explanation
-
-### What to Track in Your Trading Journal
-
-*   Date, currency pair, session, trade direction
-*   Entry price, stop loss level, take profit level
-*   Risk percentage, R:R ratio achieved
-*   Win or loss, actual profit and loss in dollars
-*   Setup type (order block, S/R level, chart pattern)
-*   Entry and exit screenshots
-*   Emotional state at time of trade
-*   Notes on execution quality
-
-### Weekly Review Process
-
-1.  **Quantitative** — Win rate, profit factor, average R:R for the week
-2.  **Qualitative** — What rules were followed? What was violated?
-3.  **Pattern analysis** — Which setup types are most and least profitable?
-4.  **Session analysis** — Which trading sessions produce the best results?
-5.  **Psychology review** — Were there emotional or revenge trades?
-
-### Monthly Optimisation Steps
-
-*   Remove setup types that consistently underperform over 20 or more trades
-*   Increase position size only on your highest-probability setup types
-*   Adjust session focus based on actual performance data
-*   Review whether current market conditions suit your strategy
-
----
-
-## 💡 Pro Tip
-
-**The 80/20 Rule**: Track which 20% of your setups generate 80% of your profits. Then focus exclusively on those setups and eliminate everything else from your trading.
-
----
-
-## Key Takeaway
-
-Elite traders treat performance review as their most important habit. Your trading journal is more valuable than any course or indicator. The data tells you exactly what to change — if you are willing to look at it honestly.""",
+    
+    rformance Review** is systematic analysis of your trading results to identify strengths, weaknesses, and optimization opportunities. Regular review transforms good traders into great ones.
+    
+    
+    
+    oncept Explanation
+    
+    Review Frequencies
+    
+    ily Review (5-10 minutes)**:
+    Did I follow my plan?
+    Emotional state during trades
+    Any rule violations?
+    Lessons for tomorrow
+    
+    ekly Review (30-60 minutes)**:
+    Win rate and expectancy
+    R-multiple distribution
+    Setup performance comparison
+    Mistake patterns
+    
+    nthly Review (2-3 hours)**:
+    Equity curve analysis
+    Drawdown periods study
+    Strategy performance by market condition
+    Goal progress assessment
+    
+    arterly Review (Full day)**:
+    System optimization
+    Strategy refinement
+    Major rule adjustments
+    Goal reassessment
+    
+    Key Metrics to Analyze
+    
+    tric | Good | Excellent |
+    -----|------|-----------|
+    n Rate | 45%+ | 55%+ |
+    ofit Factor | 1.5+ | 2.0+ |
+    pectancy | >0.3R | >0.5R |
+    an Adherence | 80%+ | 90%+ |
+    
+    
+    
+    tep-by-Step Breakdown
+    
+    ekly Review Process**:
+    Export all trades for the week
+    Calculate win rate, avg win, avg loss
+    Compute expectancy and profit factor
+    Review each losing trade—identify errors
+    Categorize mistakes (emotional, technical, execution)
+    Set focus for next week (one improvement area)
+    Journal insights and commitments
+    
+    
+    
+    eal Trading Example
+    
+    nthly Review Insights** (Trader X):
+    
+    ta**:
+    Win Rate: 52%
+    Profit Factor: 1.4 (below 1.5 target)
+    Expectancy: +0.35R
+    
+    ttern Discovered**:
+    Trades after 2pm UTC: -0.2R expectancy
+    Trades before 10am UTC: +0.6R expectancy
+    
+    timization**:
+    Eliminated afternoon trading
+    Increased morning session focus
+    Next month: +0.58R expectancy
+    
+    
+    
+     Chart Example
+    
+    rformance Review](/static/charts/performance_review_dashboard.png)
+    
+    
+    
+     Common Beginner Mistake
+    
+    ipping Reviews**: Trading day after day without review is like practicing golf without watching your swing. You repeat the same errors indefinitely. Even 10 minutes of daily review compounds into massive improvement over a year.
+    
+    
+    
+     Pro Tip
+    
+    e One-Focus Rule**: Each week, identify ONE area to improve. Don't try to fix everything at once. If you're cutting winners early, focus only on that for one week. Master one skill before moving to the next.
+    
+    
+    
+    ey Takeaway
+    
+    ormance review separates professionals from amateurs. Review daily, weekly, monthly, quarterly. Track metrics, identify patterns, optimize continuously. The trader who reviews consistently beats the trader who doesn't—regardless of starting skill level.
+    
+    
+    
+    ractice Question
+    
+     frequency for in-depth strategy review?""",
                         "quiz": [
                             {"question": "Performance review purpose?", "option_a": "Find scapegoats", "option_b": "Identify improvement areas", "option_c": "Avoid losses", "option_d": "Predict next trade", "correct_answer": "B", "explanation": "Review identifies patterns and areas for optimization.", "topic_slug": "trading_plan"},
                             {"question": "Daily review duration?", "option_a": "5-10 minutes", "option_b": "2 hours", "option_c": "All evening", "option_d": "No review needed", "correct_answer": "A", "explanation": "Daily review should be quick—5-10 minutes maximum.", "topic_slug": "trading_plan"},
-                            {"question": "Quarterly review purpose?", "option_a": "Daily adjustments", "option_b": "Major strategy optimization", "option_c": "Entry timing", "option_d": "News analysis", "correct_answer": "B", "explanation": "Quarterly reviews allow for major system adjustments.", "topic_slug": "trading_plan"}
-                        ]
+                            {"question": "Quarterly review purpose?", "option_a": "Daily adjustments", "option_b": "Major strategy optimization", "option_c": "Entry timing", "option_d": "News analysis", "correct_answer": "B", "explanation": "Quarterly reviews allow for major system adjustments.", "topic_slug": "trading_plan"},
+                                {"question": 'The 80/20 rule applied to trading means:', "option_a": 'Win 80% of trades', "option_b": 'Risk 20% per trade', "option_c": '80% of profits come from 20% of your setups — focus only on those', "option_d": 'Trade 80% of the time', "correct_answer": 'C', "explanation": 'Track your setups. Usually 2-3 setup types generate most profits while others lose money. Eliminating underperforming setups and doubling down on your edge dramatically improves results.', "topic_slug": 'performance_review'},
+                                {"question": 'How often should a trading journal be reviewed at minimum?', "option_a": 'Every trade', "option_b": 'Monthly', "option_c": 'Weekly', "option_d": 'Yearly', "correct_answer": 'C', "explanation": 'Weekly review catches developing problems before they become expensive habits. Monthly is too infrequent — bad patterns compound. Daily is good for active traders.', "topic_slug": 'performance_review'}]
                     }
                 ]
             }

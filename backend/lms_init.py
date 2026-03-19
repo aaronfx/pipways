@@ -1,30 +1,29 @@
 """
-LMS Auto-Initialisation — Refactored v4.0
-Separates curriculum content from initialization logic.
-Imports ACADEMY_CURRICULUM from academy_curriculum_seed if available.
+LMS Auto-Initialisation — v5.0
+Root-cause fix: handles orphaned DB state where levels exist but modules/lessons are missing.
+Primary entry point: seed_academy() — fully idempotent, detects all states.
 """
 from .database import database
 
-# Optional: Import curriculum from external seed file
 try:
     from .academy_curriculum_seed import ACADEMY_CURRICULUM
 except ImportError:
     ACADEMY_CURRICULUM = None
 
 # =============================================================================
-# SCHEMA DEFINITIONS — Course System (Legacy LMS)
+# SCHEMA — Course System (Legacy LMS)
 # =============================================================================
 
 _COURSE_COLUMNS = [
-    ("price", "FLOAT NOT NULL DEFAULT 0"),
-    ("thumbnail", "VARCHAR(500) NOT NULL DEFAULT ''"),
-    ("thumbnail_url", "VARCHAR(500) NOT NULL DEFAULT ''"),
-    ("preview_video", "VARCHAR(500) NOT NULL DEFAULT ''"),
-    ("is_published", "BOOLEAN NOT NULL DEFAULT FALSE"),
-    ("is_active", "BOOLEAN NOT NULL DEFAULT TRUE"),
+    ("price",               "FLOAT NOT NULL DEFAULT 0"),
+    ("thumbnail",           "VARCHAR(500) NOT NULL DEFAULT ''"),
+    ("thumbnail_url",       "VARCHAR(500) NOT NULL DEFAULT ''"),
+    ("preview_video",       "VARCHAR(500) NOT NULL DEFAULT ''"),
+    ("is_published",        "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("is_active",           "BOOLEAN NOT NULL DEFAULT TRUE"),
     ("certificate_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"),
-    ("pass_percentage", "INTEGER NOT NULL DEFAULT 70"),
-    ("instructor", "VARCHAR(255) NOT NULL DEFAULT ''"),
+    ("pass_percentage",     "INTEGER NOT NULL DEFAULT 70"),
+    ("instructor",          "VARCHAR(255) NOT NULL DEFAULT ''"),
 ]
 
 _TABLE_SQLS = [
@@ -108,7 +107,7 @@ _TABLE_SQLS = [
 ]
 
 # =============================================================================
-# SCHEMA DEFINITIONS — Trading Academy System
+# SCHEMA — Trading Academy
 # =============================================================================
 
 _LEARNING_TABLE_SQLS = [
@@ -182,27 +181,23 @@ _LEARNING_TABLE_SQLS = [
 ]
 
 # =============================================================================
-# INITIALIZATION
+# SCHEMA INIT
 # =============================================================================
 
 async def init_lms_tables():
-    """
-    Create all LMS and Academy tables if they don't exist.
-    Then safely seed curriculum from ACADEMY_CURRICULUM if provided.
-    """
+    """Create all tables then seed the academy curriculum."""
     ok = warn = 0
 
-    # Add course columns (idempotent)
     for col, definition in _COURSE_COLUMNS:
-        sql = f"ALTER TABLE courses ADD COLUMN IF NOT EXISTS {col} {definition}"
         try:
-            await database.execute(sql)
+            await database.execute(
+                f"ALTER TABLE courses ADD COLUMN IF NOT EXISTS {col} {definition}"
+            )
             ok += 1
         except Exception as e:
             warn += 1
             print(f"[LMS INIT] courses.{col}: {e}", flush=True)
 
-    # Create legacy LMS tables
     for sql in _TABLE_SQLS:
         try:
             await database.execute(sql.strip())
@@ -211,7 +206,6 @@ async def init_lms_tables():
             warn += 1
             print(f"[LMS INIT] table warn: {e}", flush=True)
 
-    # Create Academy tables
     for sql in _LEARNING_TABLE_SQLS:
         try:
             await database.execute(sql.strip())
@@ -222,147 +216,200 @@ async def init_lms_tables():
 
     print(f"[LMS INIT] Schema ready — {ok} ok, {warn} warnings", flush=True)
 
-    # Seed curriculum if available
-    if ACADEMY_CURRICULUM:
-        await upsert_curriculum()
-    else:
-        print("[LMS INIT] No ACADEMY_CURRICULUM found. Skipping seed.", flush=True)
+    await seed_academy()
 
 
-async def upsert_curriculum():
+# =============================================================================
+# SEED ACADEMY  — idempotent, handles all DB states
+# =============================================================================
+
+async def seed_academy():
     """
-    Idempotent curriculum seeding from ACADEMY_CURRICULUM structure.
-    Hierarchical: Level → Module → Lesson → Quiz
-    Prevents duplicates by checking existing records.
+    Seeds ACADEMY_CURRICULUM into the DB.
+
+    States handled:
+      • Fresh DB            → seeds everything
+      • Fully seeded        → no-op (skips)
+      • Orphaned state      → levels exist, modules missing → seeds modules+lessons+quizzes
+      • Partial state       → fills in whatever is missing at any level
     """
+    if not ACADEMY_CURRICULUM:
+        print("[SEED] No ACADEMY_CURRICULUM available — skipping.", flush=True)
+        return
+
     try:
-        # Check if curriculum already exists
-        count = await database.fetch_one("SELECT COUNT(*) as c FROM learning_levels")
-        if count and count['c'] > 0:
-            print(f"[LMS UPSERT] Curriculum exists ({count['c']} levels). Checking for new content...", flush=True)
-        
-        stats = {"levels": 0, "modules": 0, "lessons": 0, "quizzes": 0}
-        
-        # Process each level
-        for level_order, level_data in enumerate(ACADEMY_CURRICULUM, start=1):
-            level_name = level_data.get("level_name")
-            level_desc = level_data.get("description", "")
-            
-            # Check if level exists
-            existing_level = await database.fetch_one(
-                "SELECT id FROM learning_levels WHERE name = :name",
-                {"name": level_name}
+        print("[SEED] Starting...", flush=True)
+
+        # Snapshot all four tables
+        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
+        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
+        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
+        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
+
+        n_lv = r_lv["c"] if r_lv else 0
+        n_mo = r_mo["c"] if r_mo else 0
+        n_le = r_le["c"] if r_le else 0
+        n_qu = r_qu["c"] if r_qu else 0
+
+        # Fully seeded — nothing to do
+        if n_lv > 0 and n_mo > 0 and n_le > 0 and n_qu > 0:
+            print(
+                f"[SEED] Skipped (already seeded): "
+                f"{n_lv} levels, {n_mo} modules, {n_le} lessons, {n_qu} quizzes.",
+                flush=True,
             )
-            
-            if existing_level:
-                level_id = existing_level["id"]
+            return
+
+        # Log the state we detected
+        if n_lv > 0 and n_mo == 0:
+            print(
+                f"[SEED] Orphaned state — {n_lv} levels exist but 0 modules. "
+                "Seeding modules/lessons/quizzes now.",
+                flush=True,
+            )
+        elif n_lv == 0:
+            print("[SEED] Fresh database — seeding full curriculum.", flush=True)
+        else:
+            print(
+                f"[SEED] Partial state ({n_lv} lv / {n_mo} mo / {n_le} le / {n_qu} qu) — "
+                "filling in missing data.",
+                flush=True,
+            )
+
+        stats = {"levels": 0, "modules": 0, "lessons": 0, "quizzes": 0}
+
+        for level_order, level_data in enumerate(ACADEMY_CURRICULUM, start=1):
+            level_name = (level_data.get("level_name") or "").strip()
+            level_desc = level_data.get("description", "")
+
+            if not level_name:
+                continue
+
+            # ── Level ────────────────────────────────────────────────────────
+            row = await database.fetch_one(
+                "SELECT id FROM learning_levels WHERE name = :n",
+                {"n": level_name},
+            )
+            if row:
+                level_id = row["id"]
             else:
                 level_id = await database.fetch_val(
-                    """INSERT INTO learning_levels (name, description, order_index) 
-                       VALUES (:name, :desc, :order) RETURNING id""",
-                    {"name": level_name, "desc": level_desc, "order": level_order}
+                    """INSERT INTO learning_levels (name, description, order_index)
+                       VALUES (:n, :d, :o) RETURNING id""",
+                    {"n": level_name, "d": level_desc, "o": level_order},
                 )
                 stats["levels"] += 1
-                print(f"[LMS UPSERT] Created level: {level_name}", flush=True)
-            
-            # Process modules
-            modules = level_data.get("modules", [])
-            for module_order, module_data in enumerate(modules, start=1):
-                module_title = module_data.get("title")
-                module_desc = module_data.get("description", "")
-                
-                # Check if module exists
-                existing_module = await database.fetch_one(
-                    "SELECT id FROM learning_modules WHERE level_id = :lid AND title = :title",
-                    {"lid": level_id, "title": module_title}
+                print(f"[SEED] Created level: {level_name}", flush=True)
+
+            # ── Modules ───────────────────────────────────────────────────────
+            for mod_order, mod_data in enumerate(level_data.get("modules", []), start=1):
+                mod_title = (mod_data.get("title") or "").strip()
+                mod_desc  = mod_data.get("description", "")
+
+                if not mod_title:
+                    continue
+
+                row = await database.fetch_one(
+                    "SELECT id FROM learning_modules WHERE level_id = :lid AND title = :t",
+                    {"lid": level_id, "t": mod_title},
                 )
-                
-                if existing_module:
-                    module_id = existing_module["id"]
+                if row:
+                    module_id = row["id"]
                 else:
                     module_id = await database.fetch_val(
                         """INSERT INTO learning_modules (level_id, title, description, order_index)
-                           VALUES (:lid, :title, :desc, :order) RETURNING id""",
-                        {"lid": level_id, "title": module_title, "desc": module_desc, "order": module_order}
+                           VALUES (:lid, :t, :d, :o) RETURNING id""",
+                        {"lid": level_id, "t": mod_title, "d": mod_desc, "o": mod_order},
                     )
                     stats["modules"] += 1
-                
-                # Process lessons
-                lessons = module_data.get("lessons", [])
-                for lesson_order, lesson_data in enumerate(lessons, start=1):
-                    lesson_title = lesson_data.get("title")
-                    lesson_content = lesson_data.get("content", "")
-                    
-                    # Check if lesson exists
-                    existing_lesson = await database.fetch_one(
-                        "SELECT id FROM learning_lessons WHERE module_id = :mid AND title = :title",
-                        {"mid": module_id, "title": lesson_title}
+
+                # ── Lessons ───────────────────────────────────────────────────
+                for les_order, les_data in enumerate(mod_data.get("lessons", []), start=1):
+                    les_title   = (les_data.get("title") or "").strip()
+                    les_content = les_data.get("content", "")
+
+                    if not les_title:
+                        continue
+
+                    row = await database.fetch_one(
+                        "SELECT id FROM learning_lessons WHERE module_id = :mid AND title = :t",
+                        {"mid": module_id, "t": les_title},
                     )
-                    
-                    if existing_lesson:
-                        lesson_id = existing_lesson["id"]
+                    if row:
+                        lesson_id = row["id"]
                     else:
                         lesson_id = await database.fetch_val(
                             """INSERT INTO learning_lessons (module_id, title, content, order_index)
-                               VALUES (:mid, :title, :content, :order) RETURNING id""",
-                            {
-                                "mid": module_id, 
-                                "title": lesson_title, 
-                                "content": lesson_content, 
-                                "order": lesson_order
-                            }
+                               VALUES (:mid, :t, :c, :o) RETURNING id""",
+                            {"mid": module_id, "t": les_title, "c": les_content, "o": les_order},
                         )
                         stats["lessons"] += 1
-                    
-                    # Process quizzes (up to 5 per lesson)
-                    quizzes = lesson_data.get("quiz", [])
-                    for quiz_data in quizzes:
-                        question = quiz_data.get("question")
-                        
-                        # Check if this exact question exists
-                        existing_quiz = await database.fetch_one(
+
+                    # ── Quizzes ───────────────────────────────────────────────
+                    for quiz_data in les_data.get("quiz", []):
+                        question = (quiz_data.get("question") or "").strip()
+                        if not question:
+                            continue
+
+                        exists = await database.fetch_one(
                             "SELECT id FROM lesson_quizzes WHERE lesson_id = :lid AND question = :q",
-                            {"lid": lesson_id, "q": question}
+                            {"lid": lesson_id, "q": question},
                         )
-                        
-                        if not existing_quiz:
+                        if not exists:
                             await database.execute(
-                                """INSERT INTO lesson_quizzes 
-                                   (lesson_id, question, option_a, option_b, option_c, option_d, 
+                                """INSERT INTO lesson_quizzes
+                                   (lesson_id, question, option_a, option_b, option_c, option_d,
                                     correct_answer, explanation, topic_slug)
-                                   VALUES (:lid, :q, :a, :b, :c, :d, :correct, :expl, :slug)""",
+                                   VALUES (:lid, :q, :a, :b, :c, :d, :ans, :expl, :slug)""",
                                 {
-                                    "lid": lesson_id,
-                                    "q": question,
-                                    "a": quiz_data.get("option_a", ""),
-                                    "b": quiz_data.get("option_b", ""),
-                                    "c": quiz_data.get("option_c", ""),
-                                    "d": quiz_data.get("option_d", ""),
-                                    "correct": quiz_data.get("correct_answer"),
+                                    "lid":  lesson_id,
+                                    "q":    question,
+                                    "a":    quiz_data.get("option_a", ""),
+                                    "b":    quiz_data.get("option_b", ""),
+                                    "c":    quiz_data.get("option_c", ""),
+                                    "d":    quiz_data.get("option_d", ""),
+                                    "ans":  quiz_data.get("correct_answer", "A"),
                                     "expl": quiz_data.get("explanation", ""),
-                                    "slug": quiz_data.get("topic_slug", "")
-                                }
+                                    "slug": quiz_data.get("topic_slug", ""),
+                                },
                             )
                             stats["quizzes"] += 1
-        
-        # Summary
-        total_levels = await database.fetch_one("SELECT COUNT(*) as c FROM learning_levels")
-        total_modules = await database.fetch_one("SELECT COUNT(*) as c FROM learning_modules")
-        total_lessons = await database.fetch_one("SELECT COUNT(*) as c FROM learning_lessons")
-        total_quizzes = await database.fetch_one("SELECT COUNT(*) as c FROM lesson_quizzes")
-        
-        print(f"[LMS UPSERT] Complete. Added: {stats['levels']} levels, {stats['modules']} modules, "
-              f"{stats['lessons']} lessons, {stats['quizzes']} quizzes.", flush=True)
-        print(f"[LMS UPSERT] Totals: {total_levels['c']} levels, {total_modules['c']} modules, "
-              f"{total_lessons['c']} lessons, {total_quizzes['c']} quizzes.", flush=True)
-              
+
+        # Final counts
+        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
+        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
+        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
+        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
+
+        print(
+            f"[SEED] Completed successfully. "
+            f"Added: {stats['levels']} levels, {stats['modules']} modules, "
+            f"{stats['lessons']} lessons, {stats['quizzes']} quizzes.",
+            flush=True,
+        )
+        print(
+            f"[SEED] Totals in DB: "
+            f"{r_lv['c'] if r_lv else 0} levels, "
+            f"{r_mo['c'] if r_mo else 0} modules, "
+            f"{r_le['c'] if r_le else 0} lessons, "
+            f"{r_qu['c'] if r_qu else 0} quizzes.",
+            flush=True,
+        )
+
     except Exception as e:
-        print(f"[LMS UPSERT] Error: {e}", flush=True)
-        raise
+        # Non-fatal — server continues but logs the error clearly
+        print(f"[SEED ERROR] {e}", flush=True)
 
 
-# Legacy wrapper for backwards compatibility
+# =============================================================================
+# LEGACY ALIASES
+# =============================================================================
+
+async def upsert_curriculum():
+    """Backwards-compatible alias for seed_academy()."""
+    await seed_academy()
+
+
 async def _seed_curriculum():
-    """Legacy entry point — now handled by upsert_curriculum"""
-    if ACADEMY_CURRICULUM:
-        await upsert_curriculum()
+    """Backwards-compatible alias for seed_academy()."""
+    await seed_academy()

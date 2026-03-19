@@ -3,7 +3,6 @@ const AIMentorPage = {
     currentUser: null,
 
     async init() {
-        // Load current user info
         try {
             const user = await API.getCurrentUser();
             this.currentUser = user;
@@ -19,159 +18,135 @@ const AIMentorPage = {
         app.innerHTML = `
             <div class="page-header">
                 <h1>🎓 AI Trading Mentor</h1>
-                <p>Get personalized trading advice and structured learning guidance</p>
+                <p>Personalized trading guidance & structured learning</p>
             </div>
 
-            <div class="mentor-container" style="display: grid; grid-template-columns: 1fr 320px; gap: 2rem;">
+            <div class="mentor-container" style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem; max-width: 1400px; margin: 0 auto;">
                 <!-- Main Chat Area -->
                 <div>
-                    <div class="chat-box" id="chatBox" style="height: 500px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 1rem; background: var(--gray-50); margin-bottom: 1rem;">
-                        <div class="message mentor" style="margin-bottom: 1rem;">
+                    <div class="chat-box" id="chatBox" style="height: 550px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; background: var(--bg-secondary); margin-bottom: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="message mentor">
                             <div style="display: flex; gap: 1rem; align-items: flex-start;">
-                                <div class="message-avatar" style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">🎓</div>
-                                <div class="message-content" style="background: white; padding: 1rem; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1;">
-                                    <p>Welcome! I'm your AI Trading Mentor. I can help you with:</p>
-                                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
-                                        <li>Answering trading questions</li>
-                                        <li>Reviewing your performance</li>
-                                        <li>Recommending Academy lessons</li>
-                                        <li>Guiding your learning path</li>
-                                    </ul>
-                                    <p style="margin-bottom: 0;">Try commands like <code>/next</code> to continue learning, or ask me anything!</p>
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">🎓</div>
+                                <div style="background: var(--bg); padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); flex: 1; border: 1px solid var(--border);">
+                                    <p style="margin: 0; line-height: 1.5;">Welcome! I'm your AI Trading Mentor. Ask me anything about trading, or type <strong>/next</strong> to continue your Academy lessons.</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div style="display: flex; gap: 0.5rem;">
+                    <div style="display: flex; gap: 0.75rem;">
                         <input type="text" id="mentorInput" class="form-control" 
-                               placeholder="Ask about trading or type /next to continue learning..." 
-                               style="flex: 1; padding: 0.875rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font-size: 0.95rem;"
+                               placeholder="Ask about trading or type /next to continue..." 
+                               style="flex: 1; padding: 1rem; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem;"
                                onkeypress="if(event.key==='Enter') AIMentorPage.sendMessage()">
-                        <button onclick="AIMentorPage.sendMessage()" class="btn btn-primary" style="padding: 0.875rem 1.5rem;">
+                        <button onclick="AIMentorPage.sendMessage()" class="btn btn-primary" style="padding: 1rem 1.5rem; border-radius: 10px; font-weight: 600;">
                             Send
                         </button>
                     </div>
 
-                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <span style="font-size: 0.8rem; color: var(--gray-500);">Quick commands:</span>
-                        <button onclick="AIMentorPage.ask('/next')" class="btn btn-sm btn-text" style="font-size: 0.8rem;">/next</button>
-                        <button onclick="AIMentorPage.ask('/review-trades')" class="btn btn-sm btn-text" style="font-size: 0.8rem;">/review-trades</button>
-                        <button onclick="AIMentorPage.ask('/signals')" class="btn btn-sm btn-text" style="font-size: 0.8rem;">/signals</button>
-                        <button onclick="AIMentorPage.ask('/help')" class="btn btn-sm btn-text" style="font-size: 0.8rem;">/help</button>
+                    <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Quick:</span>
+                        <button onclick="AIMentorPage.ask('/next')" class="btn btn-sm btn-outline">➡️ Continue</button>
+                        <button onclick="AIMentorPage.ask('What is support and resistance?')" class="btn btn-sm btn-outline">📊 S/R Levels</button>
+                        <button onclick="AIMentorPage.ask('How do I manage risk?')" class="btn btn-sm btn-outline">🛡️ Risk</button>
+                        <button onclick="AIMentorPage.ask('/help')" class="btn btn-sm btn-outline">❓ Help</button>
                     </div>
                 </div>
 
                 <!-- Sidebar -->
                 <div>
-                    <!-- Learning Progress Card -->
-                    <div class="card" style="margin-bottom: 1rem; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <div class="card-header" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border-radius: var(--radius) var(--radius) 0 0;">
-                            <h3 class="card-title" style="margin: 0; font-size: 1rem;">📚 Learning Progress</h3>
+                    <!-- Progress Card -->
+                    <div class="card" style="margin-bottom: 1rem; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 12px; overflow: hidden;">
+                        <div class="card-header" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 1rem;">
+                            <h3 style="margin: 0; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem;">📚 Your Progress</h3>
                         </div>
-                        <div class="card-body" id="progressCard">
-                            <div class="text-center" style="padding: 1rem; color: var(--gray-500);">
-                                <div class="spinner"></div>
-                                <p>Loading...</p>
+                        <div class="card-body" id="progressCard" style="padding: 1rem;">
+                            <div style="text-align: center; padding: 1rem; color: var(--text-muted);">
+                                <div class="spinner" style="width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 0.5rem;"></div>
+                                <span style="font-size: 0.9rem;">Loading...</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Quick Topics Card -->
-                    <div class="card" style="margin-bottom: 1rem; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <div class="card-header" style="background: var(--gray-100); border-bottom: 1px solid var(--gray-200);">
-                            <h3 class="card-title" style="margin: 0; font-size: 1rem;">Quick Topics</h3>
+                    <!-- Stats Card -->
+                    <div class="card" style="border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 12px;">
+                        <div class="card-header" style="background: var(--bg); border-bottom: 1px solid var(--border); padding: 1rem;">
+                            <h3 style="margin: 0; font-size: 1rem;">Session Stats</h3>
                         </div>
-                        <div class="card-body" style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem;">
-                            <button onclick="AIMentorPage.ask('How do I manage risk?')" class="btn btn-text text-left" style="justify-content: flex-start; padding: 0.5rem;">🛡️ Risk Management</button>
-                            <button onclick="AIMentorPage.ask('What is a good risk/reward ratio?')" class="btn btn-text text-left" style="justify-content: flex-start; padding: 0.5rem;">⚖️ R:R Ratios</button>
-                            <button onclick="AIMentorPage.ask('How do I control emotions while trading?')" class="btn btn-text text-left" style="justify-content: flex-start; padding: 0.5rem;">🧠 Trading Psychology</button>
-                            <button onclick="AIMentorPage.ask('Explain support and resistance')" class="btn btn-text text-left" style="justify-content: flex-start; padding: 0.5rem;">📊 Technical Analysis</button>
-                            <button onclick="AIMentorPage.ask('What is an order block?')" class="btn btn-text text-left" style="justify-content: flex-start; padding: 0.5rem;">🏗️ Market Structure</button>
-                        </div>
-                    </div>
-
-                    <!-- Session Stats -->
-                    <div class="card" style="border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <div class="card-header" style="background: var(--gray-100); border-bottom: 1px solid var(--gray-200);">
-                            <h3 class="card-title" style="margin: 0; font-size: 1rem;">Session Stats</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                                    <span>Mentor Sessions</span>
-                                    <strong>${this.messages.length}</strong>
-                                </div>
-                                <div class="progress" style="height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden;">
-                                    <div class="progress-bar" style="width: ${Math.min(this.messages.length * 5, 100)}%; height: 100%; background: var(--primary); transition: width 0.3s;"></div>
-                                </div>
+                        <div class="card-body" style="padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <span style="color: var(--text-muted); font-size: 0.9rem;">Messages</span>
+                                <strong style="font-size: 1.1rem;">${this.messages.length}</strong>
+                            </div>
+                            <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${Math.min(this.messages.length * 5, 100)}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width 0.3s;"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <style>
+                @keyframes spin { to { transform: rotate(360deg); } }
+            </style>
         `;
 
-        // Load progress after render
         this.loadAcademyProgress();
-
-        // Focus input
-        setTimeout(() => {
-            const input = document.getElementById('mentorInput');
-            if (input) input.focus();
-        }, 100);
+        setTimeout(() => document.getElementById('mentorInput')?.focus(), 100);
     },
 
     async loadAcademyProgress() {
         try {
-            const response = await API.get('/learning/progress/' + (this.currentUser?.id || 'me'));
-            const progressCard = document.getElementById('progressCard');
+            const userId = this.currentUser?.id || 'me';
+            const response = await API.get(\`/learning/progress/\${userId}\`);
+            const card = document.getElementById('progressCard');
 
-            if (response && progressCard) {
-                const completionRate = response.completion_rate || 0;
-                const currentLevel = response.summary?.[0]?.level_name || 'Beginner';
-                const completed = response.completed_lessons || 0;
-                const total = response.total_lessons || 1;
+            if (!card || !response) return;
 
-                progressCard.innerHTML = `
-                    <div style="margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.85rem;">
-                            <span style="color: var(--gray-600);">Overall Progress</span>
-                            <strong>${completion_rate}%</strong>
-                        </div>
-                        <div class="progress" style="height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden;">
-                            <div class="progress-bar" style="width: ${completionRate}%; height: 100%; background: linear-gradient(90deg, var(--success), var(--primary)); transition: width 0.5s;"></div>
-                        </div>
+            const rate = response.completion_rate || 0;
+            const level = response.summary?.find(s => s.percent < 100)?.level_name || response.summary?.[response.summary.length - 1]?.level_name || 'Beginner';
+            const completed = response.completed_lessons || 0;
+            const total = response.total_lessons || 1;
+
+            card.innerHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                        <span style="color: var(--text-muted);">Overall Progress</span>
+                        <strong style="color: var(--primary);">${rate}%</strong>
                     </div>
-                    <div style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.5rem;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                            <span>Current Level:</span>
-                            <strong>${currentLevel}</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Completed:</span>
-                            <strong>${completed}/${total} lessons</strong>
-                        </div>
+                    <div style="height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                        <div style="width: ${rate}%; height: 100%; background: linear-gradient(90deg, var(--success), var(--primary)); border-radius: 4px; transition: width 0.5s ease;"></div>
                     </div>
-                    ${completionRate < 100 ? `
-                    <button onclick="AIMentorPage.ask('/next')" class="btn btn-primary btn-sm" style="width: 100%; margin-top: 0.5rem;">
-                        Continue Learning ➡️
-                    </button>
-                    ` : `
-                    <div style="text-align: center; padding: 0.5rem; background: var(--success-light); border-radius: var(--radius); margin-top: 0.5rem;">
-                        <span style="color: var(--success); font-size: 0.85rem;">🎉 Academy Completed!</span>
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <span>Current Level:</span>
+                        <strong style="color: var(--text);">${level}</strong>
                     </div>
-                    `}
-                `;
-            }
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Lessons:</span>
+                        <strong style="color: var(--text);">${completed}/${total}</strong>
+                    </div>
+                </div>
+                ${rate < 100 ? `
+                <button onclick="AIMentorPage.ask('/next')" class="btn btn-primary" style="width: 100%; padding: 0.75rem; border-radius: 8px; font-weight: 600;">
+                    Continue Learning →
+                </button>
+                ` : `
+                <div style="text-align: center; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px; color: var(--success); font-weight: 600;">
+                    🎉 Academy Completed!
+                </div>
+                `}
+            `;
         } catch (e) {
-            console.log('[MENTOR] Could not load progress:', e);
-            const progressCard = document.getElementById('progressCard');
-            if (progressCard) {
-                progressCard.innerHTML = `
-                    <div style="text-align: center; padding: 1rem; color: var(--gray-500);">
-                        <p style="margin-bottom: 0.5rem;">Start your learning journey!</p>
-                        <button onclick="AIMentorPage.ask('/next')" class="btn btn-primary btn-sm">
+            console.log('[MENTOR] Progress load error:', e);
+            const card = document.getElementById('progressCard');
+            if (card) {
+                card.innerHTML = `
+                    <div style="text-align: center; padding: 1rem;">
+                        <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Start your trading education!</p>
+                        <button onclick="AIMentorPage.ask('/next')" class="btn btn-primary" style="width: 100%;">
                             Start Academy
                         </button>
                     </div>
@@ -182,181 +157,138 @@ const AIMentorPage = {
 
     async sendMessage() {
         const input = document.getElementById('mentorInput');
-        const message = input.value.trim();
-        if (!message) return;
+        const msg = input.value.trim();
+        if (!msg) return;
 
-        this.addMessage(message, 'user');
+        this.addMessage(msg, 'user');
         input.value = '';
-
-        // Show typing indicator
-        this.showTypingIndicator();
+        this.showTyping();
 
         try {
-            const response = await API.askMentor(message);
-            this.hideTypingIndicator();
-            this.addMessage(response.response, 'mentor', response);
-
-            // Refresh progress if it changed
-            if (response.academy_progress) {
-                this.loadAcademyProgress();
-            }
+            const res = await API.askMentor(msg);
+            this.hideTyping();
+            this.addMessage(res.response, 'mentor', res);
+            if (res.academy_progress) this.loadAcademyProgress();
         } catch (e) {
-            this.hideTypingIndicator();
-            console.error('[MENTOR] Error:', e);
-            this.addMessage('Sorry, I encountered an error. Please try again.', 'mentor');
+            this.hideTyping();
+            this.addMessage('Sorry, error occurred. Please try again.', 'mentor');
         }
     },
 
-    ask(question) {
+    ask(q) {
         const input = document.getElementById('mentorInput');
         if (input) {
-            input.value = question;
+            input.value = q;
             this.sendMessage();
         }
     },
 
-    showTypingIndicator() {
-        const chatBox = document.getElementById('chatBox');
-        const typingDiv = document.createElement('div');
-        typingDiv.id = 'typingIndicator';
-        typingDiv.className = 'message mentor';
-        typingDiv.style.marginBottom = '1rem';
-        typingDiv.innerHTML = `
+    showTyping() {
+        const box = document.getElementById('chatBox');
+        const div = document.createElement('div');
+        div.id = 'typingIndicator';
+        div.className = 'message mentor';
+        div.innerHTML = `
             <div style="display: flex; gap: 1rem; align-items: flex-start;">
-                <div class="message-avatar" style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">🎓</div>
-                <div class="message-content" style="background: white; padding: 1rem; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <div style="display: flex; gap: 4px; align-items: center;">
-                        <span style="width: 8px; height: 8px; background: var(--gray-400); border-radius: 50%; animation: bounce 1s infinite;"></span>
-                        <span style="width: 8px; height: 8px; background: var(--gray-400); border-radius: 50%; animation: bounce 1s infinite 0.2s;"></span>
-                        <span style="width: 8px; height: 8px; background: var(--gray-400); border-radius: 50%; animation: bounce 1s infinite 0.4s;"></span>
-                    </div>
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">🎓</div>
+                <div style="background: var(--bg); padding: 1rem 1.5rem; border-radius: 12px; display: flex; gap: 4px; align-items: center;">
+                    <span style="width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; opacity: 0.4; animation: bounce 1s infinite;"></span>
+                    <span style="width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; opacity: 0.4; animation: bounce 1s infinite 0.2s;"></span>
+                    <span style="width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; opacity: 0.4; animation: bounce 1s infinite 0.4s;"></span>
                 </div>
             </div>
         `;
-        chatBox.appendChild(typingDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
 
-        // Add bounce animation if not present
-        if (!document.getElementById('mentorAnimations')) {
-            const style = document.createElement('style');
-            style.id = 'mentorAnimations';
-            style.textContent = `
-                @keyframes bounce {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-4px); }
-                }
-            `;
-            document.head.appendChild(style);
+        if (!document.getElementById('animStyles')) {
+            const s = document.createElement('style');
+            s.id = 'animStyles';
+            s.textContent = \`@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }\`;
+            document.head.appendChild(s);
         }
     },
 
-    hideTypingIndicator() {
-        const indicator = document.getElementById('typingIndicator');
-        if (indicator) indicator.remove();
+    hideTyping() {
+        document.getElementById('typingIndicator')?.remove();
     },
 
     addMessage(text, sender, data = null) {
-        const chatBox = document.getElementById('chatBox');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${sender}`;
-        messageDiv.style.marginBottom = '1rem';
+        const box = document.getElementById('chatBox');
+        const div = document.createElement('div');
+        div.className = \`message \${sender}\`;
+        div.style.marginBottom = '1rem';
 
-        let html = '<div style="display: flex; gap: 1rem; align-items: flex-start;">';
+        const isMentor = sender === 'mentor';
+        const bg = isMentor ? 'var(--bg)' : 'linear-gradient(135deg, var(--primary-light), var(--primary-lighter))';
+        const border = isMentor ? '1px solid var(--border)' : 'none';
 
-        if (sender === 'mentor') {
-            html += `<div class="message-avatar" style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">🎓</div>`;
-        } else {
-            html += `<div class="message-avatar" style="background: var(--gray-300); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">👤</div>`;
-        }
+        let html = \`<div style="display: flex; gap: 1rem; align-items: flex-start; \${!isMentor ? 'flex-direction: row-reverse;' : ''}">\`;
 
-        html += `<div class="message-content" style="${sender === 'mentor' ? 'background: white;' : 'background: var(--primary-light);'} padding: 1rem; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; max-width: calc(100% - 60px);">`;
+        // Avatar
+        html += \`<div style="width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; \${isMentor ? 'background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white;' : 'background: var(--bg-tertiary);'}">\`;
+        html += isMentor ? '🎓' : '👤';
+        html += '</div>';
 
-        // Format the message text (convert newlines to breaks)
-        const formattedText = text.replace(/\n/g, '<br>');
-        html += `<div style="line-height: 1.5; color: var(--gray-800);">${formattedText}</div>`;
+        // Content
+        html += \`<div style="max-width: calc(100% - 60px);">\`;
+        html += \`<div style="background: \${bg}; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: \${border}; line-height: 1.5; color: var(--text);">\`;
+        html += text.replace(/\n/g, '<br>');
+        html += '</div>';
 
-        // Render lesson recommendations if present
-        if (data && data.recommendations && data.recommendations.length > 0) {
-            const lessonRecs = data.recommendations.filter(r => r.type === 'lesson');
-            if (lessonRecs.length > 0) {
-                html += `<div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">`;
+        // LESSON RECOMMENDATIONS - CRITICAL SECTION
+        if (data?.recommendations?.length > 0) {
+            const lessons = data.recommendations.filter(r => r.type === 'lesson');
+            if (lessons.length > 0) {
+                html += \`<div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">\`;
 
-                lessonRecs.forEach(rec => {
-                    const isNextStep = rec.reason === 'next_step';
-                    const icon = isNextStep ? '➡️' : '📚';
-                    const badgeText = isNextStep ? 'Continue Learning' : 'Recommended Lesson';
-                    const badgeColor = isNextStep ? 'var(--success)' : 'var(--primary)';
+                lessons.forEach(lesson => {
+                    const isNext = lesson.reason === 'next_step';
+                    const icon = isNext ? '➡️' : '📚';
+                    const badge = isNext ? 'Continue' : 'Recommended';
+                    const badgeColor = isNext ? 'var(--success)' : 'var(--primary)';
+                    const bgColor = isNext ? 'rgba(16, 185, 129, 0.08)' : 'rgba(99, 102, 241, 0.08)';
+                    const borderColor = isNext ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)';
 
-                    html += `
-                        <div style="background: ${isNextStep ? '#f0fdf4' : '#eff6ff'}; border: 1px solid ${isNextStep ? '#bbf7d0' : '#bfdbfe'}; border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.5rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;"
-                             onclick="AIMentorPage.openLesson(${rec.metadata?.lesson_id || 0}, '${rec.url || ''}')"
+                    html += \`
+                        <div onclick="AIMentorPage.openLesson(\${lesson.metadata?.lesson_id || 0}, '\${lesson.url || '/academy.html'}')"
+                             style="background: \${bgColor}; border: 1px solid \${borderColor}; border-radius: 10px; padding: 1rem; cursor: pointer; transition: all 0.2s;"
                              onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)';"
                              onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                                <span style="font-size: 1.2rem;">${icon}</span>
-                                <span style="font-size: 0.75rem; font-weight: 600; color: ${badgeColor}; text-transform: uppercase; letter-spacing: 0.05em;">${badgeText}</span>
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1.25rem;">\${icon}</span>
+                                <span style="font-size: 0.75rem; font-weight: 700; color: \${badgeColor}; text-transform: uppercase; letter-spacing: 0.05em;">\${badge}</span>
                             </div>
-                            <div style="font-weight: 600; color: var(--gray-900); margin-bottom: 0.25rem;">${rec.title}</div>
-                            <div style="font-size: 0.85rem; color: var(--gray-600);">${rec.description || ''}</div>
-                            <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-                                <button class="btn btn-sm btn-primary" style="font-size: 0.8rem; padding: 0.25rem 0.75rem;">
-                                    ${isNextStep ? 'Resume Lesson →' : 'Open Lesson'}
-                                </button>
-                            </div>
+                            <div style="font-weight: 700; color: var(--text); margin-bottom: 0.25rem; font-size: 1rem;">\${lesson.title}</div>
+                            <div style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.75rem;">\${lesson.description || ''}</div>
+                            <button style="background: \${badgeColor}; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 600; cursor: pointer; width: 100%;">
+                                \${isNext ? 'Resume Lesson →' : 'Open Lesson'}
+                            </button>
                         </div>
-                    `;
+                    \`;
                 });
 
-                html += `</div>`;
-            }
-
-            // Render other recommendations (non-lesson)
-            const otherRecs = data.recommendations.filter(r => r.type !== 'lesson');
-            if (otherRecs.length > 0) {
-                html += `<div style="margin-top: 0.5rem;">`;
-                otherRecs.forEach(rec => {
-                    let icon = '📖';
-                    if (rec.type === 'signal') icon = '📡';
-                    if (rec.type === 'blog') icon = '📝';
-                    if (rec.type === 'warning') icon = '⚠️';
-
-                    html += `<div style="font-size: 0.85rem; color: var(--gray-600); margin-bottom: 0.25rem;">${icon} ${rec.title}</div>`;
-                });
-                html += `</div>`;
+                html += '</div>';
             }
         }
 
         html += '</div></div>';
-        messageDiv.innerHTML = html;
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        div.innerHTML = html;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
 
         this.messages.push({ text, sender, data });
     },
 
-    async openLesson(lessonId, url) {
-        if (!lessonId) return;
-
-        // Track the click
+    async openLesson(id, url) {
+        if (!id && !url) return;
         try {
-            await API.post('/ai/mentor/track-lesson-click', {
-                lesson_id: lessonId,
-                action: 'start'
-            });
-        } catch (e) {
-            console.log('[MENTOR] Track error:', e);
-        }
-
-        // Navigate to academy
-        if (url) {
-            window.open(url, '_blank');
-        } else {
-            window.open(`/academy.html?lesson=${lessonId}`, '_blank');
-        }
+            await API.post('/ai/mentor/track-lesson-click', { lesson_id: id || 0, action: 'start' });
+        } catch (e) {}
+        window.open(url || \`/academy.html?lesson=\${id}\`, '_blank');
     }
 };
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('app')) {
         AIMentorPage.init();

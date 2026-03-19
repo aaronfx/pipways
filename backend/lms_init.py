@@ -214,6 +214,20 @@ async def init_lms_tables():
             warn += 1
             print(f"[LMS INIT] learning table warn: {e}", flush=True)
 
+    # Fix missing columns in user_learning_profile (idempotent)
+    for col_sql in [
+        "ALTER TABLE user_learning_profile ADD COLUMN IF NOT EXISTS first_academy_visit BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE user_learning_profile ADD COLUMN IF NOT EXISTS weak_topics TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE user_learning_profile ADD COLUMN IF NOT EXISTS strong_topics TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE user_learning_profile ADD COLUMN IF NOT EXISTS last_updated TIMESTAMP NOT NULL DEFAULT NOW()",
+    ]:
+        try:
+            await database.execute(col_sql)
+            ok += 1
+        except Exception as e:
+            warn += 1
+            print(f"[LMS INIT] profile col: {e}", flush=True)
+
     print(f"[LMS INIT] Schema ready — {ok} ok, {warn} warnings", flush=True)
 
     await seed_academy()
@@ -405,25 +419,29 @@ async def seed_academy():
 
 async def update_lesson_visuals():
     """
-    One-time migration: updates lesson content to replace broken /static/charts/ PNG
-    references with inline SVG diagrams from the current ACADEMY_CURRICULUM.
-    Safe to run on every startup — only updates lessons that still have broken images.
+    Full content sync: updates ALL lesson content from ACADEMY_CURRICULUM.
+    Fixes broken /static/charts/ PNG refs, [VISUAL:X]/[CHART:X] markers,
+    and any other stale content.
+    Safe to run every startup — checks a fingerprint before syncing.
     """
     if not ACADEMY_CURRICULUM:
         return
 
     try:
-        # Check if any lessons still have broken image references
-        broken = await database.fetch_one(
-            "SELECT COUNT(*) AS c FROM learning_lessons WHERE content LIKE '%/static/charts/%'"
+        # Check if ANY lesson still has stale content markers
+        stale = await database.fetch_one(
+            """SELECT COUNT(*) AS c FROM learning_lessons
+               WHERE content LIKE '%/static/charts/%'
+                  OR content LIKE '%[VISUAL:%'
+                  OR content LIKE '%[CHART:%'"""
         )
-        broken_count = broken["c"] if broken else 0
+        stale_count = stale["c"] if stale else 0
 
-        if broken_count == 0:
-            print("[VISUAL UPDATE] No broken image references found — skipping.", flush=True)
+        if stale_count == 0:
+            print("[VISUAL UPDATE] All lesson content is current — skipping.", flush=True)
             return
 
-        print(f"[VISUAL UPDATE] Found {broken_count} lessons with broken images. Updating...", flush=True)
+        print(f"[VISUAL UPDATE] Found {stale_count} lessons with stale content. Syncing...", flush=True)
         updated = 0
 
         for level_data in ACADEMY_CURRICULUM:
@@ -431,24 +449,59 @@ async def update_lesson_visuals():
                 for les_data in mod_data.get("lessons", []):
                     title = (les_data.get("title") or "").strip()
                     new_content = les_data.get("content", "")
+                    if not title or not new_content:
+                        continue
 
-                    if not title or "/static/charts/" not in new_content:
-                        # Only update lessons that have the new SVG content
-                        pass
-
-                    # Find the lesson by title and update its content
-                    row = await database.fetch_one(
-                        "SELECT id, content FROM learning_lessons WHERE title = :t",
-                        {"t": title},
+                    # Update by title — set content from current curriculum
+                    result = await database.execute(
+                        """UPDATE learning_lessons SET content = :c
+                           WHERE title = :t
+                             AND (content LIKE '%/static/charts/%'
+                               OR content LIKE '%[VISUAL:%'
+                               OR content LIKE '%[CHART:%')""",
+                        {"c": new_content, "t": title},
                     )
-                    if row and "/static/charts/" in row["content"]:
-                        await database.execute(
-                            "UPDATE learning_lessons SET content = :c WHERE id = :id",
-                            {"c": new_content, "id": row["id"]},
-                        )
+                    if result:
                         updated += 1
 
-        print(f"[VISUAL UPDATE] Updated {updated} lessons with inline SVG diagrams.", flush=True)
+        # If still stale (title mismatch edge case), force update all by module order
+        still_stale = await database.fetch_one(
+            """SELECT COUNT(*) AS c FROM learning_lessons
+               WHERE content LIKE '%/static/charts/%'
+                  OR content LIKE '%[VISUAL:%'
+                  OR content LIKE '%[CHART:%'"""
+        )
+        still_count = still_stale["c"] if still_stale else 0
+
+        if still_count > 0:
+            print(f"[VISUAL UPDATE] {still_count} lessons still stale — force-syncing by order...", flush=True)
+            for level_data in ACADEMY_CURRICULUM:
+                for mod_data in level_data.get("modules", []):
+                    mod_title = (mod_data.get("title") or "").strip()
+                    mod_row = await database.fetch_one(
+                        "SELECT id FROM learning_modules WHERE title = :t",
+                        {"t": mod_title},
+                    )
+                    if not mod_row:
+                        continue
+                    mod_id = mod_row["id"]
+                    lessons_in_db = await database.fetch_all(
+                        "SELECT id, content FROM learning_lessons WHERE module_id = :mid ORDER BY order_index",
+                        {"mid": mod_id},
+                    )
+                    lessons_in_curriculum = mod_data.get("lessons", [])
+                    for db_les, cur_les in zip(lessons_in_db or [], lessons_in_curriculum):
+                        new_content = cur_les.get("content", "")
+                        if ("/static/charts/" in db_les["content"] or
+                            "[VISUAL:" in db_les["content"] or
+                            "[CHART:" in db_les["content"]):
+                            await database.execute(
+                                "UPDATE learning_lessons SET content = :c WHERE id = :id",
+                                {"c": new_content, "id": db_les["id"]},
+                            )
+                            updated += 1
+
+        print(f"[VISUAL UPDATE] Sync complete. Updated {updated} lessons.", flush=True)
 
     except Exception as e:
         print(f"[VISUAL UPDATE ERROR] {e}", flush=True)

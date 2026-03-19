@@ -8,7 +8,7 @@
 class AIMentor {
     constructor() {
         this.apiBaseUrl = '/api/ai';
-        this.chatContainer = document.getElementById('chat-messages');
+        this.chatContainer = document.getElementById('mentor-messages');
         this.inputField = document.getElementById('message-input');
         this.sendButton = document.getElementById('send-btn');
         this.academyProgress = null;

@@ -18,6 +18,7 @@ Remove from main.py:
 
 import os
 import json
+import re
 import traceback
 from pathlib import Path
 
@@ -32,8 +33,8 @@ from .database import database
 
 router = APIRouter()
 
+# ── Safe field accessor for asyncpg Records (databases 0.9.0) ────────────────
 def _user_get(user, key, default=None):
-    """Safe attribute access for both dict and asyncpg Record objects."""
     if user is None:
         return default
     try:
@@ -91,6 +92,548 @@ async def _ai(system: str, user_msg: str, max_tokens: int = 800) -> str:
     except Exception as e:
         print(f"[TRADING COACH] Error: {e}", flush=True)
         return "I'm having trouble connecting right now. Please try again shortly."
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AI DIAGRAM ENGINE v2.0 — Production-grade, classified, template-driven
+# ══════════════════════════════════════════════════════════════════════════════
+
+_ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
+# ── 1. LESSON CLASSIFICATION ENGINE ──────────────────────────────────────────
+
+def classify_lesson(title: str, content: str) -> str:
+    """
+    Rule-based classifier. Returns one of:
+    price_action | risk_management | indicator | pattern | structure | concept
+    No AI needed — fast and deterministic.
+    """
+    t = (title + " " + content[:400]).lower()
+
+    # Risk management signals
+    if any(k in t for k in ["position siz", "lot size", "drawdown", "r:r", "risk:reward",
+                              "portfolio heat", "expectancy", "profit factor", "risk per trade",
+                              "risk management", "1% risk", "2% risk", "max risk",
+                              "account surviv", "account risk"]):
+        return "risk_management"
+    # risk/reward also qualifies IF combined with stop/entry context
+    if ("risk" in t and "reward" in t) or ("stop loss" in t and "take profit" in t and "risk" in t):
+        return "risk_management"
+
+    # Indicator signals
+    if any(k in t for k in ["rsi", "macd", "stochastic", "bollinger", "atr", "adx",
+                              "moving average", "ema", "sma", "momentum indicator",
+                              "oscillator", "overbought", "oversold", "crossover",
+                              "golden cross", "death cross", "fibonacci"]):
+        return "indicator"
+
+    # Pattern signals
+    if any(k in t for k in ["head and shoulder", "double top", "double bottom",
+                              "flag", "pennant", "wedge", "triangle", "cup and handle",
+                              "engulfing", "pin bar", "doji", "hammer", "pattern",
+                              "candlestick formation", "chart pattern"]):
+        return "pattern"
+
+    # Market structure signals
+    if any(k in t for k in ["support", "resistance", "order block", "supply zone",
+                              "demand zone", "fair value gap", "bos", "choch",
+                              "break of structure", "change of character", "liquidity",
+                              "swing high", "swing low", "market structure", "smart money",
+                              "institutional", "imbalance"]):
+        return "structure"
+
+    # Price action signals
+    if any(k in t for k in ["trend", "uptrend", "downtrend", "higher high", "lower low",
+                              "price action", "entry", "breakout", "pullback", "retracement",
+                              "trendline", "channel", "timeframe", "session", "multi-timeframe",
+                              "confluence"]):
+        return "price_action"
+
+    return "concept"
+
+
+# ── 2. CONTENT EXTRACTION ENGINE ─────────────────────────────────────────────
+
+def extract_diagram_context(title: str, content: str) -> dict:
+    """
+    Extracts key teaching elements from lesson content.
+    Returns structured context dict used to build targeted prompts.
+    """
+    ctx: dict = {
+        "concept": title,
+        "elements": [],
+        "values": {},
+        "intent": "",
+    }
+
+    text = content[:1200] if content else ""
+
+    # Extract price values (e.g. 1.0850, 1.0800)
+    prices = re.findall(r'1\.\d{4}', text)
+    if len(prices) >= 1:
+        ctx["values"]["price_a"] = prices[0]
+    if len(prices) >= 2:
+        ctx["values"]["price_b"] = prices[1]
+    if len(prices) >= 3:
+        ctx["values"]["price_c"] = prices[2]
+
+    # Extract pip values
+    pips = re.findall(r'(\d+)\s*pip', text, re.IGNORECASE)
+    if pips:
+        ctx["values"]["pips"] = pips[0]
+
+    # Extract R:R ratios
+    rr = re.findall(r'(\d+:\d+|\d+\.\d+\s*R)', text, re.IGNORECASE)
+    if rr:
+        ctx["values"]["rr"] = rr[0]
+
+    # Extract percentage values
+    pct = re.findall(r'(\d+(?:\.\d+)?)\s*%', text)
+    if pct:
+        ctx["values"]["pct"] = pct[0]
+
+    # Detect key elements mentioned
+    checks = {
+        "Entry":      ["entry", "buy at", "sell at", "open at"],
+        "Stop Loss":  ["stop loss", "stop at", "sl:", "sl ="],
+        "Take Profit":["take profit", "target", "tp:", "tp ="],
+        "Trend":      ["uptrend", "downtrend", "trend"],
+        "Support":    ["support", "demand zone"],
+        "Resistance": ["resistance", "supply zone"],
+        "Order Block":["order block", "ob zone"],
+        "Liquidity":  ["liquidity", "stop hunt"],
+        "RSI":        ["rsi", "relative strength"],
+        "MACD":       ["macd", "histogram"],
+        "Pattern":    ["head and shoulders", "double", "flag", "triangle"],
+    }
+    tl = text.lower()
+    for elem, keywords in checks.items():
+        if any(k in tl for k in keywords):
+            ctx["elements"].append(elem)
+
+    # Build intent summary (first 2 meaningful sentences)
+    sentences = [s.strip() for s in re.split(r'[.!?]', text) if len(s.strip()) > 20]
+    ctx["intent"] = ". ".join(sentences[:2]) if sentences else title
+
+    return ctx
+
+
+# ── 3. TEMPLATE-DRIVEN PROMPT SYSTEM ─────────────────────────────────────────
+
+def build_diagram_prompt(classification: str, context: dict, attempt: int = 0) -> str:
+    """
+    Returns a highly structured, classification-specific prompt.
+    Each template guides the AI with zero ambiguity.
+    attempt=1 adds "simplify diagram" for retry.
+    """
+    simplify = "\n\nIMPORTANT: Keep the diagram SIMPLE. Fewer elements, larger labels." if attempt > 0 else ""
+    vals = context.get("values", {})
+    elems = context.get("elements", [])
+    title = context.get("concept", "Forex Concept")
+    intent = context.get("intent", title)
+
+    pa = vals.get("price_a", "1.0850")
+    pb = vals.get("price_b", "1.0820")
+    pc = vals.get("price_c", "1.0890")
+    pips_val = vals.get("pips", "20")
+    rr_val = vals.get("rr", "1:2")
+    pct_val = vals.get("pct", "1")
+
+    if classification == "price_action":
+        return f"""Create an SVG price action diagram for: "{title}"
+
+CONTEXT: {intent}
+
+DRAW THIS EXACTLY:
+1. A price polyline showing an uptrend (rising from bottom-left to top-right)
+2. A horizontal dashed green line labeled "Entry {pa}" 
+3. A horizontal dashed red line below entry labeled "Stop Loss {pb}"
+4. A horizontal dashed green line above entry labeled "Take Profit {pc}"
+5. A filled yellow circle at the entry point on the price line
+6. A green upward arrow showing the expected move to TP
+7. Annotate the risk zone (red bracket) and reward zone (green bracket) on the right
+8. Title: "{title}" in purple at the top
+9. Footer text: "R:R = {rr_val} | Risk = {pips_val} pips"
+
+Use polyline for price, dashed lines for levels, circle for entry.{simplify}"""
+
+    if classification == "risk_management":
+        return f"""Create an SVG risk management diagram for: "{title}"
+
+CONTEXT: {intent}
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top
+2. Three horizontal bar comparisons side by side:
+   - Bar 1 (green, narrow): "1% risk — Safe" — account survives drawdown
+   - Bar 2 (yellow, medium): "2% risk — Moderate" — some drawdown  
+   - Bar 3 (red, wide): "5%+ risk — Danger" — severe drawdown
+3. Show dollar amounts or percentages on each bar
+4. Add labels: "Risk Per Trade" on x-axis
+5. Add a "DANGER ZONE" red label above the 5% bar
+6. Footer: "Professional traders risk 0.5–2% per trade maximum"
+7. Show a formula box: "Lot Size = (Account × Risk%) ÷ (SL pips × Pip Value)"{simplify}"""
+
+    if classification == "indicator":
+        # Determine which indicator
+        tl = title.lower() + " " + intent.lower()
+        if "rsi" in tl or "strength" in tl:
+            return f"""Create an SVG RSI indicator panel for: "{title}"
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top
+2. A price chart panel (top 40% of SVG) — simple polyline showing price movement
+3. Below it, an RSI panel (bottom 50%) with:
+   - Horizontal red dashed line at y=70 labeled "70 Overbought"
+   - Horizontal green dashed line at y=30 labeled "30 Oversold"  
+   - Horizontal grey line at y=50 labeled "50 Midline"
+   - RSI line oscillating — dip into oversold zone then bounce up
+   - Mark the oversold point with a green circle and "BUY SIGNAL" label
+4. Footer: "RSI < 30 = Oversold (look to buy) | RSI > 70 = Overbought (look to sell)"{simplify}"""
+
+        if "macd" in tl:
+            return f"""Create an SVG MACD indicator diagram for: "{title}"
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top
+2. Price panel (top 35%) — upward trending polyline
+3. MACD panel (bottom 55%) with:
+   - Zero line across middle (grey dashed)
+   - MACD histogram bars: green bars above zero, red bars below zero
+   - MACD signal line (yellow) crossing above histogram = bullish signal
+   - Mark the crossover with a yellow circle labeled "Signal"
+   - Label: "MACD Line" and "Signal Line"
+4. Footer: "MACD crossover above zero = bullish momentum"{simplify}"""
+
+        # Generic indicator (Fibonacci, MA, etc.)
+        return f"""Create an SVG indicator/tool diagram for: "{title}"
+
+CONTEXT: {intent}
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top
+2. Price chart (polyline) showing a clear trend
+3. Overlay the key levels this indicator produces:
+   - For Fibonacci: horizontal lines at 23.6%, 38.2%, 50%, 61.8% with labels
+   - For Moving Average: a smooth curved line over price, labeled "MA20" and "MA50"
+   - Mark where price bounces off the key level with a green circle
+4. Annotate the trading signal clearly
+5. Footer: One-line explanation of how to use this indicator{simplify}"""
+
+    if classification == "pattern":
+        tl = title.lower()
+        if "head" in tl or "shoulder" in tl:
+            shape = "head_and_shoulders"
+        elif "double" in tl and "bottom" in tl:
+            shape = "double_bottom"
+        elif "double" in tl and "top" in tl:
+            shape = "double_top"
+        elif "flag" in tl or "pennant" in tl:
+            shape = "flag"
+        else:
+            shape = "generic"
+
+        shapes = {
+            "head_and_shoulders": """Draw a Head and Shoulders pattern:
+   - Left shoulder: smaller peak at left
+   - Head: taller central peak
+   - Right shoulder: smaller peak matching left
+   - Neckline: horizontal line connecting the two troughs
+   - Red downward arrow after right shoulder showing breakdown
+   - Label each part: "Left Shoulder", "Head", "Right Shoulder", "Neckline"
+   - Label "SELL SIGNAL" with red arrow pointing down after neckline break""",
+            "double_bottom": """Draw a Double Bottom (W pattern):
+   - Two equal lows connected by a peak in the middle
+   - Resistance line at the peak level (dashed)
+   - Green upward arrow after second bottom bounces
+   - Label: "Bottom 1", "Bottom 2", "Resistance", "BUY SIGNAL"
+   - Show price breaking above resistance with green arrow""",
+            "double_top": """Draw a Double Top (M pattern):
+   - Two equal highs connected by a trough in the middle  
+   - Support line at the trough level (dashed)
+   - Red downward arrow after second top rejects
+   - Label: "Top 1", "Top 2", "Support/Neckline", "SELL SIGNAL"
+   - Show price breaking below support with red arrow""",
+            "flag": """Draw a Bull Flag pattern:
+   - Strong vertical pole (sharp price surge upward)
+   - Consolidation channel sloping slightly downward (the flag)
+   - Breakout above channel with green arrow
+   - Label: "Pole", "Flag Channel", "Breakout"
+   - Show measured move target (same height as pole)""",
+            "generic": f"""Draw the chart pattern described by: "{title}"
+   - Show the recognizable shape of the pattern
+   - Label key points (peaks, troughs, necklines)
+   - Show the expected direction after pattern completes
+   - Mark entry point with yellow circle
+   - Mark target with green dashed line""",
+        }
+
+        return f"""Create an SVG chart pattern diagram for: "{title}"
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top
+2. {shapes[shape]}
+3. Entry circle (yellow) at the signal point
+4. Footer: "Wait for CONFIRMATION before entering — never trade a pattern in progress"{simplify}"""
+
+    if classification == "structure":
+        tl = title.lower()
+        if "order block" in tl:
+            detail = """Draw Order Block diagram:
+   - Price impulse: sharp move UP from a red bearish candle (the OB)
+   - Mark the last bearish candle before impulse with a green box labeled "Order Block"
+   - Dashed return path showing price retracing back to OB
+   - Yellow circle at OB zone labeled "Entry Zone"
+   - Green arrow from OB pointing up labeled "Expected Move"
+   - Label: "Displacement" on the impulse, "Mitigation" on the return"""
+        elif "liquidity" in tl:
+            detail = """Draw Liquidity Sweep diagram:
+   - Price approaching a cluster of equal lows (sell-side liquidity)
+   - Price dips BELOW the lows briefly (the sweep) — red wick
+   - Immediate rejection and recovery above the lows
+   - Mark the sweep zone with red shading labeled "Liquidity Swept"
+   - Green circle at recovery point labeled "Entry After Sweep"
+   - Show stops being triggered below with small "X" marks
+   - Green arrow showing the continuation move after sweep"""
+        elif "bos" in tl or "choch" in tl or "structure" in tl:
+            detail = """Draw Market Structure diagram:
+   - Uptrend with labeled Higher Highs (HH) and Higher Lows (HL)
+   - Mark each HH with green circle labeled "HH"
+   - Mark each HL with yellow circle labeled "HL"  
+   - Show a Break of Structure (BOS): price exceeds previous HH
+   - Mark BOS point with purple line and "BOS" label
+   - Show potential entry at next HL after BOS"""
+        else:
+            detail = """Draw Support and Resistance diagram:
+   - Price oscillating between two horizontal levels
+   - Red dashed line at top labeled "Resistance — sellers dominate"
+   - Green dashed line at bottom labeled "Support — buyers dominate"
+   - Show price bouncing off support (green arrows up)
+   - Show price rejecting resistance (red arrows down)
+   - Mark entry at support bounce with yellow circle"""
+
+        return f"""Create an SVG market structure diagram for: "{title}"
+
+CONTEXT: {intent}
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top
+2. {detail}
+3. Footer: One sentence explaining when to trade this structure{simplify}"""
+
+    # Default: concept diagram
+    return f"""Create an SVG educational diagram for the forex concept: "{title}"
+
+CONTEXT: {intent}
+
+DRAW THIS EXACTLY:
+1. Title: "{title}" in purple at top  
+2. A clear, minimal visual that illustrates the CORE concept:
+   - Use boxes, arrows, and labels to show relationships
+   - If it's a calculation: show the formula in a highlighted box with an example
+   - If it's a comparison: use side-by-side labeled sections
+   - If it's a process: use a simple flowchart with numbered steps
+   - If it's a market concept: show a simple annotated price example
+3. Use green for positive/bullish outcomes, red for negative/bearish
+4. Keep it simple — 5 to 8 elements maximum
+5. Footer: One-sentence key takeaway{simplify}"""
+
+
+# ── 4. MASTER SYSTEM PROMPT ───────────────────────────────────────────────────
+
+_SVG_SYSTEM_PROMPT = """You are a professional SVG diagram generator for a forex trading education platform used by thousands of students.
+
+OUTPUT RULES — MUST FOLLOW EXACTLY:
+- Output ONLY raw SVG. Zero markdown. Zero explanation. Zero code fences.
+- First character of output must be: <
+- Last characters must be: </svg>
+- If you cannot comply, output: <svg class="ac-svg-diagram" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="220" fill="#0d1117" rx="8"/><text x="240" y="110" text-anchor="middle" fill="#a78bfa" font-size="14">Diagram unavailable</text></svg>
+
+SVG SPECIFICATIONS:
+- Opening tag: <svg class="ac-svg-diagram" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+- Root background rect: <rect width="480" height="220" fill="#0d1117" rx="8"/>
+- viewBox: always "0 0 480 220"
+- No external references. No images. No scripts. Inline only.
+- All text: font-family="Inter, sans-serif"
+
+COLOR SYSTEM (use ONLY these):
+- #a78bfa — Title text, labels, purple accents
+- #34d399 — Bullish, profit, green zones, upward arrows
+- #f87171 — Bearish, loss, red zones, downward arrows
+- #fbbf24 — Entry points, highlights, key annotations
+- #60a5fa — Secondary labels, neutral info, blue accents
+- #9ca3af — Body text, descriptions
+- #6b7280 — Footer text, muted labels
+- #1f2937 — Dark panel backgrounds
+- #e5e7eb — White text on dark backgrounds
+- #f59e0b — Orange accents, warnings
+
+LAYOUT RULES:
+- Title: centered text at x="240" y="16", fill="#a78bfa", font-size="11", font-weight="bold"
+- Footer: centered text at x="240" y="210", fill="#6b7280", font-size="9"
+- Main content: between y=25 and y=200
+- Leave 20px padding on left and right (x=20 to x=460)
+- Price lines: use <polyline> not <path> unless curves are needed
+- Key levels: horizontal <line> with stroke-dasharray="4" 
+- Entry points: <circle r="5"> filled yellow
+- Arrows: use <polygon> or simple lines with markers
+- Labels next to elements, never overlapping
+
+QUALITY STANDARDS:
+- Every diagram must be immediately understandable by a beginner
+- Show actual price numbers or percentages where relevant
+- Use arrows to show direction of price movement
+- Annotate every key element
+- Minimum 6 elements, maximum 20 elements"""
+
+
+# ── 5. SVG VALIDATION LAYER ───────────────────────────────────────────────────
+
+def validate_svg(svg: str) -> bool:
+    """
+    Validates AI-generated SVG before saving to DB.
+    Returns False if invalid — triggers retry or fallback.
+    """
+    if not svg or not isinstance(svg, str):
+        return False
+    svg = svg.strip()
+    if not svg.startswith("<svg"):
+        return False
+    if not svg.rstrip().endswith("</svg>"):
+        return False
+    if len(svg) < 200:       # Too short — likely a stub
+        return False
+    if len(svg) > 30000:     # Too long — runaway generation
+        return False
+    if "<script" in svg.lower():    # Security: no scripts
+        return False
+    if "javascript:" in svg.lower():
+        return False
+    if 'class="ac-svg-diagram"' not in svg:
+        return False
+    # Must have at least a title text element
+    if svg.count("<text") < 1:
+        return False
+    return True
+
+
+def _fallback_svg(title: str, classification: str) -> str:
+    """Returns a clean minimal SVG when generation fails completely."""
+    icons = {
+        "price_action":    "📈",
+        "risk_management": "🛡️",
+        "indicator":       "📊",
+        "pattern":         "🔷",
+        "structure":       "🏗️",
+        "concept":         "💡",
+    }
+    icon = icons.get(classification, "📊")
+    safe_title = title.replace('"', "'")[:50]
+    return f'''<svg class="ac-svg-diagram" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+  <rect width="480" height="220" fill="#0d1117" rx="8"/>
+  <rect x="20" y="30" width="440" height="160" fill="#111827" stroke="#1f2937" rx="6"/>
+  <text x="240" y="16" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">{safe_title}</text>
+  <text x="240" y="110" text-anchor="middle" fill="#374151" font-size="48">{icon}</text>
+  <text x="240" y="155" text-anchor="middle" fill="#4b5563" font-size="12">Visual diagram for this lesson</text>
+  <text x="240" y="175" text-anchor="middle" fill="#374151" font-size="10">Open the lesson to study the concepts</text>
+  <text x="240" y="210" text-anchor="middle" fill="#6b7280" font-size="9">Trading Academy — Pipways</text>
+</svg>'''
+
+
+# ── 6. MAIN GENERATION FUNCTION WITH RETRY ────────────────────────────────────
+
+async def _generate_diagram(lesson_title: str, lesson_content: str, level_name: str) -> str:
+    """
+    Production diagram generation pipeline:
+    1. Classify lesson type
+    2. Extract structured context  
+    3. Build targeted prompt from template
+    4. Call Anthropic API
+    5. Validate SVG output
+    6. Retry up to 2 times on failure
+    7. Return fallback SVG if all attempts fail
+    """
+    if not _ANTHROPIC_KEY:
+        print("[AI DIAGRAM] ANTHROPIC_API_KEY not set — returning fallback.", flush=True)
+        classification = classify_lesson(lesson_title, lesson_content)
+        return _fallback_svg(lesson_title, classification)
+
+    # Step 1 & 2: Classify and extract context
+    classification = classify_lesson(lesson_title, lesson_content)
+    context = extract_diagram_context(lesson_title, lesson_content)
+    context["concept"] = lesson_title
+
+    print(f"[AI DIAGRAM] Lesson: '{lesson_title}' | Class: {classification} | Level: {level_name}", flush=True)
+
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            # Step 3: Build template-driven prompt
+            prompt = build_diagram_prompt(classification, context, attempt)
+
+            # Step 4: Call API
+            async with httpx.AsyncClient(timeout=45) as client:
+                res = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": _ANTHROPIC_KEY,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": "claude-sonnet-4-20250514",
+                        "max_tokens": 2500,
+                        "system": _SVG_SYSTEM_PROMPT,
+                        "messages": [{"role": "user", "content": prompt}],
+                    }
+                )
+
+            if res.status_code != 200:
+                print(f"[AI DIAGRAM] API error {res.status_code} (attempt {attempt+1})", flush=True)
+                continue
+
+            # Extract text from response
+            data = res.json()
+            svg_text = "".join(
+                block.get("text", "")
+                for block in data.get("content", [])
+                if block.get("type") == "text"
+            ).strip()
+
+            # Clean up any code fences
+            svg_text = re.sub(r"^```[a-z]*\n?", "", svg_text, flags=re.IGNORECASE)
+            svg_text = re.sub(r"\n?```$", "", svg_text).strip()
+
+            # Extract SVG if embedded in text
+            if not svg_text.startswith("<svg"):
+                match = re.search(r"<svg[\s\S]*?</svg>", svg_text, re.DOTALL)
+                if match:
+                    svg_text = match.group(0).strip()
+
+            # Ensure required class
+            if svg_text.startswith("<svg") and 'class="ac-svg-diagram"' not in svg_text:
+                svg_text = svg_text.replace("<svg ", '<svg class="ac-svg-diagram" ', 1)
+
+            # Step 5: Validate
+            if validate_svg(svg_text):
+                print(f"[AI DIAGRAM] ✅ Generated (attempt {attempt+1}): {lesson_title}", flush=True)
+                return svg_text
+            else:
+                print(f"[AI DIAGRAM] Invalid SVG on attempt {attempt+1} for: {lesson_title}", flush=True)
+
+        except Exception as e:
+            print(f"[AI DIAGRAM] Attempt {attempt+1} error: {e}", flush=True)
+
+    # Step 7: All attempts failed — return clean fallback
+    print(f"[AI DIAGRAM] All {max_attempts} attempts failed — using fallback for: {lesson_title}", flush=True)
+    return _fallback_svg(lesson_title, classification)
+
+
+def _has_diagram(content: str) -> bool:
+    """Check if lesson content already has an SVG diagram."""
+    return bool(content and ("<svg" in content or "ac-svg-diagram" in content))
+
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PYDANTIC MODELS
@@ -158,7 +701,7 @@ async def _check_and_award_badges(user_id: int, lesson_id: int = None, quiz_scor
             """SELECT level_id, COUNT(*) as total
                FROM learning_modules m
                JOIN learning_lessons l ON l.module_id = m.id
-               GROUP BY level_id"""
+               GROUP BY level_id""", {}
         )
         level_map = {r["level_id"]: r["cnt"]   for r in level_counts} if level_counts else {}
         total_map = {r["level_id"]: r["total"] for r in level_totals} if level_totals else {}
@@ -470,7 +1013,7 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
                                  "total": 0, "completed": 0, "percent": 0.0})
 
         total_lessons     = await database.fetch_val("SELECT COUNT(*) FROM learning_lessons") or 0
-        completed_lessons = sum(1 for p in (rows or []) if p and p.get("completed"))
+        completed_lessons = sum(1 for p in (rows or []) if p and p["completed"])
 
         return {
             "user_id":          user_id,
@@ -525,7 +1068,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
             "SELECT first_academy_visit, weak_topics FROM user_learning_profile WHERE user_id=:uid",
             {"uid": user_id}
         )
-        first_visit = (not profile) or bool(profile.get("first_academy_visit", True))
+        first_visit = (not profile) or bool((dict(profile).get("first_academy_visit", True) if profile else True))
 
         next_lesson = await database.fetch_one(
             """SELECT l.id, l.title FROM learning_lessons l
@@ -541,7 +1084,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
                    "from Forex fundamentals to professional strategy. Each lesson builds on the last — "
                    "take them in order and complete every quiz before moving on.")
         else:
-            weak_raw = profile.get("weak_topics", "[]") if profile else "[]"
+            weak_raw = (dict(profile).get("weak_topics", "[]") if profile else "[]")
             try:
                 weak = json.loads(weak_raw) if isinstance(weak_raw, str) else (weak_raw or [])
             except Exception:
@@ -731,7 +1274,7 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
             "with real examples. Use practical analogies. Be concise (under 200 words). "
             "Format: brief overview, key insight, practical tip."
         )
-        content_preview = (lesson.get("content") or "")[:500]
+        content_preview = ((lesson["content"] if lesson and "content" in dict(lesson) else "") or "")[:500]
         explanation = await _ai(
             system,
             f"Teach the concept: '{lesson['title']}' at {lesson['level_name']} level. "
@@ -803,7 +1346,7 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
             'scenario, question, options [A,B,C,D], correct (A/B/C/D), explanation. '
             'No text outside JSON.'
         )
-        level = lesson.get("level_name", "Beginner").lower()
+        level = (lesson["level_name"] if lesson else "Beginner").lower()
         complexity = {
             "beginner":     "support/resistance identification",
             "intermediate": "trend context with S/R",
@@ -853,63 +1396,105 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ADMIN — Seed health + reseed
+# AI DIAGRAM ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/admin/academy/status")
-async def academy_status(current_user=Depends(get_current_user)):
-    """Returns DB row counts for all academy tables."""
+@router.get("/learning/lesson/{lesson_id}/diagram")
+async def get_lesson_diagram(lesson_id: int, current_user=Depends(get_current_user)):
+    """
+    Returns an SVG diagram for a lesson.
+    - Lesson already has SVG → return it immediately (cached in DB).
+    - No SVG yet → generate via Anthropic, save to DB, return it.
+    Generation happens ONCE per lesson. All future calls are instant.
+    """
     try:
-        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
-        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
-        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
-        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
-        levels  = r_lv["c"] if r_lv else 0
-        modules = r_mo["c"] if r_mo else 0
-        lessons = r_le["c"] if r_le else 0
-        quizzes = r_qu["c"] if r_qu else 0
-        return {
-            "levels":    levels,
-            "modules":   modules,
-            "lessons":   lessons,
-            "quizzes":   quizzes,
-            "is_seeded": levels > 0 and modules > 0 and lessons > 0,
-            "orphaned":  levels > 0 and modules == 0,
-        }
+        lesson = await database.fetch_one(
+            """SELECT l.id, l.title, l.content, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id = l.module_id
+               JOIN learning_levels lv ON lv.id = m.level_id
+               WHERE l.id = :lid""",
+            {"lid": lesson_id}
+        )
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+
+        existing_content = lesson["content"] or ""
+
+        # Already has diagram — extract and return it
+        if _has_diagram(existing_content):
+            match = re.search(r'<svg[^>]*class="ac-svg-diagram"[^>]*>.*?</svg>', existing_content, re.DOTALL)
+            if not match:
+                match = re.search(r'<svg[^>]*>.*?</svg>', existing_content, re.DOTALL)
+            if match:
+                return {"lesson_id": lesson_id, "svg": match.group(0), "cached": True}
+
+        # Generate new diagram via Anthropic
+        svg = await _generate_diagram(
+            lesson_title=lesson["title"],
+            lesson_content=existing_content,
+            level_name=lesson["level_name"],
+        )
+
+        if not svg:
+            return {"lesson_id": lesson_id, "svg": "", "cached": False, "error": "Generation unavailable"}
+
+        # Append SVG to lesson content in DB (permanent cache)
+        separator = "\n\n---\n\n## 📊 Chart Diagram\n\n"
+        new_content = existing_content.rstrip() + separator + svg
+        await database.execute(
+            "UPDATE learning_lessons SET content = :c WHERE id = :id",
+            {"c": new_content, "id": lesson_id},
+        )
+        print(f"[AI DIAGRAM] Saved to DB: lesson {lesson_id} — {lesson['title']}", flush=True)
+
+        return {"lesson_id": lesson_id, "svg": svg, "cached": False}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"Status check failed: {e}")
+        print(f"[AI DIAGRAM ERROR] get_lesson_diagram: {e}", flush=True)
+        raise HTTPException(500, f"Diagram generation failed: {e}")
 
 
-@router.post("/admin/academy/reseed")
-async def academy_reseed(current_user=Depends(get_current_user)):
-    """Admin only. Wipes curriculum and re-seeds from ACADEMY_CURRICULUM."""
+@router.post("/learning/lesson/{lesson_id}/diagram/regenerate")
+async def regenerate_lesson_diagram(lesson_id: int, current_user=Depends(get_current_user)):
+    """Admin only: force-regenerate the AI diagram for a lesson."""
     is_admin = _user_get(current_user, "is_admin", False)
     if not is_admin:
         raise HTTPException(403, "Admin only")
     try:
-        from .lms_init import seed_academy
-        print("[RESEED] Admin triggered full reseed — clearing curriculum...", flush=True)
-        await database.execute("DELETE FROM lesson_quizzes")
-        await database.execute("DELETE FROM learning_lessons")
-        await database.execute("DELETE FROM learning_modules")
-        await database.execute("DELETE FROM learning_levels")
-        print("[RESEED] Cleared. Seeding now...", flush=True)
-        await seed_academy()
-        r_lv = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_levels")
-        r_mo = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_modules")
-        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
-        r_qu = await database.fetch_one("SELECT COUNT(*) AS c FROM lesson_quizzes")
-        return {
-            "status":  "success",
-            "message": "Academy curriculum reseeded successfully",
-            "levels":  r_lv["c"] if r_lv else 0,
-            "modules": r_mo["c"] if r_mo else 0,
-            "lessons": r_le["c"] if r_le else 0,
-            "quizzes": r_qu["c"] if r_qu else 0,
-        }
+        lesson = await database.fetch_one(
+            """SELECT l.id, l.title, l.content, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id = l.module_id
+               JOIN learning_levels lv ON lv.id = m.level_id
+               WHERE l.id = :lid""",
+            {"lid": lesson_id}
+        )
+        if not lesson:
+            raise HTTPException(404, "Lesson not found")
+
+        # Strip previous AI diagram section
+        clean = re.sub(
+            r'\n*---\n+## 📊 (AI-Generated Diagram|Chart Diagram)\n+<svg.*?</svg>',
+            '', lesson["content"] or "", flags=re.DOTALL
+        ).rstrip()
+
+        svg = await _generate_diagram(lesson["title"], clean, lesson["level_name"])
+        if not svg:
+            raise HTTPException(503, "Diagram generation unavailable — check ANTHROPIC_API_KEY")
+
+        new_content = clean + "\n\n---\n\n## 📊 Chart Diagram\n\n" + svg
+        await database.execute(
+            "UPDATE learning_lessons SET content = :c WHERE id = :id",
+            {"c": new_content, "id": lesson_id},
+        )
+        return {"status": "success", "lesson_id": lesson_id, "title": lesson["title"], "svg": svg}
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[RESEED ERROR] {e}", flush=True)
-        raise HTTPException(500, f"Reseed failed: {e}")
+        raise HTTPException(500, str(e))
 
 # ══════════════════════════════════════════════════════════════════════════════
 # INTERNAL HELPERS
@@ -965,8 +1550,8 @@ async def _update_learning_profile(user_id: int, wrong_slugs: list, correct_slug
             {"uid": user_id}
         )
         if existing:
-            cur_weak   = _parse_json(existing.get("weak_topics"))
-            cur_strong = _parse_json(existing.get("strong_topics"))
+            cur_weak   = _parse_json((existing["weak_topics"] if existing else "[]"))
+            cur_strong = _parse_json((existing["strong_topics"] if existing else "[]"))
             new_weak   = list(set(cur_weak   + wrong_slugs)   - set(correct_slugs))
             new_strong = list(set(cur_strong + correct_slugs))
             await database.execute(

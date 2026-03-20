@@ -140,17 +140,22 @@ async def get_progress(current_user=Depends(get_current_user)):
     rows = await _all(
         """
         SELECT c.id AS course_id, c.title,
-               COALESCE(c.lesson_count, 0)            AS total_lessons,
-               COALESCE(c.instructor, '')             AS instructor,
+               -- FIX: Use live COUNT instead of stale lesson_count column
+               COUNT(DISTINCT l.id)                       AS total_lessons,
+               COALESCE(c.instructor, '')                 AS instructor,
                COALESCE(c.thumbnail_url, c.thumbnail, '') AS thumbnail_url,
-               COALESCE(up.progress_percent, 0)       AS progress_percent,
-               COALESCE(up.completed_lessons, 0)      AS completed_lessons,
+               COALESCE(up.progress_percent, 0)           AS progress_percent,
+               COALESCE(up.completed_lessons, 0)          AS completed_lessons,
                up.completed_at, up.last_accessed
         FROM courses c
+        LEFT JOIN lessons l
+               ON l.course_id = c.id AND COALESCE(l.is_active, TRUE) = TRUE
         LEFT JOIN user_progress up
                ON c.id = up.course_id AND up.user_id = :uid
         WHERE COALESCE(c.is_active, TRUE) = TRUE
            OR COALESCE(c.is_published, FALSE) = TRUE
+        GROUP BY c.id, c.title, c.instructor, c.thumbnail_url, c.thumbnail,
+                 up.progress_percent, up.completed_lessons, up.completed_at, up.last_accessed
         ORDER BY up.last_accessed DESC NULLS LAST
         """,
         {"uid": user_id},

@@ -16,45 +16,71 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
     <script>
-    // Configure marked v4 + lightweight fallback renderer
-    if (typeof marked !== "undefined") {
-        try { marked.setOptions({ breaks: true, gfm: true }); } catch(_) {}
-    }
+    // ── Pipways Markdown Renderer ─────────────────────────────────────────
+    // Self-contained — no external library dependency
+    // Handles: **bold**, *italic*, `code`, bullet lists, numbered lists, line breaks
+    (function() {
+        function renderMd(text) {
+            if (!text) return '';
 
-    // Lightweight markdown renderer — works even if marked fails
-    function _renderMd(text) {
-        if (!text) return '';
-        try {
-            if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-                const result = marked.parse(text);
-                // marked v4 returns string synchronously; v9+ may return Promise
-                if (typeof result === 'string') return result;
+            // Process line by line for accurate list and paragraph detection
+            var lines = text.split('\n');
+            var output = [];
+            var inList = false;
+            var listType = 'ul';
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+
+                // Detect bullet list items: • or - or * at start
+                var bulletMatch = line.match(/^[•\-\*] (.+)$/);
+                // Detect numbered list items: 1. 2. etc
+                var numberedMatch = line.match(/^\d+\.\s+(.+)$/);
+
+                if (bulletMatch || numberedMatch) {
+                    var lt = bulletMatch ? 'ul' : 'ol';
+                    if (!inList) {
+                        output.push('<' + lt + '>');
+                        inList = true;
+                        listType = lt;
+                    }
+                    var itemText = bulletMatch ? bulletMatch[1] : numberedMatch[1];
+                    output.push('<li>' + inlineFormat(itemText) + '</li>');
+                } else {
+                    if (inList) {
+                        output.push('</' + listType + '>');
+                        inList = false;
+                    }
+                    if (line.trim() === '') {
+                        // Empty line = paragraph break
+                        output.push('<br>');
+                    } else {
+                        output.push('<p>' + inlineFormat(line) + '</p>');
+                    }
+                }
             }
-        } catch(_) {}
-        // Fallback: manual renderer
-        return text
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            // Bold
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            // Italic
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            // Inline code
-            .replace(/`(.+?)`/g, '<code>$1</code>')
-            // Bullet points (• or - or *)
-            .replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-            // Line breaks
-            .replace(/
 
-/g, '</p><p>')
-            .replace(/
-/g, '<br>')
-            // Wrap in paragraph
-            .replace(/^(.+)$/, '<p>$1</p>');
-    }
-    window._renderMd = _renderMd;
+            if (inList) output.push('</' + listType + '>');
+            return output.join('');
+        }
+
+        function inlineFormat(text) {
+            // Escape HTML special chars first
+            text = text.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;');
+            // Bold: **text**
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            // Italic: *text* (not preceded/followed by another *)
+            text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+            // Inline code: `text`
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            return text;
+        }
+
+        window._renderMd = renderMd;
+    })();
     </script>
     <!-- Quill rich-text editor (blog editor only) -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">

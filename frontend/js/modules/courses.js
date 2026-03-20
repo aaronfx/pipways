@@ -118,7 +118,7 @@ const CoursesPage = (() => {
         const welcomeHTML = !welcomed ? _welcomeHTML() : '';
 
         root.innerHTML = `
-        <div class="courses-home" style="max-width:1100px;margin:0 auto;">
+        <div class="courses-home" style="width:100%;">
             ${welcomeHTML}
 
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;">
@@ -129,7 +129,7 @@ const CoursesPage = (() => {
                 <div id="courses-progress-summary" style="font-size:.8rem;color:#6b7280;"></div>
             </div>
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(290px,100%),1fr));gap:1.25rem;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:1.25rem;width:100%;">
                 ${_levelCard('Beginner',     byLevel.Beginner     || [], '#10b981', 'fa-play-circle', 'Video courses covering Forex fundamentals and first trade setup.')}
                 ${_levelCard('Intermediate', byLevel.Intermediate || [], '#3b82f6', 'fa-video',        'Structured video lessons on technical analysis and strategy building.')}
                 ${_levelCard('Advanced',     byLevel.Advanced     || [], '#f59e0b', 'fa-graduation-cap','Expert video courses — institutional concepts, SMC and live trade analysis.')}
@@ -281,11 +281,9 @@ const CoursesPage = (() => {
                 const total = data.total_courses    || 0;
                 const pct   = data.overall_progress || 0;
                 el.innerHTML = `
-                    <span style="color:#6b7280;">${done}/${total} video courses complete</span>
-                    <span style="margin:0 .5rem;color:#374151;">·</span>
-                    <span style="color:#a78bfa;font-weight:600;">${pct}% overall</span>
-                    <span style="margin:0 .5rem;color:#374151;">·</span>
-                    <a href="/academy" style="color:#34d399;font-size:.75rem;text-decoration:none;">Free Academy →</a>`;
+                    <span style="color:#6b7280;">${done}/${total} video courses</span>
+                    <span style="margin:0 .4rem;color:#374151;">·</span>
+                    <span style="color:#a78bfa;font-weight:600;">${pct}%</span>`;
             }
         } catch (_) {}
     }

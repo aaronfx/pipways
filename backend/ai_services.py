@@ -748,8 +748,11 @@ async def ask_mentor(
             # Also fetch performance data if user has trades
             if request.include_platform_context:
                 gather_tasks += [
+                    # Try multiple possible performance endpoints — route prefix may vary
                     client.get(f"{base_url}/ai/performance/dashboard", headers=headers, timeout=8.0),  # 6
                     client.get(f"{base_url}/courses/list", headers=headers, timeout=6.0),              # 7
+                    client.get(f"{base_url}/performance/dashboard", headers=headers, timeout=8.0),     # 8 alt prefix
+                    client.get(f"{base_url}/ai/performance/summary", headers=headers, timeout=8.0),    # 9 alt name
                 ]
 
             results = await asyncio.gather(*gather_tasks, return_exceptions=True)
@@ -804,18 +807,40 @@ async def ask_mentor(
 
             # ── Performance (if include_platform_context) ────────────────
             if request.include_platform_context and len(results) > 6:
-                perf_data = _safe_json(results[6], None)
-                if perf_data and isinstance(perf_data, dict):
+                # Try all performance endpoint results (indices 6, 8, 9)
+                perf_data = None
+                for perf_idx in [6, 8, 9]:
+                    if perf_idx < len(results):
+                        candidate = _safe_json(results[perf_idx], None)
+                        if candidate and isinstance(candidate, dict):
+                            # Check it has actual trade data
+                            stats_check = candidate.get("statistics") or candidate.get("stats") or candidate
+                            if stats_check.get("total_trades") or stats_check.get("win_rate"):
+                                perf_data = candidate
+                                print(f"[MENTOR] Found performance data at results[{perf_idx}]", flush=True)
+                                break
+
+                if perf_data:
                     stats = perf_data.get("statistics") or perf_data.get("stats") or perf_data
-                    if stats.get("total_trades"):
+                    ai_coach = perf_data.get("ai_coach") or {}
+                    total = stats.get("total_trades", 0)
+                    print(f"[MENTOR] Performance: {total} trades, win_rate={stats.get('win_rate')}", flush=True)
+                    if total:
                         platform_context["performance"] = {
-                            "total_trades":  stats.get("total_trades", 0),
-                            "win_rate":      f"{stats.get('win_rate', 0)}%",
-                            "profit_factor": stats.get("profit_factor", 0),
-                            "net_pnl":       f"${stats.get('net_pnl', 0):.2f}",
-                            "max_drawdown":  f"${stats.get('max_drawdown', 0):.2f}",
-                            "grade":         perf_data.get("overall_grade", "N/A"),
+                            "total_trades":    total,
+                            "win_rate":        f"{stats.get('win_rate', 0)}%",
+                            "profit_factor":   stats.get("profit_factor", 0),
+                            "net_pnl":         f"${stats.get('net_pnl', 0):.2f}",
+                            "max_drawdown":    f"${stats.get('max_drawdown', 0):.2f}",
+                            "avg_rr":          stats.get("avg_rr_ratio", 0),
+                            "grade":           perf_data.get("overall_grade", "N/A"),
+                            "discipline":      ai_coach.get("discipline_score", 0),
+                            "best_pair":       stats.get("best_pair") or stats.get("best_symbol", ""),
+                            "worst_pair":      stats.get("worst_pair") or stats.get("worst_symbol", ""),
+                            "summary":         ai_coach.get("summary") or ai_coach.get("analysis") or "",
                         }
+                else:
+                    print(f"[MENTOR] No performance data found across all endpoints", flush=True)
 
                 courses_data = _safe_json(results[7], [])
                 if courses_data:
@@ -833,7 +858,10 @@ async def ask_mentor(
     if q_lower_cmd in ("/signals", "signals"):
         if platform_context.get("signals_detail"):
             sigs_text = "\n".join(f"  • {s}" for s in platform_context["signals_detail"])
-            slash_override = f"Active Market Signals right now:\n{sigs_text}\nPlease analyse these signals and tell me which looks strongest and why."
+            slash_override = (
+                f"Active Market Signals right now:\n{sigs_text}\n"
+                f"Please analyse these signals and tell me which looks strongest and why."
+            )
         else:
             slash_override = "What market signals should I be watching right now? I have no active signals currently."
 
@@ -954,13 +982,19 @@ async def ask_mentor(
     # Performance analytics
     if platform_context.get("performance"):
         p = platform_context["performance"]
-        platform_lines.append(
-            f"  TRADE PERFORMANCE: {p['total_trades']} trades | "
-            f"Win rate: {p['win_rate']} | Profit factor: {p['profit_factor']} | "
-            f"Net P&L: {p['net_pnl']} | Grade: {p['grade']}"
-        )
+        perf_lines = [
+            f"  TRADE PERFORMANCE ({p['total_trades']} trades | Grade: {p['grade']}):",
+            f"    Win rate: {p['win_rate']} | Profit factor: {p['profit_factor']} | "
+            f"Avg R:R: {p['avg_rr']} | Net P&L: {p['net_pnl']}",
+            f"    Max drawdown: {p['max_drawdown']} | Discipline score: {p['discipline']}%",
+        ]
+        if p.get("best_pair"):
+            perf_lines.append(f"    Best pair: {p['best_pair']} | Worst pair: {p.get('worst_pair','?')}")
+        if p.get("summary"):
+            perf_lines.append(f"    AI coach insight: {p['summary'][:200]}")
+        platform_lines.extend(perf_lines)
     else:
-        platform_lines.append("  PERFORMANCE ANALYTICS: No trades imported yet")
+        platform_lines.append("  PERFORMANCE ANALYTICS: User has NOT imported trades yet — encourage them to do so")
 
     # Blog
     if platform_context.get("blog_posts"):
@@ -1013,33 +1047,35 @@ STRONG AREAS (well mastered): {strong_str}
 PLATFORM CONTEXT:
 {platform_str}
 
+OUTPUT FORMAT — ALWAYS use clean markdown:
+- Use **bold** for key terms, numbers, names
+- Use bullet points (•) for lists, NOT numbered lists unless ranking
+- Use short paragraphs — max 2-3 sentences each
+- Use emojis sparingly for visual breaks (✅ ⚠️ 📈 🎯) — max 2 per response
+- Never use # headers for short responses — only for /progress and /review-trades commands
+
 RESPONSE RULES:
-1. Keep responses under 180 words — be concise and actionable
-2. Address the user by their progress level (new vs returning)
-3. If they ask about a topic: give 1 quick insight, then reference the lesson card shown below
-4. If they ask about their performance or progress: reference their actual data above
-5. If they ask about signals or charts: mention those specific platform features
-6. ALWAYS end by pointing to the lesson card below (it appears automatically)
-7. Be warm, encouraging, and specific — not generic
+1. Be specific — always reference the user's ACTUAL data (progress %, lesson names, grade)
+2. If they ask about performance: use the real stats from TRADE PERFORMANCE above
+3. If they say they imported trades but you see "No trades yet": acknowledge they may have just done it and the data refreshes on next session
+4. If they ask about a topic: 1 key insight + reference the lesson card below
+5. If they use a slash command: give a structured breakdown using their real data
+6. Be warm, direct, and coach-like — not robotic or generic
+7. End responses that have lesson cards with: "👇 Check the lesson card below to go deeper."
 
-LESSON CARD: The specific lesson recommendation appears below your text automatically. Just say "Check the lesson below" — don't describe what's in it."""
-
-    # Build message array with conversation history for memory
-    history = request.conversation_history or []
-
-    # Keep last 8 exchanges (16 messages) to stay within token limits
-    trimmed_history = history[-16:] if len(history) > 16 else history
-
-    messages_arr = [{"role": "system", "content": system_prompt}]
-
-    for h in trimmed_history:
-        messages_arr.append({"role": h.role, "content": h.content[:800]})  # cap per msg
-
-    messages_arr.append({"role": "user", "content": question})
-
+LESSON CARD: Appears automatically below your response — just reference it, don't describe it."""
 
     try:
         async with httpx.AsyncClient() as client:
+            # Build message array with conversation history for memory
+            history = request.conversation_history or []
+            # Keep last 8 exchanges (16 messages) to stay within token limits
+            trimmed_history = history[-16:] if len(history) > 16 else history
+            messages_arr = [{"role": "system", "content": system_prompt}]
+            for h in trimmed_history:
+                messages_arr.append({"role": h.role, "content": h.content[:800]})
+            messages_arr.append({"role": "user", "content": question})
+
             response = await client.post(
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
@@ -1048,11 +1084,10 @@ LESSON CARD: The specific lesson recommendation appears below your text automati
                     "X-Title": "Pipways Trading Platform",
                     "Content-Type": "application/json"
                 },
-
                 json={
                     "model": OPENROUTER_MODEL,
                     "messages": messages_arr,
-                    "max_tokens": 350,
+                    "max_tokens": 600,
                     "temperature": 0.7
                 },
                 timeout=30.0
@@ -1076,9 +1111,9 @@ LESSON CARD: The specific lesson recommendation appears below your text automati
 
             ai_response = data["choices"][0]["message"]["content"]
 
-            # Truncate if still too long
-            if len(ai_response) > 600:
-                ai_response = ai_response[:597] + "..."
+            # Only truncate if extremely long (safety valve)
+            if len(ai_response) > 1800:
+                ai_response = ai_response[:1797] + "..."
 
             return {
                 "response": ai_response,

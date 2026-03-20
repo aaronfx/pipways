@@ -114,44 +114,87 @@ class ChartAnalyzeRequest(BaseModel):
 # ==========================================
 
 async def fetch_academy_structure(client: httpx.AsyncClient, base_url: str, token: str) -> AcademyStructure:
-    """Fetch full academy hierarchy: levels → modules → lessons"""
+    """
+    Fetch full academy hierarchy: levels → modules → lessons.
+    Uses parallel fetching per level to reduce total latency.
+    Logs detailed errors so failures are visible in Render logs.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
     try:
         levels_resp = await client.get(
             f"{base_url}/learning/levels",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0
+            headers=headers,
+            timeout=12.0
         )
         if levels_resp.status_code != 200:
+            print(f"[ACADEMY] /learning/levels returned {levels_resp.status_code} — empty structure", flush=True)
             return AcademyStructure(levels=[], modules={}, lessons={})
 
         levels = levels_resp.json()
+        if not levels:
+            print("[ACADEMY] /learning/levels returned empty list", flush=True)
+            return AcademyStructure(levels=[], modules={}, lessons={})
+
+        print(f"[ACADEMY] Fetched {len(levels)} levels", flush=True)
         modules_map = {}
         lessons_map = {}
 
-        for level in levels:
+        # Fetch modules for each level in parallel
+        import asyncio as _asyncio
+
+        async def fetch_level_modules(level):
             level_id = level.get("id")
-            mod_resp = await client.get(
-                f"{base_url}/learning/modules/{level_id}",
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=5.0
-            )
-            if mod_resp.status_code == 200:
-                modules = mod_resp.json()
-                modules_map[level_id] = modules
+            try:
+                mod_resp = await client.get(
+                    f"{base_url}/learning/modules/{level_id}",
+                    headers=headers,
+                    timeout=8.0
+                )
+                if mod_resp.status_code != 200:
+                    print(f"[ACADEMY] modules/{level_id} → {mod_resp.status_code}", flush=True)
+                    return level_id, [], {}
+                modules = mod_resp.json() or []
 
-                for module in modules:
+                # Fetch lessons for each module in parallel
+                local_lessons = {}
+                async def fetch_mod_lessons(module):
                     mod_id = module.get("id")
-                    les_resp = await client.get(
-                        f"{base_url}/learning/lessons/{mod_id}",
-                        headers={"Authorization": f"Bearer {token}"},
-                        timeout=5.0
-                    )
-                    if les_resp.status_code == 200:
-                        lessons_map[mod_id] = les_resp.json()
+                    try:
+                        les_resp = await client.get(
+                            f"{base_url}/learning/lessons/{mod_id}",
+                            headers=headers,
+                            timeout=8.0
+                        )
+                        if les_resp.status_code == 200:
+                            lessons = les_resp.json() or []
+                            return mod_id, lessons
+                        print(f"[ACADEMY] lessons/{mod_id} → {les_resp.status_code}", flush=True)
+                    except Exception as e:
+                        print(f"[ACADEMY] lessons/{mod_id} error: {e}", flush=True)
+                    return mod_id, []
 
+                lesson_results = await _asyncio.gather(*[fetch_mod_lessons(m) for m in modules])
+                for mod_id, lessons in lesson_results:
+                    if lessons:
+                        local_lessons[mod_id] = lessons
+
+                return level_id, modules, local_lessons
+            except Exception as e:
+                print(f"[ACADEMY] modules/{level_id} error: {e}", flush=True)
+                return level_id, [], {}
+
+        level_results = await _asyncio.gather(*[fetch_level_modules(lv) for lv in levels])
+        for level_id, modules, local_lessons in level_results:
+            if modules:
+                modules_map[level_id] = modules
+            lessons_map.update(local_lessons)
+
+        total_lessons = sum(len(v) for v in lessons_map.values())
+        print(f"[ACADEMY] Structure loaded: {len(levels)} levels, {len(modules_map)} modules with lessons, {total_lessons} total lessons", flush=True)
         return AcademyStructure(levels=levels, modules=modules_map, lessons=lessons_map)
+
     except Exception as e:
-        print(f"[ACADEMY] Structure error: {e}", flush=True)
+        print(f"[ACADEMY] Structure fetch failed: {type(e).__name__}: {e}", flush=True)
         return AcademyStructure(levels=[], modules={}, lessons={})
 
 async def fetch_user_academy_progress(client: httpx.AsyncClient, base_url: str, token: str, user_id: str) -> UserAcademyProgress:
@@ -223,35 +266,172 @@ def get_next_lessons(academy_structure: AcademyStructure, progress: UserAcademyP
                         return recommendations
     return recommendations
 
+def _kw_match(text: str, keyword: str) -> bool:
+    """
+    Word-boundary-aware keyword match.
+    Short terms (sma, ema, rsi, etc.) must appear as whole words to prevent
+    false positives like 'sma' matching inside 'smart money'.
+    """
+    import re as _re
+    _SHORT = {"sma", "ema", "rsi", "adx", "atr", "fvg", "bos", "ma", "r:r", "s/r", "mtf"}
+    if keyword in _SHORT:
+        return bool(_re.search(r"(?<![\w])" + _re.escape(keyword) + r"(?![\w])", text))
+    return keyword in text
+
+
 def find_relevant_lessons(question: str, academy_structure: AcademyStructure, progress: UserAcademyProgress) -> List[LessonRecommendation]:
-    """Find lessons matching question keywords"""
+    """
+    Two-layer keyword matching against real curriculum lesson titles.
+    Layer 1: User question → topic buckets (via question_triggers)
+    Layer 2: Topic buckets → lesson title fragments (via lesson_title_map)
+    Uses word-boundary matching for short terms to prevent false positives.
+    """
     recommendations = []
     completed_set = set(progress.completed_lessons)
     q_lower = question.lower()
 
-    topic_keywords = {
-        "support": ["support", "resistance", "s/r", "levels"],
-        "trend": ["trend", "uptrend", "downtrend"],
-        "risk": ["risk", "position size", "lot size", "drawdown", "money management"],
-        "indicator": ["rsi", "macd", "indicator", "oscillator", "moving average", "ma "],
-        "pattern": ["pattern", "candlestick", "head and shoulders", "flag", "pennant"],
-        "psychology": ["psychology", "emotion", "fear", "greed", "discipline", "mindset"],
-        "strategy": ["strategy", "system", "trading plan", "backtest"],
-        "fibonacci": ["fibonacci", "fib", "retracement", "extension"],
-        "structure": ["structure", "bos", "choch", "order block", "liquidity", "smart money"],
-        "foundation": ["foundation", "basics", "beginner", "forex", "intro", "start"],
-        "entry": ["entry", "entry point", "setup"],
-        "exit": ["exit", "take profit", "tp", "close trade"]
+    # ── Layer 1: Question keywords → topic buckets ─────────────────────────
+    question_triggers = {
+        "smc": [
+            "smart money", "smc", "order block", "institutional", "imbalance",
+            "fair value gap", "fvg", "bos", "choch", "break of structure",
+            "change of character", "liquidity sweep", "inducement",
+            "buy side", "sell side", "wyckoff",
+        ],
+        "liquidity": [
+            "liquidity", "stop hunt", "equal highs", "equal lows",
+            "swept", "sweep", "stop run", "fake out",
+        ],
+        "support": [
+            "support", "resistance", "s/r", "key level", "horizontal level",
+            "dynamic support", "dynamic resistance", "supply zone", "demand zone",
+        ],
+        "trend": [
+            "trend", "uptrend", "downtrend", "higher high", "lower low",
+            "higher low", "trending", "trendline", "trend line",
+        ],
+        "risk": [
+            "risk management", "position sizing", "position size", "lot size",
+            "drawdown", "money management", "stop loss", "risk per trade",
+            "how much to risk", "account risk", "portfolio",
+        ],
+        "rr": [
+            "risk reward", "r:r", "rr ratio", "take profit", "reward to risk",
+            "risk to reward",
+        ],
+        "indicator": [
+            "indicator", "oscillator", "rsi", "macd", "moving average",
+            "ema", "sma", "bollinger", "stochastic", "adx", "atr",
+        ],
+        "fibonacci": [
+            "fibonacci", "fib retracement", "fib level", "fib extension",
+            "golden ratio", "0.618", "0.382",
+        ],
+        "pattern": [
+            "chart pattern", "head and shoulders", "double top", "double bottom",
+            "flag pattern", "pennant", "wedge", "triangle", "cup and handle",
+            "engulfing", "pin bar", "doji", "hammer",
+        ],
+        "candlestick": [
+            "candlestick", "candle reading", "candle wick", "candle body",
+            "inside bar", "outside bar", "bullish candle", "bearish candle",
+        ],
+        "timeframe": [
+            "timeframe", "time frame", "h4", "h1", "m15", "daily chart",
+            "multi timeframe", "mtf", "trading session", "london session",
+            "new york session", "asian session", "best time to trade",
+        ],
+        "strategy": [
+            "trading strategy", "trading plan", "trading system", "backtest",
+            "trading rules", "methodology", "trade setup", "my strategy",
+        ],
+        "performance": [
+            "performance", "trade journal", "win rate", "profit factor",
+            "expectancy", "tracking trades", "review my trades",
+        ],
+        "psychology": [
+            "psychology", "emotion", "fear", "greed", "discipline",
+            "mindset", "revenge trade", "fomo", "overtrading", "patience",
+        ],
+        "foundation": [
+            "what is forex", "how does forex work", "currency pair explained",
+            "what is a pip", "what is spread", "what is leverage",
+            "how to start trading", "new to forex", "forex for beginners",
+        ],
+        "confluence": [
+            "confluence", "multiple signals", "combine indicators",
+            "confirmation signal", "align timeframes",
+        ],
     }
 
+    # ── Layer 2: Topic bucket → lesson/module title fragments ──────────────
+    # Fragments are substrings of real lesson/module titles from the curriculum.
+    lesson_title_map = {
+        "smc": [
+            "order block", "institutional", "market structure and smart money",
+            "liquidity and market structure",
+        ],
+        "liquidity": [
+            "liquidity and market structure", "market structure and smart money",
+        ],
+        "support": [
+            "support and resistance", "dynamic support",
+        ],
+        "trend": [
+            "identifying trend", "trend analysis", "multiple timeframe",
+        ],
+        "risk": [
+            "risk management", "1-2% rule", "stop loss and take profit",
+            "position sizing", "advanced risk", "portfolio heat",
+        ],
+        "rr": [
+            "stop loss and take profit", "expectancy", "risk management",
+        ],
+        "indicator": [
+            "momentum indicator", "moving average strategies", "technical indicator",
+            "fibonacci",
+        ],
+        "fibonacci": [
+            "fibonacci",
+        ],
+        "pattern": [
+            "chart pattern", "candlestick chart",
+        ],
+        "candlestick": [
+            "candlestick chart", "candlestick",
+        ],
+        "timeframe": [
+            "trading session", "multiple timeframe", "best times to trade",
+        ],
+        "strategy": [
+            "trading system", "backtesting", "creating your trading",
+            "trading plan", "complete trading plan",
+        ],
+        "performance": [
+            "performance review", "expectancy", "profit factor", "backtesting",
+        ],
+        "psychology": [
+            "psychology", "trading plan", "performance review",
+        ],
+        "foundation": [
+            "what is forex", "who trades forex", "currency pairs and price",
+            "major, minor", "reading pips", "introduction to forex",
+        ],
+        "confluence": [
+            "confluence", "multiple timeframe", "fibonacci and advanced",
+        ],
+    }
+
+    # ── Match question → topic buckets ─────────────────────────────────────
     matched_topics = []
-    for topic, keywords in topic_keywords.items():
-        if any(kw in q_lower for kw in keywords):
+    for topic, triggers in question_triggers.items():
+        if any(_kw_match(q_lower, kw) for kw in triggers):
             matched_topics.append(topic)
 
     if not matched_topics:
         return []
 
+    # ── Search academy structure for matching lessons ──────────────────────
     for level in academy_structure.levels:
         level_id = level.get("id")
         level_name = level.get("name")
@@ -259,7 +439,7 @@ def find_relevant_lessons(question: str, academy_structure: AcademyStructure, pr
 
         for module in modules:
             mod_id = module.get("id")
-            mod_name = module.get("title")
+            mod_name = module.get("title", "")
             mod_title_lower = mod_name.lower()
             lessons = academy_structure.lessons.get(mod_id, [])
 
@@ -269,15 +449,16 @@ def find_relevant_lessons(question: str, academy_structure: AcademyStructure, pr
 
                 matches = False
                 for topic in matched_topics:
-                    if topic in lesson_title_lower or topic in mod_title_lower:
-                        matches = True
+                    frags = lesson_title_map.get(topic, [topic])
+                    for frag in frags:
+                        if frag in lesson_title_lower or frag in mod_title_lower:
+                            matches = True
+                            break
+                    if matches:
                         break
 
                 if matches:
-                    reason = "recommended"
-                    if lesson_id in completed_set:
-                        reason = "remedial"
-
+                    reason = "remedial" if lesson_id in completed_set else "recommended"
                     recommendations.append(LessonRecommendation(
                         type="lesson",
                         title=lesson.get("title"),
@@ -292,9 +473,12 @@ def find_relevant_lessons(question: str, academy_structure: AcademyStructure, pr
                         reason=reason
                     ))
 
-    # Sort: incomplete first, then by level
+    # Sort: incomplete lessons first, then by curriculum level order
     sorted_levels = {lvl["id"]: idx for idx, lvl in enumerate(academy_structure.levels)}
-    recommendations.sort(key=lambda x: (x.metadata.get("completed", False), sorted_levels.get(x.metadata.get("level_id"), 999)))
+    recommendations.sort(key=lambda x: (
+        x.metadata.get("completed", False),
+        sorted_levels.get(x.metadata.get("level_id"), 999)
+    ))
 
     return recommendations[:3]
 
@@ -332,15 +516,29 @@ def generate_lesson_recommendations(
                     reason="foundational"
                 )]
 
-    # Empty academy fallback
-    return [LessonRecommendation(
-        type="lesson",
-        title="Trading Academy",
-        description="Start your learning journey",
-        url="/academy.html",
-        metadata={},
-        reason="foundational"
-    )]
+    # Academy structure empty — use static fallback lessons
+    # These are the first 3 lessons from the standard Pipways curriculum
+    # so users always get a meaningful starting point even when DB fetch fails
+    static_fallbacks = [
+        LessonRecommendation(
+            type="lesson",
+            title="What is Forex Trading?",
+            description="Introduction to Forex Trading • Beginner",
+            url="/academy.html",
+            metadata={"lesson_id": None, "static": True},
+            reason="foundational"
+        ),
+        LessonRecommendation(
+            type="lesson",
+            title="The 1-2% Rule",
+            description="Basic Risk Management • Beginner",
+            url="/academy.html",
+            metadata={"lesson_id": None, "static": True},
+            reason="foundational"
+        ),
+    ]
+    # Filter to one and return — keeps recommendation count consistent
+    return [static_fallbacks[0]]
 
 # ==========================================
 # HELPER FUNCTIONS
@@ -467,9 +665,15 @@ async def ask_mentor(
     # Gather Academy context
     auth_header = req.headers.get("authorization", "")
     token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
-    base_url = str(req.base_url).rstrip("/")
-    if not base_url or base_url == "http://":
-        base_url = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+    # Build base URL — req.base_url can return http:// on Render/proxied deployments
+    # which causes HTTPS redirects that strip auth headers → 401 → empty academy structure
+    raw_base = str(req.base_url).rstrip("/")
+    if not raw_base or raw_base in ("http://", "https://"):
+        raw_base = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+    # Force HTTPS for non-localhost URLs to prevent redirect loops
+    if raw_base.startswith("http://") and "localhost" not in raw_base and "127.0.0.1" not in raw_base:
+        raw_base = raw_base.replace("http://", "https://", 1)
+    base_url = raw_base
 
     user_id = str(current_user.get("id", "anonymous")) if isinstance(current_user, dict) else str(getattr(current_user, "id", "anonymous"))
 
@@ -664,16 +868,18 @@ async def get_mentor_insights(
         ],
         "recommended_resources": [
             {
-                "type": "course",
-                "title": "Trading Foundations",
-                "description": "Build a solid base before anything else",
-                "url": "/academy.html"
+                "type": "lesson",
+                "title": "What is Forex Trading?",
+                "description": "Introduction to Forex Trading • Beginner — the essential first lesson",
+                "url": "/academy.html",
+                "metadata": {"lesson_id": None, "note": "Open academy to start"}
             },
             {
                 "type": "lesson",
-                "title": "Risk Management Basics",
-                "description": "The single most important skill for every trader",
-                "url": "/academy.html?topic=risk"
+                "title": "The 1-2% Rule",
+                "description": "Basic Risk Management • Beginner — protect your account from day one",
+                "url": "/academy.html",
+                "metadata": {"lesson_id": None, "note": "Open academy to find this lesson"}
             }
         ]
     }

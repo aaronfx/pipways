@@ -291,9 +291,14 @@ _COLUMN_MIGRATIONS = [
     # BUG FIX: The live table may have been created by an older migration that
     # lacked these columns.  CREATE TABLE IF NOT EXISTS never patches existing
     # tables, so every column that can be missing needs its own ADD COLUMN.
-    ("course_modules", "description", "TEXT",    "DEFAULT ''"),
-    ("course_modules", "order_index", "INTEGER", "DEFAULT 0"),
+    ("course_modules", "description",  "TEXT",    "DEFAULT ''"),
+    ("course_modules", "order_index",  "INTEGER", "DEFAULT 0"),
+    ("course_modules", "is_published", "BOOLEAN", "DEFAULT TRUE"),
+    ("course_modules", "course_id",    "INTEGER", "REFERENCES courses(id) ON DELETE CASCADE"),
     # ── lessons ───────────────────────────────────────────────────────────────
+    # Core FK columns — may be missing if table was created from old schema
+    ("lessons", "course_id",        "INTEGER",      "REFERENCES courses(id) ON DELETE CASCADE"),
+    ("lessons", "module_id",        "INTEGER",      ""),
     ("lessons", "content",          "TEXT",         "DEFAULT ''"),
     ("lessons", "video_url",        "VARCHAR(500)", "DEFAULT ''"),
     ("lessons", "attachment_url",   "VARCHAR(500)", "DEFAULT ''"),
@@ -301,6 +306,7 @@ _COLUMN_MIGRATIONS = [
     ("lessons", "order_index",      "INTEGER",      "DEFAULT 0"),
     ("lessons", "is_free_preview",  "BOOLEAN",      "DEFAULT FALSE"),
     ("lessons", "is_active",        "BOOLEAN",      "DEFAULT TRUE"),
+    ("lessons", "is_published",     "BOOLEAN",      "DEFAULT TRUE"),
 
     # ── users ─────────────────────────────────────────────────────────────────
     ("users", "last_login",        "TIMESTAMP",   ""),

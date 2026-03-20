@@ -913,30 +913,17 @@
 
             <!-- SIGNALS -->
             <section id="section-signals" class="section hidden">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                    <div>
-                        <h3 class="text-xl font-bold text-white">Market Signals</h3>
-                        <p class="text-sm text-gray-500 mt-0.5">Active trading opportunities from our analysts</p>
-                    </div>
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-400"
-                         style="background:#111827;border:1px solid #1f2937;">
-                        <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
-                        Live signals
-                    </div>
+                <!-- Live indicator pill — subtle, no duplicate heading -->
+                <div class="flex items-center gap-2 mb-5">
+                    <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
+                    <span class="text-xs text-gray-400">Live signals — updated in real time</span>
                 </div>
                 <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
             </section>
 
             <!-- TRADING JOURNAL -->
             <section id="section-journal" class="section hidden">
-                <div class="mb-6">
-                    <div class="flex items-center gap-2 mb-2">
-                        <h3 class="text-xl font-bold text-white">Performance Analytics</h3>
-                        <span class="text-xs px-2 py-0.5 rounded-full font-bold"
-                              style="background:#064e3b;color:#34d399;">AI-Powered</span>
-                    </div>
-                    <p class="text-sm text-gray-500">Import statements from MT4, MT5, CSV or Excel — get instant AI coaching and performance analysis</p>
-                </div>
+                <!-- AI-Powered badge visible near import section — no duplicate heading -->
 
                 <!-- Import Section -->
                 <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 mb-4 md:mb-6">
@@ -1174,35 +1161,17 @@
 
             <!-- COURSES -->
             <section id="section-courses" class="section hidden">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                    <div>
-                        <h3 class="text-xl font-bold text-white">Trading Academy</h3>
-                        <p class="text-sm text-gray-500 mt-0.5">Structured courses to build your trading knowledge</p>
-                        <p class="text-xs mt-1.5" style="color:#9ca3af;">
-                            <i class="fas fa-graduation-cap mr-1" style="color:#34d399;" aria-hidden="true"></i>
-                            Start with the free Trading Academy →
-                            <span style="color:#a78bfa;"> Advanced? Explore premium video courses below.</span>
-                        </p>
-                    </div>
-                </div>
-                <div id="courses-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <!-- CoursesPage renders its own full UI including heading into this container -->
+                <div id="courses-container"></div>
             </section>
 
             <!-- WEBINARS -->
             <section id="section-webinars" class="section hidden">
-                <div class="mb-6">
-                    <h3 class="text-xl font-bold text-white">Live Webinars</h3>
-                    <p class="text-sm text-gray-500 mt-0.5">Expert-led sessions, market walkthroughs and Q&amp;A</p>
-                </div>
                 <div id="webinars-container" class="space-y-4"></div>
             </section>
 
             <!-- BLOG -->
             <section id="section-blog" class="section hidden">
-                <div class="mb-6">
-                    <h3 class="text-xl font-bold text-white">Research &amp; Blog</h3>
-                    <p class="text-sm text-gray-500 mt-0.5">Market analysis, trading insights and educational content</p>
-                </div>
                 <div id="blog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </section>
 
@@ -1652,14 +1621,14 @@ const DashboardController = class {
         // ── Header title + subtitle ───────────────────────────────────────
         const meta = {
             'dashboard': { title: 'Dashboard',          sub: 'Your learning & research command centre' },
-            'courses':   { title: 'Trading Academy',    sub: 'Structured courses from beginner to advanced' },
-            'webinars':  { title: 'Live Webinars',      sub: 'Expert-led sessions and market walkthroughs' },
-            'blog':      { title: 'Research & Blog',    sub: 'Market analysis, insights and education' },
-            'analysis':  { title: 'Chart Analysis',     sub: 'AI-powered SMC and technical analysis' },
-            'stocks':    { title: 'AI Stock Research',  sub: 'Fundamental and sentiment research' },
-            'signals':   { title: 'Market Signals',     sub: 'Active trading opportunities' },
-            'journal':   { title: 'Performance Analytics', sub: 'Import trades, track performance and get AI coaching' },
-            'mentor':    { title: 'AI Mentor',          sub: '24/7 personal trading coach' },
+            'courses':   { title: 'Premium Courses',    sub: 'Expert-led video lessons for every level' },
+            'webinars':  { title: 'Live Webinars',         sub: 'Expert-led sessions, market walkthroughs and Q&A' },
+            'blog':      { title: 'Research & Blog',       sub: 'Market analysis, trading insights and education' },
+            'analysis':  { title: 'Validate Trade Setup',  sub: 'Upload a chart screenshot for AI-powered analysis' },
+            'stocks':    { title: 'AI Stock Research',     sub: 'Fundamental and sentiment analysis on global markets' },
+            'signals':   { title: 'Market Signals',        sub: 'Live trading opportunities from our analysts' },
+            'journal':   { title: 'Performance Analytics', sub: 'AI-powered coaching from your real trade data' },
+            'mentor':    { title: 'AI Mentor',             sub: '24/7 personal trading coach' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
             'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
         };

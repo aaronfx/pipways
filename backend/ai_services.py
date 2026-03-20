@@ -832,11 +832,8 @@ async def ask_mentor(
 
     if q_lower_cmd in ("/signals", "signals"):
         if platform_context.get("signals_detail"):
-            sigs_text = "
-".join(f"  • {s}" for s in platform_context["signals_detail"])
-            slash_override = f"Active Market Signals right now:
-{sigs_text}
-Please analyse these signals and tell me which looks strongest and why."
+            sigs_text = "\n".join(f"  • {s}" for s in platform_context["signals_detail"])
+            slash_override = f"Active Market Signals right now:\n{sigs_text}\nPlease analyse these signals and tell me which looks strongest and why."
         else:
             slash_override = "What market signals should I be watching right now? I have no active signals currently."
 
@@ -943,8 +940,7 @@ Please analyse these signals and tell me which looks strongest and why."
         pct_lvl = lvl.get("percent", 0)
         bar = "▓" * int(pct_lvl / 10) + "░" * (10 - int(pct_lvl / 10))
         level_summary_lines.append(f"  {lvl.get('level_name','')}: {bar} {pct_lvl}% ({lvl.get('completed',0)}/{lvl.get('total',0)} lessons)")
-    level_summary = "
-".join(level_summary_lines) if level_summary_lines else "  No progress data yet"
+    level_summary = "\n".join(level_summary_lines) if level_summary_lines else "  No progress data yet"
 
     # Build rich platform context string for system prompt
     platform_lines = []
@@ -982,8 +978,7 @@ Please analyse these signals and tell me which looks strongest and why."
     if platform_context.get("total_courses"):
         platform_lines.append(f"  PREMIUM COURSES AVAILABLE: {platform_context['total_courses']}")
 
-    platform_str = "
-".join(platform_lines) if platform_lines else "  No platform data loaded yet"
+    platform_str = "\n".join(platform_lines) if platform_lines else "  No platform data loaded yet"
 
     user_status = "NEW USER — first time, be welcoming and start from foundations" if is_new else f"RETURNING USER — {done_count} lessons completed"
 
@@ -1029,6 +1024,20 @@ RESPONSE RULES:
 
 LESSON CARD: The specific lesson recommendation appears below your text automatically. Just say "Check the lesson below" — don't describe what's in it."""
 
+    # Build message array with conversation history for memory
+    history = request.conversation_history or []
+
+    # Keep last 8 exchanges (16 messages) to stay within token limits
+    trimmed_history = history[-16:] if len(history) > 16 else history
+
+    messages_arr = [{"role": "system", "content": system_prompt}]
+
+    for h in trimmed_history:
+        messages_arr.append({"role": h.role, "content": h.content[:800]})  # cap per msg
+
+    messages_arr.append({"role": "user", "content": question})
+
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -1039,14 +1048,6 @@ LESSON CARD: The specific lesson recommendation appears below your text automati
                     "X-Title": "Pipways Trading Platform",
                     "Content-Type": "application/json"
                 },
-                # Build message array with conversation history for memory
-                history = request.conversation_history or []
-                # Keep last 8 exchanges (16 messages) to stay within token limits
-                trimmed_history = history[-16:] if len(history) > 16 else history
-                messages_arr = [{"role": "system", "content": system_prompt}]
-                for h in trimmed_history:
-                    messages_arr.append({"role": h.role, "content": h.content[:800]})  # cap per msg
-                messages_arr.append({"role": "user", "content": question})
 
                 json={
                     "model": OPENROUTER_MODEL,

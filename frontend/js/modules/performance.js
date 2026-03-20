@@ -70,8 +70,26 @@ const PerformancePage = {
     },
     
     async loadQuickStats() {
+        // Load cached performance from localStorage first
         try {
-            const stats = await API.getPerformanceStats(30);
+            const cached = localStorage.getItem('pipways_performance');
+            if (cached) {
+                const data = JSON.parse(cached);
+                const stats = data.statistics || {};
+                const el_wr = document.getElementById('winRate');
+                const el_pf = document.getElementById('profitFactor');
+                const el_gr = document.getElementById('grade');
+                if (el_wr) el_wr.textContent = (stats.win_rate || '--') + (stats.win_rate ? '%' : '');
+                if (el_pf) el_pf.textContent = stats.profit_factor || '--';
+                if (el_gr) el_gr.textContent = data.overall_grade || '--';
+                console.log('[Performance] Loaded cached results');
+                return;
+            }
+        } catch(_) {}
+        try {
+            const stats = await (typeof API.getPerformanceStats === 'function'
+                ? API.getPerformanceStats(30)
+                : API.request('/ai/performance/summary'));
             document.getElementById('winRate').textContent = stats.summary?.win_rate + '%' || '--';
             document.getElementById('profitFactor').textContent = '1.8';
             document.getElementById('expectancy').textContent = '$125';
@@ -92,6 +110,7 @@ const PerformancePage = {
         } catch (e) {
             console.error('Stats load error:', e);
         }
+        } catch (e) { /* cached load failed */ }
     },
     
     async analyze() {
@@ -105,14 +124,43 @@ const PerformancePage = {
         
         try {
             const trades = JSON.parse(data);
-            const results = await API.analyzeJournal(trades);
+            // Use correct endpoint — API.analyzeJournal may not exist
+            let results;
+            if (typeof API.analyzeJournal === 'function') {
+                results = await API.analyzeJournal(trades);
+            } else {
+                // Fallback to direct request
+                results = await API.request('/ai/performance/analyze-journal', {
+                    method: 'POST',
+                    body: JSON.stringify({ trades })
+                });
+            }
             this.displayAnalysis(results);
         } catch (e) {
-            UI.showToast('Invalid JSON format: ' + e.message, 'error');
+            const msg = e.message || 'Analysis failed';
+            if (typeof UI !== 'undefined') UI.showToast('Error: ' + msg, 'error');
+            else alert('Error: ' + msg);
         }
     },
     
     displayAnalysis(results) {
+        // ── Save to localStorage so AI Mentor can access results ──
+        try {
+            const stats = results.statistics || {};
+            const aiCoach = results.ai_coach || {};
+            localStorage.setItem('pipways_performance', JSON.stringify({
+                cached_at:      Date.now(),
+                overall_grade:  results.overall_grade,
+                overall_score:  results.overall_score,
+                statistics:     stats,
+                ai_coach:       aiCoach,
+                improvements:   results.improvements || [],
+                next_milestone: results.next_milestone || '',
+                trades_count:   stats.total_trades || 0
+            }));
+            console.log('[Performance] Results cached for AI Mentor access');
+        } catch(e) { console.warn('[Performance] Cache save failed:', e); }
+
         const container = document.getElementById('analysisResults');
         container.style.display = 'block';
         

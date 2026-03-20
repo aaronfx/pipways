@@ -23,6 +23,9 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
+        /* Mobile: remove blue tap flash, prevent text selection on cards */
+        a, button { -webkit-tap-highlight-color: transparent; }
+        .pw-card a, .pw-card button { user-select:none; -webkit-user-select:none; }
         /* ── Scrollbar ── */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -87,7 +90,7 @@
         .spinner    { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .text-primary { color:#7c3aed; } .text-success { color:#10b981; } .text-danger { color:#ef4444; }
-        .text-warning { color:#f59e0b; } .text-muted   { color:#6b7280; }
+        .text-warning { color:#f59e0b; } .text-muted   { color:#9ca3af; }
         .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
@@ -156,7 +159,7 @@
         }
         /* ── Section reveal (always animate on show) ── */
         .section:not(.hidden) { animation: fadeIn .3s ease-out both; }
-        .nav-link { position:relative; display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; border-radius:.6rem; color:#6b7280; transition:all .15s; font-size:.83rem; font-weight:500; text-decoration:none; }
+        .nav-link { position:relative; display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; border-radius:.6rem; color:#9ca3af; transition:all .15s; font-size:.83rem; font-weight:500; text-decoration:none; }
         .nav-link:hover:not(.active) { background:#111827; color:#e5e7eb; }
         .nav-link.active { background:linear-gradient(90deg,#7c3aed,#6d28d9) !important; color:white; box-shadow:0 4px 14px rgba(124,58,237,.35); }
         /* REC: force active nav icons white so coloured inline styles don't bleed through */
@@ -171,13 +174,28 @@
         .pw-blog-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center;
             background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(59,130,246,.08)); }
         /* ── Mobile sidebar tap hint ── */
-        .sidebar-tap-hint { font-size:.67rem; color:#4b5563; text-align:center; padding:.3rem 0 0; }
+        .sidebar-tap-hint { font-size:.67rem; color:#9ca3af; text-align:center; padding:.3rem 0 0; }
         @media (min-width:768px) { .sidebar-tap-hint { display:none; } }
         /* ── Curriculum lesson row completed state ── */
         .lesson-row-done { background:rgba(16,185,129,.04); }
         .lesson-row-done .lesson-title { text-decoration:line-through; color:#6b7280 !important; }
         /* ── Stat chip sub-label ── */
         .pw-stat-sub { font-size:.67rem; color:#9ca3af; margin-top:.2rem; min-height:.9rem; }
+
+        /* ── Mobile hero card responsive padding ── */
+        @media (max-width: 639px) {
+            /* Hero cards — tighter on mobile */
+            #section-dashboard .pw-card > div[class*="grid"] > a,
+            #section-dashboard .pw-card > div[class*="grid"] > button {
+                padding: 1rem !important;
+            }
+            /* Quick action chips — slightly smaller */
+            #quick-actions button { font-size: .7rem; padding: .4rem .7rem; }
+            /* Mentor messages max width on mobile */
+            #mentor-messages .max-w-\[85\%\] { max-width: 90% !important; }
+            /* Lesson rec cards description */
+            #mentor-rec-grid .text-sm { font-size: .8rem; }
+        }
 
         /* ── Accessibility: global focus rings for keyboard navigation ── */
         :focus-visible {
@@ -347,7 +365,7 @@
                 <!-- Breadcrumb — hidden on dashboard, shown on sub-sections -->
                 <nav id="header-breadcrumb" class="pw-breadcrumb mb-0.5 hidden"></nav>
                 <h2 id="page-title" class="text-xl font-bold text-white leading-tight">Dashboard</h2>
-                <p class="text-xs text-gray-500" id="header-subtitle">Welcome back, <span id="header-user-name" class="text-purple-400 font-medium">Trader</span></p>
+                <p class="text-xs text-gray-500" id="header-subtitle">Welcome back, <span class="text-purple-400 font-medium">Trader</span></p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400">
@@ -413,124 +431,98 @@
                             </div>
                             <div>
                                 <span class="font-semibold text-white text-sm">What would you like to do next?</span>
-                                <p class="text-xs mt-0.5" style="color:#4b5563;">Your guided trading journey — one step at a time</p>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;">Your guided trading journey — one step at a time</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5 flex-shrink-0">
                             <span id="hero-market-dot" class="w-2 h-2 rounded-full bg-green-400" style="animation:pulse-dot 2s infinite;"></span>
-                            <span id="hero-market-text" class="text-xs" style="color:#6b7280;">Markets Open</span>
+                            <span id="hero-market-text" class="text-xs" style="color:#9ca3af;">Markets Open</span>
                         </div>
                     </div>
 
-                    <!-- Hero action cards: 1-col mobile → 2-col sm → 4-col lg -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x"
-                         style="--tw-divide-opacity:1;border-top:1px solid #1f2937;divide-color:#1f2937;">
+                    <!-- Hero action cards — compact row on mobile, 2-col sm, 4-col lg -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                         style="border-top:1px solid #1f2937;gap:1px;background:#1f2937;">
 
-                        <!-- ① Trading Academy — STRONGEST: green accent, larger CTA -->
+                        <!-- ① Trading Academy — PRIMARY -->
                         <a href="/academy"
-                           class="group flex flex-col gap-3 p-4 sm:p-5 transition-all duration-200 relative"
-                           style="text-decoration:none;border-right:1px solid #1f2937;"
-                           onmouseover="this.style.background='rgba(16,185,129,.06)'"
-                           onmouseout="this.style.background='transparent'">
-                            <!-- Start Here badge -->
-                            <span class="absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full"
-                                  style="background:rgba(16,185,129,.2);color:#34d399;border:1px solid rgba(16,185,129,.35);">
-                                ★ Start Here
-                            </span>
-                            <div class="flex items-start gap-3">
-                                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                     style="background:linear-gradient(135deg,#059669,#047857);box-shadow:0 4px 16px rgba(5,150,105,.4);">
-                                    <i class="fas fa-graduation-cap text-white" style="font-size:1.15rem;"></i>
-                                </div>
-                                <div class="flex-1 min-w-0 pt-0.5">
-                                    <div class="font-bold text-white text-sm mb-0.5">Start Trading Academy</div>
-                                    <p class="text-xs leading-relaxed" style="color:#6b7280;">Step-by-step structured learning path from beginner to advanced</p>
-                                </div>
+                           class="group flex items-center gap-3 p-4 transition-all duration-150"
+                           style="text-decoration:none;background:#111827;"
+                           onmouseover="this.style.background='rgba(16,185,129,.07)'"
+                           onmouseout="this.style.background='#111827'">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                 style="background:linear-gradient(135deg,#059669,#047857);box-shadow:0 3px 12px rgba(5,150,105,.4);">
+                                <i class="fas fa-graduation-cap text-white" aria-hidden="true" style="font-size:.9rem;"></i>
                             </div>
-                            <!-- Larger CTA for primary action -->
-                            <span class="btn btn-success text-xs py-2 mt-auto w-full justify-center"
-                                  style="background:linear-gradient(90deg,#059669,#047857);border:none;box-shadow:0 3px 12px rgba(5,150,105,.35);">
-                                <i class="fas fa-graduation-cap text-xs"></i>
-                                Go to Academy <i class="fas fa-arrow-right" style="font-size:.6rem;"></i>
-                            </span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-bold text-white text-sm">Start Trading Academy</span>
+                                    <span class="text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                          style="background:rgba(16,185,129,.2);color:#34d399;font-size:.63rem;line-height:1.2;">★ FREE</span>
+                                </div>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;line-height:1.35;">Structured path — beginner to advanced</p>
+                            </div>
+                            <i class="fas fa-chevron-right flex-shrink-0" aria-hidden="true" style="color:#34d399;font-size:.7rem;"></i>
                         </a>
 
-                        <!-- ② Validate Trade Setup (Chart Analysis) -->
+                        <!-- ② Validate Trade -->
                         <button onclick="dashboard.navigate('analysis')"
-                                class="group flex flex-col gap-3 p-4 sm:p-5 text-left transition-all duration-200"
-                                style="border:none;border-right:1px solid #1f2937;"
-                                onmouseover="this.style.background='rgba(59,130,246,.06)'"
-                                onmouseout="this.style.background='transparent'">
-                            <div class="flex items-start gap-3">
-                                <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                                     style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.2);">
-                                    <i class="fas fa-chart-bar" style="color:#60a5fa;font-size:1rem;"></i>
-                                </div>
-                                <div class="flex-1 min-w-0 pt-0.5">
-                                    <div class="flex items-center gap-2 mb-0.5">
-                                        <span class="font-bold text-white text-sm">Validate Trade Setup</span>
-                                        <span class="text-xs font-bold px-1 py-0.5 rounded" style="background:rgba(59,130,246,.15);color:#93c5fd;">②</span>
-                                    </div>
-                                    <p class="text-xs leading-relaxed" style="color:#6b7280;">Upload your chart screenshot → confirm entry, stop loss, bias &amp; risk before trading</p>
-                                </div>
+                                class="group flex items-center gap-3 p-4 text-left transition-all duration-150"
+                                style="border:none;background:#111827;"
+                                onmouseover="this.style.background='rgba(59,130,246,.07)'"
+                                onmouseout="this.style.background='#111827'">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                 style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.25);">
+                                <i class="fas fa-chart-bar" aria-hidden="true" style="color:#60a5fa;font-size:.9rem;"></i>
                             </div>
-                            <span class="pw-tool-btn mt-auto text-xs py-2 justify-center"
-                                  style="--tc:#60a5fa;--tr:59,130,246;width:100%;">
-                                <i class="fas fa-chart-bar text-xs" style="color:#60a5fa;"></i>
-                                Analyse Chart
-                            </span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-white text-sm">Validate Trade</span>
+                                    <span class="text-xs font-bold px-1 py-0.5 rounded" style="background:rgba(59,130,246,.15);color:#93c5fd;font-size:.63rem;">②</span>
+                                </div>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;line-height:1.35;">Upload chart → confirm entry &amp; risk</p>
+                            </div>
+                            <i class="fas fa-chevron-right flex-shrink-0" aria-hidden="true" style="color:#60a5fa;font-size:.7rem;"></i>
                         </button>
 
                         <!-- ③ Ask AI Mentor -->
                         <button onclick="dashboard.navigate('mentor')"
-                                class="group flex flex-col gap-3 p-4 sm:p-5 text-left transition-all duration-200"
-                                style="border:none;border-right:1px solid #1f2937;"
-                                onmouseover="this.style.background='rgba(219,39,119,.06)'"
-                                onmouseout="this.style.background='transparent'">
-                            <div class="flex items-start gap-3">
-                                <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                                     style="background:rgba(219,39,119,.15);border:1px solid rgba(219,39,119,.2);">
-                                    <i class="fas fa-robot" style="color:#f472b6;font-size:1rem;"></i>
-                                </div>
-                                <div class="flex-1 min-w-0 pt-0.5">
-                                    <div class="flex items-center gap-2 mb-0.5">
-                                        <span class="font-bold text-white text-sm">Ask AI Mentor</span>
-                                        <span class="text-xs font-bold px-1 py-0.5 rounded" style="background:rgba(219,39,119,.15);color:#fbcfe8;">③</span>
-                                    </div>
-                                    <p class="text-xs leading-relaxed" style="color:#6b7280;">Get help with strategy, psychology, risk and lesson guidance</p>
-                                </div>
+                                class="group flex items-center gap-3 p-4 text-left transition-all duration-150"
+                                style="border:none;background:#111827;"
+                                onmouseover="this.style.background='rgba(219,39,119,.07)'"
+                                onmouseout="this.style.background='#111827'">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                 style="background:rgba(219,39,119,.15);border:1px solid rgba(219,39,119,.25);">
+                                <i class="fas fa-robot" aria-hidden="true" style="color:#f472b6;font-size:.9rem;"></i>
                             </div>
-                            <span class="pw-tool-btn mt-auto text-xs py-2 justify-center"
-                                  style="--tc:#f472b6;--tr:219,39,119;width:100%;">
-                                <i class="fas fa-robot text-xs" style="color:#f472b6;"></i>
-                                Open Mentor
-                            </span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-white text-sm">Ask AI Mentor</span>
+                                    <span class="text-xs font-bold px-1 py-0.5 rounded" style="background:rgba(219,39,119,.15);color:#fbcfe8;font-size:.63rem;">③</span>
+                                </div>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;line-height:1.35;">Strategy, psychology &amp; lessons</p>
+                            </div>
+                            <i class="fas fa-chevron-right flex-shrink-0" aria-hidden="true" style="color:#f472b6;font-size:.7rem;"></i>
                         </button>
 
                         <!-- ④ Analyze Stocks -->
                         <button onclick="dashboard.navigate('stocks')"
-                                class="group flex flex-col gap-3 p-4 sm:p-5 text-left transition-all duration-200"
-                                style="border:none;"
-                                onmouseover="this.style.background='rgba(52,211,153,.06)'"
-                                onmouseout="this.style.background='transparent'">
-                            <div class="flex items-start gap-3">
-                                <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                                     style="background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.2);">
-                                    <i class="fas fa-chart-pie" style="color:#34d399;font-size:1rem;"></i>
-                                </div>
-                                <div class="flex-1 min-w-0 pt-0.5">
-                                    <div class="flex items-center gap-2 mb-0.5">
-                                        <span class="font-bold text-white text-sm">Analyze Stocks</span>
-                                        <span class="text-xs font-bold px-1 py-0.5 rounded" style="background:rgba(52,211,153,.12);color:#6ee7b7;">④</span>
-                                    </div>
-                                    <p class="text-xs leading-relaxed" style="color:#6b7280;">AI-powered insights on global &amp; Nigerian stocks</p>
-                                </div>
+                                class="group flex items-center gap-3 p-4 text-left transition-all duration-150"
+                                style="border:none;background:#111827;"
+                                onmouseover="this.style.background='rgba(52,211,153,.07)'"
+                                onmouseout="this.style.background='#111827'">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                 style="background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);">
+                                <i class="fas fa-chart-pie" aria-hidden="true" style="color:#34d399;font-size:.9rem;"></i>
                             </div>
-                            <span class="pw-tool-btn mt-auto text-xs py-2 justify-center"
-                                  style="--tc:#34d399;--tr:52,211,153;width:100%;">
-                                <i class="fas fa-chart-pie text-xs" style="color:#34d399;"></i>
-                                Research Stocks
-                            </span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-white text-sm">Analyze Stocks</span>
+                                    <span class="text-xs font-bold px-1 py-0.5 rounded" style="background:rgba(52,211,153,.12);color:#6ee7b7;font-size:.63rem;">④</span>
+                                </div>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;line-height:1.35;">AI insights — global &amp; Nigerian stocks</p>
+                            </div>
+                            <i class="fas fa-chevron-right flex-shrink-0" aria-hidden="true" style="color:#34d399;font-size:.7rem;"></i>
                         </button>
                     </div>
                 </div>
@@ -544,21 +536,21 @@
                             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                                 <!-- Icon + text -->
                                 <div class="flex items-center gap-3 flex-1 min-w-0">
-                                    <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                                          style="background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(109,40,217,.2));border:1px solid rgba(124,58,237,.3);">
-                                        <i class="fas fa-route" style="color:#a78bfa;font-size:1.1rem;"></i>
+                                        <i class="fas fa-route" aria-hidden="true" style="color:#a78bfa;font-size:.9rem;"></i>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold uppercase tracking-widest mb-0.5" style="color:#7c3aed;">Your Next Step</p>
-                                        <p id="next-step-title" class="font-bold text-white text-base truncate leading-snug">Continue Trading Academy</p>
-                                        <p id="next-step-sub" class="text-xs mt-0.5" style="color:#6b7280;">Build strong foundations before placing trades</p>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-xs font-bold uppercase tracking-widest mb-0.5" style="color:#a78bfa;">Your Next Step</p>
+                                        <p id="next-step-title" class="font-bold text-white text-sm leading-snug" style="word-break:break-word;overflow-wrap:anywhere;">Continue Trading Academy</p>
+                                        <p id="next-step-sub" class="text-xs mt-0.5" style="color:#9ca3af;overflow-wrap:break-word;">Build strong foundations before placing trades</p>
                                     </div>
                                 </div>
-                                <!-- Large primary CTA -->
+                                <!-- Primary CTA — full width on mobile -->
                                 <a id="next-step-cta" href="/academy"
-                                   class="btn btn-primary flex-shrink-0 w-full sm:w-auto justify-center text-sm py-2.5 px-5"
+                                   class="btn btn-primary flex-shrink-0 w-full sm:w-auto justify-center text-sm py-2.5 px-5 mt-1 sm:mt-0"
                                    style="box-shadow:0 4px 14px rgba(124,58,237,.35);">
-                                    <i class="fas fa-graduation-cap"></i>
+                                    <i class="fas fa-graduation-cap" aria-hidden="true"></i>
                                     Go to Academy
                                 </a>
                             </div>
@@ -575,7 +567,7 @@
 
                 <!-- ── Row 1: Stat chips ── -->
                 <!-- ── Stat strip — single scrollable row of pills ── -->
-                <div id="dash-stat-row" class="flex items-center gap-2 mb-5 overflow-x-auto pb-1" style="scrollbar-width:none;">
+                <div id="dash-stat-row" class="flex items-center gap-2 mb-5 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
                     <!-- Courses pill -->
                     <button onclick="dashboard.navigate('courses')"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all duration-150"
@@ -584,7 +576,7 @@
                             onmouseout="this.style.borderColor='#1f2937';this.style.background='#111827'">
                         <i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i>
                         <span class="font-bold text-white text-xs count-animate" id="stat-courses">—</span>
-                        <span class="text-xs" style="color:#6b7280;">Courses</span>
+                        <span class="text-xs" style="color:#9ca3af;">Courses</span>
                         <!-- hidden sub-label kept for JS compat -->
                         <span id="stat-courses-sub" class="hidden"></span>
                     </button>
@@ -597,7 +589,7 @@
                             onmouseout="this.style.borderColor='#1f2937';this.style.background='#111827'">
                         <i class="fas fa-video text-xs" style="color:#fbbf24;"></i>
                         <span class="font-bold text-white text-xs count-animate" id="stat-webinars">—</span>
-                        <span class="text-xs" style="color:#6b7280;">Webinars</span>
+                        <span class="text-xs" style="color:#9ca3af;">Webinars</span>
                         <span id="stat-webinars-sub" class="hidden"></span>
                     </button>
                     <span class="text-gray-800 flex-shrink-0">·</span>
@@ -609,7 +601,7 @@
                             onmouseout="this.style.borderColor='#1f2937';this.style.background='#111827'">
                         <i class="fas fa-newspaper text-xs" style="color:#2dd4bf;"></i>
                         <span class="font-bold text-white text-xs count-animate" id="stat-blog">—</span>
-                        <span class="text-xs" style="color:#6b7280;">Articles</span>
+                        <span class="text-xs" style="color:#9ca3af;">Articles</span>
                         <span id="stat-blog-sub" class="hidden"></span>
                     </button>
                     <span class="text-gray-800 flex-shrink-0">·</span>
@@ -621,7 +613,7 @@
                             onmouseout="this.style.borderColor='#1f2937';this.style.background='#111827'">
                         <span id="signals-live-dot" class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
                         <span class="font-bold text-white text-xs count-animate" id="stat-signals">—</span>
-                        <span class="text-xs" style="color:#6b7280;">Signals</span>
+                        <span class="text-xs" style="color:#9ca3af;">Signals</span>
                         <span id="stat-signals-sub" class="hidden"></span>
                     </button>
                 </div>
@@ -638,7 +630,7 @@
                                 </div>
                                 <div>
                                 <span class="font-semibold text-white text-sm">Continue Learning</span>
-                                <p class="text-xs mt-0.5" style="color:#4b5563;">Your structured Trading Academy path</p>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;">Your structured Trading Academy path</p>
                             </div>
                             </div>
                             <a href="#" onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">View all →</a>
@@ -812,7 +804,6 @@
                     </div>
                 </div>
 
-            </section>
             </section>
 
             <!-- SIGNALS -->
@@ -1082,7 +1073,7 @@
                     <div>
                         <h3 class="text-xl font-bold text-white">Trading Academy</h3>
                         <p class="text-sm text-gray-500 mt-0.5">Structured courses to build your trading knowledge</p>
-                        <p class="text-xs mt-1.5" style="color:#6b7280;">
+                        <p class="text-xs mt-1.5" style="color:#9ca3af;">
                             <i class="fas fa-graduation-cap mr-1" style="color:#34d399;" aria-hidden="true"></i>
                             Start with the free Trading Academy →
                             <span style="color:#a78bfa;"> Advanced? Explore premium video courses below.</span>
@@ -1192,13 +1183,13 @@
                                             🤔 Why am I losing?
                                         </button>
                                     </div>
-                                    <div class="flex gap-2">
+                                    <div class="flex gap-2 w-full min-w-0">
                                         <label for="mentor-input" class="sr-only">Ask your AI Mentor a question</label>
-                                        <input type="text" id="mentor-input" placeholder="Ask about your trading, signals, or type /help..." 
-                                            class="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                                        <input type="text" id="mentor-input" placeholder="Ask about your trading..." 
+                                            class="flex-1 min-w-0 px-3 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                                             aria-label="Ask your AI Mentor a question"
                                             onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
-                                        <button onclick="dashboard.sendMentorMessage()" aria-label="Send message" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg transition-all transform hover:scale-105">
+                                        <button onclick="dashboard.sendMentorMessage()" aria-label="Send message" class="flex-shrink-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-3 rounded-lg transition-all">
                                             <i class="fas fa-paper-plane" aria-hidden="true"></i>
                                         </button>
                                     </div>
@@ -1868,7 +1859,7 @@ const DashboardController = class {
             const list = posts.slice(0, 4);
             if (!list.length) {
                 blogEl.innerHTML = `<div class="pw-empty" style="padding:2rem 1rem;">
-                    <div class="pw-empty-icon" style="width:44px;height:44px;"><i class="fas fa-newspaper" style="color:#4b5563;"></i></div>
+                    <div class="pw-empty-icon" style="width:44px;height:44px;"><i class="fas fa-newspaper" style="color:#6b7280;"></i></div>
                     <p class="pw-empty-title">No articles yet</p>
                 </div>`;
             } else {
@@ -2049,13 +2040,16 @@ const DashboardController = class {
         }
 
         if (!res.ok) {
-            // Try to surface FastAPI's {"detail":"..."} cleanly
             let msg = `HTTP ${res.status}`;
             try {
                 const body = await res.json();
                 if (body.detail) msg = body.detail;
                 else if (body.message) msg = body.message;
-            } catch (_) { /* ignore */ }
+                console.error(`[API] ${res.status} on ${endpoint}:`, body);
+            } catch (_) {
+                const text = await res.text().catch(() => '');
+                console.error(`[API] ${res.status} on ${endpoint} (non-JSON):`, text.slice(0, 200));
+            }
             throw new Error(msg);
         }
 
@@ -2446,7 +2440,7 @@ const DashboardController = class {
             const signals = Array.isArray(data) ? data : (data.signals || []);
             if (!signals.length) {
                 container.innerHTML = `<div class="col-span-full pw-empty">
-                    <div class="pw-empty-icon"><i class="fas fa-satellite-dish text-xl" style="color:#4b5563;"></i></div>
+                    <div class="pw-empty-icon"><i class="fas fa-satellite-dish text-xl" style="color:#6b7280;"></i></div>
                     <p class="pw-empty-title">No active signals right now</p>
                     <p class="pw-empty-sub">New signals are posted regularly by our analysts. Check back soon.</p>
                 </div>`;
@@ -2529,7 +2523,7 @@ const DashboardController = class {
             const webinars = Array.isArray(data) ? data : (data.webinars || []);
             if (!webinars.length) {
                 container.innerHTML = `<div class="pw-empty">
-                    <div class="pw-empty-icon"><i class="fas fa-video text-xl" style="color:#4b5563;"></i></div>
+                    <div class="pw-empty-icon"><i class="fas fa-video text-xl" style="color:#6b7280;"></i></div>
                     <p class="pw-empty-title">No webinars scheduled yet</p>
                     <p class="pw-empty-sub">Live sessions with expert traders are coming soon.</p>
                 </div>`;
@@ -2576,7 +2570,7 @@ const DashboardController = class {
             const posts = Array.isArray(data) ? data : (data.posts || []);
             if (!posts.length) {
                 container.innerHTML = `<div class="col-span-full pw-empty">
-                    <div class="pw-empty-icon"><i class="fas fa-newspaper text-xl" style="color:#4b5563;"></i></div>
+                    <div class="pw-empty-icon"><i class="fas fa-newspaper text-xl" style="color:#6b7280;"></i></div>
                     <p class="pw-empty-title">No articles published yet</p>
                     <p class="pw-empty-sub">Market analysis and educational content is coming soon.</p>
                 </div>`;
@@ -2760,7 +2754,6 @@ const DashboardController = class {
             const response = await this.apiRequest('/ai/mentor/ask', {
                 method: 'POST',
                 body: JSON.stringify({
-                    // Send both keys so backend is satisfied regardless of which it reads
                     message: message,
                     question: message,
                     skill_level: 'intermediate',
@@ -2770,19 +2763,34 @@ const DashboardController = class {
 
             document.getElementById('mentor-typing').classList.add('hidden');
 
-            await this.typeMentorResponse(response.response);
+            // Validate response shape — guard against unexpected server responses
+            if (!response || typeof response !== 'object') {
+                throw new Error('Invalid response format from mentor API');
+            }
 
-            // Render lesson cards in chat AND update sidebar recommendations list
-            if (response.recommendations && response.recommendations.length > 0) {
-                this._renderMentorLessonCards(response.recommendations);
-                this.updateRecommendationsList(response.recommendations);
+            const replyText = response.response || response.message || response.answer || '';
+            if (!replyText) {
+                console.warn('[Mentor] Empty response text. Full response:', response);
+            }
+
+            await this.typeMentorResponse(replyText || 'I received your message but had trouble generating a response. Please try again.');
+
+            // Render lesson recommendation cards
+            const recs = response.recommendations || response.suggested_resources || [];
+            console.log(`[Mentor] Received ${recs.length} recommendation(s):`, recs);
+            if (recs.length > 0) {
+                this._renderMentorLessonCards(recs);
+                this.updateRecommendationsList(recs);
+            } else {
+                console.warn('[Mentor] No recommendations in response. Keys:', Object.keys(response));
             }
 
             this.saveMentorHistory();
 
         } catch (e) {
             document.getElementById('mentor-typing').classList.add('hidden');
-            this.appendMentorMessage('Sorry, I encountered an error analyzing your data. Please try again.', 'error');
+            console.error('[Mentor] sendMentorMessage error:', e);
+            this.appendMentorMessage('Sorry, I encountered an error. Please try again.', 'error');
         }
     }
 
@@ -2817,6 +2825,26 @@ const DashboardController = class {
             const lessonId = rec.metadata?.lesson_id || rec.id || null;
             const url      = rec.url || null;
             const t        = typeIcons[rec.type] || typeIcons.default;
+            const isStatic = rec.metadata?.static === true;
+
+            // Build absolute URL — priority: explicit url with ?lesson= > lesson_id > academy homepage
+            const _base = window.location.origin;
+            let dest;
+            if (url && url.includes('?lesson=')) {
+                // Has specific lesson ID in URL — use it directly (best case)
+                dest = url.startsWith('http') ? url : _base + url;
+            } else if (lessonId) {
+                // Has lesson_id in metadata — build specific URL
+                dest = `${_base}/academy.html?lesson=${lessonId}`;
+            } else if (url) {
+                // Has URL but no lesson ID (fallback cards) — use URL as-is
+                dest = url.startsWith('http') ? url : _base + url;
+            } else {
+                // No URL at all — go to academy homepage
+                dest = `${_base}/academy.html`;
+            }
+
+            console.log(`[Mentor Rec] "${rec.title}" → ${dest} (lessonId=${lessonId}, url=${url})`);
 
             const card = document.createElement('div');
             card.className = 'cursor-pointer rounded-xl p-3 transition-all duration-200';
@@ -2824,22 +2852,33 @@ const DashboardController = class {
             card.onmouseover = () => { card.style.borderColor = '#7c3aed'; card.style.background = 'rgba(124,58,237,.08)'; };
             card.onmouseout  = () => { card.style.borderColor = '#1f2937'; card.style.background = '#111827'; };
 
+            // Label for CTA button — show "Open Academy" for fallback cards, "Start Lesson" for specific ones
+            const ctaLabel = (lessonId || (url && url.includes('?lesson=')))
+                ? 'Start Lesson'
+                : 'Open Academy';
+            const ctaIcon = lessonId || (url && url.includes('?lesson='))
+                ? 'fa-play-circle'
+                : 'fa-graduation-cap';
+
             card.innerHTML = `
                 <div class="flex items-start gap-3">
                     <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                          style="background:${t.bg};">
-                        <i class="fas ${t.icon} text-sm" style="color:${t.col};"></i>
+                        <i class="fas ${t.icon} text-sm" aria-hidden="true" style="color:${t.col};"></i>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="text-sm font-semibold text-white truncate mb-0.5">${this._escapeHtml(rec.title)}</div>
-                        ${rec.description ? `<div class="text-xs text-gray-500 line-clamp-2 mb-2">${this._escapeHtml(rec.description)}</div>` : ''}
-                        <span class="text-xs font-semibold flex items-center gap-1" style="color:${t.col};">
-                            Start Lesson <i class="fas fa-arrow-right" style="font-size:.6rem;"></i>
-                        </span>
+                        ${rec.description ? `<div class="text-xs mb-2" style="color:#9ca3af;line-height:1.4;">${this._escapeHtml(rec.description)}</div>` : ''}
+                        <button class="text-xs font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all"
+                                style="background:${t.bg};color:${t.col};border:1px solid ${t.col}33;"
+                                onclick="event.stopPropagation(); window.location.href='${dest}';">
+                            <i class="fas ${ctaIcon}" aria-hidden="true" style="font-size:.7rem;"></i>
+                            &nbsp;${ctaLabel}&nbsp;<i class="fas fa-arrow-right" aria-hidden="true" style="font-size:.5rem;"></i>
+                        </button>
                     </div>
                 </div>`;
 
-            card.addEventListener('click', () => this._handleMentorLessonClick(lessonId, url));
+            card.addEventListener('click', () => { window.location.href = dest; });
             grid.appendChild(card);
         });
 
@@ -2860,19 +2899,13 @@ const DashboardController = class {
             }).catch(e => console.warn('[Mentor] Lesson click tracking failed:', e));
         }
 
-        // Build the destination URL:
-        // 1. Use the url from the recommendation if provided
-        // 2. Otherwise build it from the lessonId directly
-        // 3. Last resort: academy homepage
-        let destination = url || null;
-        if (!destination && lessonId) {
-            destination = `/academy.html?lesson=${lessonId}`;
-        }
-        if (!destination) {
-            destination = '/academy.html';
-        }
+        // Build absolute URL to guarantee correct navigation across all paths
+        const _origin = window.location.origin;
+        const destination = url
+            ? (url.startsWith('http') ? url : _origin + url)
+            : (lessonId ? `${_origin}/academy.html?lesson=${lessonId}` : `${_origin}/academy.html`);
 
-        // Open in same tab so the user stays in the app flow
+        console.log('[Mentor] Navigating to lesson:', destination);
         window.location.href = destination;
     }
 
@@ -3079,3 +3112,4 @@ window.API = API;
 
 </body>
 </html>
+

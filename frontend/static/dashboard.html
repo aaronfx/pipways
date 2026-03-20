@@ -16,6 +16,8 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>if(typeof marked!=="undefined"){marked.setOptions({breaks:true,gfm:true});}</script>
     <!-- Quill rich-text editor (blog editor only) -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
@@ -2165,6 +2167,19 @@ const DashboardController = class {
 
             if (result.trades && result.trades.length > 0) {
                 this.lastAnalysisResults = result;
+                // Cache in localStorage so AI Mentor can access without a backend call
+                try {
+                    localStorage.setItem('pipways_performance', JSON.stringify({
+                        cached_at: Date.now(),
+                        overall_grade: result.overall_grade,
+                        overall_score: result.overall_score,
+                        statistics: result.statistics,
+                        ai_coach: result.ai_coach,
+                        improvements: result.improvements,
+                        next_milestone: result.next_milestone,
+                        trades_count: result.trades_parsed
+                    }));
+                } catch(_) {}
                 this.displayJournalAnalysis(result);
                 statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analyzed ${result.trades_parsed} trades</span>`;
                 this._toast(`Trade data imported successfully — ${result.trades_parsed} trades analysed`, 'success', 4000);
@@ -2450,6 +2465,19 @@ const DashboardController = class {
             body: JSON.stringify({ trades: this.manualTrades })
         }).then(result => {
             this.lastAnalysisResults = result;
+            // Cache in localStorage so AI Mentor can access it
+            try {
+                localStorage.setItem('pipways_performance', JSON.stringify({
+                    cached_at: Date.now(),
+                    overall_grade: result.overall_grade,
+                    overall_score: result.overall_score,
+                    statistics: result.statistics,
+                    ai_coach: result.ai_coach,
+                    improvements: result.improvements,
+                    next_milestone: result.next_milestone,
+                    trades_count: result.trades?.length || 0
+                }));
+            } catch(_) {}
             this.displayJournalAnalysis(result);
         }).catch(err => {
             alert('Analysis failed: ' + err.message);
@@ -2770,12 +2798,23 @@ const DashboardController = class {
     _getMentorHistory() {
         try {
             const raw = JSON.parse(localStorage.getItem('mentor_history') || '[]');
-            // Return last 8 exchanges as [{role, content}] for the backend
             return raw.slice(-16).map(m => ({
                 role: m.role === 'user' ? 'user' : 'assistant',
                 content: (m.content || '').slice(0, 800)
             }));
         } catch (_) { return []; }
+    }
+
+    // ── Get cached performance data to send with mentor request ─────────────
+    _getCachedPerformance() {
+        try {
+            const raw = localStorage.getItem('pipways_performance');
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            // Only use if cached within last 24 hours
+            if (Date.now() - data.cached_at > 86400000) return null;
+            return data;
+        } catch (_) { return null; }
     }
 
     // ── Slash command local preview — show what the command does instantly ──
@@ -2838,6 +2877,9 @@ const DashboardController = class {
         const history = this._getMentorHistory();
 
         try {
+            // Attach cached performance data directly — no backend fetch needed
+            const cachedPerf = this._getCachedPerformance();
+
             const response = await this.apiRequest('/ai/mentor/ask', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -2845,7 +2887,8 @@ const DashboardController = class {
                     question: message,
                     skill_level: 'intermediate',
                     include_platform_context: true,
-                    conversation_history: history   // ← memory
+                    conversation_history: history,       // ← memory
+                    cached_performance: cachedPerf       // ← performance data from localStorage
                 })
             });
 

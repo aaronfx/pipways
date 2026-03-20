@@ -72,6 +72,8 @@ class MentorRequest(BaseModel):
     include_platform_context: bool = False
     # Conversation history for memory — last N exchanges
     conversation_history: Optional[List[ConversationMessage]] = None
+    # Performance data cached on frontend after analysis — avoids extra backend fetch
+    cached_performance: Optional[Dict[str, Any]] = None
 
     @property
     def resolved_question(self) -> str:
@@ -807,40 +809,65 @@ async def ask_mentor(
 
             # ── Performance (if include_platform_context) ────────────────
             if request.include_platform_context and len(results) > 6:
-                # Try all performance endpoint results (indices 6, 8, 9)
-                perf_data = None
-                for perf_idx in [6, 8, 9]:
-                    if perf_idx < len(results):
-                        candidate = _safe_json(results[perf_idx], None)
-                        if candidate and isinstance(candidate, dict):
-                            # Check it has actual trade data
-                            stats_check = candidate.get("statistics") or candidate.get("stats") or candidate
-                            if stats_check.get("total_trades") or stats_check.get("win_rate"):
-                                perf_data = candidate
-                                print(f"[MENTOR] Found performance data at results[{perf_idx}]", flush=True)
-                                break
-
-                if perf_data:
-                    stats = perf_data.get("statistics") or perf_data.get("stats") or perf_data
-                    ai_coach = perf_data.get("ai_coach") or {}
-                    total = stats.get("total_trades", 0)
-                    print(f"[MENTOR] Performance: {total} trades, win_rate={stats.get('win_rate')}", flush=True)
+                # ── Performance: use cached data from frontend first (most reliable) ──
+                # Frontend caches results in localStorage immediately after upload/analysis
+                # This avoids depending on a potentially missing /ai/performance/dashboard endpoint
+                cached_perf = request.cached_performance
+                if cached_perf and isinstance(cached_perf, dict):
+                    stats = cached_perf.get("statistics") or {}
+                    ai_coach = cached_perf.get("ai_coach") or {}
+                    total = stats.get("total_trades") or cached_perf.get("trades_count", 0)
+                    print(f"[MENTOR] Using frontend-cached performance: {total} trades, grade={cached_perf.get('overall_grade')}", flush=True)
                     if total:
                         platform_context["performance"] = {
-                            "total_trades":    total,
-                            "win_rate":        f"{stats.get('win_rate', 0)}%",
-                            "profit_factor":   stats.get("profit_factor", 0),
-                            "net_pnl":         f"${stats.get('net_pnl', 0):.2f}",
-                            "max_drawdown":    f"${stats.get('max_drawdown', 0):.2f}",
-                            "avg_rr":          stats.get("avg_rr_ratio", 0),
-                            "grade":           perf_data.get("overall_grade", "N/A"),
-                            "discipline":      ai_coach.get("discipline_score", 0),
-                            "best_pair":       stats.get("best_pair") or stats.get("best_symbol", ""),
-                            "worst_pair":      stats.get("worst_pair") or stats.get("worst_symbol", ""),
-                            "summary":         ai_coach.get("summary") or ai_coach.get("analysis") or "",
+                            "total_trades":  total,
+                            "win_rate":      f"{stats.get('win_rate', 0)}%",
+                            "profit_factor": stats.get("profit_factor", 0),
+                            "net_pnl":       f"${stats.get('net_pnl', 0):.2f}",
+                            "max_drawdown":  f"${stats.get('max_drawdown', 0):.2f}",
+                            "avg_rr":        stats.get("avg_rr_ratio", 0),
+                            "grade":         cached_perf.get("overall_grade", "N/A"),
+                            "score":         cached_perf.get("overall_score", 0),
+                            "discipline":    ai_coach.get("discipline_score", 0),
+                            "best_pair":     stats.get("best_pair") or stats.get("best_symbol", ""),
+                            "worst_pair":    stats.get("worst_pair") or stats.get("worst_symbol", ""),
+                            "improvements":  (cached_perf.get("improvements") or [])[:3],
+                            "next_milestone":cached_perf.get("next_milestone", ""),
+                            "summary":       ai_coach.get("summary") or ai_coach.get("analysis") or "",
                         }
                 else:
-                    print(f"[MENTOR] No performance data found across all endpoints", flush=True)
+                    # Fallback: try backend endpoints
+                    perf_data = None
+                    for perf_idx in [6, 8, 9]:
+                        if perf_idx < len(results):
+                            candidate = _safe_json(results[perf_idx], None)
+                            if candidate and isinstance(candidate, dict):
+                                stats_check = candidate.get("statistics") or candidate.get("stats") or candidate
+                                if stats_check.get("total_trades") or stats_check.get("win_rate"):
+                                    perf_data = candidate
+                                    print(f"[MENTOR] Found performance data via endpoint results[{perf_idx}]", flush=True)
+                                    break
+
+                    if perf_data:
+                        stats = perf_data.get("statistics") or perf_data.get("stats") or perf_data
+                        ai_coach = perf_data.get("ai_coach") or {}
+                        total = stats.get("total_trades", 0)
+                        if total:
+                            platform_context["performance"] = {
+                                "total_trades":  total,
+                                "win_rate":      f"{stats.get('win_rate', 0)}%",
+                                "profit_factor": stats.get("profit_factor", 0),
+                                "net_pnl":       f"${stats.get('net_pnl', 0):.2f}",
+                                "max_drawdown":  f"${stats.get('max_drawdown', 0):.2f}",
+                                "avg_rr":        stats.get("avg_rr_ratio", 0),
+                                "grade":         perf_data.get("overall_grade", "N/A"),
+                                "discipline":    ai_coach.get("discipline_score", 0),
+                                "best_pair":     stats.get("best_pair") or stats.get("best_symbol", ""),
+                                "worst_pair":    stats.get("worst_pair") or stats.get("worst_symbol", ""),
+                                "summary":       ai_coach.get("summary") or ai_coach.get("analysis") or "",
+                            }
+                    else:
+                        print("[MENTOR] No performance data available (no cache, no endpoint)", flush=True)
 
                 courses_data = _safe_json(results[7], [])
                 if courses_data:
@@ -983,18 +1010,25 @@ async def ask_mentor(
     if platform_context.get("performance"):
         p = platform_context["performance"]
         perf_lines = [
-            f"  TRADE PERFORMANCE ({p['total_trades']} trades | Grade: {p['grade']}):",
+            f"  TRADE PERFORMANCE — {p['total_trades']} trades | Grade: {p['grade']} ({p.get('score',0)}/100):",
             f"    Win rate: {p['win_rate']} | Profit factor: {p['profit_factor']} | "
-            f"Avg R:R: {p['avg_rr']} | Net P&L: {p['net_pnl']}",
-            f"    Max drawdown: {p['max_drawdown']} | Discipline score: {p['discipline']}%",
+            f"Avg R:R: {p['avg_rr']} | Net P&L: {p['net_pnl']} | Max drawdown: {p['max_drawdown']}",
+            f"    Discipline score: {p['discipline']}%",
         ]
         if p.get("best_pair"):
-            perf_lines.append(f"    Best pair: {p['best_pair']} | Worst pair: {p.get('worst_pair','?')}")
+            perf_lines.append(f"    Best pair: {p['best_pair']} | Worst pair: {p.get('worst_pair','N/A')}")
+        if p.get("next_milestone"):
+            perf_lines.append(f"    Next milestone: {p['next_milestone']}")
+        if p.get("improvements"):
+            perf_lines.append(f"    Top improvements needed: {'; '.join(p['improvements'])}")
         if p.get("summary"):
-            perf_lines.append(f"    AI coach insight: {p['summary'][:200]}")
+            perf_lines.append(f"    AI coach summary: {p['summary'][:250]}")
         platform_lines.extend(perf_lines)
     else:
-        platform_lines.append("  PERFORMANCE ANALYTICS: User has NOT imported trades yet — encourage them to do so")
+        platform_lines.append(
+            "  PERFORMANCE ANALYTICS: No trade data found. "
+            "User should go to Performance Analytics → upload MT4/MT5 or CSV file."
+        )
 
     # Blog
     if platform_context.get("blog_posts"):

@@ -95,6 +95,21 @@
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
         /* ── Toast notifications ── */
+        /* ── Mentor message markdown styles ── */
+        .mentor-prose { font-size:.875rem; line-height:1.7; color:#d1d5db; }
+        .mentor-prose strong { color:#f9fafb; font-weight:600; }
+        .mentor-prose em { color:#c4b5fd; font-style:italic; }
+        .mentor-prose p { margin-bottom:.6rem; }
+        .mentor-prose p:last-child { margin-bottom:0; }
+        .mentor-prose ul { margin:.4rem 0 .7rem 1rem; }
+        .mentor-prose li { margin-bottom:.3rem; color:#d1d5db; list-style:disc; }
+        .mentor-prose li strong { color:#f9fafb; }
+        .mentor-prose code { background:#1f2937; color:#a78bfa; padding:.1rem .35rem; border-radius:.25rem; font-size:.8rem; font-family:monospace; }
+        .mentor-prose blockquote { border-left:3px solid #7c3aed; padding-left:.75rem; color:#9ca3af; margin:.5rem 0; }
+        .mentor-prose h3 { color:white; font-weight:700; font-size:.9rem; margin:.75rem 0 .3rem; }
+        .mentor-prose hr { border-color:#374151; margin:.6rem 0; }
+        .mentor-prose a { color:#a78bfa; text-decoration:underline; }
+
         .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
             padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px;
             box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
@@ -3019,12 +3034,15 @@ const DashboardController = class {
                 </div>
             `;
         } else {
+            const rendered = (typeof marked !== 'undefined')
+                ? marked.parse(text)
+                : text.replace(/\n/g, '<br>');
             wrapper.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1">
                     <i class="fas fa-robot text-xs text-white"></i>
                 </div>
-                <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%] border border-gray-600">
-                    <p class="text-gray-200 text-sm whitespace-pre-wrap">${text}</p>
+                <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none border border-gray-700" style="max-width:85%;">
+                    <div class="mentor-prose">${rendered}</div>
                 </div>
             `;
         }
@@ -3042,29 +3060,40 @@ const DashboardController = class {
         wrapper.dataset.role = 'assistant';
         wrapper.dataset.content = text;
 
+        // Start with a typing indicator inside the bubble
         wrapper.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1">
                 <i class="fas fa-robot text-xs text-white"></i>
             </div>
-            <div class="bg-gray-700 p-3 rounded-2xl rounded-tl-none max-w-[80%] border border-gray-600">
-                <p class="text-gray-200 text-sm typing-text"></p>
+            <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none border border-gray-700" style="max-width:85%;">
+                <div class="mentor-prose typing-content"></div>
             </div>
         `;
 
         container.appendChild(wrapper);
         container.scrollTop = container.scrollHeight;
 
-        const textEl = wrapper.querySelector('.typing-text');
+        const contentEl = wrapper.querySelector('.typing-content');
+
+        // Stream word by word as plain text first (fast — 20ms/word)
         const words = text.split(' ');
         let currentText = '';
-
         for (let i = 0; i < words.length; i++) {
-            currentText += words[i] + ' ';
-            textEl.textContent = currentText;
+            currentText += (i > 0 ? ' ' : '') + words[i];
+            contentEl.textContent = currentText;
             container.scrollTop = container.scrollHeight;
-            await new Promise(r => setTimeout(r, 30));
+            // Speed: fast for short messages, skip animation for long ones
+            if (words.length < 80) {
+                await new Promise(r => setTimeout(r, 18));
+            }
         }
 
+        // Render final markdown after typing completes
+        if (typeof marked !== 'undefined') {
+            contentEl.innerHTML = marked.parse(text);
+        }
+
+        container.scrollTop = container.scrollHeight;
         wrapper.dataset.content = text;
     }
 
@@ -3180,4 +3209,3 @@ window.API = API;
 
 </body>
 </html>
-

@@ -1,17 +1,22 @@
 /**
- * Pipways Trading Academy — courses.js  v3.0
+ * Pipways Premium Video Courses — courses.js  v3.1
  *
  * Features:
- *  • Babypips-style academy home: 3 level cards (Beginner / Intermediate / Advanced)
+ *  • Video course catalog: grouped by level (Beginner / Intermediate / Advanced)
  *  • Welcome message shown ONCE (localStorage gate)
- *  • Full lesson viewer — full-page, mobile-responsive
+ *  • Full lesson viewer — video player + optional text content
  *  • "Pipways Trading Coach" AI panel inside lessons (NOT "AI Mentor")
  *  • Back-to-course preserves state (no blank grid)
  *  • Progress bars, completion badges, certificate modal
  *  • TradingView chart embed for technical lessons
+ *  • Mobile responsive — all views optimised for small screens
  *
  * Exposed as: window.CoursesPage
  * Depends on:  window.location.origin  +  JWT in localStorage('pipways_token')
+ *
+ * NOTE: This is the PREMIUM VIDEO COURSES section.
+ *       Text-based structured learning lives in academy.html (Trading Academy).
+ *       DB tables: courses, lessons, course_modules, user_lesson_progress, user_progress
  */
 const CoursesPage = (() => {
 
@@ -43,7 +48,7 @@ const CoursesPage = (() => {
 
     async function openLesson(lessonId) {
         const lesson = _state.allLessons.find(l => l.id === parseInt(lessonId));
-        if (!lesson) { console.warn('[Academy] lesson not found:', lessonId); return; }
+        if (!lesson) { console.warn('[Courses] lesson not found:', lessonId); return; }
         _state.currentLesson = lesson;
         _state.view = 'lesson';
         _renderLesson(lesson);
@@ -88,14 +93,14 @@ const CoursesPage = (() => {
 
     async function _renderHome() {
         const root = _state.root;
-        root.innerHTML = _spinnerHTML('Loading Academy…');
+        root.innerHTML = _spinnerHTML('Loading Courses…');
 
         let courses = [];
         try {
             const data = await _req('/courses/list');
             courses = Array.isArray(data) ? data : (data.courses || []);
         } catch (e) {
-            root.innerHTML = _errorHTML('Failed to load academy', e.message);
+            root.innerHTML = _errorHTML('Failed to load courses', e.message);
             return;
         }
 
@@ -109,45 +114,45 @@ const CoursesPage = (() => {
         });
 
         // Welcome message — shown only once
-        const welcomed = localStorage.getItem('pw_academy_welcomed');
+        const welcomed = localStorage.getItem('pw_courses_welcomed');
         const welcomeHTML = !welcomed ? _welcomeHTML() : '';
 
         root.innerHTML = `
-        <div class="academy-home" style="max-width:1100px;margin:0 auto;">
+        <div class="courses-home" style="max-width:1100px;margin:0 auto;">
             ${welcomeHTML}
 
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;">
                 <div>
-                    <h2 style="font-size:1.5rem;font-weight:800;color:white;margin:0;">Trading Academy</h2>
-                    <p style="color:#6b7280;font-size:.85rem;margin:.25rem 0 0;">Structured AI-powered forex education</p>
+                    <h2 style="font-size:1.5rem;font-weight:800;color:white;margin:0;">Premium Video Courses</h2>
+                    <p style="color:#6b7280;font-size:.85rem;margin:.25rem 0 0;">Expert-led video lessons for every level</p>
                 </div>
-                <div id="academy-progress-summary" style="font-size:.8rem;color:#6b7280;"></div>
+                <div id="courses-progress-summary" style="font-size:.8rem;color:#6b7280;"></div>
             </div>
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1.25rem;">
-                ${_levelCard('Beginner',     byLevel.Beginner     || [], '#10b981', 'fa-seedling',    'Master the basics of Forex trading from scratch.')}
-                ${_levelCard('Intermediate', byLevel.Intermediate || [], '#3b82f6', 'fa-chart-line',  'Build strategies using technical analysis tools.')}
-                ${_levelCard('Advanced',     byLevel.Advanced     || [], '#f59e0b', 'fa-trophy',      'Trade like an institution — market structure and liquidity.')}
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(290px,100%),1fr));gap:1.25rem;">
+                ${_levelCard('Beginner',     byLevel.Beginner     || [], '#10b981', 'fa-play-circle', 'Video courses covering Forex fundamentals and first trade setup.')}
+                ${_levelCard('Intermediate', byLevel.Intermediate || [], '#3b82f6', 'fa-video',        'Structured video lessons on technical analysis and strategy building.')}
+                ${_levelCard('Advanced',     byLevel.Advanced     || [], '#f59e0b', 'fa-graduation-cap','Expert video courses — institutional concepts, SMC and live trade analysis.')}
             </div>
 
             ${courses.length === 0 ? `
             <div style="text-align:center;padding:4rem 1rem;color:#4b5563;">
-                <i class="fas fa-graduation-cap" style="font-size:3rem;margin-bottom:1rem;opacity:.3;display:block;"></i>
-                <p style="font-weight:600;">No courses published yet.</p>
-                <p style="font-size:.85rem;margin-top:.5rem;">Check back soon — or ask an admin to seed the curriculum.</p>
+                <i class="fas fa-video" style="font-size:3rem;margin-bottom:1rem;opacity:.3;display:block;"></i>
+                <p style="font-weight:600;">No video courses published yet.</p>
+                <p style="font-size:.85rem;margin-top:.5rem;">Premium video courses are coming soon. Try the free <a href="/academy" style="color:#a78bfa;">Trading Academy</a> while you wait.</p>
             </div>` : ''}
         </div>`;
 
         if (!welcomed) {
             // dismiss button handler
-            const btn = document.getElementById('academy-welcome-dismiss');
+            const btn = document.getElementById('courses-welcome-dismiss');
             if (btn) btn.addEventListener('click', () => {
-                localStorage.setItem('pw_academy_welcomed', '1');
-                const box = document.getElementById('academy-welcome-box');
+                localStorage.setItem('pw_courses_welcomed', '1');
+                const box = document.getElementById('courses-welcome-box');
                 if (box) box.style.display = 'none';
             });
             // CTA button
-            const cta = document.getElementById('academy-welcome-cta');
+            const cta = document.getElementById('courses-welcome-cta');
             if (cta) cta.addEventListener('click', () => {
                 const first = courses[0];
                 if (first) openCourse(first.id);
@@ -159,13 +164,13 @@ const CoursesPage = (() => {
 
     function _welcomeHTML() {
         return `
-        <div id="academy-welcome-box" style="
+        <div id="courses-welcome-box" style="
             background:linear-gradient(135deg,rgba(124,58,237,.18),rgba(59,130,246,.12));
             border:1px solid rgba(124,58,237,.35);
             border-left:4px solid #7c3aed;
             border-radius:.85rem;padding:1.25rem 1.5rem;
             margin-bottom:1.75rem;position:relative;">
-            <button id="academy-welcome-dismiss" style="
+            <button id="courses-welcome-dismiss" style="
                 position:absolute;top:.75rem;right:.75rem;
                 background:none;border:none;color:#6b7280;
                 font-size:1.25rem;cursor:pointer;line-height:1;padding:.25rem;">×</button>
@@ -177,14 +182,14 @@ const CoursesPage = (() => {
                 </div>
                 <div style="flex:1;min-width:0;">
                     <p style="font-size:.7rem;font-weight:700;color:#a78bfa;text-transform:uppercase;
-                               letter-spacing:.08em;margin:0 0 .35rem;">AI MENTOR</p>
+                               letter-spacing:.08em;margin:0 0 .35rem;">PREMIUM COURSES</p>
                     <p style="color:#e5e7eb;font-size:.9rem;line-height:1.6;margin:0 0 .85rem;">
-                        Welcome to your Forex trading journey! Start with the Beginner level to build a solid
-                        foundation — then progress to Intermediate and Advanced as you gain confidence.
-                        Inside each lesson you'll find the <strong style="color:#a78bfa;">Pipways Trading Coach</strong>
+                        Welcome to Premium Video Courses! These are expert-led video lessons that go
+                        deeper than the free Trading Academy. Pick a level to begin — inside each lesson
+                        you'll find the <strong style="color:#a78bfa;">Pipways Trading Coach</strong>
                         ready to answer your questions.
                     </p>
-                    <button id="academy-welcome-cta"
+                    <button id="courses-welcome-cta"
                         style="background:#7c3aed;color:white;border:none;border-radius:.5rem;
                                padding:.5rem 1.25rem;font-size:.85rem;font-weight:700;cursor:pointer;">
                         Start Learning →
@@ -270,15 +275,17 @@ const CoursesPage = (() => {
     async function _loadProgressSummary() {
         try {
             const data = await _req('/courses/enhanced/progress');
-            const el   = document.getElementById('academy-progress-summary');
+            const el   = document.getElementById('courses-progress-summary');
             if (el && data) {
                 const done  = data.completed_count  || 0;
                 const total = data.total_courses    || 0;
                 const pct   = data.overall_progress || 0;
                 el.innerHTML = `
-                    <span style="color:#6b7280;">${done}/${total} courses complete</span>
+                    <span style="color:#6b7280;">${done}/${total} video courses complete</span>
                     <span style="margin:0 .5rem;color:#374151;">·</span>
-                    <span style="color:#a78bfa;font-weight:600;">${pct}% overall</span>`;
+                    <span style="color:#a78bfa;font-weight:600;">${pct}% overall</span>
+                    <span style="margin:0 .5rem;color:#374151;">·</span>
+                    <a href="/academy" style="color:#34d399;font-size:.75rem;text-decoration:none;">Free Academy →</a>`;
             }
         } catch (_) {}
     }
@@ -287,7 +294,7 @@ const CoursesPage = (() => {
 
     async function _renderCurriculum() {
         const root = _state.root;
-        root.innerHTML = _spinnerHTML('Loading curriculum…');
+        root.innerHTML = _spinnerHTML('Loading course…');
         try {
             const data = await _req('/courses/' + _state.courseId + '/curriculum');
             _state.courseData = data;
@@ -362,18 +369,18 @@ const CoursesPage = (() => {
             </div>` : '';
 
         root.innerHTML = `
-        <div style="max-width:760px;margin:0 auto;padding-bottom:3rem;">
+        <div style="max-width:760px;margin:0 auto;padding:0 .5rem 3rem;">
             <button onclick="CoursesPage.render()"
                     style="display:inline-flex;align-items:center;gap:.5rem;color:#6b7280;
                            background:none;border:none;cursor:pointer;font-size:.85rem;
                            margin-bottom:1.25rem;padding:0;transition:color .15s;"
                     onmouseover="this.style.color='white'"
                     onmouseout="this.style.color='#6b7280'">
-                <i class="fas fa-arrow-left"></i> Back to Academy
+                <i class="fas fa-arrow-left"></i> Back to Courses
             </button>
 
             <div style="background:#111827;border:1px solid #1f2937;border-top:3px solid ${accentColor};
-                        border-radius:.85rem;padding:1.5rem;margin-bottom:1.5rem;">
+                        border-radius:.85rem;padding:1rem 1.25rem 1.25rem;margin-bottom:1.25rem;">
                 <div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
                     <div style="flex:1;min-width:200px;">
                         <span style="font-size:.7rem;font-weight:700;color:${accentColor};
@@ -410,7 +417,7 @@ const CoursesPage = (() => {
 
     function _lessonRow(l) {
         const icon = l.video_url ? 'fa-play-circle' : 'fa-file-alt';
-        const iconColor = l.video_url ? '#a78bfa' : '#4b5563';
+        const iconColor = l.video_url ? '#a78bfa' : '#6b7280';
         const checkmark = l.completed
             ? '<i class="fas fa-check-circle" style="color:#10b981;font-size:.85rem;flex-shrink:0;"></i>'
             : '<div style="width:16px;height:16px;border:1.5px solid #374151;border-radius:50%;flex-shrink:0;"></div>';
@@ -471,7 +478,7 @@ const CoursesPage = (() => {
             ? (_state.courseData.course.level || 'Beginner') : 'Beginner';
 
         root.innerHTML = `
-        <div style="max-width:860px;margin:0 auto;padding-bottom:4rem;" id="lesson-page">
+        <div style="max-width:860px;margin:0 auto;padding:0 .25rem 4rem;" id="lesson-page">
 
             <!-- Breadcrumb -->
             <nav style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;
@@ -480,7 +487,7 @@ const CoursesPage = (() => {
                         style="background:none;border:none;cursor:pointer;color:#6b7280;
                                padding:0;transition:color .12s;"
                         onmouseover="this.style.color='white'"
-                        onmouseout="this.style.color='#6b7280'">Academy</button>
+                        onmouseout="this.style.color='#6b7280'">Courses</button>
                 <span>›</span>
                 <button onclick="CoursesPage.closeLesson()"
                         style="background:none;border:none;cursor:pointer;color:#6b7280;
@@ -500,7 +507,7 @@ const CoursesPage = (() => {
                                  text-transform:uppercase;letter-spacing:.06em;">${_e(level)}</span>
                     ${lesson.duration_minutes
                         ? `<span style="font-size:.75rem;color:#4b5563;">
-                               <i class="fas fa-clock mr-1"></i>${lesson.duration_minutes} min read</span>`
+                               <i class="fas fa-${lesson.video_url ? 'play-circle' : 'clock'} mr-1"></i>${lesson.duration_minutes} min ${lesson.video_url ? 'watch' : 'read'}</span>`
                         : ''}
                     ${lesson.completed
                         ? `<span style="font-size:.75rem;color:#10b981;font-weight:600;">
@@ -527,8 +534,8 @@ const CoursesPage = (() => {
 
             <!-- Navigation row -->
             <div style="display:flex;align-items:center;justify-content:space-between;
-                        gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
-                <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+                        gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                     ${prev
                         ? `<button onclick="CoursesPage.openLesson(${prev.id})"
                                    style="display:inline-flex;align-items:center;gap:.5rem;
@@ -795,9 +802,8 @@ const CoursesPage = (() => {
                         <i class="fas fa-robot" style="color:white;font-size:.65rem;"></i>
                     </div>
                     <div style="background:#1e293b;border-radius:.6rem;padding:.75rem .85rem;
-                                max-width:88%;font-size:.82rem;color:#d1d5db;line-height:1.7;
-                                white-space:pre-wrap;">
-                        ${_e(reply)}
+                                max-width:88%;font-size:.82rem;color:#d1d5db;line-height:1.7;">
+                        ${window._renderMd ? window._renderMd(reply) : reply.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}
                     </div>
                 </div>`);
         } catch (e) {
@@ -876,15 +882,56 @@ const CoursesPage = (() => {
     // ── Responsive styles ─────────────────────────────────────────────────────
 
     function _injectLessonStyles() {
-        if (document.getElementById('academy-lesson-styles')) return;
+        if (document.getElementById('courses-lesson-styles')) return;
         const s = document.createElement('style');
-        s.id = 'academy-lesson-styles';
+        s.id = 'courses-lesson-styles';
         s.textContent = `
             .hidden { display: none !important; }
-            @media (max-width: 600px) {
-                .lesson-nav-label { display: none; }
+
+            /* ── Mobile: all views ── */
+            @media (max-width: 640px) {
+                /* Home: single column level cards */
+                .courses-home > div > div[style*="grid"] {
+                    grid-template-columns: 1fr !important;
+                    gap: .75rem !important;
+                }
+                /* Home header */
+                .courses-home > div > div[style*="space-between"] {
+                    flex-direction: column !important;
+                    align-items: flex-start !important;
+                    gap: .4rem !important;
+                }
+                /* Curriculum: max-width full */
                 #lesson-page { padding: 0 .25rem 4rem; }
+                /* Lesson header */
+                #lesson-page h1 { font-size: 1.1rem !important; }
+                /* Nav buttons */
+                .lesson-nav-label { display: none; }
+                /* Coach panel */
                 #coach-panel { margin: 0 -.25rem; border-radius: .5rem; }
+                /* Lesson content */
+                #lesson-content-body { padding: 1rem !important; }
+                /* Course header card */
+                #lesson-page > div > div[style*="flex-wrap"] { flex-direction: column !important; }
+                /* Breadcrumb font */
+                #lesson-page nav { font-size: .7rem !important; }
+                /* Video: ensure 16:9 responsive */
+                #lesson-page iframe[src*="youtube"],
+                #lesson-page iframe[src*="vimeo"] { border-radius: .5rem !important; }
+                /* Quick-ask chips: wrap properly */
+                #coach-panel > div > div[style*="flex-wrap"] { gap: .3rem !important; }
+                /* Mark complete button full width */
+                #lesson-page button[id^="btn-complete"] {
+                    width: 100% !important;
+                    justify-content: center;
+                }
+            }
+            @media (max-width: 400px) {
+                /* Level card body padding */
+                .courses-home div[style*="1.25rem 1.25rem"] {
+                    padding: .85rem !important;
+                }
+                #lesson-page h1 { font-size: 1rem !important; }
             }
             #lesson-content-body h2 { font-size:1.1rem; font-weight:700; color:#f9fafb;
                                        margin:1.5rem 0 .6rem; border-bottom:1px solid #1f2937;

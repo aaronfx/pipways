@@ -16,8 +16,46 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>if(typeof marked!=="undefined"){marked.setOptions({breaks:true,gfm:true});}</script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+    <script>
+    // Configure marked v4 + lightweight fallback renderer
+    if (typeof marked !== "undefined") {
+        try { marked.setOptions({ breaks: true, gfm: true }); } catch(_) {}
+    }
+
+    // Lightweight markdown renderer — works even if marked fails
+    function _renderMd(text) {
+        if (!text) return '';
+        try {
+            if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+                const result = marked.parse(text);
+                // marked v4 returns string synchronously; v9+ may return Promise
+                if (typeof result === 'string') return result;
+            }
+        } catch(_) {}
+        // Fallback: manual renderer
+        return text
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            // Bold
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            // Italic
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            // Inline code
+            .replace(/`(.+?)`/g, '<code>$1</code>')
+            // Bullet points (• or - or *)
+            .replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            // Line breaks
+            .replace(/
+
+/g, '</p><p>')
+            .replace(/
+/g, '<br>')
+            // Wrap in paragraph
+            .replace(/^(.+)$/, '<p>$1</p>');
+    }
+    window._renderMd = _renderMd;
+    </script>
     <!-- Quill rich-text editor (blog editor only) -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
@@ -25,6 +63,30 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
+        /* ── Performance Analytics — mobile overrides ── */
+        @media (max-width:767px) {
+            /* Stat tile font sizes */
+            #analytics-results .text-xs { font-size:.6rem; }
+            .stat-value { font-size:.85rem !important; }
+            /* Equity curve height */
+            #equity-curve-chart { max-height:180px; }
+            #trade-distribution-chart { max-height:160px; }
+            #monthly-performance-chart { max-height:160px; }
+            /* AI coach text */
+            #ai-coach-section .text-xs { font-size:.68rem; }
+            #ai-coach-section h4 { font-size:.9rem; }
+            /* Format buttons — icon only on tiny screens */
+            @media (max-width:380px) {
+                .format-btn .format-label { display:none; }
+            }
+            /* Improvements list items */
+            #ai-coach-section li { font-size:.78rem; }
+            /* Trade table scroll hint */
+            #trade-history .overflow-x-auto::after {
+                content: "";
+            }
+        }
+
         /* Mobile: remove blue tap flash, prevent text selection on cards */
         a, button { -webkit-tap-highlight-color: transparent; }
         .pw-card a, .pw-card button { user-select:none; -webkit-user-select:none; }
@@ -738,7 +800,7 @@
                         </button>
                     </div>
                     <div class="pw-card-body" id="ai-insight-body">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                             <!-- Market context -->
                             <div class="rounded-xl p-4" style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);">
                                 <div class="flex items-center gap-2 mb-3">
@@ -851,25 +913,25 @@
                 </div>
 
                 <!-- Import Section -->
-                <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
-                    <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trade Data</h4>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-                        <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt4">
+                <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 mb-4 md:mb-6">
+                    <h4 class="text-base md:text-lg font-bold text-white mb-3 md:mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trade Data</h4>
+                    <div class="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 mb-4 md:mb-6">
+                        <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="mt4">
                             <i class="fas fa-file-code text-blue-400"></i> MT4
                         </button>
-                        <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="mt5">
+                        <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="mt5">
                             <i class="fas fa-file-code text-green-400"></i> MT5
                         </button>
-                        <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="csv">
+                        <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="csv">
                             <i class="fas fa-file-csv text-yellow-400"></i> CSV
                         </button>
-                        <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="excel">
+                        <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="excel">
                             <i class="fas fa-file-excel text-green-500"></i> Excel
                         </button>
-                        <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-sm text-white border border-gray-600" data-format="screenshot">
+                        <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="screenshot">
                             <i class="fas fa-camera text-pink-400"></i> OCR
                         </button>
-                        <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-sm text-white">
+                        <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-xs md:text-sm text-white">
                             <i class="fas fa-edit"></i> Manual
                         </button>
                     </div>
@@ -897,42 +959,42 @@
                         <span id="overall-grade-badge" class="px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold">--</span>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                    <div class="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 md:gap-4 mb-4 md:mb-6">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-white" id="stat-total-trades">--</div>
                             <div class="text-xs text-gray-400">Trades</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-green-400" id="stat-win-rate">--</div>
                             <div class="text-xs text-gray-400">Win Rate</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-blue-400" id="stat-profit-factor">--</div>
                             <div class="text-xs text-gray-400">Profit Factor</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-purple-400" id="stat-expectancy">--</div>
                             <div class="text-xs text-gray-400">Expectancy</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-orange-400" id="stat-max-drawdown">--</div>
                             <div class="text-xs text-gray-400">Max DD</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-green-400" id="stat-winning-streak">--</div>
                             <div class="text-xs text-gray-400">Win Streak</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-red-400" id="stat-losing-streak">--</div>
                             <div class="text-xs text-gray-400">Loss Streak</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
                             <div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div>
                             <div class="text-xs text-gray-400">Net P&L</div>
                         </div>
                     </div>
 
-                    <div id="strategy-detection" class="hidden bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-4 border border-blue-700/50 mb-6">
+                    <div id="strategy-detection" class="hidden bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-3 md:p-4 border border-blue-700/50 mb-4 md:mb-6">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div>
                                 <span class="text-sm text-gray-400">Detected Strategy</span>
@@ -952,22 +1014,22 @@
                 </div>
 
                 <!-- Charts Grid -->
-                <div id="analytics-charts" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                <div id="analytics-charts" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 md:mb-6">
+                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700">
                         <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-line text-blue-400 mr-2"></i>Equity Curve</h4>
                         <div class="chart-container">
                             <canvas id="equity-curve-chart" role="img" aria-label="Equity curve chart showing trade-by-trade account balance progression"><p class="sr-only">Equity curve chart — shows how account balance changed across each trade.</p></canvas>
                         </div>
                     </div>
 
-                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                        <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-pie text-green-400 mr-2"></i>Trade Distribution</h4>
+                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700">
+                        <h4 class="font-bold text-white mb-3 md:mb-4"><i class="fas fa-chart-pie text-green-400 mr-2"></i>Trade Distribution</h4>
                         <div class="chart-container">
                             <canvas id="trade-distribution-chart" role="img" aria-label="Trade distribution donut chart showing wins, losses and breakeven trades"><p class="sr-only">Trade distribution chart — shows percentage of winning, losing and breakeven trades.</p></canvas>
                         </div>
                     </div>
 
-                    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 lg:col-span-2">
+                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 lg:col-span-2">
                         <h4 class="font-bold text-white mb-4"><i class="fas fa-calendar-alt text-purple-400 mr-2"></i>Monthly Performance</h4>
                         <div class="chart-container">
                             <canvas id="monthly-performance-chart" role="img" aria-label="Monthly performance bar chart showing profit and loss by month"><p class="sr-only">Monthly performance chart — shows profit and loss for each month of trading.</p></canvas>
@@ -976,19 +1038,19 @@
                 </div>
 
                 <!-- AI Trading Coach -->
-                <div id="ai-coach-section" class="hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border border-purple-700/50 mb-6">
+                <div id="ai-coach-section" class="hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 md:p-6 border border-purple-700/50 mb-4 md:mb-6">
                     <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-purple-400 mr-2"></i>AI Trading Coach</h4>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
+                    <div class="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700">
                             <div class="text-3xl font-bold text-blue-400 mb-1" id="ai-discipline-score">--</div>
                             <div class="text-sm text-gray-400">Discipline Score</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700">
                             <div class="text-3xl font-bold text-green-400 mb-1" id="ai-risk-score">--</div>
                             <div class="text-sm text-gray-400">Risk Management</div>
                         </div>
-                        <div class="bg-gray-800 rounded-lg p-4 text-center border border-gray-700">
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700">
                             <div class="text-3xl font-bold text-purple-400 mb-1" id="ai-consistency-score">--</div>
                             <div class="text-sm text-gray-400">Strategy Consistency</div>
                         </div>
@@ -1004,7 +1066,7 @@
                         <p id="ai-recommendation" class="text-gray-300">--</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                         <div>
                             <h5 class="font-bold text-green-400 mb-2"><i class="fas fa-check-circle mr-2"></i>Strengths</h5>
                             <ul id="ai-strengths" class="space-y-1 text-sm text-gray-300"></ul>
@@ -1017,10 +1079,10 @@
                 </div>
 
                 <!-- Trade History -->
-                <div id="trade-history" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700">
+                <div id="trade-history" class="hidden bg-gray-800 rounded-xl p-3 md:p-6 border border-gray-700">
                     <h4 class="font-bold text-white mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Trade History</h4>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
+                        <table class="w-full text-xs md:text-sm text-left">
                             <thead class="text-xs text-gray-500 uppercase bg-gray-900">
                                 <tr>
                                     <th class="px-4 py-3">Date</th>
@@ -1037,7 +1099,7 @@
                 </div>
 
                 <!-- Manual Entry Form -->
-                <div id="manual-entry-form" class="hidden bg-gray-800 rounded-xl p-6 border border-gray-700 mt-6">
+                <div id="manual-entry-form" class="hidden bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 mt-4 md:mt-6">
                     <h4 class="font-bold text-white mb-4"><i class="fas fa-plus-circle text-green-400 mr-2"></i>Add Trade Manually</h4>
                     <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" onsubmit="event.preventDefault(); dashboard.addManualTrade();">
                         <div>
@@ -1394,7 +1456,21 @@ const DashboardController = class {
         this.setupNavigation();
         this.setupMobileMenu();
         this.loadDashboardStats();
+        // Pre-load cached performance so mentor has it immediately
+        this._loadCachedPerformance();
         this.navigate('dashboard');
+    }
+
+    _loadCachedPerformance() {
+        try {
+            const raw = localStorage.getItem('pipways_performance');
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            // Keep in memory so mentor requests can attach it without re-reading localStorage
+            this._cachedPerformance = data;
+            const age = Math.round((Date.now() - data.cached_at) / 3600000);
+            console.log(`[Dashboard] Loaded cached performance (${age}h old, grade=${data.overall_grade})`);
+        } catch(e) {}
     }
 
     checkAuth() {
@@ -2167,9 +2243,9 @@ const DashboardController = class {
 
             if (result.trades && result.trades.length > 0) {
                 this.lastAnalysisResults = result;
-                // Cache in localStorage so AI Mentor can access without a backend call
+                // Cache in localStorage + memory so AI Mentor can access it
                 try {
-                    localStorage.setItem('pipways_performance', JSON.stringify({
+                    const perfCache = {
                         cached_at: Date.now(),
                         overall_grade: result.overall_grade,
                         overall_score: result.overall_score,
@@ -2178,7 +2254,9 @@ const DashboardController = class {
                         improvements: result.improvements,
                         next_milestone: result.next_milestone,
                         trades_count: result.trades_parsed
-                    }));
+                    };
+                    localStorage.setItem('pipways_performance', JSON.stringify(perfCache));
+                    this._cachedPerformance = perfCache;
                 } catch(_) {}
                 this.displayJournalAnalysis(result);
                 statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analyzed ${result.trades_parsed} trades</span>`;
@@ -2756,10 +2834,11 @@ const DashboardController = class {
         try {
             const history = JSON.parse(localStorage.getItem('mentor_history') || '[]');
             const container = document.getElementById('mentor-messages');
+            if (!container) return;
 
-            if (history.length > 0 && container) {
+            if (history.length > 0) {
+                // In-session history: restore full chat display
                 container.innerHTML = '';
-
                 history.forEach(msg => {
                     if (msg.role === 'user') {
                         this.appendMentorMessage(msg.content, 'user', false);
@@ -2767,6 +2846,39 @@ const DashboardController = class {
                         this.appendMentorMessage(msg.content, 'assistant', false);
                     }
                 });
+            } else {
+                // Fresh load — check if there's a previous session summary
+                const summaryRaw = localStorage.getItem('mentor_session_summary');
+                if (summaryRaw) {
+                    const summary = JSON.parse(summaryRaw);
+                    const age = Date.now() - new Date(summary.saved_at).getTime();
+                    if (age < 7 * 86400000 && summary.messages?.length > 0) {
+                        // Show a subtle "context restored" notice — clean UI but user knows
+                        const lastUserMsg = summary.messages.filter(m => m.role === 'user').pop();
+                        const notice = document.createElement('div');
+                        notice.className = 'flex justify-center mb-3';
+                        notice.innerHTML = `
+                            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs"
+                                 style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);color:#a78bfa;">
+                                <i class="fas fa-history" style="font-size:.65rem;"></i>
+                                Previous session context loaded
+                                ${lastUserMsg ? `· Last: "${lastUserMsg.content.slice(0, 40)}${lastUserMsg.content.length > 40 ? '…' : ''}"` : ''}
+                            </div>`;
+                        container.innerHTML = '';
+                        container.appendChild(notice);
+                        // Append welcome message after the notice
+                        const welcome = document.createElement('div');
+                        welcome.className = 'flex gap-3 animate-fade-in';
+                        welcome.innerHTML = `
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-robot text-xs text-white"></i>
+                            </div>
+                            <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none border border-gray-700" style="max-width:85%;">
+                                <div class="mentor-prose">Welcome back! I remember our last conversation. What would you like to work on today?</div>
+                            </div>`;
+                        container.appendChild(welcome);
+                    }
+                }
             }
         } catch (e) {
             console.error('Error loading mentor history:', e);
@@ -2787,8 +2899,20 @@ const DashboardController = class {
                 }
             });
 
+            // Keep last 20 messages for display history
             const trimmed = messages.slice(-20);
             localStorage.setItem('mentor_history', JSON.stringify(trimmed));
+
+            // Also save a compact summary of last 6 exchanges for cross-session context
+            // This gives the AI context even after a refresh without loading full history
+            const summary = messages.slice(-6).map(m => ({
+                role: m.role,
+                content: m.content.slice(0, 300) // truncate long responses
+            }));
+            localStorage.setItem('mentor_session_summary', JSON.stringify({
+                saved_at: new Date().toISOString(),
+                messages: summary
+            }));
         } catch (e) {
             console.error('Error saving mentor history:', e);
         }
@@ -2798,9 +2922,24 @@ const DashboardController = class {
     _getMentorHistory() {
         try {
             const raw = JSON.parse(localStorage.getItem('mentor_history') || '[]');
-            return raw.slice(-16).map(m => ({
+            if (raw.length > 0) {
+                // In-session history — use last 16 messages
+                return raw.slice(-16).map(m => ({
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: (m.content || '').slice(0, 800)
+                }));
+            }
+            // No in-session history (fresh page load) — use cross-session summary
+            // This gives the AI context of the last conversation silently
+            const summaryRaw = localStorage.getItem('mentor_session_summary');
+            if (!summaryRaw) return [];
+            const summary = JSON.parse(summaryRaw);
+            // Only use if from last 7 days
+            const age = Date.now() - new Date(summary.saved_at).getTime();
+            if (age > 7 * 86400000) return [];
+            return (summary.messages || []).map(m => ({
                 role: m.role === 'user' ? 'user' : 'assistant',
-                content: (m.content || '').slice(0, 800)
+                content: m.content
             }));
         } catch (_) { return []; }
     }
@@ -2808,11 +2947,17 @@ const DashboardController = class {
     // ── Get cached performance data to send with mentor request ─────────────
     _getCachedPerformance() {
         try {
+            // Use in-memory cache first (loaded at startup)
+            if (this._cachedPerformance) {
+                const age = Date.now() - this._cachedPerformance.cached_at;
+                if (age < 86400000) return this._cachedPerformance; // < 24 hours
+            }
+            // Fallback: read from localStorage
             const raw = localStorage.getItem('pipways_performance');
             if (!raw) return null;
             const data = JSON.parse(raw);
-            // Only use if cached within last 24 hours
             if (Date.now() - data.cached_at > 86400000) return null;
+            this._cachedPerformance = data; // store in memory
             return data;
         } catch (_) { return null; }
     }
@@ -3077,9 +3222,7 @@ const DashboardController = class {
                 </div>
             `;
         } else {
-            const rendered = (typeof marked !== 'undefined')
-                ? marked.parse(text)
-                : text.replace(/\n/g, '<br>');
+            const rendered = window._renderMd ? window._renderMd(text) : text;
             wrapper.innerHTML = `
                 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1">
                     <i class="fas fa-robot text-xs text-white"></i>
@@ -3132,9 +3275,7 @@ const DashboardController = class {
         }
 
         // Render final markdown after typing completes
-        if (typeof marked !== 'undefined') {
-            contentEl.innerHTML = marked.parse(text);
-        }
+        contentEl.innerHTML = window._renderMd ? window._renderMd(text) : text;
 
         container.scrollTop = container.scrollHeight;
         wrapper.dataset.content = text;

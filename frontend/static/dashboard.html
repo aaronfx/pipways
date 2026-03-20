@@ -1170,14 +1170,20 @@
 
                                 <div class="p-4 border-t border-gray-700 bg-gray-800">
                                     <div class="flex gap-2 mb-2 overflow-x-auto pb-2 scrollbar-hide" id="quick-actions">
+                                        <button onclick="dashboard.askMentor('/next')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                            📚 What's Next
+                                        </button>
                                         <button onclick="dashboard.askMentor('/review-trades')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
                                             📊 Review Trades
                                         </button>
-                                        <button onclick="dashboard.askMentor('/strategy')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            🎯 Strategy Check
-                                        </button>
                                         <button onclick="dashboard.askMentor('/signals')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📡 Active Signals
+                                            📡 Signals
+                                        </button>
+                                        <button onclick="dashboard.askMentor('/strategy')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                            🎯 Strategy
+                                        </button>
+                                        <button onclick="dashboard.askMentor('/progress')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
+                                            📈 My Progress
                                         </button>
                                         <button onclick="dashboard.askMentor('Why am I losing trades?')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
                                             🤔 Why am I losing?
@@ -1292,20 +1298,28 @@
                                 <h4 class="font-bold text-white mb-3">Quick Commands</h4>
                                 <div class="space-y-2 text-sm">
                                     <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/review-trades</code>
-                                        <span class="text-gray-400">Analyze performance</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/strategy</code>
-                                        <span class="text-gray-400">Check consistency</span>
+                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/next</code>
+                                        <span class="text-gray-400">What to learn next</span>
                                     </div>
                                     <div class="flex gap-2">
                                         <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/signals</code>
-                                        <span class="text-gray-400">Best active signals</span>
+                                        <span class="text-gray-400">Analyse active signals</span>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/review-trades</code>
+                                        <span class="text-gray-400">Review your performance</span>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/strategy</code>
+                                        <span class="text-gray-400">Strategy readiness check</span>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/progress</code>
+                                        <span class="text-gray-400">Full progress breakdown</span>
                                     </div>
                                     <div class="flex gap-2">
                                         <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/help</code>
-                                        <span class="text-gray-400">Show commands</span>
+                                        <span class="text-gray-400">Show all commands</span>
                                     </div>
                                 </div>
                             </div>
@@ -2737,18 +2751,76 @@ const DashboardController = class {
         }
     }
 
+    // ── Get conversation history from localStorage for memory ──────────────
+    _getMentorHistory() {
+        try {
+            const raw = JSON.parse(localStorage.getItem('mentor_history') || '[]');
+            // Return last 8 exchanges as [{role, content}] for the backend
+            return raw.slice(-16).map(m => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: (m.content || '').slice(0, 800)
+            }));
+        } catch (_) { return []; }
+    }
+
+    // ── Slash command local preview — show what the command does instantly ──
+    _getSlashPreview(cmd) {
+        const previews = {
+            '/signals':       '📡 Fetching active signals and asking mentor to analyse them…',
+            '/review-trades': '📊 Pulling your performance data for AI review…',
+            '/strategy':      '🎯 Checking your strategy readiness based on your progress…',
+            '/next':          '📚 Finding your recommended next learning step…',
+            '/progress':      '📈 Generating your full progress breakdown…',
+            '/help':          null  // handled inline
+        };
+        return previews[cmd.toLowerCase()] || null;
+    }
+
     async sendMentorMessage() {
         const input = document.getElementById('mentor-input');
         const message = input.value.trim();
         if (!message) return;
 
+        // ── Slash command: /help handled entirely client-side ──────────────
+        if (message.toLowerCase() === '/help') {
+            input.value = '';
+            this.appendMentorMessage('/help', 'user');
+            this.appendMentorMessage(
+                `**Available commands:**
+` +
+                `• \`/signals\` — Analyse active market signals
+` +
+                `• \`/review-trades\` — Review your performance stats
+` +
+                `• \`/strategy\` — Check your strategy readiness
+` +
+                `• \`/next\` — What to learn next
+` +
+                `• \`/progress\` — Full progress breakdown
+
+` +
+                `Or just ask me anything about trading!`,
+                'assistant'
+            );
+            return;
+        }
+
         this.appendMentorMessage(message, 'user');
         input.value = '';
 
-        document.getElementById('mentor-typing').classList.remove('hidden');
+        // Show slash command preview while waiting
+        const preview = this._getSlashPreview(message);
+        if (preview) {
+            const previewEl = document.getElementById('mentor-typing');
+            const span = previewEl?.querySelector('span');
+            if (span) span.textContent = preview;
+        }
 
-        // Hide stale lesson cards while waiting for new response
+        document.getElementById('mentor-typing').classList.remove('hidden');
         this._hideMentorRecommendations();
+
+        // Get conversation history for memory
+        const history = this._getMentorHistory();
 
         try {
             const response = await this.apiRequest('/ai/mentor/ask', {
@@ -2757,32 +2829,28 @@ const DashboardController = class {
                     message: message,
                     question: message,
                     skill_level: 'intermediate',
-                    include_platform_context: true
+                    include_platform_context: true,
+                    conversation_history: history   // ← memory
                 })
             });
 
             document.getElementById('mentor-typing').classList.add('hidden');
+            // Restore default typing text
+            const span = document.getElementById('mentor-typing')?.querySelector('span');
+            if (span) span.textContent = 'AI is analyzing your data...';
 
-            // Validate response shape — guard against unexpected server responses
             if (!response || typeof response !== 'object') {
                 throw new Error('Invalid response format from mentor API');
             }
 
             const replyText = response.response || response.message || response.answer || '';
-            if (!replyText) {
-                console.warn('[Mentor] Empty response text. Full response:', response);
-            }
-
             await this.typeMentorResponse(replyText || 'I received your message but had trouble generating a response. Please try again.');
 
-            // Render lesson recommendation cards
             const recs = response.recommendations || response.suggested_resources || [];
-            console.log(`[Mentor] Received ${recs.length} recommendation(s):`, recs);
+            console.log(`[Mentor] ${recs.length} recommendation(s):`, recs);
             if (recs.length > 0) {
                 this._renderMentorLessonCards(recs);
                 this.updateRecommendationsList(recs);
-            } else {
-                console.warn('[Mentor] No recommendations in response. Keys:', Object.keys(response));
             }
 
             this.saveMentorHistory();
@@ -3112,3 +3180,4 @@ window.API = API;
 
 </body>
 </html>
+

@@ -60,12 +60,18 @@ class LessonRecommendation(BaseModel):
 # REQUEST MODELS
 # ==========================================
 
+class ConversationMessage(BaseModel):
+    role: str   # "user" or "assistant"
+    content: str
+
 class MentorRequest(BaseModel):
     # Accept both 'question' (legacy) and 'message' (new frontend)
     question: Optional[str] = None
     message: Optional[str] = None
     skill_level: str = "intermediate"
     include_platform_context: bool = False
+    # Conversation history for memory — last N exchanges
+    conversation_history: Optional[List[ConversationMessage]] = None
 
     @property
     def resolved_question(self) -> str:
@@ -198,31 +204,59 @@ async def fetch_academy_structure(client: httpx.AsyncClient, base_url: str, toke
         return AcademyStructure(levels=[], modules={}, lessons={})
 
 async def fetch_user_academy_progress(client: httpx.AsyncClient, base_url: str, token: str, user_id: str) -> UserAcademyProgress:
-    """Fetch user's learning progress from academy"""
+    """
+    Fetch full user learning progress including weak/strong topics and next lesson.
+    Also fetches learning profile for personalised mentor context.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = await client.get(
-            f"{base_url}/learning/progress/{user_id}",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0
+        # Fetch progress + learning profile in parallel
+        progress_resp, resume_resp = await asyncio.gather(
+            client.get(f"{base_url}/learning/progress/{user_id}", headers=headers, timeout=10.0),
+            client.get(f"{base_url}/learning/resume", headers=headers, timeout=8.0),
+            return_exceptions=True
         )
-        if resp.status_code == 200:
-            data = resp.json()
+
+        completed_lessons = []
+        current_level = None
+        completion_rate = 0
+        summary = []
+        next_lesson_title = None
+        next_lesson_id = None
+
+        if not isinstance(progress_resp, Exception) and progress_resp.status_code == 200:
+            data = progress_resp.json()
             progress_rows = data.get("progress", [])
             completed_lessons = [p["lesson_id"] for p in progress_rows if p.get("completed")]
-
-            current_level = None
             summary = data.get("summary", [])
+            completion_rate = data.get("completion_rate", 0)
+
+            # Determine current level (first incomplete level)
             for lvl in summary:
                 if lvl.get("percent", 0) < 100:
                     current_level = lvl.get("level_name")
                     break
 
-            return UserAcademyProgress(
-                completed_lessons=completed_lessons,
-                current_level=current_level or "Beginner",
-                completion_rate=data.get("completion_rate", 0),
-                summary=summary
-            )
+        if not isinstance(resume_resp, Exception) and resume_resp.status_code == 200:
+            resume = resume_resp.json()
+            next_lesson_id = resume.get("lesson_id")
+            next_lesson_title = resume.get("title")
+
+        progress = UserAcademyProgress(
+            completed_lessons=completed_lessons,
+            current_level=current_level or "Beginner",
+            completion_rate=completion_rate,
+            summary=summary
+        )
+        # Attach extra context as dynamic attributes for use in system prompt
+        progress.__dict__["next_lesson_title"] = next_lesson_title
+        progress.__dict__["next_lesson_id"] = next_lesson_id
+        progress.__dict__["is_new_user"] = len(completed_lessons) == 0
+        progress.__dict__["lessons_done"] = len(completed_lessons)
+
+        print(f"[MENTOR] User {user_id}: {len(completed_lessons)} lessons done, level={current_level}, next={next_lesson_title}", flush=True)
+        return progress
+
     except Exception as e:
         print(f"[ACADEMY] Progress error: {e}", flush=True)
 
@@ -354,9 +388,21 @@ def find_relevant_lessons(question: str, academy_structure: AcademyStructure, pr
             "mindset", "revenge trade", "fomo", "overtrading", "patience",
         ],
         "foundation": [
-            "what is forex", "how does forex work", "currency pair explained",
-            "what is a pip", "what is spread", "what is leverage",
-            "how to start trading", "new to forex", "forex for beginners",
+            # Explicit intro phrases
+            "what is forex", "how does forex work", "how forex works",
+            "currency pair explained", "what is a pip", "what is spread",
+            "what is leverage", "how to start trading", "new to forex",
+            "forex for beginners", "intro to forex", "introduction to forex",
+            # Broad "basics/fundamentals" phrases — most common user queries
+            "forex basic", "forex fundamental", "basics of forex",
+            "forex trading basic", "trading basic", "forex 101",
+            "start forex", "learn forex", "forex beginner",
+            "what is trading", "how does trading work",
+            "currency trading", "fx trading", "foreign exchange",
+            "first lesson", "where to start", "getting started",
+            "where do i start", "new to trading", "new trader",
+            "just started", "complete beginner", "brand new",
+            "never traded", "absolute beginner", "trading for beginners",
         ],
         "confluence": [
             "confluence", "multiple signals", "combine indicators",
@@ -416,6 +462,7 @@ def find_relevant_lessons(question: str, academy_structure: AcademyStructure, pr
         "foundation": [
             "what is forex", "who trades forex", "currency pairs and price",
             "major, minor", "reading pips", "introduction to forex",
+            "introduction to", "what is forex trading", "who trades forex",
         ],
         "confluence": [
             "confluence", "multiple timeframe", "fibonacci and advanced",
@@ -681,19 +728,178 @@ async def ask_mentor(
     academy_structure = AcademyStructure(levels=[], modules={}, lessons={})
     academy_progress = UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
 
+    # Platform context — fetch ALL platform data for fully informed mentor responses
+    platform_context = {}
+
     try:
         async with httpx.AsyncClient() as client:
-            academy_structure, academy_progress = await asyncio.gather(
-                fetch_academy_structure(client, base_url, token),
-                fetch_user_academy_progress(client, base_url, token, user_id),
-                return_exceptions=True
-            )
-            if isinstance(academy_structure, Exception):
-                academy_structure = AcademyStructure(levels=[], modules={}, lessons={})
-            if isinstance(academy_progress, Exception):
-                academy_progress = UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+            headers = {"Authorization": f"Bearer {token}"}
+
+            # Always fetch academy data
+            gather_tasks = [
+                fetch_academy_structure(client, base_url, token),       # 0
+                fetch_user_academy_progress(client, base_url, token, user_id),  # 1
+                # Always fetch these lightweight endpoints
+                client.get(f"{base_url}/signals/active", headers=headers, timeout=6.0),       # 2
+                client.get(f"{base_url}/blog/posts", headers=headers, timeout=6.0),           # 3
+                client.get(f"{base_url}/webinars/upcoming?upcoming=true", headers=headers, timeout=6.0),  # 4
+                client.get(f"{base_url}/learning/badges/{user_id}", headers=headers, timeout=6.0),        # 5
+            ]
+            # Also fetch performance data if user has trades
+            if request.include_platform_context:
+                gather_tasks += [
+                    client.get(f"{base_url}/ai/performance/dashboard", headers=headers, timeout=8.0),  # 6
+                    client.get(f"{base_url}/courses/list", headers=headers, timeout=6.0),              # 7
+                ]
+
+            results = await asyncio.gather(*gather_tasks, return_exceptions=True)
+
+            academy_structure = results[0] if not isinstance(results[0], Exception) else AcademyStructure(levels=[], modules={}, lessons={})
+            academy_progress  = results[1] if not isinstance(results[1], Exception) else UserAcademyProgress(completed_lessons=[], current_level="Beginner", completion_rate=0, summary=[])
+
+            def _safe_json(r, default=None):
+                """Safely extract JSON from a response, return default on any error."""
+                try:
+                    if not isinstance(r, Exception) and hasattr(r, 'status_code') and r.status_code == 200:
+                        return r.json()
+                except Exception:
+                    pass
+                return default
+
+            # ── Signals ──────────────────────────────────────────────────
+            sigs_data = _safe_json(results[2], [])
+            active_sigs = sigs_data if isinstance(sigs_data, list) else sigs_data.get("signals", [])
+            if active_sigs:
+                platform_context["active_signals"] = len(active_sigs)
+                platform_context["signals_detail"] = [
+                    f"{s.get('symbol','?')} {s.get('direction','?')} "
+                    f"@ {s.get('entry_price','?')} | SL {s.get('stop_loss','?')} | TP {s.get('take_profit','?')} "
+                    f"({round(s.get('ai_confidence',0)*100)}% confidence)"
+                    for s in active_sigs[:4] if s.get('symbol')
+                ]
+
+            # ── Blog posts ───────────────────────────────────────────────
+            blog_data = _safe_json(results[3], [])
+            blog_posts = blog_data if isinstance(blog_data, list) else blog_data.get("posts", [])
+            if blog_posts:
+                platform_context["blog_posts"] = [
+                    f"'{p.get('title','?')}' ({p.get('category','General')})"
+                    for p in blog_posts[:4]
+                ]
+
+            # ── Webinars ─────────────────────────────────────────────────
+            web_data = _safe_json(results[4], [])
+            webinars = web_data if isinstance(web_data, list) else web_data.get("webinars", [])
+            if webinars:
+                platform_context["upcoming_webinars"] = [
+                    f"'{w.get('title','?')}' by {w.get('presenter','Pipways')}"
+                    for w in webinars[:3]
+                ]
+
+            # ── Badges earned ────────────────────────────────────────────
+            badge_data = _safe_json(results[5], {})
+            badges = badge_data.get("badges", []) if isinstance(badge_data, dict) else []
+            if badges:
+                platform_context["badges_earned"] = [b.get("name","?") for b in badges[:5]]
+
+            # ── Performance (if include_platform_context) ────────────────
+            if request.include_platform_context and len(results) > 6:
+                perf_data = _safe_json(results[6], None)
+                if perf_data and isinstance(perf_data, dict):
+                    stats = perf_data.get("statistics") or perf_data.get("stats") or perf_data
+                    if stats.get("total_trades"):
+                        platform_context["performance"] = {
+                            "total_trades":  stats.get("total_trades", 0),
+                            "win_rate":      f"{stats.get('win_rate', 0)}%",
+                            "profit_factor": stats.get("profit_factor", 0),
+                            "net_pnl":       f"${stats.get('net_pnl', 0):.2f}",
+                            "max_drawdown":  f"${stats.get('max_drawdown', 0):.2f}",
+                            "grade":         perf_data.get("overall_grade", "N/A"),
+                        }
+
+                courses_data = _safe_json(results[7], [])
+                if courses_data:
+                    platform_context["total_courses"] = len(courses_data) if isinstance(courses_data, list) else 0
+
     except Exception as e:
-        print(f"[MENTOR] Academy fetch error: {e}", flush=True)
+        print(f"[MENTOR] Context fetch error: {e}", flush=True)
+
+    # ── Slash command pre-processing ─────────────────────────────────────
+    # Intercept slash commands and resolve them to rich natural language
+    # so the AI has full context rather than just a bare command
+    slash_override = None
+    q_lower_cmd = question.lower().strip()
+
+    if q_lower_cmd in ("/signals", "signals"):
+        if platform_context.get("signals_detail"):
+            sigs_text = "
+".join(f"  • {s}" for s in platform_context["signals_detail"])
+            slash_override = f"Active Market Signals right now:
+{sigs_text}
+Please analyse these signals and tell me which looks strongest and why."
+        else:
+            slash_override = "What market signals should I be watching right now? I have no active signals currently."
+
+    elif q_lower_cmd in ("/review-trades", "review-trades", "review my trades"):
+        if platform_context.get("performance"):
+            p = platform_context["performance"]
+            slash_override = (
+                f"Please review my trading performance and give me specific coaching. "
+                f"My stats: {p['total_trades']} trades, {p['win_rate']} win rate, "
+                f"profit factor {p['profit_factor']}, net P&L {p['net_pnl']}, "
+                f"max drawdown {p['max_drawdown']}, overall grade {p['grade']}. "
+                f"What are my biggest weaknesses and what should I focus on improving?"
+            )
+        else:
+            slash_override = "I haven't imported any trades yet. What should I know about tracking my trading performance and what does each metric mean?"
+
+    elif q_lower_cmd in ("/strategy", "strategy check"):
+        done = getattr(academy_progress, "lessons_done", 0)
+        level = academy_progress.current_level or "Beginner"
+        next_t = getattr(academy_progress, "next_lesson_title", None)
+        slash_override = (
+            f"Review my trading strategy readiness. I'm at {level} level, "
+            f"completed {done} lessons, progress {academy_progress.completion_rate}%. "
+            f"Next lesson: {next_t or 'not started'}. "
+            f"Am I ready to trade live? What strategy should I be developing at my current level?"
+        )
+
+    elif q_lower_cmd in ("/next", "what should i learn next", "what to learn next"):
+        next_t = getattr(academy_progress, "next_lesson_title", None)
+        slash_override = (
+            f"What should I focus on learning next? I've completed "
+            f"{getattr(academy_progress, 'lessons_done', 0)} lessons at "
+            f"{academy_progress.current_level} level ({academy_progress.completion_rate}% done). "
+            f"My next scheduled lesson is: {next_t or 'not determined yet'}."
+        )
+
+    elif q_lower_cmd in ("/progress", "my progress"):
+        slash_override = (
+            f"Give me a detailed breakdown of my learning progress and what it means for my trading readiness. "
+            f"Level: {academy_progress.current_level}, overall {academy_progress.completion_rate}% complete, "
+            f"lessons done: {getattr(academy_progress, 'lessons_done', 0)}."
+        )
+
+    # If slash command resolved, use the override as the actual question to AI
+    if slash_override:
+        question = slash_override
+
+    # ── Weak topic detection from quiz scores ──────────────────────────────
+    # Build weak/strong topic context from progress data
+    weak_topics = []
+    strong_topics = []
+    completed_with_scores = [
+        p for p in (academy_progress.__dict__.get("_progress_rows") or [])
+        if p.get("completed") and p.get("quiz_score") is not None
+    ]
+    # Fallback: infer from level summary
+    for lvl in (academy_progress.summary or []):
+        pct = lvl.get("percent", 0)
+        name = lvl.get("level_name", "")
+        if pct > 0 and pct < 50:
+            weak_topics.append(f"{name} concepts ({pct}% complete)")
+        elif pct >= 80:
+            strong_topics.append(f"{name} ({pct}% mastered)")
 
     # Generate lesson recommendations (ALWAYS)
     recommendations = generate_lesson_recommendations(question, academy_structure, academy_progress)
@@ -724,26 +930,104 @@ async def ask_mentor(
             }
         }
 
-    # Build strict system prompt
-    system_prompt = f"""You are the AI Trading Mentor for Pipways. Guide users to specific Trading Academy lessons.
+    # ── Build rich context for system prompt ─────────────────────────────
+    is_new     = getattr(academy_progress, "is_new_user", len(academy_progress.completed_lessons) == 0)
+    done_count = getattr(academy_progress, "lessons_done", len(academy_progress.completed_lessons))
+    next_title = getattr(academy_progress, "next_lesson_title", None)
+    pct        = academy_progress.completion_rate
+    level      = academy_progress.current_level or "Beginner"
 
-STRICT RULES:
-1. Keep responses under 150 words (2-3 short paragraphs MAX)
-2. NEVER provide long explanations - reference the specific lesson shown below
-3. Briefly acknowledge the question, give one actionable tip, then direct to the lesson
-4. ALWAYS mention that lesson recommendations appear below your message
-5. Be concise and direct
+    # Level summary for mentor context
+    level_summary_lines = []
+    for lvl in (academy_progress.summary or []):
+        pct_lvl = lvl.get("percent", 0)
+        bar = "▓" * int(pct_lvl / 10) + "░" * (10 - int(pct_lvl / 10))
+        level_summary_lines.append(f"  {lvl.get('level_name','')}: {bar} {pct_lvl}% ({lvl.get('completed',0)}/{lvl.get('total',0)} lessons)")
+    level_summary = "
+".join(level_summary_lines) if level_summary_lines else "  No progress data yet"
 
-USER: {skill_level} level | PROGRESS: {academy_progress.completion_rate}% complete
+    # Build rich platform context string for system prompt
+    platform_lines = []
 
-RESPONSE FORMAT:
-[1 sentence acknowledging question]
-[1 sentence with specific actionable tip] 
-[1 sentence directing to lesson card below]
+    # Signals
+    if platform_context.get("signals_detail"):
+        platform_lines.append(f"  ACTIVE SIGNALS ({platform_context['active_signals']}):")
+        for sig in platform_context["signals_detail"]:
+            platform_lines.append(f"    • {sig}")
 
-Example: "Great question about support levels! The key is looking for 2+ touches. Click the lesson card below to learn the full strategy!"
+    # Performance analytics
+    if platform_context.get("performance"):
+        p = platform_context["performance"]
+        platform_lines.append(
+            f"  TRADE PERFORMANCE: {p['total_trades']} trades | "
+            f"Win rate: {p['win_rate']} | Profit factor: {p['profit_factor']} | "
+            f"Net P&L: {p['net_pnl']} | Grade: {p['grade']}"
+        )
+    else:
+        platform_lines.append("  PERFORMANCE ANALYTICS: No trades imported yet")
 
-REMEMBER: User will see specific lesson cards below your response. Just guide them there."""
+    # Blog
+    if platform_context.get("blog_posts"):
+        platform_lines.append(f"  RECENT BLOG/RESEARCH: {', '.join(platform_context['blog_posts'])}")
+
+    # Webinars
+    if platform_context.get("upcoming_webinars"):
+        platform_lines.append(f"  UPCOMING WEBINARS: {', '.join(platform_context['upcoming_webinars'])}")
+
+    # Badges
+    if platform_context.get("badges_earned"):
+        platform_lines.append(f"  BADGES EARNED: {', '.join(platform_context['badges_earned'])}")
+
+    # Courses
+    if platform_context.get("total_courses"):
+        platform_lines.append(f"  PREMIUM COURSES AVAILABLE: {platform_context['total_courses']}")
+
+    platform_str = "
+".join(platform_lines) if platform_lines else "  No platform data loaded yet"
+
+    user_status = "NEW USER — first time, be welcoming and start from foundations" if is_new else f"RETURNING USER — {done_count} lessons completed"
+
+    weak_str   = ", ".join(weak_topics)   if weak_topics   else "None identified yet"
+    strong_str = ", ".join(strong_topics) if strong_topics else "None identified yet"
+
+    system_prompt = f"""You are the Pipways AI Trading Mentor — a personal coach with full access to the user's learning journey on the Pipways platform.
+
+PLATFORM FEATURES YOU CAN REFERENCE:
+- Trading Academy: Free structured lessons (Beginner → Intermediate → Advanced). Always recommend this first.
+- Chart Analysis: User uploads a chart screenshot → AI validates entry, stop loss, bias & risk. Direct them to "Validate Trade Setup" on the dashboard.
+- AI Stock Research: Fundamental + sentiment analysis on global and Nigerian stocks.
+- Market Signals: Active trade setups with entry, SL, TP — you have the live data above.
+- Performance Analytics: Import MT4/MT5/CSV trades → AI coaching, win rate, drawdown analysis. If no trades imported, encourage them to do so.
+- Blog/Research: Educational articles and market analysis — titles listed above.
+- Webinars: Live expert sessions — upcoming ones listed above.
+- Badges: Achievements for completing levels, quizzes, streaks.
+
+USER PROFILE:
+- Status: {user_status}
+- Current level: {level}
+- Overall progress: {pct}% complete
+- Next lesson: {next_title or "Not started yet"}
+- Skill level: {skill_level}
+
+ACADEMY PROGRESS BREAKDOWN:
+{level_summary}
+
+WEAK AREAS (needs more practice): {weak_str}
+STRONG AREAS (well mastered): {strong_str}
+
+PLATFORM CONTEXT:
+{platform_str}
+
+RESPONSE RULES:
+1. Keep responses under 180 words — be concise and actionable
+2. Address the user by their progress level (new vs returning)
+3. If they ask about a topic: give 1 quick insight, then reference the lesson card shown below
+4. If they ask about their performance or progress: reference their actual data above
+5. If they ask about signals or charts: mention those specific platform features
+6. ALWAYS end by pointing to the lesson card below (it appears automatically)
+7. Be warm, encouraging, and specific — not generic
+
+LESSON CARD: The specific lesson recommendation appears below your text automatically. Just say "Check the lesson below" — don't describe what's in it."""
 
     try:
         async with httpx.AsyncClient() as client:
@@ -755,13 +1039,19 @@ REMEMBER: User will see specific lesson cards below your response. Just guide th
                     "X-Title": "Pipways Trading Platform",
                     "Content-Type": "application/json"
                 },
+                # Build message array with conversation history for memory
+                history = request.conversation_history or []
+                # Keep last 8 exchanges (16 messages) to stay within token limits
+                trimmed_history = history[-16:] if len(history) > 16 else history
+                messages_arr = [{"role": "system", "content": system_prompt}]
+                for h in trimmed_history:
+                    messages_arr.append({"role": h.role, "content": h.content[:800]})  # cap per msg
+                messages_arr.append({"role": "user", "content": question})
+
                 json={
                     "model": OPENROUTER_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": question}
-                    ],
-                    "max_tokens": 300,  # Force brevity
+                    "messages": messages_arr,
+                    "max_tokens": 350,
                     "temperature": 0.7
                 },
                 timeout=30.0
@@ -839,49 +1129,139 @@ async def ask_mentor_legacy(
 
 @router.get("/mentor/insights")
 async def get_mentor_insights(
+    req: Request,
     current_user=Depends(get_current_user)
 ):
     """
-    Returns AI coach insights for the sidebar panel.
-    Pulls from any existing performance data for the user.
-    Returns sensible defaults when no trade data exists yet.
+    Returns real AI coach insights based on user's actual academy progress.
+    Fetches live data: progress, next lesson, strengths/weaknesses from quiz scores.
     """
     user_id = str(current_user.get("id", "")) if isinstance(current_user, dict) else str(getattr(current_user, "id", ""))
 
-    # Default insights — enriched once we have performance data
+    # Build base_url with HTTPS enforcement (same pattern as ask_mentor)
+    raw_base = str(req.base_url).rstrip("/")
+    if not raw_base or raw_base in ("http://", "https://"):
+        raw_base = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+    if raw_base.startswith("http://") and "localhost" not in raw_base and "127.0.0.1" not in raw_base:
+        raw_base = raw_base.replace("http://", "https://", 1)
+
+    auth_header = req.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else ""
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Fetch real user progress data
+    progress_data = None
+    resume_data = None
+    try:
+        async with httpx.AsyncClient() as client:
+            prog_resp, res_resp = await asyncio.gather(
+                client.get(f"{raw_base}/learning/progress/{user_id}", headers=headers, timeout=8.0),
+                client.get(f"{raw_base}/learning/resume", headers=headers, timeout=6.0),
+                return_exceptions=True
+            )
+            if not isinstance(prog_resp, Exception) and prog_resp.status_code == 200:
+                progress_data = prog_resp.json()
+            if not isinstance(res_resp, Exception) and res_resp.status_code == 200:
+                resume_data = res_resp.json()
+    except Exception as e:
+        print(f"[INSIGHTS] Fetch error: {e}", flush=True)
+
+    # Build personalised insights from real data
+    completed = []
+    summary = []
+    completion_rate = 0
+    if progress_data:
+        rows = progress_data.get("progress", [])
+        completed = [p for p in rows if p.get("completed")]
+        summary = progress_data.get("summary", [])
+        completion_rate = progress_data.get("completion_rate", 0)
+
+    is_new = len(completed) == 0
+    lessons_done = len(completed)
+
+    # Determine personality from progress
+    if is_new:
+        personality = "New Trader"
+    elif completion_rate < 30:
+        personality = "Foundation Builder"
+    elif completion_rate < 60:
+        personality = "Developing Trader"
+    elif completion_rate < 90:
+        personality = "Intermediate Trader"
+    else:
+        personality = "Advanced Trader"
+
+    # Discipline and consistency scores based on quiz performance
+    avg_quiz = 0
+    if completed:
+        scores = [p.get("quiz_score", 0) or 0 for p in completed if p.get("quiz_score") is not None]
+        avg_quiz = round(sum(scores) / len(scores)) if scores else 0
+
+    discipline_score = min(100, avg_quiz + (5 * min(lessons_done, 10)))
+    consistency_score = min(100, round(completion_rate * 0.8 + avg_quiz * 0.2))
+
+    # Strengths and weaknesses
+    strengths = []
+    weaknesses = []
+
+    if is_new:
+        strengths = ["Taking the first step into trading education", "Using an AI-powered platform to learn faster"]
+        weaknesses = ["Start with the Trading Academy to build foundations", "Complete your first lesson to unlock insights"]
+    else:
+        if avg_quiz >= 80:
+            strengths.append(f"Strong quiz performance ({avg_quiz}% average)")
+        if lessons_done >= 5:
+            strengths.append(f"Consistent learner — {lessons_done} lessons completed")
+        for lvl in summary:
+            if lvl.get("percent", 0) >= 80:
+                strengths.append(f"{lvl['level_name']} level mastery ({lvl['percent']}%)")
+            elif lvl.get("percent", 0) > 0 and lvl.get("percent", 0) < 50:
+                weaknesses.append(f"{lvl['level_name']} needs more practice ({lvl['percent']}% complete)")
+
+        if not strengths:
+            strengths = ["Committed to continuous improvement", "Engaging with structured learning"]
+        if not weaknesses:
+            weaknesses = ["Keep completing lessons to track detailed insights"]
+
+    # Next steps
+    next_steps = []
+    if resume_data and resume_data.get("lesson_id"):
+        title = resume_data.get("title", "next lesson")
+        next_steps.append(f"Resume: {title}")
+    if is_new:
+        next_steps.append("Complete your first Trading Academy lesson")
+    next_steps.append("Ask the AI Mentor about any trading concept you want to master")
+    if completion_rate > 30:
+        next_steps.append("Import your trades in Performance Analytics for AI coaching")
+
+    # Recommended resources — use next lesson if available
+    resources = []
+    if resume_data and resume_data.get("lesson_id"):
+        resources.append({
+            "type": "lesson",
+            "title": resume_data.get("title", "Next Lesson"),
+            "description": f"{resume_data.get('module', '')} • {resume_data.get('level', '')}".strip(" •"),
+            "url": f"/academy.html?lesson={resume_data['lesson_id']}",
+            "metadata": {"lesson_id": resume_data["lesson_id"]}
+        })
+    else:
+        resources.append({
+            "type": "lesson",
+            "title": "What is Forex Trading?",
+            "description": "Introduction to Forex Trading • Beginner",
+            "url": "/academy.html",
+            "metadata": {"lesson_id": None}
+        })
+
     return {
-        "trading_personality": "Developing Trader",
-        "discipline_score": 0,
-        "consistency_score": 0,
-        "strengths": [
-            "Seeking knowledge and improvement",
-            "Using AI-powered tools for analysis"
-        ],
-        "weaknesses": [
-            "Upload a trade statement to unlock personalised insights"
-        ],
-        "risk_profile": "Unknown — import trades to assess",
-        "recommended_next_steps": [
-            "Import your MT4/MT5 trade history in Performance Analytics",
-            "Complete at least one Trading Academy course",
-            "Ask the AI Mentor a specific trading question"
-        ],
-        "recommended_resources": [
-            {
-                "type": "lesson",
-                "title": "What is Forex Trading?",
-                "description": "Introduction to Forex Trading • Beginner — the essential first lesson",
-                "url": "/academy.html",
-                "metadata": {"lesson_id": None, "note": "Open academy to start"}
-            },
-            {
-                "type": "lesson",
-                "title": "The 1-2% Rule",
-                "description": "Basic Risk Management • Beginner — protect your account from day one",
-                "url": "/academy.html",
-                "metadata": {"lesson_id": None, "note": "Open academy to find this lesson"}
-            }
-        ]
+        "trading_personality": personality,
+        "discipline_score": discipline_score,
+        "consistency_score": consistency_score,
+        "strengths": strengths[:3],
+        "weaknesses": weaknesses[:3],
+        "risk_profile": "Unknown — import trades to assess" if is_new else f"Learning profile: {personality}",
+        "recommended_next_steps": next_steps[:3],
+        "recommended_resources": resources
     }
 
 

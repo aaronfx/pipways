@@ -1,5 +1,5 @@
 /**
- * Pipways Premium Video Courses — courses.js  v3.1
+ * Pipways Professional Academy (Premium) — courses.js  v3.2
  *
  * Features:
  *  • Video course catalog: grouped by level (Beginner / Intermediate / Advanced)
@@ -121,11 +121,7 @@ const CoursesPage = (() => {
         <div class="courses-home" style="width:100%;">
             ${welcomeHTML}
 
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;">
-                <div>
-                    <h2 style="font-size:1.5rem;font-weight:800;color:white;margin:0;">Premium Video Courses</h2>
-                    <p style="color:#6b7280;font-size:.85rem;margin:.25rem 0 0;">Expert-led video lessons for every level</p>
-                </div>
+            <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;">
                 <div id="courses-progress-summary" style="font-size:.8rem;color:#6b7280;"></div>
             </div>
 
@@ -184,7 +180,7 @@ const CoursesPage = (() => {
                     <p style="font-size:.7rem;font-weight:700;color:#a78bfa;text-transform:uppercase;
                                letter-spacing:.08em;margin:0 0 .35rem;">PREMIUM COURSES</p>
                     <p style="color:#e5e7eb;font-size:.9rem;line-height:1.6;margin:0 0 .85rem;">
-                        Welcome to Premium Video Courses! These are expert-led video lessons that go
+                        Welcome to Pipways Professional Academy! These are expert-led premium video lessons that go
                         deeper than the free Trading Academy. Pick a level to begin — inside each lesson
                         you'll find the <strong style="color:#a78bfa;">Pipways Trading Coach</strong>
                         ready to answer your questions.

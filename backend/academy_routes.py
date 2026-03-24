@@ -107,46 +107,90 @@ def classify_lesson(title: str, content: str) -> str:
     Rule-based classifier. Returns one of:
     price_action | risk_management | indicator | pattern | structure | concept
     No AI needed — fast and deterministic.
+
+    FIX v2:
+    - TITLE is classified FIRST and alone — prevents content-keyword pollution
+    - Content scan extended from 400 → 1000 chars so keywords aren't missed
+    - price_action bucket is last resort only (was too greedy, grabbed concept lessons)
+    - Concept/intro/psychology lessons now fall through to "concept" correctly
     """
-    t = (title + " " + content[:400]).lower()
+    title_lower = title.lower()
 
-    # Risk management signals
-    if any(k in t for k in ["position siz", "lot size", "drawdown", "r:r", "risk:reward",
-                              "portfolio heat", "expectancy", "profit factor", "risk per trade",
-                              "risk management", "1% risk", "2% risk", "max risk",
-                              "account surviv", "account risk"]):
-        return "risk_management"
-    # risk/reward also qualifies IF combined with stop/entry context
-    if ("risk" in t and "reward" in t) or ("stop loss" in t and "take profit" in t and "risk" in t):
+    # ── TITLE-ONLY pass (highest priority) ───────────────────────────────────
+    # If the title itself contains a strong signal, trust it unconditionally.
+
+    _TITLE_RISK = ["risk management", "position siz", "stop loss", "take profit",
+                   "drawdown", "expectancy", "profit factor", "portfolio", "lot size",
+                   "leverage", "margin", "1% rule", "2% rule", "risk:reward", "r:r"]
+    if any(k in title_lower for k in _TITLE_RISK):
         return "risk_management"
 
-    # Indicator signals
-    if any(k in t for k in ["rsi", "macd", "stochastic", "bollinger", "atr", "adx",
-                              "moving average", "ema", "sma", "momentum indicator",
-                              "oscillator", "overbought", "oversold", "crossover",
-                              "golden cross", "death cross", "fibonacci"]):
+    _TITLE_INDICATOR = ["rsi", "macd", "stochastic", "bollinger", "moving average",
+                        "ema", "sma", "fibonacci", "atr", "adx", "momentum indicator",
+                        "oscillator", "indicator"]
+    if any(k in title_lower for k in _TITLE_INDICATOR):
         return "indicator"
 
-    # Pattern signals
-    if any(k in t for k in ["head and shoulder", "double top", "double bottom",
-                              "flag", "pennant", "wedge", "triangle", "cup and handle",
-                              "engulfing", "pin bar", "doji", "hammer", "pattern",
-                              "candlestick formation", "chart pattern"]):
+    _TITLE_PATTERN = ["candlestick", "chart pattern", "head and shoulder", "double top",
+                      "double bottom", "flag", "pennant", "wedge", "triangle",
+                      "engulfing", "pin bar", "doji", "hammer", "pattern"]
+    if any(k in title_lower for k in _TITLE_PATTERN):
         return "pattern"
 
-    # Market structure signals
-    if any(k in t for k in ["support", "resistance", "order block", "supply zone",
-                              "demand zone", "fair value gap", "bos", "choch",
-                              "break of structure", "change of character", "liquidity",
-                              "swing high", "swing low", "market structure", "smart money",
-                              "institutional", "imbalance"]):
+    _TITLE_STRUCTURE = ["support", "resistance", "order block", "supply zone",
+                        "demand zone", "liquidity", "market structure", "smart money",
+                        "institutional", "bos", "choch", "break of structure",
+                        "fair value gap", "imbalance"]
+    if any(k in title_lower for k in _TITLE_STRUCTURE):
         return "structure"
 
-    # Price action signals
-    if any(k in t for k in ["trend", "uptrend", "downtrend", "higher high", "lower low",
-                              "price action", "entry", "breakout", "pullback", "retracement",
-                              "trendline", "channel", "timeframe", "session", "multi-timeframe",
-                              "confluence"]):
+    _TITLE_PRICE_ACTION = ["trend", "price action", "breakout", "pullback",
+                           "trendline", "multi-timeframe", "confluence", "session timing",
+                           "timeframe analysis"]
+    if any(k in title_lower for k in _TITLE_PRICE_ACTION):
+        return "price_action"
+
+    # ── CONCEPT titles — skip to fallback immediately ────────────────────────
+    # Titles containing these words are concept/intro lessons regardless of body content.
+    _CONCEPT_TITLES = ["what is", "who trades", "why trade", "introduction",
+                       "trading plan", "performance review", "psychology",
+                       "trading sessions", "best times", "forex trading",
+                       "backtesting", "trading system", "journal", "mindset",
+                       "currency pair", "major", "minor", "exotic", "pip",
+                       "spread", "forex market", "market participant"]
+    if any(k in title_lower for k in _CONCEPT_TITLES):
+        return "concept"
+
+    # ── CONTENT pass (uses first 1000 chars, was 400) ────────────────────────
+    body = content[:1000].lower()
+
+    if any(k in body for k in ["position siz", "lot size", "drawdown", "r:r", "risk:reward",
+                                "portfolio heat", "expectancy", "profit factor", "risk per trade",
+                                "1% risk", "2% risk", "account risk"]):
+        return "risk_management"
+    if ("risk" in body and "reward" in body and "stop" in body):
+        return "risk_management"
+
+    if any(k in body for k in ["rsi", "macd", "stochastic", "bollinger", "atr", "adx",
+                                "moving average", "ema", "sma", "oscillator",
+                                "overbought", "oversold", "golden cross", "death cross"]):
+        return "indicator"
+
+    if any(k in body for k in ["head and shoulder", "double top", "double bottom",
+                                "flag pattern", "pennant", "wedge pattern", "triangle pattern",
+                                "cup and handle", "engulfing candle", "pin bar", "doji"]):
+        return "pattern"
+
+    if any(k in body for k in ["order block", "supply zone", "demand zone", "fair value gap",
+                                "break of structure", "change of character", "liquidity sweep",
+                                "swing high", "swing low", "institutional order"]):
+        return "structure"
+
+    # price_action is now last resort — only for content that explicitly describes
+    # price-based entry systems, NOT any lesson that mentions "trend" in passing.
+    if any(k in body for k in ["price action setup", "entry signal", "breakout trade",
+                                "pullback entry", "trendline break", "higher high", "lower low",
+                                "multi-timeframe", "confluence zone"]):
         return "price_action"
 
     return "concept"
@@ -443,7 +487,7 @@ Label "Cross" x=185 y=138 fill=#fbbf24 font-size=9
 
 Legend (bottom-right, spaced 16px apart):
   "— MACD" x=320 y=188 fill=#60a5fa font-size=9
-  "— Signal" x=370 y=188 fill=#fbbf24font-size=9
+  "— Signal" x=370 y=188 fill=#fbbf24 font-size=9
 
 Footer: "MACD line crosses above signal = bullish momentum building"{simplify}"""
 
@@ -887,10 +931,14 @@ CRITICAL — CONTENT CONTAINMENT:
 
 # ── 5. SVG VALIDATION LAYER ───────────────────────────────────────────────────
 
-def validate_svg(svg: str) -> bool:
+def validate_svg(svg: str, lesson_title: str = "") -> bool:
     """
     Validates AI-generated SVG before saving to DB.
     Returns False if invalid — triggers retry or fallback.
+
+    FIX v2:
+    - lesson_title param added: checks that diagram title matches the lesson
+      (prevents a "EUR/USD Basics" chart being saved for a "Trading Psychology" lesson)
     """
     if not svg or not isinstance(svg, str):
         return False
@@ -912,6 +960,14 @@ def validate_svg(svg: str) -> bool:
     # Must have at least a title text element
     if svg.count("<text") < 1:
         return False
+    # TITLE MATCH CHECK: at least the first 15 chars of the lesson title
+    # must appear somewhere in the SVG (case-insensitive).
+    # Prevents a perfectly valid SVG for the wrong lesson passing validation.
+    if lesson_title:
+        title_fragment = lesson_title[:15].lower()
+        if title_fragment not in svg.lower():
+            print(f"[SVG VALIDATE] Title mismatch — expected '{title_fragment}' not found in SVG", flush=True)
+            return False
     return True
 
 
@@ -1012,8 +1068,8 @@ async def _generate_diagram(lesson_title: str, lesson_content: str, level_name: 
             if svg_text.startswith("<svg") and 'class="ac-svg-diagram"' not in svg_text:
                 svg_text = svg_text.replace("<svg ", '<svg class="ac-svg-diagram" ', 1)
 
-            # Step 5: Validate
-            if validate_svg(svg_text):
+            # Step 5: Validate — pass lesson_title for title-match check
+            if validate_svg(svg_text, lesson_title):
                 print(f"[AI DIAGRAM] ✅ Generated (attempt {attempt+1}): {lesson_title}", flush=True)
                 return svg_text
             else:
@@ -1977,7 +2033,60 @@ async def regenerate_lesson_diagram(lesson_id: int, current_user=Depends(get_cur
     except Exception as e:
         raise HTTPException(500, str(e))
 
-@router.post("/admin/academy/reseed")
+@router.post("/admin/academy/regenerate-all-diagrams")
+async def admin_regenerate_all_diagrams(current_user=Depends(get_current_user)):
+    """
+    Admin only: strip and regenerate ALL lesson diagrams in the background.
+    Returns immediately with a job ID. Check server logs for progress.
+    Safe to call after a content reseed or classifier fix.
+    """
+    if not _user_get(current_user, "is_admin", False):
+        raise HTTPException(403, "Admin only")
+
+    import asyncio
+
+    async def _run():
+        lessons = await database.fetch_all(
+            """SELECT l.id, l.title, l.content, lv.name AS level_name
+               FROM learning_lessons l
+               JOIN learning_modules m ON m.id = l.module_id
+               JOIN learning_levels lv ON lv.id = m.level_id
+               ORDER BY lv.order_index, m.order_index, l.order_index"""
+        )
+        total = len(lessons) if lessons else 0
+        ok = 0
+        fail = 0
+        for lesson in (lessons or []):
+            try:
+                # Strip any existing SVG diagram section
+                clean = re.sub(
+                    r'\n*---\n+## 📊 (AI-Generated Diagram|Chart Diagram)\n+<svg.*?</svg>',
+                    '', lesson["content"] or "", flags=re.DOTALL
+                ).rstrip()
+
+                svg = await _generate_diagram(lesson["title"], clean, lesson["level_name"])
+                if svg:
+                    new_content = clean + "\n\n---\n\n## 📊 Chart Diagram\n\n" + svg
+                    await database.execute(
+                        "UPDATE learning_lessons SET content = :c WHERE id = :id",
+                        {"c": new_content, "id": lesson["id"]},
+                    )
+                    ok += 1
+                    print(f"[BULK REGEN] ✅ {ok}/{total} — {lesson['title']}", flush=True)
+                else:
+                    fail += 1
+                    print(f"[BULK REGEN] ⚠ Skipped (no SVG): {lesson['title']}", flush=True)
+                # Small delay to avoid rate limits
+                await asyncio.sleep(1)
+            except Exception as e:
+                fail += 1
+                print(f"[BULK REGEN] ❌ Error on '{lesson['title']}': {e}", flush=True)
+        print(f"[BULK REGEN] Done. ✅ {ok} regenerated, ❌ {fail} failed of {total} total.", flush=True)
+
+    asyncio.create_task(_run())
+    return {"status": "started", "message": "Bulk diagram regeneration running in background. Check server logs for progress."}
+
+
 async def admin_reseed(current_user=Depends(get_current_user)):
     """Admin only: wipe all curriculum data and reseed from academy_curriculum_seed.py."""
     if not _user_get(current_user, "is_admin", False):

@@ -380,9 +380,6 @@
             <a href="/academy" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#34d399;"></i><span>Trading Academy</span>
             </a>
-            <a href="#" data-section="courses" class="nav-link">
-                <i class="fas fa-graduation-cap nav-icon" style="color:#a78bfa;"></i><span>Courses <span class="text-xs font-normal opacity-60">(Premium)</span></span>
-            </a>
             <a href="#" data-section="webinars" class="nav-link">
                 <i class="fas fa-video nav-icon" style="color:#fbbf24;"></i><span>Webinars</span>
             </a>
@@ -439,11 +436,11 @@
                     <p id="user-name" class="font-semibold text-sm text-white truncate">Loading…</p>
                     <p id="user-email" class="text-xs text-gray-600 truncate">…</p>
                 </div>
-                <button onclick="dashboard.navigate('courses')" title="My learning progress"
-                        class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-                        style="background:rgba(124,58,237,.15);">
+                <a href="/academy" title="Go to Trading Academy"
+                   class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                   style="background:rgba(124,58,237,.15);text-decoration:none;">
                     <i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i>
-                </button>
+                </a>
             </div>
             <button onclick="dashboard.logout()"
                     class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
@@ -507,7 +504,7 @@
                             </div>
                         </div>
                         <div class="px-4 py-2.5 border-t text-center" style="border-color:#1f2937;">
-                            <button onclick="dashboard._toggleNotifPanel(); dashboard.navigate('courses')"
+                            <button onclick="dashboard._toggleNotifPanel(); dashboard.navigate('blog')"
                                     class="text-xs text-purple-400 hover:text-purple-300 transition-colors">
                                 View all activity →
                             </button>
@@ -673,13 +670,13 @@
                 <!-- ── Row 1: Stat chips ── -->
                 <!-- ── Stat strip — single scrollable row of pills ── -->
                 <div id="dash-stat-row" class="flex items-center gap-2 mb-5 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
-                    <!-- Courses pill -->
-                    <button onclick="dashboard.navigate('courses')"
+                    <!-- Academy pill -->
+                    <button onclick="window.location.href='/academy'"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all duration-150"
                             style="background:#111827;border:1px solid #1f2937;"
-                            onmouseover="this.style.borderColor='#a78bfa';this.style.background='rgba(167,139,250,.08)'"
+                            onmouseover="this.style.borderColor='#34d399';this.style.background='rgba(52,211,153,.08)'"
                             onmouseout="this.style.borderColor='#1f2937';this.style.background='#111827'">
-                        <i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i>
+                        <i class="fas fa-graduation-cap text-xs" style="color:#34d399;"></i>
                         <span class="font-bold text-white text-xs count-animate" id="stat-courses">—</span>
                         <span class="text-xs" style="color:#9ca3af;">Courses</span>
                         <!-- hidden sub-label kept for JS compat -->
@@ -738,7 +735,7 @@
                                 <p class="text-xs mt-0.5" style="color:#9ca3af;">Your structured Trading Academy path</p>
                             </div>
                             </div>
-                            <a href="#" onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">View all →</a>
+                            <a href="/academy" class="text-xs text-purple-400 hover:text-purple-300 transition-colors font-medium">View all →</a>
                         </div>
                         <div class="pw-card-body" id="dash-learning-body">
                             <div class="space-y-4 py-2">
@@ -853,7 +850,7 @@
                                 </p>
                                 <div class="mt-3">
                                     <div class="text-xs text-gray-500 mb-2">Recommended course</div>
-                                    <button onclick="dashboard.navigate('courses')"
+                                    <button onclick="window.location.href='/academy'"
                                             class="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all"
                                             style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);"
                                             onmouseover="this.style.background='rgba(16,185,129,.18)'" onmouseout="this.style.background='rgba(16,185,129,.1)'">
@@ -1155,14 +1152,10 @@
             <section id="section-stocks" class="section hidden">
                 <iframe 
                     src="/static/stock_terminal.html"
-                    class="w-full h-[900px] border-0 rounded-xl">
+                    class="w-full border-0 rounded-xl"
+                    style="height:calc(100vh - 160px);min-height:600px;"
+                    title="AI Stock Research Terminal">
                 </iframe>
-            </section>
-
-            <!-- COURSES -->
-            <section id="section-courses" class="section hidden">
-                <!-- CoursesPage renders its own full UI including heading into this container -->
-                <div id="courses-container"></div>
             </section>
 
             <!-- WEBINARS -->
@@ -1621,7 +1614,6 @@ const DashboardController = class {
         // ── Header title + subtitle ───────────────────────────────────────
         const meta = {
             'dashboard': { title: 'Dashboard',          sub: 'Your learning & research command centre' },
-            'courses':   { title: 'Pipways Professional Academy', sub: 'Premium video courses — expert-led, structured and in-depth' },
             'webinars':  { title: 'Live Webinars',         sub: 'Expert-led sessions, market walkthroughs and Q&A' },
             'blog':      { title: 'Research & Blog',       sub: 'Market analysis, trading insights and education' },
             'analysis':  { title: 'Validate Trade Setup',  sub: 'Upload a chart screenshot for AI-powered analysis' },
@@ -1672,7 +1664,7 @@ const DashboardController = class {
             switch(section) {
                 case 'dashboard': this.loadDashboardStats(); break;
                 case 'signals':   await this.loadSignals();  break;
-                case 'courses':   await this.loadCourses();  break;
+
                 case 'webinars':  await this.loadWebinars(); break;
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
@@ -1802,7 +1794,7 @@ const DashboardController = class {
                         </div>
                         <p class="font-semibold text-white mb-1">Ready to start learning, ${_e(name)}?</p>
                         <p class="text-xs text-gray-500 mb-4">You have ${courseList.length} course${courseList.length>1?'s':''} waiting for you.</p>
-                        <button onclick="dashboard.navigate('courses')"
+                        <button onclick="window.location.href='/academy'"
                             class="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
                             style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
                             Browse Courses →
@@ -1812,7 +1804,7 @@ const DashboardController = class {
                     learningEl.innerHTML = `
                     <div class="text-center py-4">
                         <p class="text-gray-500 text-sm">No courses available yet.</p>
-                        <a onclick="dashboard.navigate('courses')" class="text-xs text-purple-400 cursor-pointer mt-2 block">Check back soon →</a>
+                        <a href="/academy" class="text-xs text-purple-400 cursor-pointer mt-2 block">Check back soon →</a>
                     </div>`;
                 }
             } else {
@@ -1833,7 +1825,7 @@ const DashboardController = class {
                     const lessonLabel = lessons > 0 ? (done + ' / ' + lessons + ' lessons') : (isDone ? 'Completed' : 'In progress');
                     return '<div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90" '
                          + 'style="background:' + bgCol + ';border:1px solid ' + border + ';" '
-                         + 'onclick="dashboard.navigate(\'courses\')">'
+                         + 'onclick="window.location.href=\'/academy\'">'
                          + '<div class="flex items-center justify-between mb-2">'
                          + '<span class="text-xs font-semibold text-white truncate pr-2">' + _e(c.title) + '</span>'
                          + '<span class="text-xs flex-shrink-0 font-bold" style="color:' + barCol + ';">' + pctLabel + '</span>'
@@ -1846,12 +1838,12 @@ const DashboardController = class {
                 }).join('');
 
                 const resumeBtn = nextUp
-                    ? '<button onclick="dashboard._toast(\'Resuming course\',\'info\'); setTimeout(function(){dashboard.navigate(\'courses\');},400);" '
+                    ? '<button onclick="dashboard._toast(\'Resuming…\',\'info\'); setTimeout(function(){window.location.href=\'/academy\';},400);" '
                     + 'class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all" '
                     + 'style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
                     + '<i class="fas fa-play-circle mr-2"></i>Resume: ' + _e(nextUp.title.length > 28 ? nextUp.title.slice(0, 28) + '…' : nextUp.title)
                     + '</button>'
-                    : '<button onclick="dashboard.navigate(\'courses\')" '
+                    : '<button onclick="window.location.href=\'/academy\'" '
                     + 'class="w-full py-2 rounded-lg text-sm font-semibold transition-all" '
                     + 'style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">'
                     + 'View All Courses →</button>';
@@ -1874,65 +1866,6 @@ const DashboardController = class {
             }
         }  // end: if (learningEl) — was missing, caused dashboard to be undefined
 
-        // ── Card 5: Latest Courses ────────────────────────────────────────
-        const coursesEl = document.getElementById('dash-courses-body');
-        if (coursesEl) {
-            const list = Array.isArray(courses) ? courses.slice(0, 4) : [];
-            if (!list.length) {
-                coursesEl.innerHTML = `<div class="text-center py-6 text-gray-600 text-sm">No courses yet.</div>`;
-            } else {
-                const _lvlColor = {Beginner:'#a78bfa',Intermediate:'#60a5fa',Advanced:'#f87171'};
-                const _lvlBg    = {Beginner:'rgba(167,139,250,.12)',Intermediate:'rgba(96,165,250,.12)',Advanced:'rgba(248,113,113,.12)'};
-                coursesEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                ${list.map(c => {
-                    const lvlColor = _lvlColor[c.level] || '#a78bfa';
-                    const lvlBg    = _lvlBg[c.level]    || 'rgba(167,139,250,.12)';
-                    const pct      = c.progress || 0;
-                    const nearDone = pct >= 80 && pct < 100;
-                    const btnLabel = pct > 0 ? 'Continue Course' : 'Start Course';
-                    const btnIcon  = pct > 0 ? 'fa-play-circle' : 'fa-arrow-right';
-                    const thumb    = c.thumbnail_url || c.thumbnail || '';
-                    return `
-                    <div class="rounded-xl overflow-hidden cursor-pointer transition-all duration-200 hover:scale-[1.01]"
-                         style="border:1px solid #1f2937;background:#0d1321;"
-                         onclick="typeof CoursesPage!=='undefined' ? CoursesPage.openCourse(${c.id}) : dashboard.navigate('courses')"
-                         onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#1f2937'">
-                        <!-- Thumbnail -->
-                        <div class="relative h-28 overflow-hidden"
-                             style="background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(59,130,246,.15));">
-                            ${thumb ? `<img src="${thumb}" class="w-full h-full object-cover opacity-80"
-                                 onerror="this.style.display='none'">` : ''}
-                            <div class="absolute inset-0 flex items-center justify-center ${thumb?'opacity-0':'opacity-100'}">
-                                <i class="fas fa-graduation-cap text-3xl" style="color:${lvlColor};opacity:.4;"></i>
-                            </div>
-                            <!-- Difficulty badge -->
-                            <div class="absolute top-2 left-2">
-                                <span class="text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm"
-                                      style="background:${lvlBg};color:${lvlColor};border:1px solid ${lvlColor}33;">
-                                    ${_e(c.level||'Beginner').toUpperCase()}
-                                </span>
-                            </div>
-                            ${pct > 0 ? `<div class="absolute bottom-0 inset-x-0" style="height:3px;background:#111827;">
-                                <div style="height:100%;width:${pct}%;background:${pct>=80?'#a78bfa':lvlColor};transition:width .5s;${pct>=80?'box-shadow:0 0 6px rgba(167,139,250,.5);':''}"></div>
-                            </div>` : ''}
-                        </div>
-                        <!-- Content -->
-                        <div class="p-3">
-                            <div class="text-sm font-semibold text-white mb-1 truncate">${_e(c.title)}</div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs text-gray-600">
-                                    <i class="fas fa-book-open mr-1"></i>${c.lesson_count||0} lessons
-                                </span>
-                                <span class="text-xs font-medium flex items-center gap-1" style="color:${lvlColor};">
-                                    <i class="fas ${btnIcon}"></i> ${btnLabel}
-                                </span>
-                            </div>
-                        </div>
-                    </div>`;
-                }).join('')}
-                </div>`;
-            }
-        }
 
         // ── Dynamic "Your Next Step" card ────────────────────────────────────
         this._updateNextStepCard(progress, courses);
@@ -2596,47 +2529,6 @@ const DashboardController = class {
             `).join('');
         } catch (error) {
             container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load signals. Please try again.</div>';
-        }
-    }
-
-    async loadCourses() {
-        if (typeof PublicPages !== 'undefined') {
-            await PublicPages.courses('courses-container', this);
-            return;
-        }
-        const container = document.getElementById('courses-container');
-        if (!container) return;
-        if (typeof CoursesPage !== 'undefined') {
-            await CoursesPage.render('courses-container');
-            return;
-        }
-        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>';
-        try {
-            const data = await this.apiRequest('/courses/list');
-            const courses = Array.isArray(data) ? data : (data.courses || []);
-            if (!courses.length) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
-                    <i class="fas fa-graduation-cap text-4xl mb-3 block opacity-30"></i>
-                    <p class="font-medium">No courses available yet</p>
-                </div>`;
-                return;
-            }
-            container.innerHTML = courses.map(c => `
-                <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors cursor-pointer"
-                     onclick="CoursesPage ? CoursesPage.openCourse(${c.id}) : null">
-                    <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-                        <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
-                    </div>
-                    <div class="p-4">
-                        <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
-                        <h4 class="font-bold text-white mt-1 mb-2">${c.title}</h4>
-                        <p class="text-sm text-gray-400 line-clamp-2 mb-2">${c.description || ''}</p>
-                        <div class="text-xs text-gray-500">${c.lesson_count || 0} lessons</div>
-                    </div>
-                </div>
-            `).join('');
-        } catch (error) {
-            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load courses.</div>';
         }
     }
 

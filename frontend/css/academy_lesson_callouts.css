@@ -1,0 +1,637 @@
+/*
+ * Pipways Trading Academy — Lesson Callout Renderer v2.0
+ * Parses > [!TYPE] markdown blocks into styled visual callouts.
+ *
+ * SUPPORTED CALLOUT TYPES:
+ *   > [!HOOK]     — Story/analogy opener       (purple left-border)
+ *   > [!DEF]      — Plain-English definition    (blue filled)
+ *   > [!EXAMPLE]  — Worked trade with numbers   (indigo filled)
+ *   > [!NGX]      — Nigerian market parallel    (amber filled)
+ *   > [!MISTAKE]  — Common error warning        (red filled)
+ *   > [!TIP]      — Pro insight                 (green filled)
+ *   > [!TAKEAWAY] — Lesson summary sentence     (gray filled)
+ *
+ * USAGE: Apply .lesson-content to the container that holds rendered markdown.
+ * The JS renderer (academy_lesson_renderer.js) converts > [!TYPE] syntax
+ * into <div class="callout callout--TYPE"> elements before this CSS applies.
+ */
+
+/* ── Base container ─────────────────────────────────────────────────────── */
+.lesson-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--text-primary, #1a1a2e);
+  max-width: 760px;
+}
+
+.lesson-content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a2e);
+  margin: 2rem 0 0.75rem;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--border-light, #e8e8f0);
+}
+
+.lesson-content h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a2e);
+  margin: 1.5rem 0 0.5rem;
+}
+
+.lesson-content p {
+  margin: 0.85rem 0;
+}
+
+.lesson-content ul,
+.lesson-content ol {
+  padding-left: 1.5rem;
+  margin: 0.75rem 0;
+}
+
+.lesson-content li {
+  margin: 0.35rem 0;
+}
+
+.lesson-content strong {
+  font-weight: 600;
+  color: var(--text-primary, #1a1a2e);
+}
+
+.lesson-content code {
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 14px;
+  background: var(--bg-code, #f0f0f8);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #6b46c1;
+}
+
+.lesson-content pre code {
+  display: block;
+  padding: 1rem;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.lesson-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 15px;
+}
+
+.lesson-content th {
+  background: var(--bg-table-header, #f4f4fb);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--border-medium, #d0d0e8);
+}
+
+.lesson-content td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-light, #e8e8f0);
+  vertical-align: top;
+}
+
+.lesson-content tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Horizontal rule ────────────────────────────────────────────────────── */
+.lesson-content hr {
+  border: none;
+  border-top: 1px solid var(--border-light, #e8e8f0);
+  margin: 2rem 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CALLOUT BLOCKS — Core component
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.callout {
+  margin: 1.5rem 0;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  position: relative;
+}
+
+/* Header label inside each callout */
+.callout__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.6rem;
+}
+
+.callout__label .callout__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.callout__body {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.callout__body p:first-child {
+  margin-top: 0;
+}
+
+.callout__body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── HOOK — Purple left-border story block ─────────────────────────────── */
+.callout--hook {
+  background: transparent;
+  border-left: 4px solid #7c3aed;
+  border-radius: 0 8px 8px 0;
+  padding-left: 1.25rem;
+}
+
+.callout--hook .callout__label {
+  color: #7c3aed;
+}
+
+.callout--hook .callout__body {
+  color: var(--text-secondary, #374151);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+/* ── DEF — Blue filled definition ─────────────────────────────────────── */
+.callout--def {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+}
+
+.callout--def .callout__label {
+  color: #1d4ed8;
+}
+
+.callout--def .callout__body {
+  color: #1e3a5f;
+}
+
+.callout--def .callout__body strong {
+  color: #1d4ed8;
+}
+
+/* ── EXAMPLE — Indigo filled worked trade ──────────────────────────────── */
+.callout--example {
+  background: #f5f3ff;
+  border: 1px solid #c4b5fd;
+  border-left: 4px solid #7c3aed;
+}
+
+.callout--example .callout__label {
+  color: #6d28d9;
+}
+
+.callout--example .callout__body {
+  color: #2e1065;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.callout--example .callout__body strong {
+  color: #5b21b6;
+}
+
+.callout--example .callout__body table {
+  margin: 0.75rem 0;
+  font-size: 14px;
+}
+
+.callout--example .callout__body th {
+  background: #ede9fe;
+  border-bottom-color: #c4b5fd;
+}
+
+/* ── NGX — Amber Nigerian market callout ──────────────────────────────── */
+.callout--ngx {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #d97706;
+}
+
+.callout--ngx .callout__label {
+  color: #b45309;
+}
+
+.callout--ngx .callout__body {
+  color: #451a03;
+}
+
+.callout--ngx .callout__body strong {
+  color: #92400e;
+}
+
+/* ── MISTAKE — Red error warning ──────────────────────────────────────── */
+.callout--mistake {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #dc2626;
+}
+
+.callout--mistake .callout__label {
+  color: #b91c1c;
+}
+
+.callout--mistake .callout__body {
+  color: #450a0a;
+}
+
+.callout--mistake .callout__body strong {
+  color: #991b1b;
+}
+
+/* ── TIP — Green pro insight ──────────────────────────────────────────── */
+.callout--tip {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #16a34a;
+}
+
+.callout--tip .callout__label {
+  color: #15803d;
+}
+
+.callout--tip .callout__body {
+  color: #052e16;
+}
+
+.callout--tip .callout__body strong {
+  color: #166534;
+}
+
+/* ── TAKEAWAY — Gray summary sentence ─────────────────────────────────── */
+.callout--takeaway {
+  background: var(--bg-surface, #f8f8fc);
+  border: 1px solid var(--border-medium, #d0d0e8);
+  border-left: 4px solid #6b7280;
+}
+
+.callout--takeaway .callout__label {
+  color: #374151;
+}
+
+.callout--takeaway .callout__body {
+  color: #111827;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+/* ── Dark mode overrides ───────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .lesson-content {
+    color: #e2e8f0;
+  }
+
+  .lesson-content h2,
+  .lesson-content h3 {
+    color: #f1f5f9;
+    border-bottom-color: #2d3748;
+  }
+
+  .lesson-content strong {
+    color: #f1f5f9;
+  }
+
+  .lesson-content code {
+    background: #2d3748;
+    color: #a78bfa;
+  }
+
+  .lesson-content th {
+    background: #1e293b;
+    border-bottom-color: #334155;
+  }
+
+  .lesson-content td {
+    border-bottom-color: #1e293b;
+  }
+
+  .callout--hook {
+    border-left-color: #a78bfa;
+  }
+
+  .callout--hook .callout__label { color: #a78bfa; }
+  .callout--hook .callout__body  { color: #cbd5e1; }
+
+  .callout--def {
+    background: #1e3a5f;
+    border-color: #1d4ed8;
+  }
+  .callout--def .callout__label { color: #60a5fa; }
+  .callout--def .callout__body  { color: #bfdbfe; }
+  .callout--def .callout__body strong { color: #93c5fd; }
+
+  .callout--example {
+    background: #1e1b4b;
+    border-color: #4c1d95;
+  }
+  .callout--example .callout__label { color: #a78bfa; }
+  .callout--example .callout__body  { color: #ede9fe; }
+  .callout--example .callout__body strong { color: #c4b5fd; }
+  .callout--example .callout__body th { background: #312e81; border-bottom-color: #4c1d95; }
+
+  .callout--ngx {
+    background: #451a03;
+    border-color: #d97706;
+  }
+  .callout--ngx .callout__label { color: #fbbf24; }
+  .callout--ngx .callout__body  { color: #fef3c7; }
+  .callout--ngx .callout__body strong { color: #fde68a; }
+
+  .callout--mistake {
+    background: #450a0a;
+    border-color: #dc2626;
+  }
+  .callout--mistake .callout__label { color: #fca5a5; }
+  .callout--mistake .callout__body  { color: #fee2e2; }
+  .callout--mistake .callout__body strong { color: #fca5a5; }
+
+  .callout--tip {
+    background: #052e16;
+    border-color: #16a34a;
+  }
+  .callout--tip .callout__label { color: #4ade80; }
+  .callout--tip .callout__body  { color: #dcfce7; }
+  .callout--tip .callout__body strong { color: #86efac; }
+
+  .callout--takeaway {
+    background: #1e1e2e;
+    border-color: #374151;
+  }
+  .callout--takeaway .callout__label { color: #9ca3af; }
+  .callout--takeaway .callout__body  { color: #f1f5f9; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LESSON PROGRESS BAR
+   ══════════════════════════════════════════════════════════════════════════ */
+.lesson-progress-bar {
+  height: 4px;
+  background: var(--bg-progress, #e8e8f0);
+  border-radius: 2px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.lesson-progress-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #2563eb);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QUIZ COMPONENT
+   ══════════════════════════════════════════════════════════════════════════ */
+.lesson-quiz {
+  margin: 2rem 0;
+  border: 1px solid var(--border-light, #e8e8f0);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lesson-quiz__header {
+  background: var(--bg-surface, #f8f8fc);
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-light, #e8e8f0);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-tertiary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lesson-quiz__question {
+  padding: 1.25rem;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a2e);
+  border-bottom: 1px solid var(--border-light, #e8e8f0);
+  line-height: 1.5;
+}
+
+.lesson-quiz__options {
+  padding: 1rem 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 540px) {
+  .lesson-quiz__options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quiz-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border-light, #e8e8f0);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--bg-primary, #fff);
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-primary, #1a1a2e);
+  line-height: 1.4;
+}
+
+.quiz-option:hover {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.quiz-option--correct {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #052e16;
+}
+
+.quiz-option--incorrect {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #450a0a;
+}
+
+.quiz-option--reveal {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  opacity: 0.6;
+}
+
+.quiz-option__letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-surface, #f0f0f8);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary, #6b7280);
+  transition: all 0.15s ease;
+}
+
+.quiz-option--correct .quiz-option__letter {
+  background: #16a34a;
+  color: white;
+}
+
+.quiz-option--incorrect .quiz-option__letter {
+  background: #dc2626;
+  color: white;
+}
+
+.quiz-option--reveal .quiz-option__letter {
+  background: #16a34a;
+  color: white;
+}
+
+.lesson-quiz__explanation {
+  margin: 0 1.25rem 1.25rem;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #052e16;
+  line-height: 1.6;
+  display: none;
+}
+
+.lesson-quiz__explanation.is-visible {
+  display: block;
+}
+
+.lesson-quiz__explanation strong {
+  color: #15803d;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LESSON NAVIGATION
+   ══════════════════════════════════════════════════════════════════════════ */
+.lesson-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-light, #e8e8f0);
+  gap: 12px;
+}
+
+.lesson-nav__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  border: 1.5px solid var(--border-medium, #d0d0e8);
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #1a1a2e);
+}
+
+.lesson-nav__btn:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.lesson-nav__btn--primary {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: white;
+}
+
+.lesson-nav__btn--primary:hover {
+  background: #6d28d9;
+  border-color: #6d28d9;
+  color: white;
+}
+
+.lesson-nav__btn:disabled,
+.lesson-nav__btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AI MENTOR INTEGRATION — "Ask the Mentor" button
+   ══════════════════════════════════════════════════════════════════════════ */
+.lesson-mentor-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  margin: 2rem 0;
+  background: linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%);
+  border: 1px solid #c4b5fd;
+  border-radius: 10px;
+  gap: 12px;
+}
+
+.lesson-mentor-cta__text {
+  flex: 1;
+}
+
+.lesson-mentor-cta__text strong {
+  display: block;
+  font-size: 14px;
+  color: #5b21b6;
+  margin-bottom: 2px;
+}
+
+.lesson-mentor-cta__text span {
+  font-size: 13px;
+  color: #7c3aed;
+}
+
+.lesson-mentor-cta__btn {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  background: #7c3aed;
+  color: white;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.lesson-mentor-cta__btn:hover {
+  background: #6d28d9;
+}

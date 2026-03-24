@@ -33,34 +33,14 @@ const ChartAnalysisPage = {
         const app = document.getElementById(containerId);
         if (!app) return;
 
-        // ── Inject mobile-responsive styles once ────────────────────────────
-        if (!document.getElementById('ca-responsive-style')) {
-            const s = document.createElement('style');
-            s.id = 'ca-responsive-style';
-            s.textContent = [
-                '#ca-main-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;}',
-                '#ca-symbol-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;}',
-                '#ca-validator-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;}',
-                '.page-header h1{font-size:1.25rem;line-height:1.3;}',
-                '@media(max-width:767px){',
-                '  #ca-main-grid{grid-template-columns:1fr!important;gap:1.25rem!important;}',
-                '  #ca-symbol-row{grid-template-columns:1fr!important;}',
-                '  #ca-validator-grid{grid-template-columns:1fr!important;}',
-                '  .page-header h1{font-size:1rem!important;}',
-                '  .upload-area{padding:1.25rem!important;}',
-                '  #ca-main-grid .card{margin-top:0.75rem;}',
-                '}',
-            ].join('');
-            document.head.appendChild(s);
-        }
-
         app.innerHTML = `
-            <div class="page-header">
-                <h1>📊 AI Chart Analysis</h1>
-                <p>Smart Money Concepts (SMC) Institutional Analysis</p>
+            <div style="margin-bottom:1.25rem;">
+                <h1 style="font-size:1.1rem;font-weight:700;color:white;margin:0 0 .2rem;">📊 AI Chart Analysis</h1>
+                <p style="font-size:.8rem;color:var(--gray-500);margin:0;">Smart Money Concepts (SMC) Institutional Analysis</p>
             </div>
 
-            <div id="ca-main-grid">
+            <!-- MAIN GRID — 1-col on mobile, 2-col on md+ using Tailwind -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                 <div>
                     <div class="upload-area" id="dropZone"
                          onclick="document.getElementById('chartInput').click()">
@@ -85,7 +65,8 @@ const ChartAnalysisPage = {
                         </div>
                     </div>
 
-                    <div id="ca-symbol-row">
+                    <!-- Symbol + Timeframe row — always 2 cols (inputs are compact) -->
+                    <div class="grid grid-cols-2 gap-3 mt-4">
                         <div class="form-group mb-0">
                             <label>Symbol (optional)</label>
                             <input type="text" id="chartSymbol" placeholder="Auto-detected"
@@ -105,14 +86,15 @@ const ChartAnalysisPage = {
                     </div>
 
                     <!-- Trade Validator -->
-                    <div class="card" style="margin-top:1.5rem;background:linear-gradient(135deg,var(--gray-800) 0%,var(--gray-900) 100%);">
+                    <div class="card" style="margin-top:1.25rem;background:linear-gradient(135deg,var(--gray-800) 0%,var(--gray-900) 100%);">
                         <div class="card-header" style="border-bottom:1px solid var(--gray-700);">
                             <h3 class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
                                 <i class="fas fa-shield-alt text-primary"></i> Trade Validator
                             </h3>
                         </div>
                         <div class="card-body">
-                            <div id="ca-validator-grid">
+                            <!-- 4 inputs: 1-col on mobile, 2-col on sm+ -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                 <div class="form-group mb-0">
                                     <label style="font-size:0.75rem;color:var(--gray-500);">Entry Price</label>
                                     <input type="number" id="validatorEntry" step="0.00001"
@@ -154,11 +136,11 @@ const ChartAnalysisPage = {
                 </div>
             </div>
 
-            <div style="margin-top:3rem;">
-                <h3>Pattern Library</h3>
+            <div style="margin-top:2.5rem;">
+                <h3 style="font-size:1rem;font-weight:600;color:white;margin-bottom:.75rem;">Pattern Library</h3>
                 <div id="patternGrid"
                      style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));
-                            gap:1rem;margin-top:1rem;">
+                            gap:1rem;">
                     Loading patterns...
                 </div>
             </div>`;

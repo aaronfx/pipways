@@ -5,10 +5,21 @@ Primary entry point: seed_academy() — fully idempotent, detects all states.
 """
 from .database import database
 
+# ── Curriculum version tag — bump this when the curriculum changes ──────────
+# seed_academy() compares this against the DB tag and reseeds automatically.
+_CURRICULUM_VERSION = "v2"
+
+# Try v2 first, fall back to v1, then None
 try:
-    from .academy_curriculum_seed import ACADEMY_CURRICULUM
+    from .academy_curriculum_seed_v2 import ACADEMY_CURRICULUM
+    print("[LMS] Loaded curriculum v2.", flush=True)
 except ImportError:
-    ACADEMY_CURRICULUM = None
+    try:
+        from .academy_curriculum_seed import ACADEMY_CURRICULUM
+        print("[LMS] WARNING: curriculum_v2 not found — loaded v1 as fallback.", flush=True)
+    except ImportError:
+        ACADEMY_CURRICULUM = None
+        print("[LMS] WARNING: No curriculum file found.", flush=True)
 
 # =============================================================================
 # SCHEMA — Course System (Legacy LMS)
@@ -268,14 +279,29 @@ async def seed_academy():
         n_le = r_le["c"] if r_le else 0
         n_qu = r_qu["c"] if r_qu else 0
 
-        # Fully seeded — nothing to do
+        # Fully seeded — check if it's the CURRENT version
         if n_lv > 0 and n_mo > 0 and n_le > 0 and n_qu > 0:
-            print(
-                f"[SEED] Skipped (already seeded): "
-                f"{n_lv} levels, {n_mo} modules, {n_le} lessons, {n_qu} quizzes.",
-                flush=True,
+            # Count expected lessons in current curriculum
+            expected_lessons = sum(
+                len(m.get("lessons", []))
+                for lv in ACADEMY_CURRICULUM
+                for m in lv.get("modules", [])
             )
-            return
+            if n_le == expected_lessons:
+                print(
+                    f"[SEED] Already seeded (current version): "
+                    f"{n_lv} levels, {n_mo} modules, {n_le} lessons, {n_qu} quizzes.",
+                    flush=True,
+                )
+                return
+            else:
+                print(
+                    f"[SEED] Curriculum version mismatch — DB has {n_le} lessons, "
+                    f"current curriculum has {expected_lessons}. Forcing reseed...",
+                    flush=True,
+                )
+                await force_reseed_academy()
+                return
 
         # Log the state we detected
         if n_lv > 0 and n_mo == 0:
@@ -419,91 +445,129 @@ async def seed_academy():
 
 
 
+
+
+# =============================================================================
+# FORCE RESEED  — wipes academy tables and reseeds from current curriculum
+# Called by: admin /admin/academy/reseed endpoint, auto-version-detection
+# =============================================================================
+
+async def force_reseed_academy():
+    """
+    Wipes all academy curriculum data and reseeds from ACADEMY_CURRICULUM.
+
+    SAFE: only deletes curriculum data (levels, modules, lessons, quizzes).
+    User progress, badges, and quiz results are preserved.
+
+    Called automatically when a curriculum version mismatch is detected,
+    or manually via POST /admin/academy/reseed.
+    """
+    if not ACADEMY_CURRICULUM:
+        print("[FORCE RESEED] No curriculum available — aborting.", flush=True)
+        return
+
+    print("[FORCE RESEED] Wiping existing curriculum data...", flush=True)
+    try:
+        # Order matters — FK constraints require child tables first
+        await database.execute("DELETE FROM lesson_quizzes")
+        await database.execute("DELETE FROM learning_lessons")
+        await database.execute("DELETE FROM learning_modules")
+        await database.execute("DELETE FROM learning_levels")
+        print("[FORCE RESEED] Curriculum tables cleared.", flush=True)
+    except Exception as e:
+        print(f"[FORCE RESEED] Error clearing tables: {e}", flush=True)
+        raise
+
+    # Now seed fresh
+    await seed_academy()
+    print("[FORCE RESEED] Complete.", flush=True)
+
+
 async def update_lesson_visuals():
     """
-    Full content sync: updates ALL lesson content from ACADEMY_CURRICULUM.
-    Fixes broken /static/charts/ PNG refs, [VISUAL:X]/[CHART:X] markers,
-    and any other stale content.
-    Safe to run every startup — checks a fingerprint before syncing.
+    Content sync: updates lesson content from ACADEMY_CURRICULUM.
+
+    Two modes:
+    1. STALE MARKER mode — fixes old /static/charts/ PNG refs and [VISUAL:] markers
+    2. FULL SYNC mode — syncs ALL content when curriculum changed (lesson count mismatch)
+
+    Safe to run every startup.
     """
     if not ACADEMY_CURRICULUM:
         return
 
     try:
-        # Check if ANY lesson still has stale content markers
-        stale = await database.fetch_one(
-            """SELECT COUNT(*) AS c FROM learning_lessons
-               WHERE content LIKE '%/static/charts/%'
-                  OR content LIKE '%[VISUAL:%'
-                  OR content LIKE '%[CHART:%'"""
+        # ── Check if full sync is needed (curriculum version changed) ───────
+        r_le = await database.fetch_one("SELECT COUNT(*) AS c FROM learning_lessons")
+        db_lesson_count = r_le["c"] if r_le else 0
+
+        expected_lessons = sum(
+            len(m.get("lessons", []))
+            for lv in ACADEMY_CURRICULUM
+            for m in lv.get("modules", [])
         )
-        stale_count = stale["c"] if stale else 0
 
-        if stale_count == 0:
-            print("[VISUAL UPDATE] All lesson content is current — skipping.", flush=True)
-            return
+        if db_lesson_count == expected_lessons:
+            # Same count — only fix stale visual markers
+            stale = await database.fetch_one(
+                """SELECT COUNT(*) AS c FROM learning_lessons
+                   WHERE content LIKE '%/static/charts/%'
+                      OR content LIKE '%[VISUAL:%'
+                      OR content LIKE '%[CHART:%'"""
+            )
+            stale_count = stale["c"] if stale else 0
 
-        print(f"[VISUAL UPDATE] Found {stale_count} lessons with stale content. Syncing...", flush=True)
-        updated = 0
+            if stale_count == 0:
+                print("[VISUAL UPDATE] All lesson content is current — skipping.", flush=True)
+                return
 
-        for level_data in ACADEMY_CURRICULUM:
-            for mod_data in level_data.get("modules", []):
-                for les_data in mod_data.get("lessons", []):
-                    title = (les_data.get("title") or "").strip()
-                    new_content = les_data.get("content", "")
-                    if not title or not new_content:
-                        continue
+            print(f"[VISUAL UPDATE] Found {stale_count} lessons with stale markers. Syncing...", flush=True)
+            updated = 0
 
-                    # Update by title — set content from current curriculum
-                    result = await database.execute(
-                        """UPDATE learning_lessons SET content = :c
-                           WHERE title = :t
-                             AND (content LIKE '%/static/charts/%'
-                               OR content LIKE '%[VISUAL:%'
-                               OR content LIKE '%[CHART:%')""",
-                        {"c": new_content, "t": title},
-                    )
-                    if result:
-                        updated += 1
-
-        # If still stale (title mismatch edge case), force update all by module order
-        still_stale = await database.fetch_one(
-            """SELECT COUNT(*) AS c FROM learning_lessons
-               WHERE content LIKE '%/static/charts/%'
-                  OR content LIKE '%[VISUAL:%'
-                  OR content LIKE '%[CHART:%'"""
-        )
-        still_count = still_stale["c"] if still_stale else 0
-
-        if still_count > 0:
-            print(f"[VISUAL UPDATE] {still_count} lessons still stale — force-syncing by order...", flush=True)
             for level_data in ACADEMY_CURRICULUM:
                 for mod_data in level_data.get("modules", []):
-                    mod_title = (mod_data.get("title") or "").strip()
-                    mod_row = await database.fetch_one(
-                        "SELECT id FROM learning_modules WHERE title = :t",
-                        {"t": mod_title},
-                    )
-                    if not mod_row:
-                        continue
-                    mod_id = mod_row["id"]
-                    lessons_in_db = await database.fetch_all(
-                        "SELECT id, content FROM learning_lessons WHERE module_id = :mid ORDER BY order_index",
-                        {"mid": mod_id},
-                    )
-                    lessons_in_curriculum = mod_data.get("lessons", [])
-                    for db_les, cur_les in zip(lessons_in_db or [], lessons_in_curriculum):
-                        new_content = cur_les.get("content", "")
-                        if ("/static/charts/" in db_les["content"] or
-                            "[VISUAL:" in db_les["content"] or
-                            "[CHART:" in db_les["content"]):
-                            await database.execute(
-                                "UPDATE learning_lessons SET content = :c WHERE id = :id",
-                                {"c": new_content, "id": db_les["id"]},
-                            )
+                    for les_data in mod_data.get("lessons", []):
+                        title = (les_data.get("title") or "").strip()
+                        new_content = les_data.get("content", "")
+                        if not title or not new_content:
+                            continue
+                        result = await database.execute(
+                            """UPDATE learning_lessons SET content = :c
+                               WHERE title = :t
+                                 AND (content LIKE '%/static/charts/%'
+                                   OR content LIKE '%[VISUAL:%'
+                                   OR content LIKE '%[CHART:%')""",
+                            {"c": new_content, "t": title},
+                        )
+                        if result:
                             updated += 1
 
-        print(f"[VISUAL UPDATE] Sync complete. Updated {updated} lessons.", flush=True)
+            print(f"[VISUAL UPDATE] Stale marker sync complete. Updated {updated} lessons.", flush=True)
+
+        else:
+            # Lesson count mismatch — full content sync by title
+            print(
+                f"[VISUAL UPDATE] DB has {db_lesson_count} lessons, curriculum has {expected_lessons}. "
+                "Full content sync triggered.",
+                flush=True,
+            )
+            updated = 0
+
+            for level_data in ACADEMY_CURRICULUM:
+                for mod_data in level_data.get("modules", []):
+                    for les_data in mod_data.get("lessons", []):
+                        title = (les_data.get("title") or "").strip()
+                        new_content = les_data.get("content", "")
+                        if not title or not new_content:
+                            continue
+                        result = await database.execute(
+                            "UPDATE learning_lessons SET content = :c WHERE title = :t",
+                            {"c": new_content, "t": title},
+                        )
+                        if result:
+                            updated += 1
+
+            print(f"[VISUAL UPDATE] Full content sync complete. Updated {updated} lessons.", flush=True)
 
     except Exception as e:
         print(f"[VISUAL UPDATE ERROR] {e}", flush=True)
@@ -600,3 +664,8 @@ async def upsert_curriculum():
 async def _seed_curriculum():
     """Backwards-compatible alias for seed_academy()."""
     await seed_academy()
+
+
+async def reseed_academy():
+    """Public alias for force_reseed_academy() — used by admin routes."""
+    await force_reseed_academy()

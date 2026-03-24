@@ -172,6 +172,60 @@
         .ac-lesson-text li { margin-bottom:.3rem; line-height:1.6; }
         .ac-lesson-text code { background:#1f2937; color:#a78bfa; padding:.1rem .35rem; border-radius:.25rem; font-size:.8rem; }
         .ac-lesson-text blockquote { border-left:3px solid #7c3aed; padding-left:1rem; color:#6b7280; font-style:italic; margin:.75rem 0; }
+
+        /* ═══════════════════════════════════════════════
+           CALLOUT BLOCKS — v2 Babypips-style lesson cards
+           > [!HOOK] > [!DEF] > [!EXAMPLE] > [!NGX]
+           > [!MISTAKE] > [!TIP] > [!TAKEAWAY]
+        ═══════════════════════════════════════════════ */
+        .callout { margin:1.1rem 0; border-radius:.6rem; padding:.85rem 1rem; position:relative; }
+        .callout__label { display:flex; align-items:center; gap:6px; font-size:.62rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:.09em; margin-bottom:.5rem; }
+        .callout__label .cl-icon { font-size:.75rem; }
+        .callout__body { font-size:.875rem; line-height:1.7; }
+        .callout__body > p { color:inherit !important; font-size:.875rem !important; margin:.35rem 0 !important; }
+        .callout__body > p:first-child { margin-top:0 !important; }
+        .callout__body > p:last-child  { margin-bottom:0 !important; }
+        .callout__body strong { color:inherit !important; filter:brightness(1.2); }
+        .callout__body ul, .callout__body ol { padding-left:1.25rem; margin:.35rem 0; color:inherit; font-size:.875rem; }
+        .callout__body li { margin:.2rem 0; line-height:1.6; }
+        .callout__body table { width:100%; border-collapse:collapse; margin:.65rem 0; font-size:.82rem; }
+        .callout__body th { padding:.4rem .7rem; text-align:left; font-weight:600; color:white;
+            border-bottom:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04); }
+        .callout__body td { padding:.4rem .7rem; color:inherit; border-top:1px solid rgba(255,255,255,.07); }
+        .callout__body code { background:rgba(0,0,0,.25); color:inherit; filter:brightness(1.15);
+            padding:.1rem .3rem; border-radius:.25rem; font-size:.82rem; }
+        .callout__body h3 { color:inherit !important; filter:brightness(1.2); font-size:.9rem !important; margin:.6rem 0 .2rem !important; }
+        /* HOOK — story opener (purple left-border, no fill) */
+        .callout--hook { background:transparent; border-left:3px solid #7c3aed;
+            border-radius:0 .5rem .5rem 0; padding-left:1rem; }
+        .callout--hook .callout__label { color:#a78bfa; }
+        .callout--hook .callout__body  { color:#9ca3af; font-style:italic; }
+        /* DEF — blue */
+        .callout--def { background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.18); border-left:3px solid #2563eb; }
+        .callout--def .callout__label  { color:#60a5fa; }
+        .callout--def .callout__body   { color:#bfdbfe; }
+        /* EXAMPLE — indigo */
+        .callout--example { background:rgba(124,58,237,.07); border:1px solid rgba(124,58,237,.18); border-left:3px solid #7c3aed; }
+        .callout--example .callout__label { color:#a78bfa; }
+        .callout--example .callout__body  { color:#ede9fe; }
+        .callout--example .callout__body th { background:rgba(124,58,237,.15); }
+        /* NGX — amber (Nigerian market) */
+        .callout--ngx { background:rgba(217,119,6,.07); border:1px solid rgba(217,119,6,.18); border-left:3px solid #d97706; }
+        .callout--ngx .callout__label { color:#fbbf24; }
+        .callout--ngx .callout__body  { color:#fde68a; }
+        /* MISTAKE — red */
+        .callout--mistake { background:rgba(220,38,38,.07); border:1px solid rgba(220,38,38,.18); border-left:3px solid #dc2626; }
+        .callout--mistake .callout__label { color:#f87171; }
+        .callout--mistake .callout__body  { color:#fecaca; }
+        /* TIP — green */
+        .callout--tip { background:rgba(16,185,129,.07); border:1px solid rgba(16,185,129,.18); border-left:3px solid #10b981; }
+        .callout--tip .callout__label { color:#34d399; }
+        .callout--tip .callout__body  { color:#d1fae5; }
+        /* TAKEAWAY — dark card */
+        .callout--takeaway { background:#0d1117; border:1px solid #1f2937; border-left:3px solid #4b5563; }
+        .callout--takeaway .callout__label { color:#9ca3af; }
+        .callout--takeaway .callout__body  { color:#e5e7eb; font-weight:500; font-size:.9rem !important; }
         .ac-lesson-text table { width:100%; border-collapse:collapse; margin:1rem 0; font-size:.82rem; }
         .ac-lesson-text th { background:#1f2937; color:white; padding:.5rem .75rem; text-align:left; font-weight:600; }
         .ac-lesson-text td { border-top:1px solid #1f2937; padding:.5rem .75rem; color:#9ca3af; }
@@ -478,6 +532,9 @@
             </a>
 
             <div class="nav-section-label">Learning</div>
+            <a href="/dashboard.html#courses" class="nav-link">
+                <i class="fas fa-graduation-cap nav-icon" style="color:#a78bfa;"></i><span>Courses</span>
+            </a>
             <!-- Academy is the active page -->
             <a href="/academy" class="nav-link active">
                 <i class="fas fa-book-open nav-icon" style="color:#34d399;"></i><span>Trading Academy</span>
@@ -594,11 +651,11 @@
                             <p class="ac-hero-sub">Structured AI-powered forex education — from first pip to pro strategy</p>
                             <div class="ac-hero-stats">
                                 <div class="ac-hero-stat">
-                                    <span class="ac-hero-stat-val">36</span>
+                                    <span class="ac-hero-stat-val">28</span>
                                     <span class="ac-hero-stat-lbl">Lessons</span>
                                 </div>
                                 <div class="ac-hero-stat">
-                                    <span class="ac-hero-stat-val">36</span>
+                                    <span class="ac-hero-stat-val">140</span>
                                     <span class="ac-hero-stat-lbl">Quizzes</span>
                                 </div>
                                 <div class="ac-hero-stat">
@@ -777,6 +834,77 @@
             .replace(/&/g,'&amp;').replace(/</g,'&lt;')
             .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
             .replace(/'/g,'&#39;');
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       CALLOUT RENDERER — v2 curriculum  > [!TYPE] syntax
+       Converts > [!HOOK] / [!DEF] / [!EXAMPLE] / [!NGX] /
+                > [!MISTAKE] / [!TIP] / [!TAKEAWAY]
+       blockquote blocks into styled callout divs BEFORE marked runs.
+    ══════════════════════════════════════════════════════════════ */
+    const _CALLOUT_CFG = {
+        HOOK:    { label:'Story',           cls:'callout--hook',     icon:'✦' },
+        DEF:     { label:'Definition',      cls:'callout--def',      icon:'◈' },
+        EXAMPLE: { label:'Trade Example',   cls:'callout--example',  icon:'↗' },
+        NGX:     { label:'Nigerian Market', cls:'callout--ngx',      icon:'₦' },
+        MISTAKE: { label:'Common Mistake',  cls:'callout--mistake',  icon:'⚠' },
+        TIP:     { label:'Pro Tip',         cls:'callout--tip',      icon:'◆' },
+        TAKEAWAY:{ label:'Key Takeaway',    cls:'callout--takeaway', icon:'✓' },
+    };
+
+    function _renderCallouts(text) {
+        // Quick exit — no callouts present, avoid overhead
+        if (!text.includes('> [!')) return text;
+
+        const _md = (s) => {
+            if (!s.trim()) return '';
+            if (typeof marked !== 'undefined' && marked.parse)
+                return marked.parse(s, { breaks: true, gfm: true });
+            // Minimal fallback
+            return s
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/^(.+)$(?!\n)/gm, (m) => m.startsWith('<') ? m : `<p>${m}</p>`);
+        };
+
+        const lines = text.split('\n');
+        const out = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            const m = lines[i].match(/^>\s*\[!(\w+)\]\s*$/);
+            if (m) {
+                const type = m[1].toUpperCase();
+                const cfg = _CALLOUT_CFG[type];
+                const bodyLines = [];
+                i++;
+                while (i < lines.length && (lines[i].startsWith('> ') || lines[i].trim() === '>')) {
+                    bodyLines.push(lines[i].startsWith('> ') ? lines[i].slice(2) : '');
+                    i++;
+                }
+                if (cfg) {
+                    const bodyMd  = bodyLines.join('\n').trim();
+                    const bodyHtml = _md(bodyMd);
+                    // Output as raw block — marked will pass through block-level <div> unchanged
+                    out.push(
+                        `\n<div class="callout ${cfg.cls}" role="note">` +
+                        `<div class="callout__label"><span class="cl-icon">${cfg.icon}</span>${cfg.label}</div>` +
+                        `<div class="callout__body">${bodyHtml}</div>` +
+                        `</div>\n`
+                    );
+                } else {
+                    // Unknown type — render as plain blockquote markdown
+                    out.push('> ' + bodyLines.join('\n> '));
+                }
+                continue;
+            }
+            out.push(lines[i]);
+            i++;
+        }
+        return out.join('\n');
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -1421,6 +1549,12 @@
             const cleaned = dedented
                 .replace(/\[VISUAL:[^\]]+\]/g, '')
                 .replace(/\[CHART:[^\]]+\]/g, '');
+
+            // ── Pre-process > [!TYPE] callout blocks BEFORE marked ──
+            // Converts callout syntax into raw HTML divs; marked passes
+            // block-level <div> tags through without modification.
+            const withCallouts = _renderCallouts(cleaned);
+
             const parse = (typeof marked !== 'undefined' && marked.parse)
                 ? t => marked.parse(t, { breaks: true, gfm: true })
                 : t => t
@@ -1432,7 +1566,7 @@
                     .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
                     .replace(/^---$/gm,       '<hr>')
                     .replace(/\n\n/g,         '</p><p>');
-            let result = parse(cleaned);
+            let result = parse(withCallouts);
             // Strip text that leaked after </svg> closing tags
             result = result.replace(/<\/svg>(\s*[^<\s][^<]*?)(<(?!\/svg))/g, (m, leaked, next) => {
                 return '</svg>' + next;

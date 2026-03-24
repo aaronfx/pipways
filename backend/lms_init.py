@@ -468,12 +468,16 @@ async def force_reseed_academy():
 
     print("[FORCE RESEED] Wiping existing curriculum data...", flush=True)
     try:
-        # Order matters — FK constraints require child tables first
+        # Delete in FK-safe order.
+        # user_quiz_results references lesson_quizzes(id) — must go first.
+        # user_learning_progress references learning_lessons(id) — must go before lessons.
+        await database.execute("DELETE FROM user_quiz_results")
+        await database.execute("DELETE FROM user_learning_progress")
         await database.execute("DELETE FROM lesson_quizzes")
         await database.execute("DELETE FROM learning_lessons")
         await database.execute("DELETE FROM learning_modules")
         await database.execute("DELETE FROM learning_levels")
-        print("[FORCE RESEED] Curriculum tables cleared.", flush=True)
+        print("[FORCE RESEED] Curriculum + dependent user data cleared.", flush=True)
     except Exception as e:
         print(f"[FORCE RESEED] Error clearing tables: {e}", flush=True)
         raise

@@ -22,6 +22,29 @@
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ── Mobile responsive overrides ── */
+        @media (max-width: 639px) {
+            .glass-panel { padding: 1rem !important; }
+            .glass-panel.rounded-2xl { border-radius: 0.75rem; }
+            /* AI scores and details grid: single col on mobile */
+            .grid.grid-cols-1.md\\:grid-cols-3 { grid-template-columns: 1fr !important; }
+            /* Risks/opps always 1 col on mobile */
+            .grid.grid-cols-1.md\\:grid-cols-2 { grid-template-columns: 1fr !important; }
+            /* Portfolio builder inputs */
+            .grid.grid-cols-1.md\\:grid-cols-3 { grid-template-columns: 1fr !important; }
+            /* Compare input row */
+            .grid.grid-cols-1.md\\:grid-cols-2.gap-4 { grid-template-columns: 1fr !important; }
+            /* Analysis detail columns inside "Analysis Details" card */
+            .grid.grid-cols-1.sm\\:grid-cols-2.gap-4 { grid-template-columns: 1fr !important; }
+            /* NGX cards */
+            .grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3 { grid-template-columns: 1fr !important; }
+            /* Reduce heading sizes */
+            h2.text-2xl, h2.text-xl { font-size: 1.1rem !important; }
+            h3.text-lg { font-size: 1rem !important; }
+            /* Portfolio summary header */
+            .flex.justify-between.items-center { flex-wrap: wrap; gap: 0.75rem; }
+        }
     </style>
     <base target="_blank">
 </head>
@@ -48,33 +71,36 @@
 
     <!-- Header -->
     <header class="border-b border-gray-800 bg-gray-900/95 sticky top-0 z-40 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-chart-pie text-white"></i>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <!-- Logo / title -->
+                <div class="flex items-center gap-3 flex-shrink-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-chart-pie text-white text-sm sm:text-base"></i>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold text-white">AI Stock Research</h1>
+                        <h1 class="text-base sm:text-xl font-bold text-white leading-tight">AI Stock Research</h1>
                         <p class="text-xs text-gray-400">Powered by Claude AI</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-4">
+                <!-- Tab buttons — scrollable row on mobile -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 w-full sm:w-auto"
+                     style="scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
                     <button onclick="switchTab('analyzer')" id="tab-analyzer"
-                        class="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white transition-all">
-                        <i class="fas fa-search mr-2"></i>Analyze
+                        class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium bg-purple-600 text-white transition-all whitespace-nowrap flex-shrink-0">
+                        <i class="fas fa-search mr-1.5"></i>Analyze
                     </button>
                     <button onclick="switchTab('portfolio')" id="tab-portfolio"
-                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
-                        <i class="fas fa-briefcase mr-2"></i>Portfolio
+                        class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap flex-shrink-0">
+                        <i class="fas fa-briefcase mr-1.5"></i>Portfolio
                     </button>
                     <button onclick="switchTab('compare')" id="tab-compare"
-                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
-                        <i class="fas fa-code-compare mr-2"></i>Compare
+                        class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap flex-shrink-0">
+                        <i class="fas fa-code-compare mr-1.5"></i>Compare
                     </button>
                     <button onclick="switchTab('ngx')" id="tab-ngx"
-                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all flex items-center gap-2">
-                        <svg width="16" height="16" viewBox="0 0 60 60" fill="none"><polygon points="10,10 30,5 50,10 50,30 30,55 10,30" fill="#16a34a"/><polygon points="20,20 30,15 40,20 40,35 30,45 20,35" fill="#4ade80"/><polygon points="25,25 30,22 35,25 35,35 30,40 25,35" fill="#fff"/></svg>
+                        class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0">
+                        <svg width="14" height="14" viewBox="0 0 60 60" fill="none"><polygon points="10,10 30,5 50,10 50,30 30,55 10,30" fill="#16a34a"/><polygon points="20,20 30,15 40,20 40,35 30,45 20,35" fill="#4ade80"/><polygon points="25,25 30,22 35,25 35,35 30,40 25,35" fill="#fff"/></svg>
                         NGX Picks
                     </button>
                 </div>
@@ -83,12 +109,12 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
 
         <!-- Stock Analyzer Tab -->
-        <div id="view-analyzer" class="space-y-6">
-            <div class="glass-panel rounded-2xl p-6">
-                <div class="flex gap-4">
+        <div id="view-analyzer" class="space-y-4 sm:space-y-6">
+            <div class="glass-panel rounded-2xl p-4 sm:p-6">
+                <div class="flex flex-col sm:flex-row gap-3">
                     <div class="flex-1 relative">
                         <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input type="text" id="stock-symbol"
@@ -97,7 +123,7 @@
                             onkeypress="if(event.key==='Enter') analyzeStock()">
                     </div>
                     <button onclick="analyzeStock()" id="analyze-btn"
-                        class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all flex items-center gap-2">
+                        class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 w-full sm:w-auto">
                         <span>Analyze</span><i class="fas fa-arrow-right"></i>
                     </button>
                 </div>
@@ -113,28 +139,28 @@
             </div>
 
             <!-- Results -->
-            <div id="analysis-results" class="hidden space-y-6 fade-in">
+            <div id="analysis-results" class="hidden space-y-4 sm:space-y-6 fade-in">
                 <!-- Top Summary Card -->
-                <div class="glass-panel rounded-2xl p-6">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                <div class="glass-panel rounded-2xl p-4 sm:p-6">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4 sm:mb-6">
                         <div>
-                            <h2 id="res-symbol" class="text-3xl font-bold text-white mb-1"></h2>
-                            <p id="res-name" class="text-gray-400"></p>
+                            <h2 id="res-symbol" class="text-2xl sm:text-3xl font-bold text-white mb-1"></h2>
+                            <p id="res-name" class="text-gray-400 text-sm sm:text-base"></p>
                             <p id="res-datasource" class="hidden text-xs text-yellow-500 mt-1 flex items-center gap-1">
                                 <i class="fas fa-robot"></i> AI estimates (live data unavailable)
                             </p>
                         </div>
-                        <div class="flex items-center gap-4 flex-wrap">
-                            <div id="res-rating-badge" class="px-6 py-3 rounded-xl border font-bold text-xl"></div>
+                        <div class="flex items-center gap-3 sm:gap-4 flex-wrap">
+                            <div id="res-rating-badge" class="px-4 sm:px-6 py-2 sm:py-3 rounded-xl border font-bold text-lg sm:text-xl"></div>
                             <div class="text-right">
-                                <div id="res-price" class="text-3xl font-bold text-white"></div>
-                                <div id="res-change" class="font-medium"></div>
+                                <div id="res-price" class="text-2xl sm:text-3xl font-bold text-white"></div>
+                                <div id="res-change" class="font-medium text-sm sm:text-base"></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Key Metrics Grid -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                    <!-- Key Metrics Grid — 2 cols on mobile, expands up -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-6">
                         <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                             <div class="text-xs text-gray-500 mb-1">Market Cap</div>
                             <div id="res-market-cap" class="text-sm font-semibold text-white"></div>
@@ -238,10 +264,10 @@
         </div>
 
         <!-- Portfolio Builder Tab -->
-        <div id="view-portfolio" class="hidden space-y-6">
-            <div class="glass-panel rounded-2xl p-6">
-                <h2 class="text-2xl font-bold text-white mb-6">AI Portfolio Builder</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div id="view-portfolio" class="hidden space-y-4 sm:space-y-6">
+            <div class="glass-panel rounded-2xl p-4 sm:p-6">
+                <h2 class="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">AI Portfolio Builder</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Investment Amount ($)</label>
                         <input type="number" id="portfolio-amount" value="10000" min="1000" step="1000"
@@ -301,16 +327,16 @@
         </div>
 
         <!-- Compare Tab -->
-        <div id="view-compare" class="hidden space-y-6">
-            <div class="glass-panel rounded-2xl p-6">
-                <h2 class="text-2xl font-bold text-white mb-4">Compare Stocks</h2>
-                <div class="flex gap-2 mb-4">
+        <div id="view-compare" class="hidden space-y-4 sm:space-y-6">
+            <div class="glass-panel rounded-2xl p-4 sm:p-6">
+                <h2 class="text-xl sm:text-2xl font-bold text-white mb-4">Compare Stocks</h2>
+                <div class="flex flex-col sm:flex-row gap-2 sm:gap-2 mb-4">
                     <input type="text" id="compare-input"
                         placeholder="Enter symbols separated by commas (e.g., AAPL, MSFT, GOOGL)"
                         class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 uppercase"
                         onkeypress="if(event.key==='Enter') compareStocks()">
                     <button onclick="compareStocks()" id="compare-btn"
-                        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors w-full sm:w-auto">
                         Compare
                     </button>
                 </div>
@@ -324,25 +350,26 @@
         </div>
 
         <!-- NGX Picks Tab -->
-        <div id="view-ngx" class="hidden space-y-6">
+        <div id="view-ngx" class="hidden space-y-4 sm:space-y-6">
 
-            <!-- Sub-tab nav -->
-            <div class="glass-panel rounded-2xl p-4 flex gap-3 flex-wrap">
+            <!-- Sub-tab nav — scrollable on mobile -->
+            <div class="glass-panel rounded-2xl p-3 sm:p-4 flex gap-2 overflow-x-auto"
+                 style="scrollbar-width:none;-webkit-overflow-scrolling:touch;">
                 <button onclick="switchNgxTab('research')" id="ngxtab-research"
-                    class="ngx-subtab px-4 py-2 rounded-lg text-sm font-medium bg-green-700 text-white transition-all">
-                    <i class="fas fa-search mr-2"></i>NGX Research
+                    class="ngx-subtab px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium bg-green-700 text-white transition-all whitespace-nowrap flex-shrink-0">
+                    <i class="fas fa-search mr-1.5"></i>NGX Research
                 </button>
                 <button onclick="switchNgxTab('picks')" id="ngxtab-picks"
-                    class="ngx-subtab px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
-                    <i class="fas fa-trophy mr-2"></i>Top Picks
+                    class="ngx-subtab px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap flex-shrink-0">
+                    <i class="fas fa-trophy mr-1.5"></i>Top Picks
                 </button>
                 <button onclick="switchNgxTab('card')" id="ngxtab-card"
-                    class="ngx-subtab px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all">
-                    <i class="fas fa-share-alt mr-2"></i>Card Generator
+                    class="ngx-subtab px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap flex-shrink-0">
+                    <i class="fas fa-share-alt mr-1.5"></i>Card Generator
                 </button>
-                <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
-                    <svg width="14" height="14" viewBox="0 0 60 60"><polygon points="10,10 30,5 50,10 50,30 30,55 10,30" fill="#16a34a"/><polygon points="20,20 30,15 40,20 40,35 30,45 20,35" fill="#4ade80"/><polygon points="25,25 30,22 35,25 35,35 30,40 25,35" fill="#fff"/></svg>
-                    Nigerian Exchange Group · AI-powered
+                <div class="ml-auto flex items-center gap-1.5 text-xs text-gray-500 flex-shrink-0 pl-2">
+                    <svg width="12" height="12" viewBox="0 0 60 60"><polygon points="10,10 30,5 50,10 50,30 30,55 10,30" fill="#16a34a"/><polygon points="20,20 30,15 40,20 40,35 30,45 20,35" fill="#4ade80"/><polygon points="25,25 30,22 35,25 35,35 30,40 25,35" fill="#fff"/></svg>
+                    <span class="hidden sm:inline">Nigerian Exchange Group · </span>AI-powered
                 </div>
             </div>
 

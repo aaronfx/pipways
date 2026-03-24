@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>if(typeof marked!=="undefined"){marked.setOptions({breaks:true,gfm:true});}</script>
+    <script src="/js/usage.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -393,21 +394,26 @@
             .ac-lesson-text h3 { font-size:.88rem; }
             .ac-lesson-text p, .ac-lesson-text li { font-size:.82rem; line-height:1.65; }
 
-            /* Bug 7: Action bar — 2-column grid on mobile */
+            /* Bug 7: Action bar — improved mobile layout */
             .ac-action-bar {
                 display:grid !important;
-                grid-template-columns:1fr 1fr;
-                gap:.5rem;
+                grid-template-columns:1fr 1fr 1fr;
+                gap:.45rem;
                 padding:.75rem;
+                /* Extra clearance above mobile nav bar */
+                margin-bottom:calc(.75rem + 64px + env(safe-area-inset-bottom, 0px));
             }
             .ac-action-btn {
                 justify-content:center;
-                padding:.5rem .6rem;
-                font-size:.78rem;
+                padding:.55rem .4rem;
+                font-size:.75rem;
                 width:100%;
+                min-height:44px;
             }
-            /* Take Quiz spans full width */
-            .ac-action-btn-primary { grid-column:1/-1; }
+            /* Take Quiz spans all 3 columns */
+            .ac-action-btn-primary { grid-column:1/-1; font-size:.85rem; padding:.65rem; }
+            /* 3 ghost buttons each take 1 column — perfect 3-col split */
+            .ac-action-btn-ghost { grid-column:span 1; }
 
             /* Bug 8: SVG diagrams on mobile */
             .ac-svg-diagram { padding:.35rem; min-height:140px; }
@@ -442,15 +448,20 @@
             /* Bug 14: Mobile bar safe area */
             .ac-mobile-bar {
                 display:flex !important;
-                padding-bottom:calc(.5rem + env(safe-area-inset-bottom, 0px));
+                padding-bottom:max(.6rem, env(safe-area-inset-bottom, .6rem));
                 padding-left:max(.75rem, env(safe-area-inset-left, .75rem));
                 padding-right:max(.75rem, env(safe-area-inset-right, .75rem));
+                padding-top:.5rem;
+                z-index:200;
+                min-height:56px;
+                box-shadow:0 -1px 0 rgba(255,255,255,.04);
             }
+            .ac-mobile-btn { min-height:44px; font-size:.8rem; }
 
-            /* Bottom padding for mobile bar + safe area */
-            main { padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px)) !important; }
-            /* Ensure main content div doesn't leave ghost whitespace */
-            .p-4 { padding-bottom:1rem !important; }
+            /* Bottom padding: clears mobile bar (56px) + safe area + extra breathing room */
+            main { padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
+            /* Inner content div extra pad */
+            .p-4 { padding-bottom:1.5rem !important; }
 
             /* Coach strip compact */
             .ac-coach-strip { padding:.75rem .9rem; gap:.6rem; }
@@ -479,6 +490,7 @@
             .ac-hero-stat-val { font-size:.9rem; }
             .ac-action-bar { grid-template-columns:1fr; }
             .ac-action-btn-primary { grid-column:1; }
+            .ac-action-btn-ghost { grid-column:1; }
             .ac-quiz-opt { font-size:.78rem; padding:.65rem .75rem; }
             .ac-level-card-body { padding:.85rem .85rem .75rem; }
         }

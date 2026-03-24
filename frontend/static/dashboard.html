@@ -16,6 +16,8 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Usage manager — loads before page scripts, intercepts 402s globally -->
+    <script src="/js/usage.js"></script>
     <script>
     // ── Pipways Markdown Renderer ─────────────────────────────────────────
     // Self-contained — no external library dependency
@@ -380,6 +382,7 @@
             <a href="/academy" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#34d399;"></i><span>Trading Academy</span>
             </a>
+
             <a href="#" data-section="webinars" class="nav-link">
                 <i class="fas fa-video nav-icon" style="color:#fbbf24;"></i><span>Webinars</span>
             </a>
@@ -436,10 +439,10 @@
                     <p id="user-name" class="font-semibold text-sm text-white truncate">Loading…</p>
                     <p id="user-email" class="text-xs text-gray-600 truncate">…</p>
                 </div>
-                <a href="/academy" title="Go to Trading Academy"
-                   class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-                   style="background:rgba(124,58,237,.15);text-decoration:none;">
-                    <i class="fas fa-graduation-cap text-xs" style="color:#a78bfa;"></i>
+                <a href="/academy" title="Trading Academy"
+                        class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                        style="background:rgba(124,58,237,.15);">
+                    <i class="fas fa-book-open text-xs" style="color:#a78bfa;"></i>
                 </a>
             </div>
             <button onclick="dashboard.logout()"
@@ -504,9 +507,9 @@
                             </div>
                         </div>
                         <div class="px-4 py-2.5 border-t text-center" style="border-color:#1f2937;">
-                            <button onclick="dashboard._toggleNotifPanel(); dashboard.navigate('blog')"
+                            <button onclick="dashboard._toggleNotifPanel(); window.location.href='/academy'"
                                     class="text-xs text-purple-400 hover:text-purple-300 transition-colors">
-                                View all activity →
+                                View Academy →
                             </button>
                         </div>
                     </div>
@@ -671,17 +674,16 @@
                 <!-- ── Stat strip — single scrollable row of pills ── -->
                 <div id="dash-stat-row" class="flex items-center gap-2 mb-5 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
                     <!-- Academy pill -->
-                    <button onclick="window.location.href='/academy'"
-                            class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all duration-150"
+                    <a href="/academy"
+                            class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all duration-150 text-decoration-none"
                             style="background:#111827;border:1px solid #1f2937;"
-                            onmouseover="this.style.borderColor='#34d399';this.style.background='rgba(52,211,153,.08)'"
+                            onmouseover="this.style.borderColor='#a78bfa';this.style.background='rgba(167,139,250,.08)'"
                             onmouseout="this.style.borderColor='#1f2937';this.style.background='#111827'">
-                        <i class="fas fa-graduation-cap text-xs" style="color:#34d399;"></i>
+                        <i class="fas fa-book-open text-xs" style="color:#34d399;"></i>
                         <span class="font-bold text-white text-xs count-animate" id="stat-courses">—</span>
-                        <span class="text-xs" style="color:#9ca3af;">Courses</span>
-                        <!-- hidden sub-label kept for JS compat -->
+                        <span class="text-xs" style="color:#9ca3af;">Lessons</span>
                         <span id="stat-courses-sub" class="hidden"></span>
-                    </button>
+                    </a>
                     <span class="text-gray-800 flex-shrink-0">·</span>
                     <!-- Webinars pill -->
                     <button onclick="dashboard.navigate('webinars')"
@@ -850,20 +852,49 @@
                                 </p>
                                 <div class="mt-3">
                                     <div class="text-xs text-gray-500 mb-2">Recommended course</div>
-                                    <button onclick="window.location.href='/academy'"
-                                            class="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all"
+                                    <a href="/academy" class="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg transition-all text-decoration-none"
                                             style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);"
                                             onmouseover="this.style.background='rgba(16,185,129,.18)'" onmouseout="this.style.background='rgba(16,185,129,.1)'">
-                                        <i class="fas fa-graduation-cap text-xs" style="color:#34d399;"></i>
+                                        <i class="fas fa-book-open text-xs" style="color:#34d399;"></i>
                                         <span class="text-xs font-medium text-white" id="insight-course-name">Market Structure</span>
                                         <i class="fas fa-arrow-right text-gray-600 text-xs ml-auto"></i>
-                                    </button>
+                                    </a>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+
+                <!-- ── Row 3: Platform Tools Hub ── -->
+                <div class="pw-card mb-4" id="dash-tools-row">
+                    <div class="pw-card-hdr">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style="background:rgba(96,165,250,.15);">
+                                <i class="fas fa-chart-bar" style="color:#60a5fa;"></i>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-white text-sm">Your Trading Tools</span>
+                                <p class="text-xs mt-0.5" style="color:#9ca3af;">Analysis · Research · Signals · Academy</p>
+                            </div>
+                        </div>
+                        <a href="/pricing.html" class="text-xs font-semibold px-2 py-1 rounded-lg transition-all" style="background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.25);">
+                            Upgrade →
+                        </a>
+                    </div>
+                    <div class="pw-card-body" id="dash-courses-body">
+                        <!-- Populated by JS: Chart Analysis hero + 4 feature cards -->
+                        <div class="space-y-3 py-2">
+                            <div class="h-20 rounded-xl" style="background:#1f2937;animation:shimmer 1.5s infinite linear;background-size:800px 100%;background-image:linear-gradient(90deg,#1f2937 0%,#374151 50%,#1f2937 100%);"></div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="h-20 rounded-xl" style="background:#1f2937;"></div>
+                                <div class="h-20 rounded-xl" style="background:#1f2937;"></div>
+                                <div class="h-20 rounded-xl" style="background:#1f2937;"></div>
+                                <div class="h-20 rounded-xl" style="background:#1f2937;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- ── Row 5: Latest Blog / Research ── -->
                 <div id="dash-blog-row" class="pw-card">
@@ -1152,10 +1183,24 @@
             <section id="section-stocks" class="section hidden">
                 <iframe 
                     src="/static/stock_terminal.html"
-                    class="w-full border-0 rounded-xl"
-                    style="height:calc(100vh - 160px);min-height:600px;"
-                    title="AI Stock Research Terminal">
+                    class="w-full h-[900px] border-0 rounded-xl">
                 </iframe>
+            </section>
+
+            <!-- COURSES — redirects to Academy (courses removed, Trading Academy is the product) -->
+            <section id="section-courses" class="section hidden">
+                <div style="text-align:center;padding:4rem 1rem;">
+                    <div style="width:64px;height:64px;border-radius:50%;background:rgba(124,58,237,.12);border:2px dashed rgba(124,58,237,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                        <i class="fas fa-book-open" style="color:#a78bfa;font-size:1.4rem;"></i>
+                    </div>
+                    <h3 style="font-size:1.1rem;font-weight:700;color:white;margin-bottom:.5rem;">Trading Academy</h3>
+                    <p style="font-size:.875rem;color:#6b7280;margin-bottom:1.5rem;max-width:360px;margin-left:auto;margin-right:auto;">
+                        All structured learning has moved to the Trading Academy — 28 lessons, 3 levels, always free.
+                    </p>
+                    <a href="/academy" style="display:inline-flex;align-items:center;gap:.5rem;padding:.75rem 1.5rem;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;border-radius:.75rem;font-size:.875rem;font-weight:700;text-decoration:none;">
+                        <i class="fas fa-graduation-cap"></i> Go to Trading Academy
+                    </a>
+                </div>
             </section>
 
             <!-- WEBINARS -->
@@ -1614,6 +1659,7 @@ const DashboardController = class {
         // ── Header title + subtitle ───────────────────────────────────────
         const meta = {
             'dashboard': { title: 'Dashboard',          sub: 'Your learning & research command centre' },
+            'courses':   { title: 'Trading Academy', sub: 'Structured AI-powered forex education — from first pip to pro strategy' },
             'webinars':  { title: 'Live Webinars',         sub: 'Expert-led sessions, market walkthroughs and Q&A' },
             'blog':      { title: 'Research & Blog',       sub: 'Market analysis, trading insights and education' },
             'analysis':  { title: 'Validate Trade Setup',  sub: 'Upload a chart screenshot for AI-powered analysis' },
@@ -1664,7 +1710,7 @@ const DashboardController = class {
             switch(section) {
                 case 'dashboard': this.loadDashboardStats(); break;
                 case 'signals':   await this.loadSignals();  break;
-
+                case 'courses':   await this.loadCourses();  break;
                 case 'webinars':  await this.loadWebinars(); break;
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
@@ -1733,13 +1779,34 @@ const DashboardController = class {
         const set  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
         const _e   = s => s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+        // Helper: renders a premium feature mini-card (used in Card 5)
+        function _premiumFeatureCard({ icon, color, bg, border, title, sub, section, href, isPaid, tag }) {
+            const lockIcon  = !isPaid && !href ? '<i class="fas fa-lock" style="font-size:.55rem;margin-left:.3rem;opacity:.6;"></i>' : '';
+            const tagHtml   = tag ? '<span class="text-xs px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0" style="background:' + color + '20;color:' + color + ';border:1px solid ' + color + '33;">' + tag + '</span>' : '';
+            const clickAct  = href ? 'window.location.href=\'' + href + '\'' : 'dashboard.navigate(\'' + section + '\')';
+            return '<div class="rounded-xl p-3 cursor-pointer transition-all" '
+                + 'style="background:' + bg + ';border:1px solid ' + border + ';" '
+                + 'onclick="' + clickAct + '" '
+                + 'onmouseover="this.style.borderColor=\'' + color + '66\'" '
+                + 'onmouseout="this.style.borderColor=\'' + border + '\'">'
+                + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;">'
+                + '<div style="width:32px;height:32px;border-radius:.5rem;background:' + color + '20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+                + '<i class="fas ' + icon + '" style="color:' + color + ';font-size:.85rem;"></i></div>'
+                + tagHtml
+                + '</div>'
+                + '<div class="font-semibold text-white" style="font-size:.8rem;line-height:1.3;">' + title + lockIcon + '</div>'
+                + '<div style="font-size:.7rem;color:#6b7280;margin-top:.15rem;line-height:1.35;">' + sub + '</div>'
+                + '</div>';
+        }
+
         // ── Fetch all data in parallel ────────────────────────────────────
-        const [courses, webinars, blog, signals, progress] = await Promise.all([
+        const [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
             safe(this.apiRequest('/courses/list')),
             safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
             safe(this.apiRequest('/blog/posts')),
             safe(this.apiRequest('/signals/active')),
             safe(this.apiRequest('/courses/enhanced/progress')),
+            safe(this.apiRequest('/learning/resume')),
         ]);
 
         const count = d => Array.isArray(d) ? d.length
@@ -1761,114 +1828,139 @@ const DashboardController = class {
         const courseArr = Array.isArray(courses) ? courses : [];
         const inProgCount = (progress?.in_progress || []).length;
         const completedCount = (progress?.completed || []).length;
-        const coursesSub = inProgCount > 0 ? `${inProgCount} in progress` : completedCount > 0 ? `${completedCount} completed` : courseArr.length > 0 ? 'None started yet' : '';
+        const coursesSub = ''; // Legacy courses removed — Academy stat chip handles its own label
         const webinarArr = Array.isArray(webinars) ? webinars : (webinars?.webinars || []);
         const webinarsSub = webinarArr.length > 0 ? 'This week' : '';
         const blogArr = Array.isArray(blog) ? blog : (blog?.posts || []);
         const signalArr = Array.isArray(signals) ? signals : (signals?.signals || []);
         const activeSignals = signalArr.filter(s => s.status === 'active').length;
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
-        setChip('stat-courses',  courses  ? count(courses)  : '—', coursesSub);
+        // Academy lessons completed count for the stat chip
+        const academyLessonsCount = (() => {
+            if (!academyResume) return '—';
+            if (academyResume.type === 'complete') return '28'; // all done
+            if (academyResume.lesson_id) {
+                // lesson_id tells us roughly how far they are
+                return academyResume.completed_count != null ? String(academyResume.completed_count) : '—';
+            }
+            return '0';
+        })();
+        setChip('stat-courses', academyLessonsCount, academyResume?.type === 'complete' ? 'All done! 🎉' : 'lessons done');
         setChip('stat-webinars', webinars ? count(webinars) : '—', webinarsSub);
         setChip('stat-blog',     blog     ? count(blog)     : '—', blogArr.length > 0 ? 'Latest articles' : '');
         setChip('stat-signals',  signals  ? count(signals)  : '—', signalsSub);
 
-        // ── Card 1: Continue Learning ─────────────────────────────────────
+        // ── Card 1: Continue Learning (Academy-powered) ──────────────────
         const learningEl = document.getElementById('dash-learning-body');
         if (learningEl) {
-            const inProgress = progress?.in_progress || [];
-            const completed  = progress?.completed    || [];
-            const overall    = progress?.overall_progress || 0;
-            const name       = progress?.student_name || (this.user?.full_name?.split(' ')[0]) || 'Trader';
+            const name = this.user?.full_name?.split(' ')[0] || 'Trader';
 
-            if (!progress || (inProgress.length === 0 && completed.length === 0)) {
-                const courseList = Array.isArray(courses) ? courses : [];
-                if (courseList.length > 0) {
-                    // Has courses, just hasn't started one
-                    const c = courseList[0];
-                    learningEl.innerHTML = `
-                    <div class="flex flex-col items-center text-center py-4">
-                        <div class="w-16 h-16 rounded-full flex items-center justify-center mb-3"
-                             style="background:rgba(124,58,237,.12);border:2px dashed rgba(124,58,237,.3);">
-                            <i class="fas fa-graduation-cap text-2xl" style="color:#a78bfa;"></i>
-                        </div>
-                        <p class="font-semibold text-white mb-1">Ready to start learning, ${_e(name)}?</p>
-                        <p class="text-xs text-gray-500 mb-4">You have ${courseList.length} course${courseList.length>1?'s':''} waiting for you.</p>
-                        <button onclick="window.location.href='/academy'"
-                            class="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
-                            style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
-                            Browse Courses →
-                        </button>
-                    </div>`;
-                } else {
-                    learningEl.innerHTML = `
-                    <div class="text-center py-4">
-                        <p class="text-gray-500 text-sm">No courses available yet.</p>
-                        <a href="/academy" class="text-xs text-purple-400 cursor-pointer mt-2 block">Check back soon →</a>
-                    </div>`;
-                }
+            if (!academyResume || academyResume.type === 'start') {
+                // New user — hasn't started Academy yet
+                learningEl.innerHTML =
+                    '<div class="flex flex-col items-center text-center py-4">'
+                    + '<div class="w-16 h-16 rounded-full flex items-center justify-center mb-3" style="background:rgba(52,211,153,.1);border:2px dashed rgba(52,211,153,.25);">'
+                    + '<i class="fas fa-book-open text-2xl" style="color:#34d399;"></i>'
+                    + '</div>'
+                    + '<p class="font-semibold text-white mb-1">Start your Trading Academy journey, ' + _e(name) + '</p>'
+                    + '<p class="text-xs text-gray-500 mb-4">28 lessons · 140 quizzes · Beginner to Advanced</p>'
+                    + '<a href="/academy" class="px-5 py-2 rounded-lg text-sm font-semibold transition-all text-decoration-none" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
+                    + 'Begin Academy →</a>'
+                    + '</div>';
+            } else if (academyResume.type === 'complete') {
+                learningEl.innerHTML =
+                    '<div class="flex flex-col items-center text-center py-4">'
+                    + '<div class="w-16 h-16 rounded-full flex items-center justify-center mb-3" style="background:rgba(251,191,36,.1);border:2px dashed rgba(251,191,36,.25);">'
+                    + '<i class="fas fa-trophy text-2xl" style="color:#fbbf24;"></i>'
+                    + '</div>'
+                    + '<p class="font-semibold text-white mb-1">Academy Complete! 🏆</p>'
+                    + '<p class="text-xs text-gray-500 mb-4">You finished all 28 lessons. Review any module anytime.</p>'
+                    + '<a href="/academy" class="px-5 py-2 rounded-lg text-sm font-semibold transition-all text-decoration-none" style="background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">'
+                    + 'Review Academy →</a>'
+                    + '</div>';
             } else {
-                // Has in-progress or completed courses — show named progress widget
-                const items = [...inProgress.slice(0, 3), ...completed.slice(0, 1)];
-                const nextUp = inProgress[0];
-
-                // Build course rows without nested template literals (avoids backslash-backtick syntax errors)
-                const courseRows = items.map(function(c, i) {
-                    const pct     = c.progress_percent || 0;
-                    const isDone  = c.is_completed;
-                    const barCol  = isDone ? '#34d399' : i === 0 ? '#a78bfa' : '#6d28d9';
-                    const bgCol   = isDone ? 'rgba(16,185,129,.1)' : 'rgba(124,58,237,.08)';
-                    const border  = isDone ? 'rgba(16,185,129,.2)' : 'rgba(124,58,237,.2)';
-                    const lessons = c.total_lessons || 0;
-                    const done    = c.completed_lessons || 0;
-                    const pctLabel = isDone ? '&#10003; Done' : pct + '%';
-                    const lessonLabel = lessons > 0 ? (done + ' / ' + lessons + ' lessons') : (isDone ? 'Completed' : 'In progress');
-                    return '<div class="rounded-xl p-3 cursor-pointer transition-all hover:opacity-90" '
-                         + 'style="background:' + bgCol + ';border:1px solid ' + border + ';" '
-                         + 'onclick="window.location.href=\'/academy\'">'
-                         + '<div class="flex items-center justify-between mb-2">'
-                         + '<span class="text-xs font-semibold text-white truncate pr-2">' + _e(c.title) + '</span>'
-                         + '<span class="text-xs flex-shrink-0 font-bold" style="color:' + barCol + ';">' + pctLabel + '</span>'
-                         + '</div>'
-                         + '<div class="pw-progress-bar mb-1">'
-                         + '<div class="pw-progress-fill" style="width:' + pct + '%;background:' + barCol + ';transition:width .6s ease ' + (i * 0.12) + 's;"></div>'
-                         + '</div>'
-                         + '<div class="text-xs text-gray-600">' + lessonLabel + '</div>'
-                         + '</div>';
-                }).join('');
-
-                const resumeBtn = nextUp
-                    ? '<button onclick="dashboard._toast(\'Resuming…\',\'info\'); setTimeout(function(){window.location.href=\'/academy\';},400);" '
-                    + 'class="w-full py-2.5 rounded-lg text-sm font-semibold transition-all" '
-                    + 'style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
-                    + '<i class="fas fa-play-circle mr-2"></i>Resume: ' + _e(nextUp.title.length > 28 ? nextUp.title.slice(0, 28) + '…' : nextUp.title)
-                    + '</button>'
-                    : '<button onclick="window.location.href=\'/academy\'" '
-                    + 'class="w-full py-2 rounded-lg text-sm font-semibold transition-all" '
-                    + 'style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">'
-                    + 'View All Courses →</button>';
+                // In progress — show resume card
+                const lessonTitle = academyResume.title || 'Next Lesson';
+                const moduleName  = academyResume.module || '';
+                const levelName   = academyResume.level  || 'Beginner';
+                const lessonId    = academyResume.lesson_id;
+                const pct         = academyResume.level_percent || 0;
 
                 learningEl.innerHTML =
-                    '<div class="flex items-center justify-between mb-3">'
-                    + '<div>'
+                    '<div class="mb-3">'
+                    + '<div class="flex items-center justify-between mb-1">'
                     + '<span class="text-xs text-gray-500">Your Learning Progress</span>'
-                    + '<div class="flex items-center gap-2 mt-0.5">'
-                    + '<div class="pw-progress-bar" style="width:80px;">'
-                    + '<div class="pw-progress-fill" style="width:' + overall + '%;"></div>'
+                    + '<span class="text-xs font-bold" style="color:#a78bfa;">' + pct + '% ' + _e(levelName) + '</span>'
                     + '</div>'
-                    + '<span class="text-xs font-bold" style="color:#a78bfa;">' + overall + '% overall</span>'
+                    + '<div class="pw-progress-bar"><div class="pw-progress-fill" style="width:' + pct + '%;transition:width .6s ease;"></div></div>'
                     + '</div>'
+                    + '<div class="rounded-xl p-3 mb-4" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);">'
+                    + '<div class="text-xs text-purple-400 mb-1">' + _e(levelName) + ' · ' + _e(moduleName) + '</div>'
+                    + '<div class="font-semibold text-white text-sm truncate">' + _e(lessonTitle) + '</div>'
                     + '</div>'
-                    + '<span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(16,185,129,.12);color:#6ee7b7;">' + completed.length + ' completed</span>'
-                    + '</div>'
-                    + '<div class="space-y-3 mb-4">' + courseRows + '</div>'
-                    + resumeBtn;
+                    + '<a href="/academy' + (lessonId ? '?lesson=' + lessonId : '') + '" class="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold transition-all text-decoration-none" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
+                    + '<i class="fas fa-play-circle"></i> Resume: ' + _e(lessonTitle.length > 26 ? lessonTitle.slice(0, 26) + '…' : lessonTitle)
+                    + '</a>';
             }
-        }  // end: if (learningEl) — was missing, caused dashboard to be undefined
+        }
 
+        // ── Card 5: Platform Tools Hub (replaces old Courses card) ─────────
+        const coursesEl = document.getElementById('dash-courses-body');
+        if (coursesEl) {
+            const tier = (JSON.parse(localStorage.getItem('pipways_user') || '{}').subscription_tier) || 'free';
+            const isPaid = tier === 'basic' || tier === 'pro';
+
+            coursesEl.innerHTML =
+                // Chart Analysis — hero CTA
+                '<div class="rounded-xl p-4 mb-3 cursor-pointer transition-all" '
+                + 'style="background:linear-gradient(135deg,rgba(96,165,250,.08),rgba(124,58,237,.08));border:1px solid rgba(96,165,250,.2);" '
+                + 'onclick="dashboard.navigate('analysis')" '
+                + 'onmouseover="this.style.borderColor='rgba(96,165,250,.45)'" onmouseout="this.style.borderColor='rgba(96,165,250,.2)'">'
+                + '<div class="flex items-center gap-3 mb-2">'
+                + '<div style="width:40px;height:40px;border-radius:.75rem;background:rgba(96,165,250,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+                + '<i class="fas fa-chart-bar" style="color:#60a5fa;font-size:1rem;"></i></div>'
+                + '<div style="flex:1;min-width:0;">'
+                + '<div class="font-bold text-white text-sm">Analyse a Chart</div>'
+                + '<div class="text-xs" style="color:#6b7280;">Upload any screenshot — get entry, stop &amp; target instantly</div>'
+                + '</div>'
+                + '<span class="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0" style="background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25);">Free</span>'
+                + '</div>'
+                + '<div id="dash-chart-usage"></div>'
+                + '<div class="flex items-center justify-between mt-2">'
+                + '<span class="text-xs" style="color:#6b7280;"><i class="fas fa-upload mr-1"></i>Drag &amp; drop or click to upload</span>'
+                + '<span class="text-xs font-semibold" style="color:#60a5fa;">Open → </span>'
+                + '</div>'
+                + '</div>'
+
+                + '<div class="grid grid-cols-2 gap-3">'
+
+                + _premiumFeatureCard({ icon:'fa-file-chart-pie', color:'#a78bfa', bg:'rgba(124,58,237,.08)', border:'rgba(124,58,237,.2)',
+                    title:'Performance Analysis', sub:'Upload MT4/MT5 · find your weaknesses',
+                    section:'journal', isPaid, tag: isPaid ? null : '1 free' })
+
+                + _premiumFeatureCard({ icon:'fa-chart-pie', color:'#34d399', bg:'rgba(52,211,153,.08)', border:'rgba(52,211,153,.2)',
+                    title:'AI Stock Research', sub:'NGX + global stocks analysis',
+                    section:'stocks', isPaid, tag: isPaid ? null : '2 free/day' })
+
+                + _premiumFeatureCard({ icon:'fa-satellite-dish', color:'#f472b6', bg:'rgba(244,114,182,.08)', border:'rgba(244,114,182,.2)',
+                    title:'Market Signals', sub:'Live trade setups with validation',
+                    section:'signals', isPaid, tag: isPaid ? null : 'Preview' })
+
+                + _premiumFeatureCard({ icon:'fa-book-open', color:'#fbbf24', bg:'rgba(251,191,36,.08)', border:'rgba(251,191,36,.2)',
+                    title:'Trading Academy', sub:'28 lessons · always free',
+                    href:'/academy', isPaid: true, tag:'Free' })
+
+                + '</div>';
+
+            // Render chart analysis usage badge
+            const badgeEl = document.getElementById('dash-chart-usage');
+            if (badgeEl && typeof PipwaysUsage !== 'undefined') {
+                PipwaysUsage.renderBadge('chart_analysis', badgeEl);
+            }
+        }
 
         // ── Dynamic "Your Next Step" card ────────────────────────────────────
-        this._updateNextStepCard(progress, courses);
+        this._updateNextStepCard(progress, courses, academyResume);
 
         // ── AI Market Insight: show only for users ≥30% academy progress ──
         // Prevents confusing beginners with advanced market commentary
@@ -1929,45 +2021,37 @@ const DashboardController = class {
         }
     }
 
-    _updateNextStepCard(progress, courses) {
+    _updateNextStepCard(progress, courses, academyResume) {
         /**
-         * Dynamically updates the "Your Next Step" card based on real user progress.
-         * Falls back gracefully to Academy CTA when no data is available.
+         * Dynamically updates the "Your Next Step" card.
+         * Prioritises Trading Academy data over old courses.
          */
         const titleEl = document.getElementById('next-step-title');
         const subEl   = document.getElementById('next-step-sub');
         const ctaEl   = document.getElementById('next-step-cta');
         if (!titleEl || !subEl || !ctaEl) return;
 
-        const inProgress  = progress?.in_progress  || [];
-        const completed   = progress?.completed     || [];
-        const overall     = progress?.overall_progress || 0;
-        const courseArr   = Array.isArray(courses) ? courses : [];
-
-        if (inProgress.length > 0) {
-            // User has a course in progress — resume it
-            const current = inProgress[0];
-            const pct     = current.progress_percent || 0;
-            const lessons = current.total_lessons    || 0;
-            const done    = current.completed_lessons || 0;
-            titleEl.textContent = `Resume: ${current.title}`;
-            subEl.textContent   = `${done} of ${lessons} lessons done · ${pct}% complete`;
-            ctaEl.href          = `/academy.html`;
+        if (academyResume && academyResume.type === 'continue' && academyResume.lesson_id) {
+            // Actively in-progress in Academy
+            const lessonTitle = academyResume.title  || 'Next Lesson';
+            const moduleName  = academyResume.module || '';
+            const levelName   = academyResume.level  || '';
+            titleEl.textContent = `Resume: ${lessonTitle}`;
+            subEl.textContent   = `${moduleName}${levelName ? ' · ' + levelName : ''}`;
+            ctaEl.href          = `/academy?lesson=${academyResume.lesson_id}`;
             ctaEl.innerHTML     = '<i class="fas fa-play-circle text-xs"></i> Continue Lesson';
-        } else if (completed.length > 0 && courseArr.length > 0) {
-            // Has completed at least one course — push to next
-            titleEl.textContent = 'Keep going — start your next course';
-            subEl.textContent   = `${completed.length} course${completed.length > 1 ? 's' : ''} completed · ${overall}% overall progress`;
-            ctaEl.href          = `/academy.html`;
-            ctaEl.innerHTML     = '<i class="fas fa-graduation-cap text-xs"></i> Next Course';
-        } else if (completed.length === 0 && courseArr.length > 0) {
-            // Has courses but hasn't started — nudge to begin
-            titleEl.textContent = 'Start your first Trading Academy lesson';
-            subEl.textContent   = `${courseArr.length} course${courseArr.length > 1 ? 's' : ''} available — build foundations before placing trades`;
-            ctaEl.href          = `/academy.html`;
+        } else if (academyResume && academyResume.type === 'complete') {
+            titleEl.textContent = 'Academy Complete! 🏆';
+            subEl.textContent   = 'All 28 lessons done. Review any module anytime.';
+            ctaEl.href          = '/academy';
+            ctaEl.innerHTML     = '<i class="fas fa-trophy text-xs"></i> View Academy';
+        } else {
+            // Not started or no academy data — prompt to begin
+            titleEl.textContent = 'Start your Trading Academy';
+            subEl.textContent   = '28 lessons · from first pip to institutional strategy';
+            ctaEl.href          = '/academy';
             ctaEl.innerHTML     = '<i class="fas fa-graduation-cap text-xs"></i> Go to Academy';
         }
-        // else: fallback HTML already set — no change needed
     }
 
     _setGreeting() {
@@ -2529,6 +2613,53 @@ const DashboardController = class {
             `).join('');
         } catch (error) {
             container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load signals. Please try again.</div>';
+        }
+    }
+
+    async loadCourses() {
+        // Courses section now redirects to Academy
+        window.location.href = '/academy';
+        return;
+        // Legacy code below kept for reference
+    }
+    async _loadCoursesLegacy() {
+        if (typeof PublicPages !== 'undefined') {
+            await PublicPages.courses('courses-container', this);
+            return;
+        }
+        const container = document.getElementById('courses-container');
+        if (!container) return;
+        if (typeof CoursesPage !== 'undefined') {
+            await CoursesPage.render('courses-container');
+            return;
+        }
+        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>';
+        try {
+            const data = await this.apiRequest('/courses/list');
+            const courses = Array.isArray(data) ? data : (data.courses || []);
+            if (!courses.length) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
+                    <i class="fas fa-graduation-cap text-4xl mb-3 block opacity-30"></i>
+                    <p class="font-medium">No courses available yet</p>
+                </div>`;
+                return;
+            }
+            container.innerHTML = courses.map(c => `
+                <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors cursor-pointer"
+                     onclick="CoursesPage ? CoursesPage.openCourse(${c.id}) : null">
+                    <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
+                        <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
+                    </div>
+                    <div class="p-4">
+                        <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
+                        <h4 class="font-bold text-white mt-1 mb-2">${c.title}</h4>
+                        <p class="text-sm text-gray-400 line-clamp-2 mb-2">${c.description || ''}</p>
+                        <div class="text-xs text-gray-500">${c.lesson_count || 0} lessons</div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load courses.</div>';
         }
     }
 

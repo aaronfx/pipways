@@ -158,12 +158,10 @@ const PerformancePage = {
         
         try {
             const trades = JSON.parse(data);
-            // Use correct endpoint — API.analyzeJournal may not exist
             let results;
             if (typeof API.analyzeJournal === 'function') {
                 results = await API.analyzeJournal(trades);
             } else {
-                // Fallback to direct request
                 results = await API.request('/ai/performance/analyze-journal', {
                     method: 'POST',
                     body: JSON.stringify({ trades })
@@ -171,7 +169,21 @@ const PerformancePage = {
             }
             this.displayAnalysis(results);
         } catch (e) {
-            const msg = e.message || 'Analysis failed';
+            // 402 limit reached — show upgrade modal
+            if (e.message && (e.message.includes('limit_reached') || e.message.includes('402'))) {
+                if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
+                    PipwaysUsage.showUpgradeModal('performance',
+                        PipwaysUsage.used('performance'),
+                        PipwaysUsage.limit('performance'));
+                } else if (window.PaymentsPage) {
+                    PaymentsPage.showUpgradeModal('Performance Analytics');
+                }
+                return;
+            }
+            // Parse JSON error messages cleanly
+            let msg;
+            try { msg = JSON.parse(e.message).detail || JSON.parse(e.message).error || e.message; }
+            catch (_) { msg = e.message || 'Analysis failed'; }
             if (typeof UI !== 'undefined') UI.showToast('Error: ' + msg, 'error');
             else alert('Error: ' + msg);
         }

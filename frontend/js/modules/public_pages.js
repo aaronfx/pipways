@@ -254,7 +254,7 @@ const PublicPages = (() => {
                 // Thumbnail
                 const thumb = w.thumbnail
                     ? '<div style="width:120px;flex-shrink:0;overflow:hidden;border-radius:.75rem 0 0 .75rem;">'
-                      + '<img src="' + w.thumbnail + '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none'">'
+                      + '<img src="' + w.thumbnail + '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display=\'none\'">'
                       + '</div>'
                     : '<div style="width:6px;flex-shrink:0;background:linear-gradient(180deg,'
                       + (isCompleted ? '#374151,#1f2937' : isLive ? '#ef4444,#dc2626' : '#7c3aed,#6d28d9')
@@ -285,7 +285,7 @@ const PublicPages = (() => {
                 const bioId = 'bio-' + w.id;
                 const speakerHtml = w.speaker_bio
                     ? '<div style="margin-top:.5rem;">'
-                      + '<button onclick="var b=document.getElementById('' + bioId + '');b.style.display=b.style.display==='none'?'block':'none'" '
+                      + '<button onclick="(function(){var b=document.getElementById(\'bio-'+w.id+'\');b.style.display=b.style.display===\'none\'?\'block\':\'none\'})()" '
                       + 'style="font-size:.72rem;color:#a78bfa;background:none;border:none;cursor:pointer;padding:0;">'
                       + '<i class="fas fa-user-tie" style="margin-right:.35rem;"></i>About the speaker ▾</button>'
                       + '<div id="' + bioId + '" style="display:none;margin-top:.4rem;padding:.6rem .75rem;background:rgba(124,58,237,.06);'
@@ -309,7 +309,7 @@ const PublicPages = (() => {
                             + 'background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3);">'
                             + '<i class="fas fa-play-circle" style="font-size:.8rem;"></i> Watch Recording</a>';
                     } else if (!isPro) {
-                        cta = '<button onclick="window.PaymentsPage ? PaymentsPage.showUpgradeModal('Webinar Recordings') : window.location.href='/pricing.html'" '
+                        cta = '<button onclick="window.PaymentsPage ? PaymentsPage.showUpgradeModal(\'Webinar Recordings\') : window.location.href=\'/pricing.html\'" '
                             + 'style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.1rem;border-radius:.5rem;font-size:.82rem;font-weight:600;cursor:pointer;'
                             + 'background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">'
                             + '<i class="fas fa-lock" style="font-size:.75rem;"></i> Pro — Watch Recording</button>';
@@ -347,9 +347,7 @@ const PublicPages = (() => {
                     const params = new URLSearchParams({
                         action:'TEMPLATE', text:w.title,
                         dates:fmt(d)+'/'+fmt(endD),
-                        details:(w.description||'')+(w.meeting_link?'
-
-Join: '+w.meeting_link:''),
+                        details:(w.description||'')+(w.meeting_link?' Join: '+w.meeting_link:''),
                     });
                     calLink = ' <a href="https://calendar.google.com/calendar/render?' + params.toString()
                         + '" target="_blank" rel="noopener" '
@@ -359,8 +357,8 @@ Join: '+w.meeting_link:''),
 
                 return '<div style="background:#111827;border:1px solid ' + (isCompleted ? '#1f2937' : '#1f2937') + ';border-radius:.85rem;overflow:hidden;'
                      + 'display:flex;flex-direction:row;opacity:' + (isCompleted ? '.85' : '1') + ';margin-bottom:.1rem;"'
-                     + ' onmouseover="this.style.borderColor='#374151';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px -6px rgba(0,0,0,.5)'"'
-                     + ' onmouseout="this.style.borderColor='#1f2937';this.style.transform='';this.style.boxShadow=''">>'
+                     + ' onmouseover="this.style.borderColor=\'#374151\';this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 24px -6px rgba(0,0,0,.5)\'"'
+                     + ' onmouseout="this.style.borderColor=\'#1f2937\';this.style.transform=\'\';this.style.boxShadow=\'\'">>>'
                      + thumb
                      + dateBlock
                      + '<div style="flex:1;padding:1.1rem 1.25rem;">'
@@ -495,11 +493,15 @@ Join: '+w.meeting_link:''),
                     var slug = (p.slug || '').replace(/"/g, '');
 
                     var imgHero = p.featured_image
-                        ? '<img src="' + p.featured_image + '" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display=\'none\'">'
+                        ? '<img src="' + p.featured_image + '" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500"'
+                          + ' onerror="this.style.display=\'none\'"height:100%;min-height:14rem;background:linear-gradient(135deg,#1e1b4b,#1a1040,#0f172a);display:flex;align-items:center;justify-content:center;\"><i class=\"fas fa-newspaper\" style=\"font-size:3rem;color:rgba(255,255,255,.07)\"></i></div>\'">'
                         : '<div class="h-56 lg:h-full bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-6xl text-white/10"></i></div>';
 
                     var imgSmall = p.featured_image
-                        ? '<div class="overflow-hidden h-44"><img src="' + p.featured_image + '" class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display=\'none\'"></div>'
+                        ? '<div class="overflow-hidden h-44" style="background:linear-gradient(135deg,#1e1b4b,#0f172a);">'
+                          + '<img src="' + p.featured_image + '" class="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-500"'
+                          + ' onerror="this.style.display=\'none\'">'
+                          + '</div>'
                         : '<div class="h-44 bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center"><i class="fas fa-newspaper text-4xl text-gray-600"></i></div>';
 
                     var featBadge = p.featured ? '<span class="text-xs text-yellow-400">&#11088; Featured</span>' : '';
@@ -737,7 +739,13 @@ Join: '+w.meeting_link:''),
             var img = document.createElement('img');
             img.src = post.featured_image;
             img.style.cssText = 'width:100%;height:300px;object-fit:cover;display:block;';
-            img.onerror = function() { this.style.display = 'none'; };
+            img.onerror = function() {
+                this.style.display = 'none';
+                var ph = document.createElement('div');
+                ph.style.cssText = 'height:280px;background:linear-gradient(135deg,#1e1b4b,#1a1040,#0f172a);border-radius:.75rem;display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;';
+                ph.innerHTML = '<i class="fas fa-newspaper" style="font-size:3rem;color:rgba(255,255,255,.07)"></i>';
+                this.parentNode.insertBefore(ph, this.nextSibling);
+            };
             card.appendChild(img);
         }
 

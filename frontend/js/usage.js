@@ -107,6 +107,10 @@
                 };
                 _saveToStorage();
                 _updateAllBadges();
+                // Notify any listeners (e.g. dashboard._initUsageBars) that data is ready
+                document.dispatchEvent(new CustomEvent('pipways:usage-updated', {
+                    detail: { tier: _state.tier, features: _state.features }
+                }));
             }
         } catch (e) {
             console.warn('[PipwaysUsage] refresh failed:', e);

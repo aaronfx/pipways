@@ -221,19 +221,39 @@ const ChartAnalysisPage = {
         } catch (error) {
             // ── 402 limit reached — show upgrade modal instead of raw error ──
             if (error.message && (error.message.includes('limit_reached') || error.message.includes('402'))) {
-                if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
-                    PipwaysUsage.showUpgradeModal('chart_analysis',
-                        PipwaysUsage.used('chart_analysis'),
-                        PipwaysUsage.limit('chart_analysis'));
-                } else if (window.PaymentsPage) {
-                    PaymentsPage.showUpgradeModal('Chart Analysis');
-                }
+                // Show upgrade UI
                 if (results) results.innerHTML = `
-                    <div style="text-align:center;padding:3rem;">
+                    <div style="text-align:center;padding:3rem;background:#111827;border-radius:12px;border:1px solid #374151;">
                         <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
-                        <p style="color:#a78bfa;font-weight:600;margin-bottom:.5rem;">Free limit reached</p>
-                        <p style="color:#6b7280;font-size:.875rem;">Upgrade to Pro to continue analysing charts.</p>
+                        <p style="color:white;font-weight:700;font-size:1.1rem;margin-bottom:.5rem;">Free limit reached</p>
+                        <p style="color:#9ca3af;font-size:.875rem;margin-bottom:1.5rem;">
+                            You've used all your free chart analyses.<br>Upgrade to Pro for unlimited access.
+                        </p>
+                        <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+                            <button onclick="window.PaymentsPage ? PaymentsPage.startPayment('pro_monthly') : window.location.href='/pricing.html'"
+                                style="padding:10px 24px;background:#7c3aed;color:white;border:none;
+                                       border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;">
+                                Upgrade to Pro →
+                            </button>
+                            <a href="/pricing.html"
+                                style="padding:10px 24px;background:#1f2937;color:#9ca3af;border:1px solid #374151;
+                                       border-radius:8px;font-weight:600;font-size:.9rem;text-decoration:none;
+                                       display:inline-flex;align-items:center;">
+                                See Plans
+                            </a>
+                        </div>
                     </div>`;
+
+                // Also trigger the upgrade modal if available
+                setTimeout(() => {
+                    if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
+                        PipwaysUsage.showUpgradeModal('chart_analysis',
+                            PipwaysUsage.used('chart_analysis'),
+                            PipwaysUsage.limit('chart_analysis'));
+                    } else if (window.PaymentsPage) {
+                        PaymentsPage.showUpgradeModal('Chart Analysis');
+                    }
+                }, 300);
                 return;
             }
 

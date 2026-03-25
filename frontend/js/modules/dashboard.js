@@ -1400,45 +1400,7 @@ class DashboardController {
     }
 }
 
-// API Client
-const API_BASE = window.location.origin;
-
-const api = {
-    async request(endpoint, options = {}) {
-        const token = localStorage.getItem('pipways_token');
-        const headers = {
-            'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` }),
-            ...options.headers
-        };
-
-        if (options.body instanceof FormData) delete headers['Content-Type'];
-
-        try {
-            const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-            if (!res.ok) {
-                const err = await res.text();
-                throw new Error(err || `HTTP ${res.status}`);
-            }
-            return res.json();
-        } catch (e) {
-            console.error(`API Error ${endpoint}:`, e);
-            throw e;
-        }
-    },
-
-    getSignals() { return this.request('/signals/active'); },
-    getCourses() { return this.request('/courses/list'); },
-    getWebinars() { return this.request('/webinars/upcoming?upcoming=true'); },
-    getBlogPosts() { return this.request('/blog/posts'); },
-    getAdminStats() { return this.request('/admin/users'); },
-
-    askMentor(question, skillLevel = 'intermediate') { 
-        return this.request('/ai/mentor/ask', { 
-            method: 'POST', 
-            body: JSON.stringify({ question, skill_level: skillLevel }) 
-        }); 
-    }
-};
+// NOTE: api.js defines window.API and window.api globally.
+// The local duplicate api object has been removed — use window.API everywhere.
 
 const dashboard = new DashboardController();

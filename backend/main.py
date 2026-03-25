@@ -46,6 +46,15 @@ except ImportError:
     async def upsert_curriculum():
         print("[LMS INIT] Cannot upsert curriculum without lms_init.py", flush=True)
 
+# Subscription & usage enforcement
+try:
+    from .subscriptions import init_subscription_tables
+    _HAS_SUBSCRIPTIONS = True
+except ImportError:
+    _HAS_SUBSCRIPTIONS = False
+    async def init_subscription_tables():
+        print("[SUBSCRIPTIONS] subscriptions.py not found — skipping", flush=True)
+
 from . import stock_terminal_backend as stock_module
 stock_router = stock_module.router
 
@@ -83,6 +92,12 @@ async def lifespan(app: FastAPI):
                 print("[LMS] Tables ready", flush=True)
             except Exception as e:
                 print(f"[LMS] Initialization error: {e}", flush=True)
+
+        if _HAS_SUBSCRIPTIONS:
+            try:
+                await init_subscription_tables()
+            except Exception as e:
+                print(f"[SUBSCRIPTIONS] Initialization error: {e}", flush=True)
 
         try:
             chart_analysis._http_client = httpx.AsyncClient(timeout=60.0)
@@ -154,6 +169,7 @@ async def health_check():
         "status": "healthy",
         "version": APP_VERSION,
         "lms_available": _HAS_LMS_INIT,
+        "subscriptions_available": _HAS_SUBSCRIPTIONS,
         "academy_router": True,
         "stock_terminal": {
             "anthropic_ready": stock_module._anthropic is not None,
@@ -171,7 +187,9 @@ async def health_check():
             "ai_stock_research",
             "chart_analysis_caching",
             "proactive_ai_insights",
-            "trading_academy_lms"
+            "trading_academy_lms",
+            "subscription_enforcement",
+            "usage_tracking",
         ]
     }
 
@@ -180,12 +198,37 @@ async def init_academy():
     """Manually initialize academy curriculum (admin only)"""
     if not _HAS_LMS_INIT:
         raise HTTPException(status_code=503, detail="LMS module not available")
-    
     try:
         await upsert_curriculum()
         return {"status": "success", "message": "Academy curriculum initialized"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/academy/reseed")
+async def admin_reseed_academy():
+    """Force wipe and reseed the full academy curriculum from v2 seed file."""
+    if not _HAS_LMS_INIT:
+        raise HTTPException(status_code=503, detail="LMS module not available")
+    try:
+        from .lms_init import force_reseed_academy
+        await force_reseed_academy()
+        return {"status": "success", "message": "Academy reseeded from v2 curriculum"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pricing.html")
+async def serve_pricing():
+    for path in [
+        os.path.join(BASE_DIR, "frontend", "static", "pricing.html"),
+        os.path.join(BASE_DIR, "static", "pricing.html"),
+        os.path.join(STATIC_DIR, "pricing.html"),
+        "static/pricing.html",
+    ]:
+        if path and os.path.exists(path):
+            return FileResponse(path)
+    raise HTTPException(404, "pricing.html not found")
 
 app.include_router(auth.router,             prefix="/auth",           tags=["Authentication"])
 app.include_router(signals.router,          prefix="/signals",        tags=["Trading Signals"])

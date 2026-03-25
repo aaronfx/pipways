@@ -91,6 +91,121 @@ const BlogEnhanced = {
         }
     },
 
+    /**
+     * renderPostCTAs — injected below every blog post.
+     * Drives conversions from reader → platform user.
+     * Uses only existing platform features.
+     */
+    renderPostCTAs(container, category) {
+        const isAuth = !!localStorage.getItem('pipways_token');
+        category = (category || '').toLowerCase();
+
+        // Pick the most relevant CTA tool based on post category
+        let primaryCTA;
+        if (category.includes('risk') || category.includes('position')) {
+            primaryCTA = {
+                emoji: '💰',
+                title: 'Try Our Free Risk Calculator',
+                desc:  'Calculate the exact lot size for your next trade in seconds.',
+                btn:   'Open Risk Calculator',
+                action: isAuth ? "dashboard.navigate('risk')" : "window.location.href='/'",
+            };
+        } else if (category.includes('chart') || category.includes('analysis') || category.includes('pattern')) {
+            primaryCTA = {
+                emoji: '📊',
+                title: 'Analyse Your Chart with AI',
+                desc:  'Upload a screenshot — get instant pattern recognition and trade ideas.',
+                btn:   'Try Chart Analysis',
+                action: isAuth ? "dashboard.navigate('analysis')" : "window.location.href='/'",
+            };
+        } else {
+            primaryCTA = {
+                emoji: '📚',
+                title: 'Learn This in the Academy',
+                desc:  'Structured lessons, quizzes and certificates. Completely free.',
+                btn:   'Open Trading Academy',
+                action: "window.location.href='/academy.html'",
+            };
+        }
+
+        // Email capture for non-logged-in readers
+        const emailBlock = !isAuth ? `
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="email" id="blog-cta-email" placeholder="Your email address"
+                style="flex:1;min-width:200px;padding:10px 14px;border-radius:6px;
+                       border:1px solid #d1d5db;font-size:.875rem;outline:none;">
+            <button onclick="BlogEnhanced._captureFromBlog()"
+                style="padding:10px 18px;background:#3b82f6;color:white;border:none;
+                       border-radius:6px;font-weight:600;font-size:.875rem;cursor:pointer;
+                       white-space:nowrap;">
+                Get Free Access →
+            </button>
+        </div>
+        <p style="margin:6px 0 0;font-size:.75rem;color:#9ca3af;">
+            Join 5,000+ Nigerian traders. No spam, unsubscribe anytime.
+        </p>` : '';
+
+        container.insertAdjacentHTML('beforeend', `
+        <div style="margin-top:3rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;
+                    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+
+            <!-- Primary CTA -->
+            <div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;
+                        padding:24px;color:white;grid-column:${!isAuth ? '1' : '1/3'};">
+                <div style="font-size:1.75rem;margin-bottom:8px;">${primaryCTA.emoji}</div>
+                <h4 style="margin:0 0 6px;font-size:1rem;font-weight:700;">${primaryCTA.title}</h4>
+                <p style="margin:0 0 14px;font-size:.875rem;opacity:.9;">${primaryCTA.desc}</p>
+                <button onclick="${primaryCTA.action}"
+                    style="background:white;color:#7c3aed;border:none;padding:10px 20px;
+                           border-radius:6px;font-weight:700;font-size:.875rem;cursor:pointer;">
+                    ${primaryCTA.btn} →
+                </button>
+            </div>
+
+            <!-- Email CTA (non-auth only) -->
+            ${!isAuth ? `
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:24px;">
+                <div style="font-size:1.75rem;margin-bottom:8px;">🚀</div>
+                <h4 style="margin:0 0 6px;font-size:1rem;font-weight:700;color:#111827;">
+                    Get Free Platform Access
+                </h4>
+                <p style="margin:0;font-size:.875rem;color:#6b7280;">
+                    Academy, Risk Calculator, AI Mentor — all free.
+                </p>
+                ${emailBlock}
+            </div>` : `
+            <!-- Academy nudge for logged-in users -->
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px;"
+                 onclick="window.location.href='/academy.html'" style="cursor:pointer;">
+                <div style="font-size:1.75rem;margin-bottom:8px;">📚</div>
+                <h4 style="margin:0 0 6px;font-size:1rem;font-weight:700;color:#111827;">
+                    Continue Learning
+                </h4>
+                <p style="margin:0 0 14px;font-size:.875rem;color:#6b7280;">
+                    Pick up where you left off in the Trading Academy.
+                </p>
+                <span style="font-size:.875rem;color:#16a34a;font-weight:600;">Open Academy →</span>
+            </div>`}
+        </div>`);
+    },
+
+    async _captureFromBlog() {
+        const input = document.getElementById('blog-cta-email');
+        const email = input?.value.trim();
+        if (!email) return;
+        try {
+            await fetch('/email/capture', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, source: 'blog' }),
+            });
+            if (input) input.closest('div').innerHTML =
+                '<p style="color:#16a34a;font-weight:600;margin:8px 0 0;">✅ Check your email!</p>';
+        } catch (_) {
+            if (input) input.placeholder = 'Something went wrong — try again';
+        }
+    },
+
     async renderCalendar(container) {
         if (!Store.state.isAdmin) {
             container.innerHTML = '<p>Admin access required</p>';

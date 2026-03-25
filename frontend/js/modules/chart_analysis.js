@@ -219,6 +219,24 @@ const ChartAnalysisPage = {
             this.displayResults(analysis);
 
         } catch (error) {
+            // ── 402 limit reached — show upgrade modal instead of raw error ──
+            if (error.message && (error.message.includes('limit_reached') || error.message.includes('402'))) {
+                if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
+                    PipwaysUsage.showUpgradeModal('chart_analysis',
+                        PipwaysUsage.used('chart_analysis'),
+                        PipwaysUsage.limit('chart_analysis'));
+                } else if (window.PaymentsPage) {
+                    PaymentsPage.showUpgradeModal('Chart Analysis');
+                }
+                if (results) results.innerHTML = `
+                    <div style="text-align:center;padding:3rem;">
+                        <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
+                        <p style="color:#a78bfa;font-weight:600;margin-bottom:.5rem;">Free limit reached</p>
+                        <p style="color:#6b7280;font-size:.875rem;">Upgrade to Pro to continue analysing charts.</p>
+                    </div>`;
+                return;
+            }
+
             const MAX_RETRIES = 3;
             if (error.isColdStart && _retryCount < MAX_RETRIES) {
                 const next = _retryCount + 1;
@@ -254,9 +272,18 @@ const ChartAnalysisPage = {
             this.uploadedImage   = null;
             this.currentAnalysis = null;
             const exhausted  = error.isColdStart && _retryCount >= MAX_RETRIES;
-            const userMsg    = exhausted
-                ? 'The server is taking too long to wake up. Please wait 30 seconds and try again.'
-                : error.message;
+            // Parse JSON error messages into human-readable text
+            let userMsg;
+            if (exhausted) {
+                userMsg = 'The server is taking too long to wake up. Please wait 30 seconds and try again.';
+            } else {
+                try {
+                    const parsed = JSON.parse(error.message);
+                    userMsg = parsed.detail || parsed.error || error.message;
+                } catch (_) {
+                    userMsg = error.message;
+                }
+            }
             results.innerHTML = `
                 <div class="alert alert-error" style="padding:1.25rem;">
                     <div style="font-weight:600;margin-bottom:0.5rem;">

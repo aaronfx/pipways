@@ -29,6 +29,12 @@ from typing import List, Optional
 import httpx
 
 from .security import get_current_user
+
+try:
+    from .email_service import send_lesson_complete_task, send_certificate_task
+    _HAS_EMAIL = True
+except ImportError:
+    _HAS_EMAIL = False
 from .database import database
 
 router = APIRouter()
@@ -1681,6 +1687,35 @@ async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(g
             raise HTTPException(401, "Not authenticated")
         await _mark_lesson_complete(user_id, payload.lesson_id, payload.quiz_score)
         new_badges = await _check_and_award_badges(user_id, payload.lesson_id)
+
+        # Send lesson-complete email (background, non-fatal)
+        if _HAS_EMAIL:
+            import asyncio
+            try:
+                user_row = await database.fetch_one(
+                    "SELECT email, full_name FROM users WHERE id=:uid", {"uid": user_id}
+                )
+                lesson_row = await database.fetch_one(
+                    """SELECT l.title, m.title AS module_title,
+                              (SELECT l2.title FROM learning_lessons l2
+                               JOIN learning_modules m2 ON m2.id=l2.module_id
+                               WHERE m2.level_id=(SELECT level_id FROM learning_modules WHERE id=l.module_id)
+                               AND l2.order_index > l.order_index
+                               ORDER BY l2.order_index LIMIT 1) AS next_title
+                       FROM learning_lessons l
+                       JOIN learning_modules m ON m.id=l.module_id
+                       WHERE l.id=:lid""",
+                    {"lid": payload.lesson_id}
+                )
+                if user_row and lesson_row:
+                    asyncio.create_task(send_lesson_complete_task(
+                        user_id, user_row["email"], user_row["full_name"] or "",
+                        lesson_row["title"], lesson_row["module_title"],
+                        lesson_row.get("next_title")
+                    ))
+            except Exception as _email_err:
+                print(f"[ACADEMY EMAIL] {_email_err}", flush=True)
+
         return {"success": True, "new_badges": new_badges}
     except Exception as e:
         print(f"[API ERROR] complete_lesson: {e}", flush=True)

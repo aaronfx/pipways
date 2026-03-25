@@ -283,7 +283,7 @@ async def generate_ai_response(message: str, context: Dict) -> str:
         print(f"[AI ERROR] {e}")
         return "Great question! Learn the complete answer in the lesson below. 👇"
 
-@router.post("/mentor/ask", response_model=MentorResponse)
+@router.post("/ask", response_model=MentorResponse)
 async def ask_mentor(
     chat: ChatMessage,
     current_user = Depends(get_current_user)
@@ -354,7 +354,7 @@ async def ask_mentor(
         academy_progress=user_progress
     )
 
-@router.post("/mentor/track-lesson-click")
+@router.post("/track-lesson-click")
 async def track_lesson_click(
     lesson_id: int,
     current_user = Depends(get_current_user)

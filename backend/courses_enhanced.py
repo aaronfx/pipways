@@ -98,15 +98,28 @@ async def get_progress(current_user=Depends(get_current_user)):
     user_row = await _safe_one("SELECT full_name, email FROM users WHERE id = :uid", {"uid": user_id})
     student_name = (user_row or {}).get("full_name") or (user_row or {}).get("email", "Student") or "Student"
 
-    certificates = [
-        {
-            "certificate_number": r["certificate_number"],
-            "course_title":       r["course_title"],
+    import os, urllib.parse
+    app_url = os.getenv("APP_BASE_URL", "https://pipways.com")
+    certificates = []
+    for r in cert_rows:
+        cert_num = r["certificate_number"]
+        course_title = r["course_title"]
+        issued = r["issued_at"]
+        linkedin_params = urllib.parse.urlencode({
+            "startTask":  "CERTIFICATION_NAME",
+            "name":       f"Pipways: {course_title}",
+            "certUrl":    f"{app_url}/academy.html",
+            "certId":     cert_num,
+            **({"issueYear": issued.year, "issueMonth": issued.month} if issued else {}),
+        })
+        certificates.append({
+            "certificate_number": cert_num,
+            "course_title":       course_title,
             "student_name":       student_name,
-            "issued_at":          r["issued_at"].isoformat() if r.get("issued_at") else None,
-        }
-        for r in cert_rows
-    ]
+            "issued_at":          issued.isoformat() if issued else None,
+            "linkedin_share_url": f"https://www.linkedin.com/profile/add?{linkedin_params}",
+            "share_message":      f"I just earned my '{course_title}' certificate on Pipways Trading Academy! 🎓📈",
+        })
 
     total_courses = len(rows)
     overall_pct   = round(total_pct_sum / total_courses) if total_courses else 0
@@ -145,10 +158,29 @@ async def get_certificate(course_id: int, current_user=Depends(get_current_user)
     user_row = await _safe_one("SELECT full_name, email FROM users WHERE id = :uid", {"uid": user_id})
     student_name = (user_row or {}).get("full_name") or (user_row or {}).get("email", "Student") or "Student"
 
+    import os, urllib.parse
+    app_url = os.getenv("APP_BASE_URL", "https://pipways.com")
+    cert_num = row["certificate_number"]
+    course_title = row["course_title"]
+
+    # LinkedIn certification share URL
+    linkedin_params = urllib.parse.urlencode({
+        "startTask":        "CERTIFICATION_NAME",
+        "name":             f"Pipways: {course_title}",
+        "organizationId":   "",           # fill with your LinkedIn company ID
+        "issueYear":        row["issued_at"].year if row.get("issued_at") else "",
+        "issueMonth":       row["issued_at"].month if row.get("issued_at") else "",
+        "certUrl":          f"{app_url}/academy.html",
+        "certId":           cert_num,
+    })
+    linkedin_share_url = f"https://www.linkedin.com/profile/add?{linkedin_params}"
+
     return {
-        "certificate_number": row["certificate_number"],
-        "course_title":       row["course_title"],
+        "certificate_number": cert_num,
+        "course_title":       course_title,
         "student_name":       student_name,
         "issued_at":          row["issued_at"].isoformat() if row.get("issued_at") else None,
         "course_id":          course_id,
+        "linkedin_share_url": linkedin_share_url,
+        "share_message":      f"I just earned my '{course_title}' certificate on Pipways Trading Academy! 🎓📈 #forex #trading #pipways",
     }

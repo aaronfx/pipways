@@ -32,7 +32,7 @@ openpyxl==3.1.2
 xlsxwriter==3.1.9
 
 # Payments
-stripe==7.0.0
+# stripe removed — using Paystack via httpx
 
 # Background tasks
 celery==5.3.6
@@ -52,3 +52,7 @@ pytesseract==0.3.10          # OCR for screenshot trade extraction
 
 # NEW: AI Stock Research Terminal
 anthropic>=0.21.0            # Anthropic AI API client for stock analysis
+# Paystack payments (handled via httpx — no extra package needed)
+# Email (Mailgun via httpx, SMTP via stdlib smtplib — no extra package needed)
+# Uncomment below for async SMTP if you prefer it over stdlib:
+# aiosmtplib==3.0.1

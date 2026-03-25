@@ -831,7 +831,7 @@ const CoursesPage = (() => {
             </p>
             ${result.certificate_number ? `
             <div style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.4);
-                        border-radius:.75rem;padding:1rem;margin-bottom:1.5rem;">
+                        border-radius:.75rem;padding:1rem;margin-bottom:1.25rem;">
                 <p style="color:#a78bfa;font-size:.72rem;font-weight:700;
                            text-transform:uppercase;letter-spacing:.06em;margin:0 0 .35rem;">
                     Certificate Number
@@ -839,7 +839,26 @@ const CoursesPage = (() => {
                 <p style="color:white;font-family:monospace;font-size:.9rem;margin:0;">
                     ${result.certificate_number}
                 </p>
-            </div>` : ''}
+            </div>
+
+            <!-- Share buttons -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem;">
+                ${result.linkedin_share_url ? `
+                <a href="${result.linkedin_share_url}" target="_blank" rel="noopener"
+                   style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+                          padding:.65rem 1rem;border-radius:.5rem;font-weight:700;font-size:.8rem;
+                          background:#0a66c2;color:white;text-decoration:none;">
+                    <i class="fab fa-linkedin"></i> Add to LinkedIn
+                </a>` : ''}
+                <button onclick="navigator.share ? navigator.share({title:'Pipways Certificate',text:'${result.share_message || 'I earned a certificate on Pipways Trading Academy! 🎓'}',url:location.origin+'/academy.html'}) : navigator.clipboard.writeText('${result.share_message || ''}').then(()=>alert('Copied!'))"
+                    style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+                           padding:.65rem 1rem;border-radius:.5rem;font-weight:700;font-size:.8rem;
+                           background:#1f2937;color:#d1d5db;border:1px solid #374151;cursor:pointer;">
+                    <i class="fas fa-share-alt"></i> Share
+                </button>
+            </div>
+            ` : ''}
+
             <button onclick="document.getElementById('cert-modal').remove();CoursesPage.render()"
                     style="padding:.75rem 2rem;border-radius:.5rem;font-weight:700;
                            background:#7c3aed;color:white;border:none;cursor:pointer;

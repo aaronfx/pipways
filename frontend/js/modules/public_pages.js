@@ -145,12 +145,25 @@ const PublicPages = (() => {
     // ── WEBINARS ─────────────────────────────────────────────────────────────
     async function webinars(containerId = 'webinars-container', ctrl = null) {
         const c = el(containerId); if (!c) return;
-        c.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
+        c.innerHTML = '<div style="text-align:center;padding:3rem;color:#6b7280;"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
+
         try {
             const data = await req('/webinars/upcoming?upcoming=true', ctrl);
             const list = Array.isArray(data) ? data : (data.webinars || []);
 
-            if (!list.length) {
+            // Split into upcoming and completed
+            const upcoming  = list.filter(w => !w.is_completed);
+            const completed = list.filter(w => w.is_completed);
+
+            // Get user tier for gating recordings
+            let userTier = 'free';
+            try {
+                const uRaw = localStorage.getItem('pipways_user');
+                if (uRaw) userTier = (JSON.parse(uRaw).subscription_tier || 'free');
+            } catch(_) {}
+            const isPro = userTier === 'pro' || userTier === 'enterprise';
+
+            if (!upcoming.length && !completed.length) {
                 c.innerHTML =
                     '<div style="text-align:center;padding:3.5rem 1rem;">'
                     + '<div style="width:60px;height:60px;border-radius:50%;border:2px dashed #374151;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;background:#0d1117;">'
@@ -158,115 +171,244 @@ const PublicPages = (() => {
                     + '<p style="font-size:.9rem;font-weight:600;color:#6b7280;margin-bottom:.35rem;">No webinars scheduled yet</p>'
                     + '<p style="font-size:.78rem;color:#4b5563;margin-bottom:1.25rem;">Live sessions with expert traders are coming soon.</p>'
                     + '<button onclick="PublicPages._webinarNotify(this)" '
-                    + 'style="background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.3);padding:.5rem 1.25rem;border-radius:.5rem;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .15s;">'
-                    + '<i class="fas fa-bell mr-1.5"></i>Notify me when one is scheduled</button>'
+                    + 'style="background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.3);padding:.5rem 1.25rem;border-radius:.5rem;font-size:.82rem;font-weight:600;cursor:pointer;">'
+                    + '<i class="fas fa-bell" style="margin-right:.4rem;"></i>Notify me when one is scheduled</button>'
                     + '</div>';
                 return;
             }
 
-            c.innerHTML = list.map(function(w) {
+            // ── Countdown to next upcoming webinar ────────────────────────────
+            let countdownBanner = '';
+            const nextW = upcoming[0];
+            if (nextW && nextW.scheduled_at) {
+                const nextDate = new Date(nextW.scheduled_at);
+                const diffMs   = nextDate - Date.now();
+                if (diffMs > 0) {
+                    const days  = Math.floor(diffMs / 86400000);
+                    const hrs   = Math.floor((diffMs % 86400000) / 3600000);
+                    const mins  = Math.floor((diffMs % 3600000) / 60000);
+                    const secs  = Math.floor((diffMs % 60000) / 1000);
+                    const parts = [];
+                    if (days)  parts.push('<span id="wcd-d">' + days  + '</span><small>d</small>');
+                    if (hrs)   parts.push('<span id="wcd-h">' + hrs   + '</span><small>h</small>');
+                    if (mins)  parts.push('<span id="wcd-m">' + mins  + '</span><small>m</small>');
+                               parts.push('<span id="wcd-s">' + secs  + '</span><small>s</small>');
+
+                    countdownBanner =
+                        '<div style="background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(219,39,119,.1));'
+                        + 'border:1px solid rgba(124,58,237,.3);border-radius:.85rem;padding:1rem 1.25rem;'
+                        + 'display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">'
+                        + '<div style="display:flex;align-items:center;gap:.75rem;">'
+                        +   '<div style="width:36px;height:36px;border-radius:50%;background:rgba(124,58,237,.2);display:flex;align-items:center;justify-content:center;">'
+                        +     '<i class="fas fa-calendar-alt" style="color:#a78bfa;font-size:.9rem;"></i></div>'
+                        +   '<div>'
+                        +     '<div style="font-size:.7rem;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;">Next Session</div>'
+                        +     '<div style="font-weight:700;color:white;font-size:.9rem;">' + (nextW.title || '') + '</div>'
+                        +   '</div>'
+                        + '</div>'
+                        + '<div id="pw-webinar-countdown" style="display:flex;align-items:center;gap:.4rem;font-size:1.1rem;font-weight:800;color:#a78bfa;font-variant-numeric:tabular-nums;">'
+                        +   parts.join('<span style="color:#374151;margin:0 .1rem;">:</span>')
+                        + '</div>'
+                        + '</div>';
+
+                    // Live tick
+                    setTimeout(function tick() {
+                        const cd = document.getElementById('pw-webinar-countdown');
+                        if (!cd) return;
+                        const diff = new Date(nextW.scheduled_at) - Date.now();
+                        if (diff <= 0) { cd.innerHTML = '<span style="color:#34d399;">Live Now!</span>'; return; }
+                        const d2 = Math.floor(diff/86400000);
+                        const h2 = Math.floor((diff%86400000)/3600000);
+                        const m2 = Math.floor((diff%3600000)/60000);
+                        const s2 = Math.floor((diff%60000)/1000);
+                        const p2 = [];
+                        if (d2) p2.push(d2+'<small>d</small>');
+                        if (h2) p2.push(h2+'<small>h</small>');
+                        if (m2) p2.push(m2+'<small>m</small>');
+                              p2.push(s2+'<small>s</small>');
+                        cd.innerHTML = p2.join('<span style="color:#374151;margin:0 .1rem;">:</span>');
+                        setTimeout(tick, 1000);
+                    }, 1000);
+                }
+            }
+
+            // ── Card builder ──────────────────────────────────────────────────
+            function buildCard(w, isCompleted) {
                 const d = w.scheduled_at ? new Date(w.scheduled_at) : null;
+                const isLive = w.status === 'live';
 
                 // Status badge
-                const isLive = w.status === 'live';
-                const statusStyle = isLive
-                    ? 'background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);'
-                    : 'background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3);';
-                const statusLabel = isLive ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;margin-right:.4rem;animation:pulse-dot 1.5s infinite;"></span>Live Now'
-                                           : 'Upcoming';
-
-                // Timezone-aware time display (user's local timezone)
-                let timeStr = '';
-                let tzStr   = '';
-                if (d) {
-                    timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                    tzStr   = Intl.DateTimeFormat().resolvedOptions().timeZone
-                                   .replace('_',' ').split('/').pop();
+                let statusHtml;
+                if (isLive) {
+                    statusHtml = '<span style="font-size:.7rem;font-weight:700;padding:.2rem .65rem;border-radius:9999px;'
+                        + 'background:rgba(239,68,68,.2);color:#f87171;border:1px solid rgba(239,68,68,.4);">'
+                        + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;margin-right:.4rem;animation:pulse-dot 1.5s infinite;"></span>Live Now</span>';
+                } else if (isCompleted) {
+                    statusHtml = '<span style="font-size:.7rem;font-weight:700;padding:.2rem .65rem;border-radius:9999px;'
+                        + 'background:rgba(107,114,128,.15);color:#9ca3af;border:1px solid rgba(107,114,128,.3);">✓ Completed</span>';
+                } else {
+                    statusHtml = '<span style="font-size:.7rem;font-weight:700;padding:.2rem .65rem;border-radius:9999px;'
+                        + 'background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3);">Upcoming</span>';
                 }
 
-                // Countdown (only show if within 48 hrs and not live)
-                let countdown = '';
-                if (d && !isLive) {
-                    const diffMs  = d - Date.now();
-                    const diffMin = Math.floor(diffMs / 60000);
-                    if (diffMin > 0 && diffMin <= 2880) {
-                        const hrs  = Math.floor(diffMin / 60);
-                        const mins = diffMin % 60;
-                        const label = hrs > 0 ? 'Starts in ' + hrs + 'h ' + (mins > 0 ? mins + 'm' : '') : 'Starts in ' + mins + 'm';
-                        countdown = '<span style="font-size:.72rem;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);padding:.15rem .55rem;border-radius:9999px;margin-left:.5rem;">'
-                                  + '<i class="fas fa-clock" style="margin-right:.3rem;"></i>' + label + '</span>';
-                    }
-                }
-
-                // Calendar add link (Google Calendar)
-                let calLink = '';
-                if (d && !isLive) {
-                    const fmt = dt => dt.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
-                    const endD = new Date(d.getTime() + (w.duration_minutes || 60) * 60000);
-                    const params = new URLSearchParams({
-                        action: 'TEMPLATE',
-                        text:   w.title,
-                        dates:  fmt(d) + '/' + fmt(endD),
-                        details: (w.description || '') + (w.meeting_link ? '\n\nJoin: ' + w.meeting_link : ''),
-                    });
-                    calLink = '<a href="https://calendar.google.com/calendar/render?' + params.toString()
-                            + '" target="_blank" rel="noopener" '
-                            + 'style="display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;color:#6b7280;border:1px solid #374151;padding:.3rem .75rem;border-radius:.4rem;text-decoration:none;transition:all .15s;margin-left:.5rem;"'
-                            + ' onmouseover="this.style.color=\'#a78bfa\'" onmouseout="this.style.color=\'#6b7280\'">'
-                            + '<i class="fas fa-calendar-plus" style="font-size:.7rem;"></i>Add to calendar</a>';
-                }
+                // Thumbnail
+                const thumb = w.thumbnail
+                    ? '<div style="width:120px;flex-shrink:0;overflow:hidden;border-radius:.75rem 0 0 .75rem;">'
+                      + '<img src="' + w.thumbnail + '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none'">'
+                      + '</div>'
+                    : '<div style="width:6px;flex-shrink:0;background:linear-gradient(180deg,'
+                      + (isCompleted ? '#374151,#1f2937' : isLive ? '#ef4444,#dc2626' : '#7c3aed,#6d28d9')
+                      + ');border-radius:.75rem 0 0 .75rem;"></div>';
 
                 // Date block
                 const dateBlock = d
-                    ? '<div style="min-width:80px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.25rem .75rem;background:rgba(107,114,128,.1);border-right:1px solid #374151;border-radius:.75rem 0 0 .75rem;">'
-                      + '<div style="font-size:2rem;font-weight:900;color:#fbbf24;line-height:1;">' + d.getDate() + '</div>'
-                      + '<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-top:.15rem;">' + d.toLocaleString('default',{month:'short'}) + '</div>'
-                      + '<div style="font-size:.72rem;color:#6b7280;margin-top:.25rem;">' + timeStr + '</div>'
-                      + (tzStr ? '<div style="font-size:.65rem;color:#4b5563;">' + tzStr + '</div>' : '')
+                    ? '<div style="min-width:72px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem .6rem;background:rgba(107,114,128,.08);border-right:1px solid #1f2937;">'
+                      + '<div style="font-size:1.8rem;font-weight:900;line-height:1;color:' + (isCompleted ? '#6b7280' : '#fbbf24') + ';">' + d.getDate() + '</div>'
+                      + '<div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-top:.1rem;">' + d.toLocaleString('default',{month:'short'}) + '</div>'
+                      + '<div style="font-size:.68rem;color:#6b7280;margin-top:.2rem;">' + d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + '</div>'
+                      + '<div style="font-size:.6rem;color:#4b5563;">Lagos</div>'
+                      + '</div>' : '';
+
+                // Tags
+                const tagList = (w.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+                const tagsHtml = tagList.length
+                    ? '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.6rem;">'
+                      + tagList.map(t =>
+                          '<span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;'
+                          + 'background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.2);'
+                          + 'padding:.15rem .5rem;border-radius:9999px;">' + t + '</span>'
+                        ).join('')
                       + '</div>'
+                    : '';
+
+                // Speaker bio (collapsible)
+                const bioId = 'bio-' + w.id;
+                const speakerHtml = w.speaker_bio
+                    ? '<div style="margin-top:.5rem;">'
+                      + '<button onclick="var b=document.getElementById('' + bioId + '');b.style.display=b.style.display==='none'?'block':'none'" '
+                      + 'style="font-size:.72rem;color:#a78bfa;background:none;border:none;cursor:pointer;padding:0;">'
+                      + '<i class="fas fa-user-tie" style="margin-right:.35rem;"></i>About the speaker ▾</button>'
+                      + '<div id="' + bioId + '" style="display:none;margin-top:.4rem;padding:.6rem .75rem;background:rgba(124,58,237,.06);'
+                      + 'border-left:3px solid rgba(124,58,237,.3);border-radius:0 .4rem .4rem 0;font-size:.78rem;color:#9ca3af;line-height:1.5;">'
+                      + w.speaker_bio + '</div></div>'
                     : '';
 
                 // Meta chips
                 const metaChips = [
-                    w.presenter    ? '<span><i class="fas fa-user" style="margin-right:.35rem;"></i>' + w.presenter + '</span>' : '',
-                    w.duration_minutes ? '<span><i class="fas fa-clock" style="margin-right:.35rem;"></i>' + w.duration_minutes + ' mins</span>' : '',
-                    w.max_attendees    ? '<span><i class="fas fa-users" style="margin-right:.35rem;"></i>' + w.max_attendees + ' seats</span>' : '',
+                    w.presenter ? '<span><i class="fas fa-user" style="margin-right:.3rem;"></i>' + w.presenter + '</span>' : '',
+                    w.duration_minutes ? '<span><i class="fas fa-clock" style="margin-right:.3rem;"></i>' + w.duration_minutes + ' mins</span>' : '',
+                    (!isCompleted && w.max_attendees) ? '<span><i class="fas fa-users" style="margin-right:.3rem;"></i>' + w.max_attendees + ' seats</span>' : '',
                 ].filter(Boolean).join('');
 
-                // CTA
-                const cta = w.meeting_link
-                    ? '<a href="' + w.meeting_link + '" target="_blank" rel="noopener" '
-                      + 'style="display:inline-flex;align-items:center;gap:.5rem;padding:.55rem 1.25rem;border-radius:.5rem;font-size:.85rem;font-weight:600;text-decoration:none;background:rgba(124,58,237,.25);color:#c4b5fd;border:1px solid rgba(124,58,237,.4);transition:all .15s;"'
-                      + ' onmouseover="this.style.background=\'rgba(124,58,237,.4)\'" onmouseout="this.style.background=\'rgba(124,58,237,.25)\'">'
-                      + '<i class="fas fa-video" style="font-size:.8rem;"></i> Join Meeting \u2192</a>'
-                    : '<span style="display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;color:#6b7280;border:1px solid #374151;padding:.4rem .9rem;border-radius:.5rem;">'
-                      + '<i class="fas fa-hourglass-half" style="font-size:.75rem;"></i>Link coming soon</span>';
+                // CTA buttons
+                let cta = '';
+                if (isCompleted) {
+                    if (isPro && w.recording_url) {
+                        cta = '<a href="' + w.recording_url + '" target="_blank" rel="noopener" '
+                            + 'style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.1rem;border-radius:.5rem;font-size:.82rem;font-weight:600;text-decoration:none;'
+                            + 'background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3);">'
+                            + '<i class="fas fa-play-circle" style="font-size:.8rem;"></i> Watch Recording</a>';
+                    } else if (!isPro) {
+                        cta = '<button onclick="window.PaymentsPage ? PaymentsPage.showUpgradeModal('Webinar Recordings') : window.location.href='/pricing.html'" '
+                            + 'style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.1rem;border-radius:.5rem;font-size:.82rem;font-weight:600;cursor:pointer;'
+                            + 'background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.3);">'
+                            + '<i class="fas fa-lock" style="font-size:.75rem;"></i> Pro — Watch Recording</button>';
+                    } else {
+                        cta = '<span style="font-size:.78rem;color:#4b5563;font-style:italic;">Recording not available</span>';
+                    }
+                } else if (isLive) {
+                    cta = '<a href="' + (w.meeting_link || '#') + '" target="_blank" rel="noopener" '
+                        + 'style="display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.25rem;border-radius:.5rem;font-size:.85rem;font-weight:700;text-decoration:none;'
+                        + 'background:rgba(239,68,68,.25);color:#f87171;border:1px solid rgba(239,68,68,.4);animation:pulse-dot 2s infinite;">'
+                        + '<i class="fas fa-circle" style="font-size:.6rem;"></i> Join Live Now</a>';
+                } else {
+                    cta = w.meeting_link
+                        ? '<a href="' + w.meeting_link + '" target="_blank" rel="noopener" '
+                          + 'style="display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.25rem;border-radius:.5rem;font-size:.82rem;font-weight:600;text-decoration:none;'
+                          + 'background:rgba(124,58,237,.2);color:#c4b5fd;border:1px solid rgba(124,58,237,.35);">'
+                          + '<i class="fas fa-video" style="font-size:.75rem;"></i> Join Meeting →</a>'
+                        : '<span style="font-size:.78rem;color:#6b7280;border:1px solid #374151;padding:.4rem .9rem;border-radius:.5rem;">'
+                          + '<i class="fas fa-hourglass-half" style="margin-right:.35rem;"></i>Link coming soon</span>';
+                }
 
-                return '<div style="background:#111827;border:1px solid #1f2937;border-radius:.85rem;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;display:flex;flex-direction:row;"'
-                     + ' onmouseover="this.style.borderColor=\'#374151\';this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 24px -6px rgba(0,0,0,.5)\'"'
-                     + ' onmouseout="this.style.borderColor=\'#1f2937\';this.style.transform=\'\';this.style.boxShadow=\'\'">'
+                // Notify button (upcoming only, not live)
+                const notifyBtn = (!isCompleted && !isLive)
+                    ? ' <button onclick="PublicPages._webinarNotify(this,' + w.id + ')" '
+                      + 'style="display:inline-flex;align-items:center;gap:.35rem;padding:.5rem .9rem;border-radius:.5rem;font-size:.75rem;font-weight:600;cursor:pointer;'
+                      + 'background:rgba(251,191,36,.08);color:#fbbf24;border:1px solid rgba(251,191,36,.2);">'
+                      + '<i class="fas fa-bell" style="font-size:.7rem;"></i>Remind me</button>'
+                    : '';
+
+                // Calendar link (upcoming only)
+                let calLink = '';
+                if (!isCompleted && d) {
+                    const fmt = dt => dt.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+                    const endD = new Date(d.getTime() + (w.duration_minutes||60)*60000);
+                    const params = new URLSearchParams({
+                        action:'TEMPLATE', text:w.title,
+                        dates:fmt(d)+'/'+fmt(endD),
+                        details:(w.description||'')+(w.meeting_link?'
+
+Join: '+w.meeting_link:''),
+                    });
+                    calLink = ' <a href="https://calendar.google.com/calendar/render?' + params.toString()
+                        + '" target="_blank" rel="noopener" '
+                        + 'style="display:inline-flex;align-items:center;gap:.35rem;font-size:.75rem;color:#6b7280;border:1px solid #374151;padding:.4rem .75rem;border-radius:.5rem;text-decoration:none;">'
+                        + '<i class="fas fa-calendar-plus" style="font-size:.7rem;"></i>Add to calendar</a>';
+                }
+
+                return '<div style="background:#111827;border:1px solid ' + (isCompleted ? '#1f2937' : '#1f2937') + ';border-radius:.85rem;overflow:hidden;'
+                     + 'display:flex;flex-direction:row;opacity:' + (isCompleted ? '.85' : '1') + ';margin-bottom:.1rem;"'
+                     + ' onmouseover="this.style.borderColor='#374151';this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px -6px rgba(0,0,0,.5)'"'
+                     + ' onmouseout="this.style.borderColor='#1f2937';this.style.transform='';this.style.boxShadow=''">>'
+                     + thumb
                      + dateBlock
-                     + '<div style="flex:1;padding:1.25rem;">'
-                     +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.5rem;">'
-                     +     '<h4 style="font-weight:700;color:white;font-size:1rem;line-height:1.35;margin:0;">' + (w.title || '') + '</h4>'
-                     +     '<span style="font-size:.7rem;font-weight:700;padding:.2rem .65rem;border-radius:9999px;flex-shrink:0;' + statusStyle + '">' + statusLabel + '</span>'
+                     + '<div style="flex:1;padding:1.1rem 1.25rem;">'
+                     +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.4rem;">'
+                     +     '<h4 style="font-weight:700;color:' + (isCompleted ? '#9ca3af' : 'white') + ';font-size:.95rem;line-height:1.3;margin:0;">' + (w.title||'') + '</h4>'
+                     +     statusHtml
                      +   '</div>'
-                     +   (w.description ? '<p style="font-size:.83rem;color:#9ca3af;margin:0 0 .75rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + w.description + '</p>' : '')
-                     +   (metaChips ? '<div style="display:flex;flex-wrap:wrap;gap:.65rem;font-size:.75rem;color:#6b7280;margin-bottom:.9rem;">' + metaChips + '</div>' : '')
-                     +   '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;">'
-                     +     cta
-                     +     countdown
-                     +     calLink
+                     +   tagsHtml
+                     +   (w.description ? '<p style="font-size:.8rem;color:#9ca3af;margin:0 0 .6rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + w.description + '</p>' : '')
+                     +   (metaChips ? '<div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.73rem;color:#6b7280;margin-bottom:.7rem;">' + metaChips + '</div>' : '')
+                     +   speakerHtml
+                     +   '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin-top:.75rem;">'
+                     +     cta + notifyBtn + calLink
                      +   '</div>'
                      + '</div>'
                      + '</div>';
-            }).join('');
+            }
 
-            // Start live countdown tickers for any webinar within 48 hrs
-            _startCountdownTickers(c);
+            // ── Build full HTML ───────────────────────────────────────────────
+            let html = countdownBanner;
+
+            // Upcoming section
+            if (upcoming.length) {
+                html += '<div style="margin-bottom:1.5rem;">'
+                     +  '<h3 style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;">'
+                     +    '<i class="fas fa-calendar-alt" style="color:#a78bfa;"></i> Upcoming Sessions'
+                     +  '</h3>'
+                     +  '<div style="display:flex;flex-direction:column;gap:.75rem;">'
+                     +  upcoming.map(w => buildCard(w, false)).join('')
+                     +  '</div></div>';
+            }
+
+            // Completed / Recordings section
+            if (completed.length) {
+                html += '<div>'
+                     +  '<h3 style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;">'
+                     +    '<i class="fas fa-play-circle" style="color:#6b7280;"></i> Past Sessions'
+                     +    (isPro ? '' : ' <span style="font-size:.65rem;background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.25);padding:.1rem .5rem;border-radius:9999px;">Pro: recordings</span>')
+                     +  '</h3>'
+                     +  '<div style="display:flex;flex-direction:column;gap:.75rem;">'
+                     +  completed.map(w => buildCard(w, true)).join('')
+                     +  '</div></div>';
+            }
+
+            c.innerHTML = html;
 
         } catch (e) {
-            c.innerHTML = '<div class="text-center py-10 text-gray-500"><p class="text-sm text-red-400">Could not load webinars: ' + e.message + '</p></div>';
+            c.innerHTML = '<div style="text-align:center;padding:3rem;color:#6b7280;"><p style="color:#f87171;font-size:.9rem;">Could not load webinars: ' + e.message + '</p></div>';
         }
     }
 
@@ -745,8 +887,13 @@ const PublicPages = (() => {
 window.PublicPages = PublicPages;
 
 // Notify-me handler — attached after export so it can reference window.PublicPages
-window.PublicPages._webinarNotify = function(btn) {
-    try { localStorage.setItem('pw_webinar_notify', '1'); } catch(_) {}
+window.PublicPages._webinarNotify = function(btn, webinarId) {
+    try {
+        const stored = JSON.parse(localStorage.getItem('pw_webinar_reminders') || '[]');
+        if (webinarId && !stored.includes(webinarId)) stored.push(webinarId);
+        localStorage.setItem('pw_webinar_reminders', JSON.stringify(stored));
+        localStorage.setItem('pw_webinar_notify', '1');
+    } catch(_) {}
     btn.textContent = "\u2713 You'll be notified";
     btn.style.background = 'rgba(16,185,129,.15)';
     btn.style.color = '#34d399';

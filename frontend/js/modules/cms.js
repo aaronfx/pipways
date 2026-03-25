@@ -1894,51 +1894,47 @@ const CMSPage = {
         const g=(k,fb='')=>this._e(s[k]!=null?s[k]:fb);
 
         const features=[
-            { key:'signals',        label:'Trading Signals',  icon:'fa-satellite-dish', color:'#a78bfa',
-              desc:'Live trading signals from the admin',
+            // ── Keys match subscriptions.py FEATURE_CONFIG exactly ──
+            { key:'chart_analysis', label:'Chart Analysis',      icon:'fa-chart-bar',       color:'#60a5fa',
+              desc:'AI-powered chart analysis — uploads per day',
               fields:[
-                { k:'signals_free_limit',  label:'Free tier — max visible signals',  type:'number', default:'3' },
-                { k:'signals_pro_limit',   label:'Pro tier — max visible signals',   type:'number', default:'999' },
+                { k:'chart_free_daily',       label:'Free tier — analyses per day',     type:'number', default:'2' },
+                { k:'chart_pro_daily',        label:'Pro tier — analyses per day',      type:'number', default:'50' },
             ]},
-            { key:'chart_analysis', label:'Chart Analysis',   icon:'fa-chart-bar',      color:'#60a5fa',
-              desc:'AI-powered chart analysis (uploads per day)',
+            { key:'performance',    label:'Performance Analytics', icon:'fa-chart-line',    color:'#f59e0b',
+              desc:'Trade journal uploads — per month',
               fields:[
-                { k:'chart_free_daily',    label:'Free tier — analyses per day',    type:'number', default:'2' },
-                { k:'chart_pro_daily',     label:'Pro tier — analyses per day',     type:'number', default:'50' },
+                { k:'journal_free_imports',   label:'Free tier — uploads per month',    type:'number', default:'1' },
+                { k:'journal_pro_imports',    label:'Pro tier — uploads per month',     type:'number', default:'999' },
             ]},
-            { key:'ai_mentor',      label:'AI Mentor',        icon:'fa-robot',          color:'#f472b6',
+            { key:'ai_mentor',      label:'AI Mentor',             icon:'fa-robot',          color:'#f472b6',
               desc:'AI trading coach — questions per day',
               fields:[
-                { k:'mentor_free_daily',   label:'Free tier — questions per day',   type:'number', default:'5' },
-                { k:'mentor_pro_daily',    label:'Pro tier — questions per day',    type:'number', default:'200' },
+                { k:'mentor_free_daily',      label:'Free tier — questions per day',    type:'number', default:'5' },
+                { k:'mentor_pro_daily',       label:'Pro tier — questions per day',     type:'number', default:'200' },
             ]},
-            { key:'ai_stock',       label:'AI Stock Research', icon:'fa-chart-pie',     color:'#34d399',
+            { key:'ai_stock',       label:'AI Stock Research',     icon:'fa-chart-pie',      color:'#34d399',
               desc:'Stock research queries per day',
               fields:[
-                { k:'stock_free_daily',    label:'Free tier — queries per day',     type:'number', default:'3' },
-                { k:'stock_pro_daily',     label:'Pro tier — queries per day',      type:'number', default:'100' },
+                { k:'stock_free_daily',       label:'Free tier — queries per day',      type:'number', default:'3' },
+                { k:'stock_pro_daily',        label:'Pro tier — queries per day',       type:'number', default:'100' },
             ]},
-            { key:'journal',        label:'Trading Journal',  icon:'fa-book-open',      color:'#fbbf24',
-              desc:'Trade imports per month',
+            { key:'signals',        label:'Trading Signals',       icon:'fa-satellite-dish', color:'#a78bfa',
+              desc:'Max visible signals per tier',
               fields:[
-                { k:'journal_free_imports',label:'Free tier — imports per month',   type:'number', default:'1' },
-                { k:'journal_pro_imports', label:'Pro tier — imports per month',    type:'number', default:'999' },
+                { k:'signals_free_limit',     label:'Free tier — max visible signals',  type:'number', default:'3' },
+                { k:'signals_pro_limit',      label:'Pro tier — max visible signals',   type:'number', default:'999' },
             ]},
-            { key:'courses',        label:'Courses / LMS',    icon:'fa-graduation-cap', color:'#818cf8',
-              desc:'Access to paid courses',
-              fields:[
-                { k:'courses_free_access', label:'Free tier — max free courses',   type:'number', default:'2' },
-            ]},
-            { key:'webinars',       label:'Webinars',         icon:'fa-video',          color:'#fb923c',
+            { key:'webinars',       label:'Webinars',               icon:'fa-video',         color:'#fb923c',
               desc:'Webinar registrations per month',
               fields:[
-                { k:'webinar_free_limit',  label:'Free tier — registrations/month', type:'number', default:'1' },
-                { k:'webinar_pro_limit',   label:'Pro tier — registrations/month',  type:'number', default:'999' },
+                { k:'webinar_free_limit',     label:'Free tier — registrations/month',  type:'number', default:'1' },
+                { k:'webinar_pro_limit',      label:'Pro tier — registrations/month',   type:'number', default:'999' },
             ]},
-            { key:'blog',           label:'Blog',             icon:'fa-newspaper',      color:'#2dd4bf',
-              desc:'Articles visible to each tier',
+            { key:'blog',           label:'Blog',                   icon:'fa-newspaper',     color:'#2dd4bf',
+              desc:'Articles visible to free tier',
               fields:[
-                { k:'blog_free_limit',     label:'Free tier — articles visible',   type:'number', default:'10' },
+                { k:'blog_free_limit',        label:'Free tier — articles visible',     type:'number', default:'10' },
             ]},
         ];
 
@@ -1985,10 +1981,9 @@ const CMSPage = {
             <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 <i class="fas fa-info-circle mr-2 text-blue-400"></i>How these limits work
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-500">
-                <div><span class="text-gray-300 font-semibold block mb-1">Free Tier</span>Limited access — drives upgrade to Pro</div>
-                <div><span class="text-gray-300 font-semibold block mb-1">Pro Tier</span>Full access within pro limits</div>
-                <div><span class="text-gray-300 font-semibold block mb-1">Enterprise</span>Unlimited access on all features</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-500">
+                <div><span class="text-gray-300 font-semibold block mb-1">Free Tier</span>Limited daily/monthly access — drives upgrade to Pro</div>
+                <div><span class="text-gray-300 font-semibold block mb-1">Pro Tier — ₦15,000/month</span>Full access within pro limits. Set 999 for unlimited.</div>
             </div>
             <div class="text-xs text-gray-600 mt-3">
                 <i class="fas fa-code mr-1"></i>

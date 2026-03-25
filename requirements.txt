@@ -1,78 +1,56 @@
-services:
-  - type: web
-    name: pipways-api
-    runtime: python
-    plan: standard
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
-    autoDeploy: true
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
+# FastAPI and Server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+httpx
+websockets>=12.0
 
-      # ── Database ───────────────────────────────────────────────────────────
-      - key: DATABASE_URL
-        fromDatabase:
-          name: pipways-db
-          property: connectionString
+# Database
+sqlalchemy==2.0.25
+databases[postgresql]==0.9.0
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+alembic==1.13.1
 
-      # ── Security ───────────────────────────────────────────────────────────
-      - key: SECRET_KEY
-        generateValue: true
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
 
-      # ── App URL (required by Paystack callback + email links) ──────────────
-      - key: APP_BASE_URL
-        value: "https://pipways.com"   # ← change to your real domain
+# Validation & Serialization
+pydantic[email]==2.5.3
+email-validator==2.1.0.post1
 
-      # ── AI / OpenRouter ────────────────────────────────────────────────────
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: OPENROUTER_MODEL
-        value: "anthropic/claude-3.5-sonnet"
-      - key: OPENROUTER_VISION_MODEL
-        value: "anthropic/claude-3.5-sonnet"
-      - key: ANTHROPIC_API_KEY
-        sync: false
+# Rate Limiting
+slowapi==0.1.9
+redis==5.0.1
 
-      # ── Paystack (Nigerian payments) ───────────────────────────────────────
-      # Get these from https://dashboard.paystack.com/#/settings/developers
-      - key: PAYSTACK_SECRET_KEY
-        sync: false   # paste sk_live_xxx in Render dashboard
-      - key: PAYSTACK_PUBLIC_KEY
-        sync: false   # paste pk_live_xxx in Render dashboard
+# Data Processing
+pandas==2.1.4
+numpy==1.26.3
+Pillow==10.2.0
+openpyxl==3.1.2
+xlsxwriter==3.1.9
 
-      # ── Email (Mailgun recommended for Nigeria) ────────────────────────────
-      # Sign up at https://mailgun.com — free tier = 1,000 emails/month
-      - key: EMAIL_PROVIDER
-        value: "mailgun"              # or "smtp"
-      - key: MAILGUN_API_KEY
-        sync: false                   # paste key in Render dashboard
-      - key: MAILGUN_DOMAIN
-        value: "mg.pipways.com"       # ← your Mailgun sending domain
-      - key: EMAIL_FROM_NAME
-        value: "Pipways"
-      - key: EMAIL_FROM_ADDRESS
-        value: "noreply@pipways.com"  # ← must match your Mailgun domain
+# Payments — Paystack handled via httpx (no extra package needed)
+# stripe removed — replaced by Paystack
 
-      # ── SMTP fallback (if not using Mailgun) ──────────────────────────────
-      # Uncomment and fill in if EMAIL_PROVIDER=smtp
-      # - key: SMTP_HOST
-      #   value: "smtp.gmail.com"
-      # - key: SMTP_PORT
-      #   value: "587"
-      # - key: SMTP_USER
-      #   sync: false
-      # - key: SMTP_PASSWORD
-      #   sync: false
+# Background tasks
+celery==5.3.6
 
-      # ── CORS ───────────────────────────────────────────────────────────────
-      - key: ALLOWED_ORIGINS
-        value: "*"
+# Utilities
+python-dotenv==1.0.0
+aiofiles==23.2.1
+python-slugify==8.0.1
 
-    healthCheckPath: /health
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.21.1
 
-databases:
-  - name: pipways-db
-    databaseName: pipways
-    plan: standard
-    ipAllowList: []
+# Multi-format Trade Journal Parser
+beautifulsoup4==4.12.3
+pdfplumber==0.10.4
+pytesseract==0.3.10
+
+# AI
+anthropic>=0.21.0

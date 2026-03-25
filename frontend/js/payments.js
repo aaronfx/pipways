@@ -1,0 +1,278 @@
+/**
+ * payments.js — Paystack Integration for Pipways
+ *
+ * Loads plans from /payments/plans, shows a pricing modal,
+ * then uses Paystack Inline to collect payment without leaving the page.
+ *
+ * Dependencies (add to dashboard.html before this file):
+ *   <script src="https://js.paystack.co/v1/inline.js"></script>
+ *
+ * Usage:
+ *   PaymentsPage.showUpgradeModal()          — from any 402 error handler
+ *   PaymentsPage.render(container)           — full pricing page
+ */
+
+const PaymentsPage = {
+
+    _plans: null,
+    _publicKey: null,
+
+    // ── Load config from backend ────────────────────────────────────────────
+    async _loadConfig() {
+        if (this._plans && this._publicKey) return;
+        try {
+            const config = await API.request('/payments/config');
+            this._publicKey = config.public_key;
+            const full = await API.request('/payments/plans');
+            this._plans = full;
+        } catch (e) {
+            console.error('[Payments] Failed to load config:', e);
+        }
+    },
+
+    // ── Full pricing page ───────────────────────────────────────────────────
+    async render(container) {
+        container.innerHTML = `
+            <div class="page-header">
+                <h1>Upgrade Your Account</h1>
+                <p style="color:#6b7280;">Choose a plan to unlock AI tools, signals, and more</p>
+            </div>
+            <div id="plans-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;margin-top:2rem;">
+                <div style="text-align:center;padding:3rem;color:#9ca3af;">
+                    <i class="fas fa-spinner fa-spin text-2xl"></i>
+                    <p style="margin-top:1rem;">Loading plans…</p>
+                </div>
+            </div>
+        `;
+        await this._loadConfig();
+        this._renderPlanCards(document.getElementById('plans-grid'));
+    },
+
+    _renderPlanCards(container) {
+        if (!this._plans) {
+            container.innerHTML = '<p style="color:#ef4444;">Failed to load plans. Please try again.</p>';
+            return;
+        }
+
+        const user = Store.getUser();
+        const currentTier = user?.subscription_tier || 'free';
+
+        const planOrder = ['pro_monthly', 'pro_annual', 'enterprise_monthly'];
+        const badges = {
+            'pro_annual': { text: 'Best Value', color: '#10b981' },
+            'pro_monthly': { text: 'Most Popular', color: '#3b82f6' },
+        };
+
+        container.innerHTML = planOrder.map(key => {
+            const plan = this._plans[key];
+            if (!plan) return '';
+            const isActive = currentTier === plan.tier;
+            const badge = badges[key];
+
+            return `
+            <div style="background:white;border-radius:1rem;padding:2rem;border:2px solid ${isActive ? '#3b82f6' : '#e5e7eb'};
+                        position:relative;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .2s;"
+                 onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.12)'"
+                 onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'">
+
+                ${badge ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+                    background:${badge.color};color:white;font-size:.75rem;font-weight:700;
+                    padding:.25rem .75rem;border-radius:99px;">${badge.text}</div>` : ''}
+
+                ${isActive ? `<div style="position:absolute;top:-12px;right:1rem;
+                    background:#10b981;color:white;font-size:.75rem;font-weight:700;
+                    padding:.25rem .75rem;border-radius:99px;">✓ Current Plan</div>` : ''}
+
+                <h3 style="font-size:1.25rem;font-weight:700;color:#111827;margin-bottom:.5rem;">
+                    ${plan.name}
+                </h3>
+                <p style="color:#6b7280;font-size:.875rem;margin-bottom:1.5rem;">${plan.description}</p>
+
+                <div style="margin-bottom:1.5rem;">
+                    <span style="font-size:2.25rem;font-weight:800;color:#111827;">
+                        ₦${plan.amount_ngn.toLocaleString()}
+                    </span>
+                    <span style="color:#9ca3af;font-size:.875rem;">
+                        /${plan.interval === 'annually' ? 'year' : 'month'}
+                    </span>
+                </div>
+
+                <ul style="list-style:none;padding:0;margin-bottom:1.5rem;">
+                    ${(plan.features || []).map(f => `
+                        <li style="display:flex;align-items:center;gap:.5rem;padding:.375rem 0;
+                                   font-size:.875rem;color:#374151;border-bottom:1px solid #f3f4f6;">
+                            <i class="fas fa-check" style="color:#10b981;flex-shrink:0;"></i>
+                            ${f}
+                        </li>
+                    `).join('')}
+                </ul>
+
+                ${isActive
+                    ? `<button disabled style="width:100%;padding:.75rem;border-radius:.5rem;
+                          background:#f3f4f6;color:#9ca3af;border:none;font-weight:600;cursor:default;">
+                          Active Plan
+                       </button>`
+                    : `<button onclick="PaymentsPage.startPayment('${key}')"
+                          style="width:100%;padding:.75rem;border-radius:.5rem;
+                                 background:#3b82f6;color:white;border:none;font-weight:700;
+                                 cursor:pointer;font-size:.9rem;transition:background .2s;"
+                          onmouseover="this.style.background='#2563eb'"
+                          onmouseout="this.style.background='#3b82f6'">
+                          Upgrade to ${plan.tier.charAt(0).toUpperCase() + plan.tier.slice(1)}
+                       </button>`
+                }
+            </div>`;
+        }).join('');
+    },
+
+    // ── Quick upgrade modal (shown on 402 errors) ───────────────────────────
+    async showUpgradeModal(featureName = 'this feature') {
+        await this._loadConfig();
+
+        const user = Store.getUser();
+        const currentTier = user?.subscription_tier || 'free';
+
+        // Suggest pro_monthly as default upgrade
+        const suggestedKey = currentTier === 'pro' ? 'enterprise_monthly' : 'pro_monthly';
+        const plan = this._plans?.[suggestedKey];
+
+        UI.showModal(`
+            <div style="text-align:center;padding:1rem 0 1.5rem;">
+                <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
+                <h2 style="font-size:1.4rem;font-weight:700;color:#111827;margin-bottom:.5rem;">
+                    Upgrade to unlock ${featureName}
+                </h2>
+                <p style="color:#6b7280;font-size:.9rem;margin-bottom:1.5rem;">
+                    You've reached your free tier limit.
+                </p>
+
+                ${plan ? `
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:.75rem;
+                            padding:1.25rem;margin-bottom:1.5rem;text-align:left;">
+                    <div style="font-weight:700;color:#111827;">${plan.name}</div>
+                    <div style="font-size:1.5rem;font-weight:800;color:#3b82f6;margin:.25rem 0;">
+                        ₦${plan.amount_ngn?.toLocaleString()}<span style="font-size:.875rem;color:#9ca3af;">/${plan.interval === 'annually' ? 'year' : 'month'}</span>
+                    </div>
+                    <ul style="list-style:none;padding:0;margin:.75rem 0 0;">
+                        ${(plan.features || []).slice(0, 3).map(f => `
+                            <li style="font-size:.8rem;color:#374151;padding:.2rem 0;">
+                                <i class="fas fa-check" style="color:#10b981;margin-right:.4rem;"></i>${f}
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+
+                <button onclick="UI.closeModal(); PaymentsPage.startPayment('${suggestedKey}')"
+                    style="width:100%;padding:.85rem;border-radius:.5rem;background:#3b82f6;
+                           color:white;border:none;font-weight:700;cursor:pointer;font-size:1rem;">
+                    Upgrade Now — ₦${plan.amount_ngn?.toLocaleString()}
+                </button>
+                <button onclick="UI.closeModal()"
+                    style="width:100%;margin-top:.75rem;padding:.7rem;border-radius:.5rem;
+                           background:none;color:#9ca3af;border:1px solid #e5e7eb;cursor:pointer;">
+                    Maybe Later
+                </button>
+                ` : `
+                <button onclick="UI.closeModal(); Router.navigate('/pricing')"
+                    style="width:100%;padding:.85rem;border-radius:.5rem;background:#3b82f6;
+                           color:white;border:none;font-weight:700;cursor:pointer;">
+                    View Plans
+                </button>`}
+            </div>
+        `);
+    },
+
+    // ── Paystack Inline popup ───────────────────────────────────────────────
+    async startPayment(planKey) {
+        await this._loadConfig();
+
+        const user = Store.getUser();
+        if (!user) {
+            UI.showToast('Please log in to upgrade', 'warning');
+            return;
+        }
+
+        if (!this._publicKey) {
+            UI.showToast('Payment system unavailable — contact support', 'error');
+            return;
+        }
+
+        const plan = this._plans?.[planKey];
+        if (!plan) {
+            UI.showToast('Plan not found', 'error');
+            return;
+        }
+
+        // Get a reference from backend (backend stores metadata)
+        let reference;
+        try {
+            const init = await API.request('/payments/initialize', {
+                method: 'POST',
+                body: JSON.stringify({ plan_key: planKey }),
+            });
+            reference = init.reference;
+        } catch (e) {
+            UI.showToast('Could not start payment: ' + e.message, 'error');
+            return;
+        }
+
+        // Paystack Inline popup
+        const handler = PaystackPop.setup({
+            key:       this._publicKey,
+            email:     user.email,
+            amount:    plan.amount,          // kobo
+            currency:  'NGN',
+            ref:       reference,
+            metadata: {
+                user_id:  user.id,
+                plan_key: planKey,
+            },
+            onClose() {
+                UI.showToast('Payment window closed', 'info');
+            },
+            callback: async (response) => {
+                // Verify on backend
+                try {
+                    const result = await API.request(`/payments/verify/${response.reference}`);
+                    UI.showToast(result.message || 'Payment successful!', 'success');
+
+                    // Update local user object with new tier
+                    const updated = { ...user, subscription_tier: result.tier };
+                    localStorage.setItem('pipways_user', JSON.stringify(updated));
+                    Store.state.user = updated;
+
+                    // Redirect to dashboard
+                    setTimeout(() => Router.navigate('/dashboard'), 1500);
+                } catch (err) {
+                    UI.showToast('Payment received but verification failed — contact support', 'warning');
+                }
+            },
+        });
+
+        handler.openIframe();
+    },
+};
+
+window.PaymentsPage = PaymentsPage;
+
+// ── Global 402 handler — intercept all API calls ──────────────────────────
+// Monkey-patch API.request to auto-show upgrade modal on 402
+const _originalRequest = API.request.bind(API);
+API.request = async function(endpoint, options = {}) {
+    try {
+        return await _originalRequest(endpoint, options);
+    } catch (err) {
+        if (err.message && err.message.includes('402')) {
+            const featureMap = {
+                '/ai/mentor': 'AI Mentor',
+                '/ai/chart':  'Chart Analysis',
+                '/ai/performance': 'Performance Analytics',
+                '/api/stock': 'Stock Terminal',
+            };
+            const feature = Object.entries(featureMap).find(([k]) => endpoint.includes(k))?.[1] || 'this feature';
+            PaymentsPage.showUpgradeModal(feature);
+            throw err;
+        }
+        throw err;
+    }
+};

@@ -820,18 +820,10 @@
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;">
                             <div class="space-y-1.5" id="dash-forex-tickers">
-                                <div class="flex justify-between py-1 border-b" style="border-color:#1f2937;">
-                                    <span class="text-xs" style="color:#9ca3af;">EUR/USD</span>
-                                    <span class="text-xs font-semibold" style="color:#34d399;">+0.12%</span>
-                                </div>
-                                <div class="flex justify-between py-1 border-b" style="border-color:#1f2937;">
-                                    <span class="text-xs" style="color:#9ca3af;">GBP/USD</span>
-                                    <span class="text-xs font-semibold" style="color:#f87171;">−0.08%</span>
-                                </div>
-                                <div class="flex justify-between py-1" >
-                                    <span class="text-xs" style="color:#9ca3af;">USD/JPY</span>
-                                    <span class="text-xs font-semibold" style="color:#34d399;">+0.05%</span>
-                                </div>
+                                <!-- Populated by _initTicker() — shimmer until ready -->
+                                <div class="shimmer-line w-full" style="height:18px;border-radius:4px;"></div>
+                                <div class="shimmer-line w-full" style="height:18px;border-radius:4px;"></div>
+                                <div class="shimmer-line w-full" style="height:18px;border-radius:4px;"></div>
                             </div>
                             <div class="mt-3 pt-2.5 border-t flex items-center justify-between" style="border-color:#1f2937;">
                                 <span class="text-xs" style="color:#4b5563;">NY opens in</span>
@@ -1004,55 +996,58 @@
                     </div>
                 </div>
 
-                <!-- Next Step + Blog row -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
-
-                    <!-- Your Next Step — 1/3 -->
-                    <div id="dash-next-step" class="pw-card" style="border-color:rgba(124,58,237,.3);">
-                        <div style="height:2px;border-radius:1px 1px 0 0;background:linear-gradient(90deg,#7c3aed,#6d28d9,rgba(124,58,237,.1));"></div>
-                        <div class="pw-card-body">
-                            <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color:#a78bfa;">Your Next Step</p>
-                            <p id="next-step-title" class="font-bold text-white text-sm leading-snug mb-1">Continue Trading Academy</p>
-                            <p id="next-step-sub" class="text-xs mb-3" style="color:#9ca3af;">Build strong foundations before placing trades</p>
-                            <a id="next-step-cta" href="/academy"
-                               class="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold text-decoration-none"
-                               style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
-                                <i class="fas fa-graduation-cap text-xs"></i> Go to Academy
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Blog — 2/3 -->
-                    <div class="pw-card lg:col-span-2" id="dash-blog-row">
-                        <div class="pw-card-hdr">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:rgba(45,212,191,.15);">
-                                    <i class="fas fa-newspaper" style="color:#2dd4bf;"></i>
-                                </div>
-                                <span class="font-semibold text-white text-sm">Latest Research &amp; Blog</span>
+                <!-- Blog full width -->
+                <div class="pw-card mb-4" id="dash-blog-row">
+                    <div class="pw-card-hdr">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:rgba(45,212,191,.15);">
+                                <i class="fas fa-newspaper" style="color:#2dd4bf;"></i>
                             </div>
-                            <a href="#" onclick="dashboard.navigate('blog')" class="text-xs text-teal-400 hover:text-teal-300 font-medium">View all →</a>
+                            <span class="font-semibold text-white text-sm">Latest Research &amp; Blog</span>
                         </div>
-                        <div class="pw-card-body" id="dash-blog-body">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1">
-                                <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
-                                    <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
-                                    <div class="shimmer-line w-1/3 mb-1"></div>
-                                    <div class="shimmer-line w-full mb-1"></div>
-                                    <div class="shimmer-line-sm w-2/3"></div>
-                                </div>
-                                <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
-                                    <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
-                                    <div class="shimmer-line w-2/5 mb-1"></div>
-                                    <div class="shimmer-line w-3/4 mb-1"></div>
-                                    <div class="shimmer-line-sm w-1/2"></div>
-                                </div>
+                        <a href="#" onclick="dashboard.navigate('blog')" class="text-xs text-teal-400 hover:text-teal-300 font-medium">View all →</a>
+                    </div>
+                    <div class="pw-card-body" id="dash-blog-body">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-1">
+                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-1/3 mb-1"></div>
+                                <div class="shimmer-line w-full mb-1"></div>
+                                <div class="shimmer-line-sm w-2/3"></div>
+                            </div>
+                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-2/5 mb-1"></div>
+                                <div class="shimmer-line w-3/4 mb-1"></div>
+                                <div class="shimmer-line-sm w-1/2"></div>
+                            </div>
+                            <div class="hidden sm:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-1/4 mb-1"></div>
+                                <div class="shimmer-line w-full mb-1"></div>
+                                <div class="shimmer-line-sm w-2/5"></div>
+                            </div>
+                            <div class="hidden lg:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
+                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
+                                <div class="shimmer-line w-1/3 mb-1"></div>
+                                <div class="shimmer-line w-2/3 mb-1"></div>
+                                <div class="shimmer-line-sm w-1/3"></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Hidden compatibility shims — JS hooks that still reference old IDs -->
+                <!-- next-step IDs kept so _updateNextStepCard doesn't throw errors -->
+                <span id="next-step-title" class="hidden"></span>
+                <span id="next-step-sub" class="hidden"></span>
+                <a id="next-step-cta" href="/academy" class="hidden"></a>
+                <div id="dash-next-step" class="hidden"></div>
+                <span id="greeting-sub" class="hidden"></span>
+                <span id="dash-market-dot-old" class="hidden"></span>
+                <!-- Tools row still renders via JS into dash-courses-body -->
+                <div id="dash-tools-row" class="hidden"><div id="dash-courses-body"></div></div>
+                <span id="ai-insight-body-old" class="hidden"></span>
                 <span id="greeting-sub" class="hidden"></span>
                 <span id="dash-market-dot-old" class="hidden"></span>
                 <!-- Tools row still renders via JS into dash-courses-body -->
@@ -1965,16 +1960,30 @@ const DashboardController = class {
     }
 
     _initUsageBars() {
-        // Wire usage.js badge into the hero card usage bar
-        const barEl = document.getElementById('dash-chart-usage-bar');
-        if (barEl && typeof PipwaysUsage !== 'undefined') {
-            PipwaysUsage.renderBadge('chart_analysis', barEl);
-            // Also update signal lock overlay for paid users
-            const tier = PipwaysUsage.tier;
-            if (tier === 'basic' || tier === 'pro') {
-                const lockEl = document.getElementById('dash-signals-lock');
-                if (lockEl) lockEl.style.display = 'none';
+        // Wire usage.js badges — wait for PipwaysUsage to finish its /auth/me fetch
+        // before rendering, so counters show real data not stale localStorage
+        const _wire = () => {
+            const barEl = document.getElementById('dash-chart-usage-bar');
+            if (barEl && typeof PipwaysUsage !== 'undefined') {
+                PipwaysUsage.renderBadge('chart_analysis', barEl);
             }
+            // Remove signals lock overlay for paid users
+            if (typeof PipwaysUsage !== 'undefined') {
+                const tier = PipwaysUsage.tier;
+                if (tier === 'basic' || tier === 'pro') {
+                    const lockEl = document.getElementById('dash-signals-lock');
+                    if (lockEl) lockEl.style.display = 'none';
+                }
+            }
+        };
+
+        if (typeof PipwaysUsage !== 'undefined' && PipwaysUsage.isLoaded) {
+            _wire();
+        } else {
+            // PipwaysUsage hasn't finished its refresh yet — wait for it
+            // It fires pipways:usage-updated when done, but also try after 1.5s as fallback
+            document.addEventListener('pipways:usage-updated', _wire, { once: true });
+            setTimeout(_wire, 1500);
         }
     }
 
@@ -2072,11 +2081,13 @@ const DashboardController = class {
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
         // Academy lessons completed count for the stat chip
         const academyLessonsCount = (() => {
-            if (!academyResume) return '—';
-            if (academyResume.type === 'complete') return '28'; // all done
-            if (academyResume.lesson_id) {
-                // lesson_id tells us roughly how far they are
-                return academyResume.completed_count != null ? String(academyResume.completed_count) : '—';
+            if (!academyResume) return '0';
+            if (academyResume.type === 'complete') return '28';
+            if (academyResume.completed_count != null) return String(academyResume.completed_count);
+            // lesson_id is the DB id of the NEXT lesson — use level_percent as proxy
+            if (academyResume.level_percent > 0) {
+                const approx = Math.round((academyResume.level_percent / 100) * 12); // beginner has ~12 lessons
+                return approx > 0 ? String(approx) : '1';
             }
             return '0';
         })();
@@ -2091,51 +2102,72 @@ const DashboardController = class {
             const name = this.user?.full_name?.split(' ')[0] || 'Trader';
 
             if (!academyResume || academyResume.type === 'start') {
-                // New user — hasn't started Academy yet
+                // New user — show inviting empty state
                 learningEl.innerHTML =
-                    '<div class="flex flex-col items-center text-center py-4">'
-                    + '<div class="w-16 h-16 rounded-full flex items-center justify-center mb-3" style="background:rgba(52,211,153,.1);border:2px dashed rgba(52,211,153,.25);">'
-                    + '<i class="fas fa-book-open text-2xl" style="color:#34d399;"></i>'
+                    '<div class="flex flex-col items-center text-center py-3">'
+                    + '<div class="w-14 h-14 rounded-full flex items-center justify-center mb-3" style="background:rgba(52,211,153,.08);border:2px dashed rgba(52,211,153,.2);">'
+                    + '<i class="fas fa-book-open" style="color:#34d399;font-size:1.25rem;"></i>'
                     + '</div>'
-                    + '<p class="font-semibold text-white mb-1">Start your Trading Academy journey, ' + _e(name) + '</p>'
-                    + '<p class="text-xs text-gray-500 mb-4">28 lessons · 140 quizzes · Beginner to Advanced</p>'
-                    + '<a href="/academy" class="px-5 py-2 rounded-lg text-sm font-semibold transition-all text-decoration-none" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
-                    + 'Begin Academy →</a>'
+                    + '<p class="font-semibold text-white mb-1 text-sm">Start your Trading Academy, ' + _e(name) + '</p>'
+                    + '<p class="text-xs mb-4" style="color:#4b5563;line-height:1.5;">28 free lessons · from first pip to institutional strategy</p>'
+                    + '<a href="/academy" class="px-4 py-2 rounded-lg text-sm font-semibold text-decoration-none" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
+                    + '<i class="fas fa-graduation-cap mr-1.5"></i>Begin Academy →</a>'
                     + '</div>';
+
             } else if (academyResume.type === 'complete') {
                 learningEl.innerHTML =
-                    '<div class="flex flex-col items-center text-center py-4">'
-                    + '<div class="w-16 h-16 rounded-full flex items-center justify-center mb-3" style="background:rgba(251,191,36,.1);border:2px dashed rgba(251,191,36,.25);">'
-                    + '<i class="fas fa-trophy text-2xl" style="color:#fbbf24;"></i>'
+                    '<div class="flex flex-col items-center text-center py-3">'
+                    + '<div class="w-14 h-14 rounded-full flex items-center justify-center mb-3" style="background:rgba(251,191,36,.1);border:2px dashed rgba(251,191,36,.2);">'
+                    + '<i class="fas fa-trophy" style="color:#fbbf24;font-size:1.25rem;"></i>'
                     + '</div>'
-                    + '<p class="font-semibold text-white mb-1">Academy Complete! 🏆</p>'
-                    + '<p class="text-xs text-gray-500 mb-4">You finished all 28 lessons. Review any module anytime.</p>'
-                    + '<a href="/academy" class="px-5 py-2 rounded-lg text-sm font-semibold transition-all text-decoration-none" style="background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">'
+                    + '<p class="font-semibold text-white mb-1 text-sm">Academy Complete! 🏆</p>'
+                    + '<p class="text-xs mb-4" style="color:#4b5563;">All 28 lessons done. Review any module anytime.</p>'
+                    + '<a href="/academy" class="px-4 py-2 rounded-lg text-sm font-semibold text-decoration-none" style="background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">'
                     + 'Review Academy →</a>'
                     + '</div>';
+
             } else {
-                // In progress — show resume card
+                // In progress — show level progress bars (the CTA is in "Your Next Step" card)
+                const levelName  = academyResume.level || 'Beginner';
+                const levelPct   = academyResume.level_percent || 0;
+                const totalPct   = academyResume.overall_percent || 0;
                 const lessonTitle = academyResume.title || 'Next Lesson';
                 const moduleName  = academyResume.module || '';
-                const levelName   = academyResume.level  || 'Beginner';
                 const lessonId    = academyResume.lesson_id;
-                const pct         = academyResume.level_percent || 0;
 
-                learningEl.innerHTML =
-                    '<div class="mb-3">'
-                    + '<div class="flex items-center justify-between mb-1">'
-                    + '<span class="text-xs text-gray-500">Your Learning Progress</span>'
-                    + '<span class="text-xs font-bold" style="color:#a78bfa;">' + pct + '% ' + _e(levelName) + '</span>'
+                // Level palette
+                const levels = [
+                    { name: 'Beginner',     color: '#34d399' },
+                    { name: 'Intermediate', color: '#60a5fa' },
+                    { name: 'Advanced',     color: '#f59e0b' },
+                ];
+                const progBars = levels.map(lv => {
+                    const isActive = levelName === lv.name;
+                    const pct = isActive ? levelPct : (academyResume['level_' + lv.name.toLowerCase() + '_pct'] || 0);
+                    return '<div style="margin-bottom:.6rem;">'
+                        + '<div class="flex items-center justify-between mb-1">'
+                        + '<span class="text-xs" style="color:' + lv.color + ';">' + lv.name + '</span>'
+                        + '<span class="text-xs font-bold" style="color:' + lv.color + ';">' + pct + '%</span>'
+                        + '</div>'
+                        + '<div class="pw-progress-bar" style="height:5px;">'
+                        + '<div class="pw-progress-fill" style="width:' + pct + '%;background:' + lv.color + ';transition:width .6s ease;"></div>'
+                        + '</div>'
+                        + '</div>';
+                }).join('');
+
+                // Current lesson chip
+                const lessonChip =
+                    '<div class="flex items-center gap-2 mt-3 p-2.5 rounded-lg" style="background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.15);">'
+                    + '<div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style="background:rgba(124,58,237,.2);">'
+                    + '<i class="fas fa-play" style="color:#a78bfa;font-size:.55rem;margin-left:1px;"></i></div>'
+                    + '<div class="min-w-0 flex-1">'
+                    + '<div class="text-xs" style="color:#6b7280;">' + _e(moduleName) + ' · ' + _e(levelName) + '</div>'
+                    + '<div class="text-xs font-semibold text-white truncate">' + _e(lessonTitle) + '</div>'
                     + '</div>'
-                    + '<div class="pw-progress-bar"><div class="pw-progress-fill" style="width:' + pct + '%;transition:width .6s ease;"></div></div>'
-                    + '</div>'
-                    + '<div class="rounded-xl p-3 mb-4" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);">'
-                    + '<div class="text-xs text-purple-400 mb-1">' + _e(levelName) + ' · ' + _e(moduleName) + '</div>'
-                    + '<div class="font-semibold text-white text-sm truncate">' + _e(lessonTitle) + '</div>'
-                    + '</div>'
-                    + '<a href="/academy' + (lessonId ? '?lesson=' + lessonId : '') + '" class="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold transition-all text-decoration-none" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">'
-                    + '<i class="fas fa-play-circle"></i> Resume: ' + _e(lessonTitle.length > 26 ? lessonTitle.slice(0, 26) + '…' : lessonTitle)
-                    + '</a>';
+                    + '<a href="/academy' + (lessonId ? '?lesson=' + lessonId : '') + '" class="text-xs font-semibold flex-shrink-0 text-decoration-none" style="color:#a78bfa;">Continue →</a>'
+                    + '</div>';
+
+                learningEl.innerHTML = progBars + lessonChip;
             }
         }
 
@@ -2161,10 +2193,19 @@ const DashboardController = class {
                 card.addEventListener('mouseleave',  function() { this.style.opacity = '1'; });
             });
 
-            // Render chart analysis usage badge
+            // Render chart analysis usage badge — deferred for PipwaysUsage timing
             var badgeEl = document.getElementById('dash-chart-usage');
-            if (badgeEl && typeof PipwaysUsage !== 'undefined') {
-                PipwaysUsage.renderBadge('chart_analysis', badgeEl);
+            if (badgeEl) {
+                var _renderToolBadge = function() {
+                    if (typeof PipwaysUsage !== 'undefined') {
+                        PipwaysUsage.renderBadge('chart_analysis', badgeEl);
+                    }
+                };
+                if (typeof PipwaysUsage !== 'undefined' && PipwaysUsage.isLoaded) {
+                    _renderToolBadge();
+                } else {
+                    setTimeout(_renderToolBadge, 1500);
+                }
             }
         }
 
@@ -2343,6 +2384,8 @@ const DashboardController = class {
             { sym: 'US30',    price: '41,850',  chg: '+120',   pct: '+0.29%', up: true  },
             { sym: 'US100',   price: '18,240',  chg: '-85',    pct: '-0.46%', up: false },
         ];
+
+        // ── Top scrolling ticker ──────────────────────────────────────────
         const html = pairs.map(p => `
             <div class="ticker-item">
                 <span class="ticker-sym">${p.sym}</span>
@@ -2351,6 +2394,36 @@ const DashboardController = class {
             </div>`).join('');
         const track = document.getElementById('ticker-track');
         if (track) track.innerHTML = html + html;
+
+        // ── Zone 3 forex snapshot card — populated from same data ─────────
+        const fxEl = document.getElementById('dash-forex-tickers');
+        if (fxEl) {
+            // Show EUR/USD, GBP/USD, XAU/USD — most relevant for London session
+            const featured = ['EUR/USD', 'GBP/USD', 'XAU/USD'];
+            fxEl.innerHTML = featured.map((sym, i) => {
+                const p = pairs.find(x => x.sym === sym);
+                if (!p) return '';
+                const isLast = i === featured.length - 1;
+                const color = p.up ? '#34d399' : '#f87171';
+                return `<div class="flex justify-between py-1.5 ${isLast ? '' : 'border-b'}" style="border-color:#1f2937;">
+                    <div>
+                        <span class="text-xs font-semibold" style="color:#e5e7eb;">${p.sym}</span>
+                        <span class="text-xs ml-2" style="color:#4b5563;">${p.price}</span>
+                    </div>
+                    <span class="text-xs font-bold" data-base="${parseFloat(p.pct)}" style="color:${color};">${p.pct}</span>
+                </div>`;
+            }).join('');
+            // Simulate live micro-drift every 6s so the card looks alive
+            setInterval(() => {
+                fxEl.querySelectorAll('[data-base]').forEach(el => {
+                    const base = parseFloat(el.dataset.base) || 0;
+                    const val  = base + (Math.random() - 0.5) * 0.06;
+                    const up   = val >= 0;
+                    el.textContent  = (up ? '+' : '') + val.toFixed(2) + '%';
+                    el.style.color  = up ? '#34d399' : '#f87171';
+                });
+            }, 6000);
+        }
     }
 
 

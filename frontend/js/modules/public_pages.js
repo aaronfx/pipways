@@ -358,7 +358,7 @@ const PublicPages = (() => {
                 return '<div style="background:#111827;border:1px solid ' + (isCompleted ? '#1f2937' : '#1f2937') + ';border-radius:.85rem;overflow:hidden;'
                      + 'display:flex;flex-direction:row;opacity:' + (isCompleted ? '.85' : '1') + ';margin-bottom:.1rem;"'
                      + ' onmouseover="this.style.borderColor=\'#374151\';this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 24px -6px rgba(0,0,0,.5)\'"'
-                     + ' onmouseout="this.style.borderColor=\'#1f2937\';this.style.transform=\'\';this.style.boxShadow=\'\'">>>'
+                     + ' onmouseout="this.style.borderColor=\'#1f2937\';this.style.transform=\'\';this.style.boxShadow=\'\'">'
                      + thumb
                      + dateBlock
                      + '<div style="flex:1;padding:1.1rem 1.25rem;">'
@@ -493,8 +493,7 @@ const PublicPages = (() => {
                     var slug = (p.slug || '').replace(/"/g, '');
 
                     var imgHero = p.featured_image
-                        ? '<img src="' + p.featured_image + '" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500"'
-                          + ' onerror="this.style.display=\'none\'"height:100%;min-height:14rem;background:linear-gradient(135deg,#1e1b4b,#1a1040,#0f172a);display:flex;align-items:center;justify-content:center;\"><i class=\"fas fa-newspaper\" style=\"font-size:3rem;color:rgba(255,255,255,.07)\"></i></div>\'">'
+                        ? '<img src="' + p.featured_image + '" class="w-full h-56 lg:h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display=\'none\'">'
                         : '<div class="h-56 lg:h-full bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-6xl text-white/10"></i></div>';
 
                     var imgSmall = p.featured_image

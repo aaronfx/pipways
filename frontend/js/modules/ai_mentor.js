@@ -36,13 +36,22 @@ class AIMentor {
     }
 
     addWelcomeMessage() {
+        // Personalise greeting using stored user + cached academy progress
+        const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+        const firstName = (user.full_name || user.email || 'Trader').split(' ')[0];
+        const perf = JSON.parse(localStorage.getItem('pipways_performance') || '{}');
+        let subText = 'Ask me about strategies, risk management, or specific concepts.';
+        if (perf.overall_grade) {
+            subText = `Your last performance grade was <strong>${perf.overall_grade}</strong>. Ask me how to improve, or explore a new concept.`;
+        }
         const welcomeHTML = `
             <div class="message ai-message">
                 <div class="message-avatar">🤖</div>
                 <div class="message-content">
                     <div class="message-text">
-                        Welcome to your AI Trading Mentor! Ask me about strategies, risk management, 
-                        or specific concepts. I'll recommend Academy lessons tailored to your questions.
+                        Welcome back, <strong>${this.escapeHtml(firstName)}</strong>! 👋<br>
+                        ${subText}<br><br>
+                        I'll recommend Academy lessons tailored to your questions.
                     </div>
                     <div class="message-time">${this.getCurrentTime()}</div>
                 </div>
@@ -67,7 +76,7 @@ class AIMentor {
 
         try {
             // CRITICAL FIX: Direct API call to /mentor/ask (not /api/ai/mentor/ask)
-            const response = await fetch(`/mentor/ask`, {
+            const response = await fetch(`/ai/mentor/ask`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -205,7 +214,7 @@ class AIMentor {
         // Track click if we have lesson ID
         if (lessonId) {
             try {
-                await fetch(`/mentor/track-lesson-click`, {
+                await fetch(`/ai/mentor/track-lesson-click`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

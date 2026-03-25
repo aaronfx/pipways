@@ -33,8 +33,14 @@ const PerformancePage = {
                         <h3 class="card-title">Upload Trade Journal</h3>
                     </div>
                     <div class="card-body">
-                        <p style="color: var(--gray-600); margin-bottom: 1rem;">Paste your trade data in JSON format</p>
-                        <textarea id="tradeJournal" rows="8" class="form-control" style="font-family: monospace; font-size: 0.75rem;" placeholder='[
+                        <p style="color: var(--gray-600); margin-bottom: 0.5rem;">Upload MT4/MT5 export or paste trade data (JSON/CSV)</p>
+                        <div style="margin-bottom: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="file" id="journalFile" accept=".csv,.html,.htm,.pdf,.xlsx"
+                                style="font-size: 0.8rem; color: var(--gray-600);"
+                                onchange="PerformancePage.handleFileUpload(event)">
+                            <span style="font-size: 0.75rem; color: var(--gray-400);">or paste below ↓</span>
+                        </div>
+                        <textarea id="tradeJournal" rows="6" class="form-control" style="font-family: monospace; font-size: 0.75rem;" placeholder='[
   {
     "entry_date": "2024-01-01T10:00:00",
     "symbol": "EURUSD",
@@ -110,9 +116,37 @@ const PerformancePage = {
         } catch (e) {
             console.error('Stats load error:', e);
         }
-        } catch (e) { /* cached load failed */ }
     },
     
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        if (ext === 'csv') {
+            const text = await file.text();
+            // Put CSV text in textarea for backend to parse
+            const textarea = document.getElementById('tradeJournal');
+            if (textarea) textarea.value = text;
+            UI.showToast('CSV loaded — click Analyze to process', 'info');
+        } else {
+            // For binary formats (xlsx, pdf, html), send directly to the multi-format endpoint
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                UI.showToast('Parsing file...', 'info');
+                const result = await API.request('/ai/performance/upload-journal', {
+                    method: 'POST',
+                    headers: {},
+                    body: formData
+                });
+                this.displayAnalysis(result);
+            } catch (e) {
+                UI.showToast('File parse failed: ' + e.message, 'error');
+            }
+        }
+    },
+
     async analyze() {
         const textarea = document.getElementById('tradeJournal');
         const data = textarea.value.trim();

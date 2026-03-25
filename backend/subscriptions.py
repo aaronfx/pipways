@@ -50,7 +50,7 @@ FEATURE_CONFIG = {
     },
     "ai_mentor": {
         "label": "AI Mentor",
-        "free":  {"limit_key": "mentor_free_daily",     "reset": "daily",    "default": 3},
+        "free":  {"limit_key": "mentor_free_daily",     "reset": "daily",    "default": 5},
         "basic": {"limit_key": "mentor_basic_daily",    "reset": "daily",    "default": 25},
         "pro":   {"limit_key": "mentor_pro_daily",      "reset": "daily",    "default": 999},
         "table": "ai_mentor_logs",
@@ -75,7 +75,7 @@ _DEFAULT_LIMIT_SETTINGS = {
     "perf_basic_monthly":   "4",
     "perf_pro_monthly":     "999",
     # AI Mentor
-    "mentor_free_daily":    "3",
+    "mentor_free_daily":    "5",
     "mentor_basic_daily":   "25",
     "mentor_pro_daily":     "999",
     # Stock Research
@@ -86,9 +86,8 @@ _DEFAULT_LIMIT_SETTINGS = {
 
 # Tier display info (used in error responses for frontend upgrade modal)
 TIER_INFO = {
-    "free":  {"name": "Free",  "price": None,  "next": "basic"},
-    "basic": {"name": "Basic", "price": 15,    "next": "pro"},
-    "pro":   {"name": "Pro",   "price": 25,    "next": None},
+    "free":  {"name": "Free",  "price_ngn": None,   "next": "pro"},
+    "pro":   {"name": "Pro",   "price_ngn": 15000,  "next": None},
 }
 
 

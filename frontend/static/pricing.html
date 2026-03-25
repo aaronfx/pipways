@@ -518,6 +518,7 @@
             animation: fadeUp .3s ease;
         }
     </style>
+<script src="https://js.paystack.co/v1/inline.js"></script>
 </head>
 <body>
 
@@ -574,7 +575,7 @@
                 <div class="plan-name">Free</div>
                 <div class="plan-desc">Start learning and run your first analyses — no credit card needed.</div>
                 <div class="plan-price free">
-                    <span class="currency" style="color:var(--muted);">$</span>
+                    <span class="currency" style="color:var(--muted);">₦</span>
                     <span class="amount" style="color:var(--text);">0</span>
                     <span class="period">/mo</span>
                 </div>
@@ -621,12 +622,12 @@
             <div class="plan-popular-badge"><i class="fas fa-star" style="font-size:.55rem;margin-right:.3rem;"></i>Most Popular</div>
             <div class="plan-accent" style="background:linear-gradient(90deg,var(--purple),var(--blue));"></div>
             <div class="plan-body">
-                <div class="plan-badge" style="background:rgba(124,58,237,.15);color:var(--purple-l);">Basic Plan</div>
-                <div class="plan-name">Basic</div>
-                <div class="plan-desc">For active traders who analyse multiple setups and review performance monthly.</div>
+                <div class="plan-badge" style="background:rgba(124,58,237,.15);color:var(--purple-l);">Pro Monthly</div>
+                <div class="plan-name">Pro</div>
+                <div class="plan-desc">For serious traders who want unlimited AI tools and full signal access.</div>
                 <div class="plan-price">
-                    <span class="currency" style="color:var(--purple-l);">$</span>
-                    <span class="amount" style="color:var(--purple-l);" id="basic-price">15</span>
+                    <span class="currency" style="color:var(--purple-l);">₦</span>
+                    <span class="amount" style="color:var(--purple-l);" id="basic-price">15,000</span>
                     <span class="period">/mo</span>
                 </div>
                 <a href="#" class="plan-cta plan-cta-primary" onclick="handleUpgrade('basic'); return false;">
@@ -677,8 +678,8 @@
                 <div class="plan-name">Pro</div>
                 <div class="plan-desc">Unlimited access for serious traders who need every tool, every day, without limits.</div>
                 <div class="plan-price">
-                    <span class="currency" style="color:var(--amber-l);">$</span>
-                    <span class="amount" style="color:var(--amber-l);" id="pro-price">25</span>
+                    <span class="currency" style="color:var(--amber-l);">₦</span>
+                    <span class="amount" style="color:var(--amber-l);" id="pro-price">25,000</span>
                     <span class="period">/mo</span>
                 </div>
                 <a href="#" class="plan-cta plan-cta-outline" onclick="handleUpgrade('pro'); return false;">Upgrade to Pro</a>
@@ -724,7 +725,7 @@
     <div class="animate" style="display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;margin-bottom:4rem;font-size:.78rem;color:var(--muted);">
         <span><i class="fas fa-lock" style="margin-right:.4rem;color:var(--green-l);"></i>Secure payment</span>
         <span><i class="fas fa-redo" style="margin-right:.4rem;color:var(--green-l);"></i>Cancel anytime</span>
-        <span><i class="fas fa-dollar-sign" style="margin-right:.4rem;color:var(--green-l);"></i>USD billing</span>
+        <span><i class="fas fa-credit-card" style="margin-right:.4rem;color:var(--green-l);"></i>NGN billing via Paystack</span>
         <span><i class="fas fa-bolt" style="margin-right:.4rem;color:var(--green-l);"></i>Instant access</span>
     </div>
 
@@ -900,7 +901,7 @@
                 What payment methods are accepted?
                 <i class="fas fa-chevron-down icon"></i>
             </button>
-            <div class="faq-a">All major credit and debit cards (Visa, Mastercard, Amex) via Stripe. Nigerian bank cards are fully supported. Billing is in USD — your bank converts at the prevailing rate.</div>
+            <div class="faq-a">All major cards (Visa, Mastercard, Verve) plus bank transfer and USSD — all via Paystack. Billing is in NGN. No hidden conversion fees.</div>
         </div>
 
         <div class="faq-item">
@@ -935,7 +936,7 @@
             <a href="/academy">Academy</a>
             <a href="/dashboard.html#blog">Blog</a>
             <a href="/pricing.html">Pricing</a>
-            <a href="mailto:support@pipways.com">Support</a>
+            <a href="/cdn-cgi/l/email-protection#fb888e8b8b94898fbb8b928b8c9a8288d5989496">Support</a>
         </div>
         <p>© 2025 Pipways · Built for serious traders · <a href="#">Privacy</a> · <a href="#">Terms</a></p>
     </div>
@@ -943,7 +944,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
     // ── Billing toggle ─────────────────────────────────────────────────────
     let isAnnual = false;
     const PRICES = { basic: { monthly: 15, annual: 12 }, pro: { monthly: 25, annual: 20 } };
@@ -1016,10 +1017,11 @@
             if (e.isIntersecting) { e.target.style.animationPlayState = 'running'; }
         });
     }, { threshold: 0.1 });
-    document.querySelectorAll('.animate').forEach(el => {
-        el.style.animationPlayState = 'paused';
-        obs.observe(el);
-    });
-</script>
+    document.qu
+    document.querySelectorAll('.animate-on-scroll').forEach(el => obs.observe(el));
+
+    </script>
+    <script src="/js/api.js"></script>
+    <script src="/js/payments.js"></script>
 </body>
 </html>

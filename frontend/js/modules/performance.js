@@ -171,13 +171,43 @@ const PerformancePage = {
         } catch (e) {
             // 402 limit reached — show upgrade modal
             if (e.message && (e.message.includes('limit_reached') || e.message.includes('402'))) {
-                if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
-                    PipwaysUsage.showUpgradeModal('performance',
-                        PipwaysUsage.used('performance'),
-                        PipwaysUsage.limit('performance'));
-                } else if (window.PaymentsPage) {
-                    PaymentsPage.showUpgradeModal('Performance Analytics');
+                // Show inline upgrade UI
+                const container = document.getElementById('analysisResults');
+                if (container) {
+                    container.style.display = 'block';
+                    container.innerHTML = `
+                        <div style="text-align:center;padding:3rem;background:#111827;
+                                    border-radius:12px;border:1px solid #374151;margin-top:1rem;">
+                            <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
+                            <p style="color:white;font-weight:700;font-size:1.1rem;margin-bottom:.5rem;">Free limit reached</p>
+                            <p style="color:#9ca3af;font-size:.875rem;margin-bottom:1.5rem;">
+                                You've used your free performance analysis.<br>Upgrade to Pro for unlimited access.
+                            </p>
+                            <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+                                <button onclick="window.PaymentsPage ? PaymentsPage.startPayment('pro_monthly') : window.location.href='/pricing.html'"
+                                    style="padding:10px 24px;background:#7c3aed;color:white;border:none;
+                                           border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;">
+                                    Upgrade to Pro →
+                                </button>
+                                <a href="/pricing.html"
+                                    style="padding:10px 24px;background:#1f2937;color:#9ca3af;border:1px solid #374151;
+                                           border-radius:8px;font-weight:600;font-size:.9rem;text-decoration:none;
+                                           display:inline-flex;align-items:center;">
+                                    See Plans
+                                </a>
+                            </div>
+                        </div>`;
                 }
+                // Also trigger modal
+                setTimeout(() => {
+                    if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
+                        PipwaysUsage.showUpgradeModal('performance',
+                            PipwaysUsage.used('performance'),
+                            PipwaysUsage.limit('performance'));
+                    } else if (window.PaymentsPage) {
+                        PaymentsPage.showUpgradeModal('Performance Analytics');
+                    }
+                }, 300);
                 return;
             }
             // Parse JSON error messages cleanly

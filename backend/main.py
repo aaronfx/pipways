@@ -56,6 +56,21 @@ except ImportError:
         print("[SUBSCRIPTIONS] subscriptions.py not found — skipping", flush=True)
 
 from . import stock_terminal_backend as stock_module
+
+# New modules
+try:
+    from . import payments as payments_module
+    _HAS_PAYMENTS = True
+except ImportError:
+    _HAS_PAYMENTS = False
+    print("[IMPORT] payments.py not found — payment routes disabled", flush=True)
+
+try:
+    from . import email_service as email_module
+    _HAS_EMAIL_MODULE = True
+except ImportError:
+    _HAS_EMAIL_MODULE = False
+    print("[IMPORT] email_service.py not found — email routes disabled", flush=True)
 stock_router = stock_module.router
 
 from anthropic import AsyncAnthropic
@@ -80,6 +95,12 @@ _USAGE_ENFORCEMENT = {
 }
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+
+# ── Directory resolution (defined early — used by route handlers below) ───────
+BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR = os.path.join(BASE_DIR, "frontend", "static")
+if not os.path.exists(STATIC_DIR):
+    STATIC_DIR = os.path.join(BASE_DIR, "static")
 APP_VERSION = "2.4.0"
 
 @asynccontextmanager
@@ -250,6 +271,8 @@ async def health_check():
         "chart_analysis": {
             "http_pooling": chart_analysis._http_client is not None
         },
+        "payments_available": _HAS_PAYMENTS,
+        "email_available": _HAS_EMAIL_MODULE,
         "features": [
             "multi_format_journal",
             "ai_trade_validator",
@@ -290,6 +313,20 @@ async def admin_reseed_academy():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/risk-calculator")
+@app.get("/risk-calculator.html")
+async def serve_risk_calculator():
+    """Public SEO page — no auth required."""
+    for path in [
+        os.path.join(BASE_DIR, "frontend", "static", "risk_calculator.html"),
+        os.path.join(BASE_DIR, "static", "risk_calculator.html"),
+        os.path.join(STATIC_DIR, "risk_calculator.html"),
+    ]:
+        if path and os.path.exists(path):
+            return FileResponse(path)
+    raise HTTPException(404, "risk_calculator.html not found")
+
+
 @app.get("/pricing.html")
 async def serve_pricing():
     for path in [
@@ -320,11 +357,18 @@ app.include_router(ai_mentor.router,        prefix="/ai/mentor",      tags=["AI 
 app.include_router(cms.router,              prefix="/cms",            tags=["CMS"])
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Terminal"])
 
+# Payments & Email
+if _HAS_PAYMENTS:
+    app.include_router(payments_module.router, prefix="/payments", tags=["Payments"])
+    print("[ROUTES] Payments router mounted (/payments/*)", flush=True)
+
+if _HAS_EMAIL_MODULE:
+    app.include_router(email_module.router, prefix="/email", tags=["Email"])
+    print("[ROUTES] Email router mounted (/email/*)", flush=True)
+
 # Academy: no prefix — router owns /academy.html, /academy, /learning/*, /admin/academy/*
 app.include_router(academy_router, tags=["Academy"])
 print("[ROUTES] Academy router mounted (/academy.html + /academy + /learning/* + /admin/academy/*)", flush=True)
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 JS_DIR = os.path.join(BASE_DIR, "frontend", "js")
 if os.path.exists(JS_DIR):
@@ -334,9 +378,6 @@ elif os.path.exists("js"):
     app.mount("/js", StaticFiles(directory="js"), name="js")
     print("[STATIC] Mounted /js from js/", flush=True)
 
-STATIC_DIR = os.path.join(BASE_DIR, "frontend", "static")
-if not os.path.exists(STATIC_DIR):
-    STATIC_DIR = os.path.join(BASE_DIR, "static")
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     print(f"[STATIC] Mounted /static from {STATIC_DIR}", flush=True)

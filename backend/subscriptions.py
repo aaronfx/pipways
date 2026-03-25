@@ -121,6 +121,19 @@ async def init_subscription_tables():
         except Exception as e:
             print(f"[SUBSCRIPTIONS] table init warning: {e}", flush=True)
 
+    # Ensure site_settings table exists before trying to seed into it
+    # (CMS also creates this table, but may run after subscriptions in startup)
+    try:
+        await database.execute("""
+            CREATE TABLE IF NOT EXISTS site_settings (
+                key VARCHAR(120) PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """)
+    except Exception as e:
+        print(f"[SUBSCRIPTIONS] site_settings table warning: {e}", flush=True)
+
     # Seed default limit settings (ON CONFLICT DO NOTHING — never overwrites admin edits)
     for key, value in _DEFAULT_LIMIT_SETTINGS.items():
         try:

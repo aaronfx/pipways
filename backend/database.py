@@ -270,6 +270,8 @@ _COLUMN_MIGRATIONS = [
     ("webinars", "thumbnail",        "VARCHAR(500)", "DEFAULT ''"),
     ("webinars", "max_attendees",    "INTEGER",      "DEFAULT 100"),
     ("webinars", "is_published",     "BOOLEAN",      "DEFAULT FALSE"),
+    ("webinars", "speaker_bio",      "TEXT",         "DEFAULT ''"),
+    ("webinars", "tags",             "VARCHAR(500)", "DEFAULT ''"),
     ("webinars", "status",           "VARCHAR(50)",  "DEFAULT 'scheduled'"),  # was missing → CMS INSERT failed
 
     # ── courses ───────────────────────────────────────────────────────────────

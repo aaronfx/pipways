@@ -63,6 +63,9 @@ const BlogPage = {
             // Show content upgrade if available
             // BlogEnhanced.renderContentUpgrade(upgrade); // Would need upgrade data
 
+            // ── Blog CTAs (converts readers → users) ─────────────────
+            BlogEnhanced.renderPostCTAs(container, post.category);
+
             // Show related posts
             BlogEnhanced.renderRelatedPosts(post.id, container);
 

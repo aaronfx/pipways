@@ -63,6 +63,22 @@ import httpx
 
 print("[IMPORT] All modules loaded successfully", flush=True)
 
+# ── Usage enforcement map ─────────────────────────────────────────────────────
+# Maps URL prefix → feature key in subscriptions.FEATURE_CONFIG
+# Middleware intercepts POST requests to these paths and enforces limits.
+_USAGE_ENFORCEMENT = {
+    "/ai/chart/analyse":          "chart_analysis",
+    "/ai/chart/analyze":          "chart_analysis",
+    "/ai/performance/analyse":    "performance",
+    "/ai/performance/analyze":    "performance",
+    "/ai/performance/upload":     "performance",
+    "/ai/mentor/ask":             "ai_mentor",
+    "/mentor/ask":                "ai_mentor",
+    "/api/stock/analyse":         "stock_research",
+    "/api/stock/analyze":         "stock_research",
+    "/api/stock/research":        "stock_research",
+}
+
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 APP_VERSION = "2.4.0"
 
@@ -163,6 +179,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Usage enforcement middleware ──────────────────────────────────────────────
+# Intercepts POST requests to gated feature endpoints.
+# Raises 402 if the user has hit their tier limit.
+# This means individual route files don't need to be modified.
+@app.middleware("http")
+async def enforce_usage_limits(request: Request, call_next):
+    if not _HAS_SUBSCRIPTIONS:
+        return await call_next(request)
+
+    # Only enforce on POST/PUT to gated paths
+    if request.method not in ("POST", "PUT"):
+        return await call_next(request)
+
+    path = request.url.path
+    feature = None
+    for prefix, feat in _USAGE_ENFORCEMENT.items():
+        if path.startswith(prefix):
+            feature = feat
+            break
+
+    if feature is None:
+        return await call_next(request)
+
+    # Extract user from Bearer token
+    try:
+        from jose import jwt, JWTError
+        from .security import SECRET_KEY, ALGORITHM
+        from .subscriptions import check_and_record_usage
+
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return await call_next(request)
+
+        token = auth_header[7:]
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+
+        if not user_id:
+            return await call_next(request)
+
+        # check_and_record_usage raises HTTP 402 if limit hit,
+        # records usage event if allowed
+        await check_and_record_usage(int(user_id), feature)
+
+    except HTTPException as he:
+        # 402 from check_and_record_usage — return as JSON
+        return JSONResponse(
+            status_code=he.status_code,
+            content=he.detail if isinstance(he.detail, dict) else {"error": he.detail}
+        )
+    except Exception as e:
+        # Non-fatal — if middleware errors, allow request through
+        print(f"[USAGE MIDDLEWARE] Non-fatal error for {path}: {e}", flush=True)
+
+    return await call_next(request)
+
 @app.get("/health")
 async def health_check():
     return {
@@ -222,9 +294,11 @@ async def admin_reseed_academy():
 async def serve_pricing():
     for path in [
         os.path.join(BASE_DIR, "frontend", "static", "pricing.html"),
+        os.path.join(BASE_DIR, "frontend", "pricing.html"),
         os.path.join(BASE_DIR, "static", "pricing.html"),
         os.path.join(STATIC_DIR, "pricing.html"),
         "static/pricing.html",
+        "pricing.html",
     ]:
         if path and os.path.exists(path):
             return FileResponse(path)

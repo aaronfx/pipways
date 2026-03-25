@@ -517,6 +517,36 @@ async def run_migrations():
         )
     except Exception: pass
 
+    # ── Phase 4: ensure site_settings has correct schema ────────────────────
+    # If the table exists with wrong column names, add the correct ones.
+    # The CREATE TABLE IF NOT EXISTS above never fixes an existing bad schema.
+    for fix_sql in [
+        # Ensure 'key' column exists (PRIMARY KEY)
+        """DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='site_settings' AND column_name='key'
+            ) THEN
+                -- Table exists but has wrong columns — drop and recreate
+                DROP TABLE IF EXISTS site_settings CASCADE;
+                CREATE TABLE site_settings (
+                    key        VARCHAR(120) PRIMARY KEY,
+                    value      TEXT NOT NULL DEFAULT '',
+                    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                );
+            END IF;
+        END $$""",
+        # Ensure 'value' column exists
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS value TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()",
+    ]:
+        try:
+            await database.execute(fix_sql)
+            ok += 1
+        except Exception as e:
+            print(f"[DB MIGRATION] site_settings fix warn: {e}", flush=True)
+            warn += 1
+
     print(f"[DB MIGRATION] Complete — {ok} statements ok, {warn} warnings", flush=True)
 
 # ── Phase 4: Ensure UNIQUE constraints that ON CONFLICT clauses depend on ────

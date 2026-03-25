@@ -189,6 +189,33 @@ const API = {
     buildPortfolio(data)    { return this.request('/api/stock/portfolio',   { method: 'POST', body: JSON.stringify(data) }); },
     compareStocks(symbols)  { return this.request('/api/stock/compare',     { method: 'POST', body: JSON.stringify({ symbols }) }); },
 
+    // ── Payments (Paystack) ──────────────────────────────────────────────────────
+    getPaymentConfig()  { return this.request('/payments/config'); },
+    getPaymentPlans()   { return this.request('/payments/plans'); },
+    initializePayment(planKey, currency = 'NGN') {
+        return this.request('/payments/initialize', {
+            method: 'POST',
+            body: JSON.stringify({ plan_key: planKey, currency }),
+        });
+    },
+    verifyPayment(reference) { return this.request(`/payments/verify/${reference}`); },
+    getPaymentHistory()  { return this.request('/payments/history'); },
+
+    // ── Email ─────────────────────────────────────────────────────────────────
+    captureLeadEmail(email, name = '', source = 'general') {
+        return this.request('/email/capture', {
+            method: 'POST',
+            body: JSON.stringify({ email, name, source }),
+        });
+    },
+    getEmailPrefs()         { return this.request('/email/preferences'); },
+    saveEmailPrefs(prefs)   {
+        return this.request('/email/preferences', {
+            method: 'POST',
+            body: JSON.stringify(prefs),
+        });
+    },
+
     // ── Admin ─────────────────────────────────────────────────────────────────
     /** Full dashboard stats — total users, signals, AI usage, recent users, growth chart */
     getAdminStats() { return this.request('/admin/users'); },

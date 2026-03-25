@@ -18,6 +18,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from .database import database
 from .security import get_current_user, is_admin_user
 
+try:
+    from .email_service import send_signal_alert_task
+    _HAS_EMAIL = True
+except ImportError:
+    _HAS_EMAIL = False
+
 router = APIRouter()
 
 
@@ -152,7 +158,37 @@ async def create_signal(signal: dict, current_user=Depends(get_current_user)):
     except Exception:
         pass
 
+    # Queue email alerts to opted-in users (background, non-fatal)
+    if _HAS_EMAIL:
+        import asyncio
+        asyncio.create_task(_send_signal_emails(
+            signal["symbol"].upper(),
+            signal["direction"].upper(),
+            float(signal["entry_price"]),
+            float(signal["stop_loss"]),
+            float(signal["take_profit"]),
+        ))
+
     return {"status": "created", "id": sid}
+
+
+async def _send_signal_emails(symbol: str, direction: str, entry: float, sl: float, tp: float):
+    """Send signal alert to all users who opted in to signal emails."""
+    try:
+        rows = await database.fetch_all(
+            """SELECT u.id, u.email, u.full_name
+               FROM users u
+               LEFT JOIN user_email_preferences p ON p.user_id = u.id
+               WHERE u.is_active = TRUE
+               AND (p.preferences->>'signal_alerts')::boolean = true"""
+        )
+        for row in (rows or []):
+            await send_signal_alert_task(
+                row["id"], row["email"], row["full_name"] or "",
+                symbol, direction, entry, sl, tp
+            )
+    except Exception as e:
+        print(f"[SIGNAL EMAIL] Error: {e}", flush=True)
 
 
 @router.put("/{signal_id}")

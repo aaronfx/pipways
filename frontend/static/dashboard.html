@@ -16,8 +16,6 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Paystack inline checkout -->
-    <script src="https://js.paystack.co/v1/inline.js"></script>
     <!-- Usage manager — loads before page scripts, intercepts 402s globally -->
     <script src="/js/usage.js"></script>
     <script>
@@ -406,10 +404,12 @@
 
             <!-- DEVELOPMENT -->
             <div class="nav-section-label">Development</div>
+            <a href="#" data-section="risk" class="nav-link">
+                <i class="fas fa-calculator nav-icon" style="color:#34d399;"></i><span>Risk Calculator</span>
+            </a>
             <a href="#" data-section="journal" class="nav-link">
-                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
+                <i class="fas fa-chart-line nav-icon" style="color:#fb923c;"></i>
                 <span>Performance Analytics</span>
-
             </a>
 
             <!-- AI ASSISTANT -->
@@ -918,11 +918,11 @@
                                     <p class="text-xs font-semibold text-white mb-0.5">2 of 3 signals visible</p>
                                     <p class="text-xs" style="color:#4b5563;">Upgrade to see all active signals</p>
                                 </div>
-                                <button onclick="PaymentsPage ? PaymentsPage.showUpgradeModal('signals') : window.location.href='/pricing.html'"
-                                   class="text-xs font-semibold px-4 py-1.5 rounded-lg"
-                                   style="background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);color:#a78bfa;cursor:pointer;">
-                                    Unlock signals · ₦15,000/mo →
-                                </button>
+                                <a href="/pricing.html"
+                                   class="text-xs font-semibold px-4 py-1.5 rounded-lg text-decoration-none"
+                                   style="background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);color:#a78bfa;">
+                                    Unlock signals · $15/mo →
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -1298,6 +1298,19 @@
                 </div>
             </section>
 
+            <!-- RISK CALCULATOR -->
+            <section id="section-risk" class="section hidden">
+                <div class="page-header" style="margin-bottom:1.5rem;">
+                    <h1 style="font-size:1.1rem;font-weight:700;color:white;margin:0 0 4px;">
+                        💰 Risk Calculator
+                    </h1>
+                    <p style="color:#6b7280;font-size:.875rem;margin:0;">
+                        Calculate your exact lot size before every trade.
+                    </p>
+                </div>
+                <div id="risk-calc-container"></div>
+            </section>
+
             <!-- AI STOCK RESEARCH -->
             <section id="section-stocks" class="section hidden">
                 <iframe 
@@ -1560,15 +1573,6 @@
             </section>
 
             <!-- CHART ANALYSIS -->
-            <!-- Email Settings Section -->
-            <section id="section-email_settings" class="section hidden">
-                <div class="page-header" style="margin-bottom:1.5rem;">
-                    <h1 style="color:white;font-size:1.25rem;font-weight:700;margin:0 0 4px;">Email Settings</h1>
-                    <p style="color:#6b7280;font-size:.875rem;margin:0;">Control which emails Pipways sends you.</p>
-                </div>
-                <div id="email-settings-container"></div>
-            </section>
-
             <section id="section-analysis" class="section hidden">
                 <div class="max-w-6xl mx-auto">
                     <div id="chart-analysis-container"></div>
@@ -1793,6 +1797,7 @@ const DashboardController = class {
             'analysis':  { title: 'Validate Trade Setup',  sub: 'Upload a chart screenshot for AI-powered analysis' },
             'stocks':    { title: 'AI Stock Research',     sub: 'Fundamental and sentiment analysis on global markets' },
             'signals':   { title: 'Market Signals',        sub: 'Live trading opportunities from our analysts' },
+            'risk':      { title: 'Risk Calculator',       sub: 'Calculate your exact lot size before every trade' },
             'journal':   { title: 'Performance Analytics', sub: 'AI-powered coaching from your real trade data' },
             'mentor':    { title: 'AI Mentor',             sub: '24/7 personal trading coach' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
@@ -1841,6 +1846,7 @@ const DashboardController = class {
                 case 'courses':   await this.loadCourses();  break;
                 case 'webinars':  await this.loadWebinars(); break;
                 case 'blog':      await this.loadBlog();     break;
+                case 'risk':      this.loadRiskCalculator(); break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
                 case 'admin': {
@@ -3673,20 +3679,118 @@ const DashboardController = class {
     }
 
 
+    loadRiskCalculator() {
+        const container = document.getElementById('risk-calc-container');
+        if (!container) return;
+        if (container.dataset.loaded === '1') return; // already rendered
+        container.dataset.loaded = '1';
+
+        container.innerHTML = `
+        <div style="max-width:680px;">
+            <!-- Inputs card -->
+            <div style="background:#1e293b;border-radius:14px;padding:24px;border:1px solid #334155;margin-bottom:1rem;">
+                <h3 style="color:white;font-size:.95rem;font-weight:700;margin:0 0 16px;">Trade Parameters</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div>
+                        <label style="display:block;font-size:.75rem;color:#94a3b8;font-weight:600;margin-bottom:5px;">Account Balance ($)</label>
+                        <input type="number" id="rc-balance" value="10000" min="100" oninput="dashboard._rcCalc()"
+                            style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:white;font-size:.9rem;box-sizing:border-box;outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:.75rem;color:#94a3b8;font-weight:600;margin-bottom:5px;">Risk Per Trade (%) <span style="color:#f59e0b;">max 2%</span></label>
+                        <input type="number" id="rc-risk" value="1" min="0.1" max="10" step="0.1" oninput="dashboard._rcCalc()"
+                            style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:white;font-size:.9rem;box-sizing:border-box;outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:.75rem;color:#94a3b8;font-weight:600;margin-bottom:5px;">Entry Price</label>
+                        <input type="number" id="rc-entry" value="1.0850" step="0.00001" oninput="dashboard._rcCalc()"
+                            style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:white;font-size:.9rem;box-sizing:border-box;outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:.75rem;color:#94a3b8;font-weight:600;margin-bottom:5px;">Stop Loss</label>
+                        <input type="number" id="rc-sl" value="1.0800" step="0.00001" oninput="dashboard._rcCalc()"
+                            style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:white;font-size:.9rem;box-sizing:border-box;outline:none;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:.75rem;color:#94a3b8;font-weight:600;margin-bottom:5px;">Take Profit <span style="color:#6b7280;font-weight:400;">(optional)</span></label>
+                        <input type="number" id="rc-tp" value="1.0950" step="0.00001" oninput="dashboard._rcCalc()"
+                            style="width:100%;padding:9px 12px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:white;font-size:.9rem;box-sizing:border-box;outline:none;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results card -->
+            <div id="rc-results" style="background:#1e293b;border-radius:14px;padding:24px;border:1px solid #334155;">
+                <h3 style="color:white;font-size:.95rem;font-weight:700;margin:0 0 16px;">Results</h3>
+                <div style="text-align:center;padding:12px 0 16px;">
+                    <div style="font-size:3rem;font-weight:800;color:#a78bfa;line-height:1;" id="rc-lots">—</div>
+                    <div style="color:#6b7280;font-size:.8rem;margin-top:4px;">Standard Lots</div>
+                </div>
+                <div id="rc-details"></div>
+                <div id="rc-warn" style="display:none;margin-top:12px;"></div>
+            </div>
+        </div>`;
+
+        // Run initial calculation
+        this._rcCalc();
+    }
+
+    _rcCalc() {
+        const balance = parseFloat(document.getElementById('rc-balance')?.value) || 0;
+        const riskPct = parseFloat(document.getElementById('rc-risk')?.value)    || 1;
+        const entry   = parseFloat(document.getElementById('rc-entry')?.value)   || 0;
+        const sl      = parseFloat(document.getElementById('rc-sl')?.value)      || 0;
+        const tp      = parseFloat(document.getElementById('rc-tp')?.value)      || 0;
+
+        const lotsEl    = document.getElementById('rc-lots');
+        const detailsEl = document.getElementById('rc-details');
+        const warnEl    = document.getElementById('rc-warn');
+
+        if (!balance || !entry || !sl || entry === sl) {
+            if (lotsEl) lotsEl.textContent = '—';
+            return;
+        }
+
+        const riskAmt  = balance * (riskPct / 100);
+        const stopDist = Math.abs(entry - sl);
+        const lotSize  = Math.max(0.01, Math.round((riskAmt / stopDist) * 100) / 100);
+        const units    = Math.round(lotSize * 100000);
+        const pips     = Math.round(stopDist * 10000);
+        const rr       = tp ? Math.round((Math.abs(tp - entry) / stopDist) * 100) / 100 : 0;
+        const rrColor  = rr >= 2 ? '#34d399' : rr >= 1.5 ? '#fbbf24' : '#f87171';
+
+        if (lotsEl) lotsEl.textContent = lotSize.toFixed(2);
+
+        if (detailsEl) {
+            detailsEl.innerHTML = [
+                ['Units',         units.toLocaleString(),  'white'],
+                ['Max Loss',      '$' + riskAmt.toFixed(2), '#f87171'],
+                ['Stop Distance', pips + ' pips',           'white'],
+                rr > 0 ? ['Risk:Reward', '1 : ' + rr, rrColor] : null,
+            ].filter(Boolean).map(([l, v, c]) => `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1e293b;font-size:.85rem;">
+                    <span style="color:#94a3b8;">${l}</span>
+                    <span style="color:${c};font-weight:600;">${v}</span>
+                </div>`).join('');
+        }
+
+        // Warnings
+        let warning = '';
+        if (riskPct > 2) warning = '⚠️ Risking more than 2% is dangerous for your account.';
+        else if (rr > 0 && rr < 1.5) warning = '⚠️ Risk:Reward below 1:1.5 — consider a better take profit level.';
+
+        if (warnEl) {
+            warnEl.style.display = warning ? 'block' : 'none';
+            warnEl.innerHTML = warning
+                ? `<div style="background:#451a03;border:1px solid #92400e;border-radius:8px;padding:10px 14px;color:#fbbf24;font-size:.8rem;">${warning}</div>`
+                : '';
+        }
+    }
+
     logout() {
         localStorage.removeItem('pipways_token');
         localStorage.removeItem('pipways_user');
         window.location.href = '/';
-    }
-
-    _loadEmailSettings() {
-        const container = document.getElementById('email-settings-container');
-        if (!container) return;
-        if (window.EmailSettings) {
-            EmailSettings.render(container);
-        } else {
-            container.innerHTML = '<p style="color:#6b7280;">Email settings module not loaded.</p>';
-        }
     }
 };
 
@@ -3714,26 +3818,6 @@ window.API = API;
     <script src="/js/modules/public_pages.js"></script>
     <script src="/js/modules/courses.js"></script>
     <script src="/js/modules/quiz.js"></script>
-    <!-- Payments, onboarding & dashboard enhancements -->
-    <script src="/js/payments.js"></script>
-    <script>
-    // Hide upgrade sidebar CTA for paid users
-    (function() {
-        try {
-            const u = JSON.parse(localStorage.getItem('pipways_user') || '{}');
-            const tier = u.subscription_tier || 'free';
-            if (tier !== 'free') {
-                document.addEventListener('DOMContentLoaded', function() {
-                    const el = document.getElementById('sidebar-upgrade-cta');
-                    if (el) el.style.display = 'none';
-                });
-            }
-        } catch(_) {}
-    })();
-    </script>
-    <script src="/js/onboarding.js"></script>
-    <script src="/js/email_settings.js"></script>
-    <script src="/js/dashboard_home.js"></script>
 
 </body>
 </html>

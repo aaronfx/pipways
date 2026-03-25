@@ -22,9 +22,8 @@
 
     // ── Tier config ──────────────────────────────────────────────────────────
     const TIER_CONFIG = {
-        free:  { label: 'Free',  color: '#6b7280', badge: 'bg-gray-700',  next: 'basic', price: null },
-        basic: { label: 'Basic', color: '#a78bfa', badge: 'bg-purple-900', next: 'pro',   price: 15   },
-        pro:   { label: 'Pro',   color: '#fbbf24', badge: 'bg-yellow-900', next: null,    price: 25   },
+        free:  { label: 'Free',  color: '#6b7280', badge: 'bg-gray-700',  next: 'pro',  price_ngn: null },
+        pro:   { label: 'Pro',   color: '#a78bfa', badge: 'bg-purple-900', next: null,  price_ngn: 15000 },
     };
 
     const FEATURE_LABELS = {
@@ -229,35 +228,33 @@
         const tierCfg      = TIER_CONFIG[tier] || TIER_CONFIG.free;
         const nextTierCfg  = TIER_CONFIG[nextTier] || {};
 
-        // Build tier comparison cards
+        // Build tier cards — NGN pricing via Paystack
         const basicCard = _planCard({
-            name:      'Basic',
-            price:     15,
+            name:      'Pro Monthly',
+            planKey:   'pro_monthly',
+            price_ngn: 15000,
             color:     '#a78bfa',
-            highlight: nextTier === 'basic',
+            highlight: true,
             features:  [
-                '30 chart analyses/month',
-                '4 performance analyses/month',
-                '25 AI mentor questions/day',
-                '15 stock research queries/day',
-                'Full market signals',
-                'Recorded webinars',
+                'Unlimited AI Mentor sessions',
+                'Chart Analysis (unlimited)',
+                'Full signal history + alerts',
+                'Performance analytics',
+                'Webinar recordings',
             ],
         });
 
         const proCard = _planCard({
-            name:      'Pro',
-            price:     25,
+            name:      'Pro Annual',
+            planKey:   'pro_annual',
+            price_ngn: 12500,
             color:     '#fbbf24',
-            highlight: nextTier === 'pro',
+            highlight: false,
             features:  [
-                'Unlimited chart analyses',
-                'Unlimited performance analyses',
-                'Unlimited AI mentor',
-                'Unlimited stock research',
-                'Signals + email alerts',
-                'Live & recorded webinars',
-                'AI coaching on every report',
+                'Everything in Pro Monthly',
+                'Save ₦30,000 per year',
+                '2 months effectively free',
+                'Priority support',
             ],
         });
 
@@ -292,7 +289,7 @@
                 <!-- Footer note -->
                 <div style="padding:.75rem 1.5rem 1.5rem;text-align:center;">
                     <p style="font-size:.75rem;color:#4b5563;">
-                        Cancel anytime · USD billing · Instant access after payment
+                        Cancel anytime · NGN billing via Paystack · Instant access
                     </p>
                     <a href="/pricing.html" style="font-size:.78rem;color:#a78bfa;text-decoration:underline;margin-top:.35rem;display:inline-block;">
                         Compare all plan features →
@@ -304,26 +301,28 @@
         document.body.appendChild(modal);
     }
 
-    function _planCard({ name, price, color, highlight, features }) {
-        const border    = highlight ? `border-color:${color};` : 'border-color:#374151;';
-        const badge     = highlight ? `<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${color};background:${color}20;border:1px solid ${color}44;padding:.2rem .6rem;border-radius:9999px;margin-bottom:.6rem;display:inline-block;">Recommended</div>` : '';
-        const btnStyle  = highlight
-            ? `background:${color};color:${name === 'Pro' ? '#000' : '#fff'};border:none;`
+    function _planCard({ name, planKey, price_ngn, color, highlight, features }) {
+        const border   = highlight ? `border-color:${color};` : 'border-color:#374151;';
+        const badge    = highlight ? `<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${color};background:${color}20;border:1px solid ${color}44;padding:.2rem .6rem;border-radius:9999px;margin-bottom:.6rem;display:inline-block;">Most Popular</div>` : '';
+        const btnStyle = highlight
+            ? `background:${color};color:#0d1117;border:none;`
             : 'background:#1f2937;color:#e5e7eb;border:1px solid #374151;';
+        // Use Paystack if available, else fall back to pricing page
+        const onClick  = `onclick="document.getElementById('pw-upgrade-modal')?.remove(); if(window.PaymentsPage){PaymentsPage.startPayment('${planKey}')}else{window.location.href='/pricing.html'}" `;
 
         return `
         <div style="background:#111827;border:1px solid;${border}border-radius:1rem;padding:1.1rem;display:flex;flex-direction:column;gap:.6rem;">
             ${badge}
             <div>
                 <div style="font-size:.95rem;font-weight:800;color:white;">${name}</div>
-                <div style="font-size:1.35rem;font-weight:800;color:${color};">$${price}<span style="font-size:.75rem;font-weight:400;color:#6b7280;">/mo</span></div>
+                <div style="font-size:1.35rem;font-weight:800;color:${color};">₦${price_ngn.toLocaleString()}<span style="font-size:.75rem;font-weight:400;color:#6b7280;">/mo</span></div>
             </div>
             <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.3rem;">
                 ${features.map(f => `<li style="font-size:.75rem;color:#9ca3af;display:flex;align-items:flex-start;gap:.4rem;"><i class="fas fa-check" style="color:${color};margin-top:.15rem;font-size:.6rem;flex-shrink:0;"></i>${f}</li>`).join('')}
             </ul>
-            <a href="/pricing.html?plan=${name.toLowerCase()}" style="display:block;text-align:center;padding:.6rem;border-radius:.6rem;font-size:.82rem;font-weight:700;cursor:pointer;text-decoration:none;margin-top:auto;${btnStyle}">
-                Upgrade to ${name} →
-            </a>
+            <button ${onClick} style="display:block;width:100%;text-align:center;padding:.6rem;border-radius:.6rem;font-size:.82rem;font-weight:700;cursor:pointer;margin-top:auto;${btnStyle}">
+                Upgrade →
+            </button>
         </div>`;
     }
 

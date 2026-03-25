@@ -108,11 +108,28 @@ class AIMentor {
 
         } catch (error) {
             this.hideTyping();
+
+            // 402 limit reached — show upgrade modal
+            if (error.message && (error.message.includes('limit_reached') || error.message.includes('402'))) {
+                if (window.PipwaysUsage && PipwaysUsage.showUpgradeModal) {
+                    PipwaysUsage.showUpgradeModal('ai_mentor',
+                        PipwaysUsage.used('ai_mentor'),
+                        PipwaysUsage.limit('ai_mentor'));
+                } else if (window.PaymentsPage) {
+                    PaymentsPage.showUpgradeModal('AI Mentor');
+                }
+                this.addMessage(
+                    "You've reached your free AI Mentor limit. Upgrade to Pro for unlimited sessions. 👆",
+                    'ai'
+                );
+                this.renderRecommendations([]);
+                return;
+            }
+
             this.addMessage(
-                "I'm having trouble connecting. Please try again shortly.", 
+                "I'm having trouble connecting. Please try again shortly.",
                 'ai'
             );
-            // Clear recommendations on error
             this.renderRecommendations([]);
         }
     }

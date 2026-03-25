@@ -404,10 +404,12 @@
 
             <!-- DEVELOPMENT -->
             <div class="nav-section-label">Development</div>
+            <a href="#" data-section="risk" class="nav-link">
+                <i class="fas fa-calculator nav-icon" style="color:#34d399;"></i><span>Risk Calculator</span>
+            </a>
             <a href="#" data-section="journal" class="nav-link">
-                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
+                <i class="fas fa-chart-line nav-icon" style="color:#fb923c;"></i>
                 <span>Performance Analytics</span>
-
             </a>
 
             <!-- AI ASSISTANT -->
@@ -1296,6 +1298,11 @@
                 </div>
             </section>
 
+            <!-- RISK CALCULATOR -->
+            <section id="section-risk" class="section hidden">
+                <div id="risk-calc-container"></div>
+            </section>
+
             <!-- AI STOCK RESEARCH -->
             <section id="section-stocks" class="section hidden">
                 <iframe 
@@ -1322,10 +1329,6 @@
 
             <!-- WEBINARS -->
             <section id="section-webinars" class="section hidden">
-                <div style="margin-bottom:1.5rem;">
-                    <h1 style="font-size:1.1rem;font-weight:700;color:white;margin:0 0 4px;">Live Webinars</h1>
-                    <p style="color:#6b7280;font-size:.875rem;margin:0;">Expert-led sessions, market walkthroughs and Q&amp;A</p>
-                </div>
                 <div id="webinars-container" class="space-y-4"></div>
             </section>
 
@@ -1786,6 +1789,7 @@ const DashboardController = class {
             'analysis':  { title: 'Validate Trade Setup',  sub: 'Upload a chart screenshot for AI-powered analysis' },
             'stocks':    { title: 'AI Stock Research',     sub: 'Fundamental and sentiment analysis on global markets' },
             'signals':   { title: 'Market Signals',        sub: 'Live trading opportunities from our analysts' },
+            'risk':      { title: 'Risk Calculator',       sub: 'Calculate your exact lot size before every trade' },
             'journal':   { title: 'Performance Analytics', sub: 'AI-powered coaching from your real trade data' },
             'mentor':    { title: 'AI Mentor',             sub: '24/7 personal trading coach' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
@@ -1834,6 +1838,7 @@ const DashboardController = class {
                 case 'courses':   await this.loadCourses();  break;
                 case 'webinars':  await this.loadWebinars(); break;
                 case 'blog':      await this.loadBlog();     break;
+                case 'risk':      this.loadRiskCalculator(); break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
                 case 'admin': {

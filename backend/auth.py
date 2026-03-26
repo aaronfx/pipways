@@ -10,12 +10,6 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 
 from .database import database, users, get_available_columns
-try:
-    from .email_service import send_welcome_email_task
-    _HAS_EMAIL = True
-except ImportError:
-    _HAS_EMAIL = False
-
 from .security import (
     verify_password,
     get_password_hash,
@@ -138,12 +132,9 @@ async def register(user_data: UserRegister):
         data={"sub": user_data.email, "user_id": user["id"]},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    # Send welcome email in background (non-fatal if email service not configured)
-    if _HAS_EMAIL:
-        import asyncio
-        asyncio.create_task(
-            send_welcome_email_task(user["id"], user_data.email, user_data.full_name)
-        )
+    # Fire welcome email (non-blocking — doesn't delay registration response)
+    import asyncio
+    asyncio.create_task(_send_welcome_async(user_data.email, user_data.full_name or ""))
 
     return {"access_token": access_token, "token_type": "bearer", "user": UserResponse(**user)}
 

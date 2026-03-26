@@ -1114,7 +1114,7 @@ LESSON CARD: Appears automatically below your response — just reference it, do
                 f"{OPENROUTER_BASE_URL}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://pipwaysapp.onrender.com",
+                    "HTTP-Referer": "https://pipways-api-production.up.railway.app",
                     "X-Title": "Pipways Trading Platform",
                     "Content-Type": "application/json"
                 },

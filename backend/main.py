@@ -56,6 +56,15 @@ except ImportError:
         print("[SUBSCRIPTIONS] subscriptions.py not found — skipping", flush=True)
 
 from . import stock_terminal_backend as stock_module
+# Auto-setup for Railway deployment
+try:
+    from .auto_setup import auto_setup_if_needed
+    _HAS_AUTO_SETUP = True
+except ImportError:
+    _HAS_AUTO_SETUP = False
+    async def auto_setup_if_needed():
+        pass
+
 
 # Email + Health
 try:
@@ -162,6 +171,13 @@ async def lifespan(app: FastAPI):
             print("[CMS] Settings table ready", flush=True)
         except Exception as e:
             print(f"[CMS] Settings init error: {e}", flush=True)
+
+        # Auto-setup database if needed (Railway deployment)
+        if _HAS_AUTO_SETUP and os.getenv("RAILWAY_ENVIRONMENT_NAME"):
+            try:
+                await auto_setup_if_needed()
+            except Exception as e:
+                print(f"[AUTO-SETUP] Error: {e}", flush=True)
 
         if _HAS_EMAIL:
             try:

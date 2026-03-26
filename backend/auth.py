@@ -19,6 +19,14 @@ from .security import (
     ALGORITHM
 )
 
+# Guard email import — email service may not be fully configured on first deploy
+try:
+    from .email_service import send_welcome_email_task as _send_welcome_email_task
+    _EMAIL_AVAILABLE = True
+except Exception:
+    _EMAIL_AVAILABLE = False
+    _send_welcome_email_task = None
+
 router = APIRouter(tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
@@ -132,9 +140,16 @@ async def register(user_data: UserRegister):
         data={"sub": user_data.email, "user_id": user["id"]},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
+
     # Fire welcome email (non-blocking — doesn't delay registration response)
-    import asyncio
-    asyncio.create_task(_send_welcome_async(user_data.email, user_data.full_name or ""))
+    if _EMAIL_AVAILABLE and _send_welcome_email_task is not None:
+        try:
+            import asyncio
+            asyncio.create_task(
+                _send_welcome_email_task(user["id"], user_data.email, user_data.full_name or "")
+            )
+        except Exception as e:
+            print(f"[Auth] Welcome email task failed (non-fatal): {e}", flush=True)
 
     return {"access_token": access_token, "token_type": "bearer", "user": UserResponse(**user)}
 

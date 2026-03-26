@@ -192,6 +192,22 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"[HEALTH] Init error: {e}", flush=True)
 
+        # Auto-promote admin user from ADMIN_EMAIL env var
+        try:
+            admin_email = os.getenv("ADMIN_EMAIL", "").strip()
+            if admin_email:
+                result = await database.execute(
+                    """UPDATE users 
+                       SET is_admin = TRUE, role = 'admin', subscription_tier = 'pro'
+                       WHERE email = :email""",
+                    {"email": admin_email}
+                )
+                print(f"[ADMIN] Promoted {admin_email} to admin (subscription_tier=pro)", flush=True)
+            else:
+                print("[ADMIN] ADMIN_EMAIL not set — skipping auto-promote", flush=True)
+        except Exception as e:
+            print(f"[ADMIN] Auto-promote error (non-fatal): {e}", flush=True)
+
         print("[STARTUP] Database connected", flush=True)
 
     except Exception as e:

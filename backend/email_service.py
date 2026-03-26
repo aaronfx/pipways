@@ -46,6 +46,43 @@ FROM_ADDRESS    = os.getenv("EMAIL_FROM_ADDRESS", "noreply@pipways.com")
 APP_BASE_URL    = os.getenv("APP_BASE_URL", "https://pipways.com")
 
 
+# ── Table initialisation ───────────────────────────────────────────────────────
+
+async def ensure_email_tables():
+    """Create email-related tables if they don't exist. Called from main.py lifespan."""
+    statements = [
+        """CREATE TABLE IF NOT EXISTS email_logs (
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER,
+            email_type VARCHAR(50),
+            to_email   VARCHAR(255),
+            success    BOOLEAN DEFAULT FALSE,
+            sent_at    TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS email_subscribers (
+            id              SERIAL PRIMARY KEY,
+            email           VARCHAR(255) UNIQUE NOT NULL,
+            name            VARCHAR(255),
+            source          VARCHAR(50),
+            subscribed_at   TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS user_email_preferences (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER UNIQUE NOT NULL,
+            preferences TEXT,
+            updated_at  TIMESTAMP DEFAULT NOW()
+        )""",
+    ]
+    ok = 0
+    for stmt in statements:
+        try:
+            await database.execute(stmt)
+            ok += 1
+        except Exception as e:
+            print(f"[EMAIL TABLES] Warning: {e}", flush=True)
+    print(f"[EMAIL] Tables ready ({ok}/{len(statements)} ok)", flush=True)
+
+
 # ── Core send ──────────────────────────────────────────────────────────────────
 
 async def send_email(to_email: str, subject: str, html_body: str,
@@ -173,33 +210,34 @@ def certificate_email(full_name: str, course_title: str, cert_number: str) -> tu
   <p style="color:#374151;margin:0;">Congratulations {first} — you completed <strong>{course_title}</strong>.</p>
 </div>
 <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:20px;text-align:center;margin-bottom:24px;">
-  <p style="margin:0;font-size:12px;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Certificate Number</p>
-  <p style="margin:6px 0 0;font-size:18px;font-weight:800;color:#78350f;font-family:monospace;">{cert_number}</p>
+  <p style="margin:0;font-size:13px;color:#92400e;">Certificate #{cert_number}</p>
 </div>
-<div style="text-align:center;">
-  <a href="{APP_BASE_URL}/academy.html" style="display:inline-block;background:#7c3aed;color:white;
-     text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;">View Certificate →</a>
-</div>"""
-    return (f"🏆 Certificate: {course_title}",
-            _base(content, f"You earned your {course_title} certificate!"))
+<a href="{APP_BASE_URL}/academy.html" style="display:inline-block;background:#3b82f6;color:white;
+   text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:700;font-size:15px;">
+   View Certificate →
+</a>"""
+    return (f"🏆 Certificate Earned: {course_title}",
+            _base(content, f"You earned a certificate for {course_title}!"))
 
 
 def new_signal_email(full_name: str, symbol: str, direction: str,
                      entry: float, sl: float, tp: float) -> tuple:
-    color = "#10b981" if direction.upper() == "BUY" else "#ef4444"
-    arrow = "↑" if direction.upper() == "BUY" else "↓"
-    rows  = [("Direction", f"{arrow} {direction.upper()}", color),
-             ("Entry Price", str(entry), "#111827"),
-             ("Stop Loss",   str(sl),    "#ef4444"),
-             ("Take Profit", str(tp),    "#10b981")]
-    table_rows = "".join(
-        f'<tr style="border-bottom:1px solid #f3f4f6;">'
-        f'<td style="font-size:13px;color:#6b7280;font-weight:600;padding:10px;width:40%;">{l}</td>'
-        f'<td style="font-size:14px;color:{c};font-weight:700;padding:10px;">{v}</td></tr>'
-        for l, v, c in rows
-    )
+    first  = (full_name or "Trader").split()[0]
+    color  = "#22c55e" if direction.upper() == "BUY" else "#ef4444"
+    rr     = round(abs(tp - entry) / abs(entry - sl), 2) if abs(entry - sl) > 0 else 0
+    table_rows = f"""
+<tr style="background:#f9fafb;"><td style="padding:10px;font-weight:600;">Direction</td>
+  <td style="padding:10px;color:{color};font-weight:700;">{direction.upper()}</td></tr>
+<tr><td style="padding:10px;font-weight:600;">Entry</td><td style="padding:10px;">{entry}</td></tr>
+<tr style="background:#f9fafb;"><td style="padding:10px;font-weight:600;">Stop Loss</td>
+  <td style="padding:10px;color:#ef4444;">{sl}</td></tr>
+<tr><td style="padding:10px;font-weight:600;">Take Profit</td>
+  <td style="padding:10px;color:#22c55e;">{tp}</td></tr>
+<tr style="background:#f9fafb;"><td style="padding:10px;font-weight:600;">R:R Ratio</td>
+  <td style="padding:10px;">1:{rr}</td></tr>"""
     content = f"""
-<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">New Signal: {symbol} {arrow}</h2>
+<h2 style="margin:0 0 16px;font-size:22px;color:#111827;">New Signal: {symbol} 📊</h2>
+<p style="color:#374151;margin:0 0 20px;">Hey {first}, a new {direction.upper()} signal is live for {symbol}.</p>
 <table width="100%" cellpadding="0" cellspacing="0"
        style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:20px;">{table_rows}</table>
 <a href="{APP_BASE_URL}/dashboard.html#/signals" style="display:inline-block;background:{color};
@@ -230,6 +268,12 @@ async def send_welcome_email_task(user_id: int, email: str, full_name: str):
     subject, html = welcome_email(full_name)
     ok = await send_email(email, subject, html)
     await log_email(user_id, "welcome", email, ok)
+
+
+# Alias used by main.py import: `from .email_service import send_welcome`
+async def send_welcome(user_id: int, email: str, full_name: str):
+    """Thin alias for send_welcome_email_task — used by main.py lifespan."""
+    await send_welcome_email_task(user_id, email, full_name)
 
 
 async def send_lesson_complete_task(user_id: int, email: str, full_name: str,

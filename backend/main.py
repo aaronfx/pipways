@@ -73,24 +73,15 @@ async def run_enhanced_signals_migration():
     try:
         print("[ENHANCED SIGNALS] Checking migration status...")
         
-        # Check if migration is needed - using databases library pattern
-        check_query = """
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'signals' 
-            AND table_schema = 'public'
-            AND column_name IN ('pattern', 'full_name', 'asset_type')
+        # Get existing columns
+        existing_query = """
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'signals' AND table_schema = 'public'
         """
-        rows = await database.fetch_all(check_query)
-        enhanced_columns = [row["column_name"] for row in rows]
+        existing_rows = await database.fetch_all(existing_query)
+        existing_columns = [row["column_name"] for row in existing_rows]
         
-        if len(enhanced_columns) >= 3:
-            print("[ENHANCED SIGNALS] ✅ Migration already applied")
-            return True
-            
-        print("[ENHANCED SIGNALS] 🔄 Running migration...")
-        
-        # Add new columns
+        # All columns we need
         new_columns = [
             ('pattern', 'VARCHAR(50)'),
             ('full_name', 'TEXT'),
@@ -108,15 +99,9 @@ async def run_enhanced_signals_migration():
             ('entry', 'VARCHAR(50)'),
             ('target', 'VARCHAR(50)'),
             ('stop', 'VARCHAR(50)'),
+            ('pattern_points', 'TEXT'),  # JSON: [{time, price}, ...]
+            ('pattern_lines', 'TEXT'),   # JSON: [{start: {time, price}, end: {time, price}}, ...]
         ]
-        
-        # Get existing columns
-        existing_query = """
-            SELECT column_name FROM information_schema.columns 
-            WHERE table_name = 'signals' AND table_schema = 'public'
-        """
-        existing_rows = await database.fetch_all(existing_query)
-        existing_columns = [row["column_name"] for row in existing_rows]
         
         # Add missing columns
         columns_added = 0

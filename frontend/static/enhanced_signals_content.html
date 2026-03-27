@@ -1,458 +1,537 @@
-<!-- Enhanced Signals Content - frontend/static/enhanced_signals_content.html -->
-<style>
-    /* Include all the CSS from the professional signals page */
-    :root {
-        --bg-primary: #0a0c0f;
-        --bg-secondary: #0f1419;
-        --bg-tertiary: #1a1e24;
-        --accent-orange: #ff8c2a;
-        --accent-purple: #8b5cf6;
-        --accent-cyan: #22d3ee;
-        --text-primary: #ffffff;
-        --text-secondary: #9ca3af;
-        --text-muted: #6b7280;
-        --success-green: #10b981;
-        --danger-red: #ef4444;
-        --warning-yellow: #f59e0b;
-        --border-primary: #374151;
-        --border-secondary: #1f2937;
-    }
+<!-- Enhanced Signals Content for Pipways Dashboard -->
+<div class="enhanced-signals-container">
+    <!-- Performance Stats Header -->
+    <div class="bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 rounded-lg p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-center">
+                <div class="text-3xl font-bold text-white mb-2">
+                    <span class="stat-value">78</span>%
+                </div>
+                <div class="text-purple-200">Win Rate</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-white mb-2">
+                    <span class="stat-value">2.4</span>:1
+                </div>
+                <div class="text-purple-200">Average R:R</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-white mb-2">
+                    <span class="stat-value">12</span>
+                </div>
+                <div class="text-purple-200">Live Signals</div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Filter and Tab Section -->
+    <div class="flex flex-col lg:flex-row gap-6">
+        <!-- Desktop Filters Sidebar -->
+        <div id="filterSidebar" class="w-full lg:w-64 bg-gray-800 rounded-lg p-4 lg:sticky lg:top-4 lg:h-fit transition-all duration-300">
+            <div class="flex items-center justify-between mb-4 lg:mb-6">
+                <h3 class="font-semibold text-white">Filters</h3>
+                <button id="closeMobileFilter" class="lg:hidden text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Confidence Filter -->
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-300 mb-3">Confidence Level</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="confidence" value="60" id="conf60" checked class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">≥60%</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="confidence" value="70" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">≥70%</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="confidence" value="80" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">≥80%</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="confidence" value="90" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">≥90%</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Asset Type Filter -->
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-300 mb-3">Asset Type</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="asset" value="all" id="assetAll" checked class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">All Assets</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="asset" value="forex" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Forex</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="asset" value="indices" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Indices</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="asset" value="commodities" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Commodities</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="asset" value="crypto" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Crypto</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Country Filter -->
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-300 mb-3">Country</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="country" value="all" id="countryAll" checked class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">All Countries</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="country" value="US" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">🇺🇸 United States</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="country" value="EU" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">🇪🇺 European Union</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="country" value="AU" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">🇦🇺 Australia</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="country" value="CN" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">🇨🇳 China</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Pattern Filter -->
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-300 mb-3">Pattern Type</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="pattern" value="all" id="patternAll" checked class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">All Patterns</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="pattern" value="flag" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Flag</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="pattern" value="wedge" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Wedge</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="pattern" value="pennant" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Pennant</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-300 mb-3">Status</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="status" value="all" id="statusAll" checked class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">All Status</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="status" value="active" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Active</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="status" value="closed" class="text-purple-600 focus:ring-purple-500">
+                        <span class="ml-2 text-sm text-gray-300">Closed</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Filter Action Buttons -->
+            <div class="space-y-3">
+                <button id="applyFilters" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                    Apply Filters
+                </button>
+                <button id="resetFilters" class="w-full bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition-colors">
+                    Reset All
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1">
+            <!-- Mobile Filter Toggle -->
+            <div class="lg:hidden mb-4 flex items-center justify-between">
+                <button id="filterToggle" class="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center">
+                    <i class="fas fa-filter mr-2"></i>
+                    Filters
+                </button>
+                <div class="text-sm text-gray-400">
+                    <span id="resultsCount">Loading...</span> signals found
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex space-x-1 bg-gray-800 rounded-lg p-1 mb-6">
+                <button id="aiDrivenTab" class="flex-1 py-2 px-4 rounded-md font-medium transition-colors active bg-purple-600 text-white">
+                    AI-Driven Signals
+                </button>
+                <button id="patternTab" class="flex-1 py-2 px-4 rounded-md font-medium transition-colors text-gray-400 hover:text-white">
+                    Pattern Analysis
+                </button>
+            </div>
+
+            <!-- Signals Grid -->
+            <div id="signalsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+                <!-- Signal cards will be populated here -->
+                <div class="col-span-full text-center py-12">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                    <p class="text-gray-400">Loading enhanced signals...</p>
+                </div>
+            </div>
+
+            <!-- Load More Button -->
+            <div class="text-center">
+                <button id="loadMoreBtn" class="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors hidden">
+                    Load More Signals
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden"></div>
+
+    <!-- Signal Detail Modal -->
+    <div id="signalModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4" style="backdrop-filter: blur(4px);">
+        <div class="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-700">
+                <h2 id="modalTitle" class="text-xl font-bold text-white">Signal Details</h2>
+                <button id="closeModal" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Content -->
+            <div id="modalContent" class="p-6">
+                <!-- Content will be loaded dynamically -->
+                <div class="text-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                    <p class="text-gray-400">Loading signal details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Signals Styles -->
+<style>
+    /* Signal Cards */
     .signal-card {
-        background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
-        border: 1px solid var(--border-secondary);
+        background: linear-gradient(135deg, #1a1e24, #0f1419);
+        border: 1px solid #374151;
         border-radius: 12px;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .signal-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, var(--accent-orange), var(--accent-purple));
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .signal-card:hover::before {
-        opacity: 1;
+        animation: fadeInUp 0.6s ease-out both;
     }
 
     .signal-card:hover {
-        border-color: var(--accent-purple);
+        border-color: #8b5cf6;
         transform: translateY(-4px);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(139, 92, 246, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.1);
     }
 
+    /* Badge Styles */
     .live-badge {
-        background: linear-gradient(90deg, var(--accent-orange), #ff6b1a);
+        background: linear-gradient(135deg, #10b981, #059669);
         color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
+        font-size: 10px;
         font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 4px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        animation: pulse-glow 2s infinite;
-    }
-
-    @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 8px rgba(255, 140, 42, 0.4); }
-        50% { box-shadow: 0 0 16px rgba(255, 140, 42, 0.8); }
+        animation: pulse 2s infinite;
     }
 
     .pattern-badge {
-        background: linear-gradient(90deg, var(--accent-purple), #7c3aed);
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
         color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
+        font-size: 10px;
         font-weight: 600;
-    }
-
-    .buy-stop { 
-        background: linear-gradient(90deg, var(--success-green), #059669);
-        color: white;
-        padding: 6px 16px;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 0.875rem;
-    }
-
-    .sell-stop { 
-        background: linear-gradient(90deg, var(--danger-red), #dc2626);
-        color: white;
-        padding: 6px 16px;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 0.875rem;
-    }
-
-    .mini-chart {
-        background: linear-gradient(135deg, rgba(34, 211, 238, 0.05), rgba(139, 92, 246, 0.05));
-        border-radius: 8px;
-        height: 120px;
-        position: relative;
-        overflow: hidden;
-        border: 1px solid var(--border-secondary);
-    }
-
-    .chart-overlay {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        text-align: center;
-    }
-
-    .filter-sidebar {
-        background: linear-gradient(180deg, var(--bg-secondary), var(--bg-tertiary));
-        border-right: 1px solid var(--border-primary);
-        min-height: calc(100vh - 120px);
-    }
-
-    .filter-group { margin-bottom: 24px; }
-    .filter-title { color: var(--accent-orange); font-weight: 600; font-size: 1rem; margin-bottom: 12px; }
-    
-    .filter-option {
-        display: flex;
-        align-items: center;
-        padding: 8px 0;
-        cursor: pointer;
-        transition: color 0.2s ease;
-    }
-    .filter-option:hover { color: var(--accent-purple); }
-    
-    .filter-option input[type="radio"] {
-        appearance: none;
-        width: 16px;
-        height: 16px;
-        border: 2px solid var(--border-primary);
-        border-radius: 50%;
-        margin-right: 12px;
-        position: relative;
-        transition: all 0.2s ease;
-    }
-    .filter-option input[type="radio"]:checked { border-color: var(--accent-purple); }
-    .filter-option input[type="radio"]:checked::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--accent-purple);
-    }
-
-    .sentiment-bar {
-        background: var(--bg-tertiary);
-        height: 8px;
+        padding: 4px 8px;
         border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .timeframe-badge {
+        background: rgba(107, 114, 128, 0.3);
+        color: #9ca3af;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid rgba(107, 114, 128, 0.2);
+    }
+
+    /* Trade Direction Buttons */
+    .buy-stop {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+    }
+
+    .sell-stop {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+    }
+
+    /* Trade Levels */
+    .trade-levels {
+        background: rgba(31, 41, 55, 0.5);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 16px 0;
+    }
+
+    .level-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .level-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .level-label {
+        font-size: 12px;
+        color: #9ca3af;
+        font-weight: 500;
+    }
+
+    .level-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .level-entry {
+        color: #60a5fa;
+    }
+
+    .level-target {
+        color: #10b981;
+    }
+
+    .level-stop {
+        color: #ef4444;
+    }
+
+    /* Sentiment Bar */
+    .sentiment-bar {
+        width: 100%;
+        height: 6px;
+        background: rgba(107, 114, 128, 0.3);
+        border-radius: 3px;
         overflow: hidden;
-        position: relative;
     }
 
     .sentiment-fill {
         height: 100%;
-        transition: width 0.6s ease;
-        position: relative;
+        border-radius: 3px;
+        transition: width 0.3s ease;
     }
 
-    .sentiment-bearish { background: linear-gradient(90deg, var(--danger-red), #dc2626); }
-    .sentiment-bullish { background: linear-gradient(90deg, var(--success-green), #059669); }
-
-    .timeframe-badge {
-        background: var(--bg-tertiary);
-        border: 1px solid var(--border-secondary);
-        color: var(--text-secondary);
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 500;
+    .sentiment-bullish {
+        background: linear-gradient(135deg, #10b981, #059669);
     }
 
-    .learn-btn {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: var(--text-primary);
-        padding: 8px 20px;
+    .sentiment-bearish {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    /* Mini Chart */
+    .mini-chart {
+        height: 60px;
+        background: rgba(31, 41, 55, 0.3);
         border-radius: 6px;
-        font-weight: 500;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .chart-overlay {
+        position: absolute;
+        bottom: 4px;
+        left: 6px;
+        z-index: 1;
+    }
+
+    /* Action Buttons */
+    .learn-btn {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        cursor: pointer;
         transition: all 0.2s ease;
     }
 
     .learn-btn:hover {
-        background: rgba(255, 255, 255, 0.15);
-        border-color: var(--accent-purple);
+        background: linear-gradient(135deg, #7c3aed, #6d28d9);
+        transform: translateY(-1px);
     }
 
     .install-ea-btn {
-        background: linear-gradient(90deg, var(--accent-purple), #7c3aed);
+        background: linear-gradient(135deg, #f59e0b, #d97706);
         color: white;
-        padding: 10px 24px;
+        border: none;
+        padding: 8px 16px;
         border-radius: 6px;
         font-weight: 600;
-        border: none;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         cursor: pointer;
         transition: all 0.2s ease;
     }
 
     .install-ea-btn:hover {
+        background: linear-gradient(135deg, #d97706, #b45309);
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
     }
 
-    .trade-levels {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 16px;
-        margin: 16px 0;
+    /* Expiry Time */
+    .expiry-time {
+        color: #fbbf24;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
     }
 
-    .level-item { text-align: center; }
-    .level-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
-    .level-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 0.875rem; }
-    .level-entry { color: var(--accent-cyan); }
-    .level-target { color: var(--success-green); }
-    .level-stop { color: var(--danger-red); }
-
-    .expiry-time { color: var(--warning-yellow); font-weight: 600; }
-
-    .tab-button {
-        background: transparent;
-        border: 1px solid var(--border-secondary);
-        color: var(--text-secondary);
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 500;
-        transition: all 0.2s ease;
+    /* Filter Sidebar Mobile */
+    #filterSidebar {
+        transform: translateX(-100%);
     }
 
-    .tab-button.active {
-        background: var(--accent-orange);
-        color: white;
-        border-color: var(--accent-orange);
+    #filterSidebar.active {
+        transform: translateX(0);
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 50;
+        overflow-y: auto;
     }
 
-    .tab-button:not(.active):hover {
-        background: var(--accent-purple);
-        color: white;
-        border-color: var(--accent-purple);
-    }
-
-    @media (max-width: 768px) {
-        .filter-sidebar {
-            position: fixed;
-            top: 0;
-            left: -100%;
-            width: 280px;
-            z-index: 50;
-            transition: left 0.3s ease;
-            height: 100vh;
+    @media (min-width: 1024px) {
+        #filterSidebar {
+            transform: translateX(0) !important;
+            position: static !important;
+            height: auto !important;
+            z-index: auto !important;
         }
-        .filter-sidebar.active { left: 0; }
+    }
+
+    /* Mobile Overlay */
+    #mobileOverlay {
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+
+    #mobileOverlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* Tab Active State */
+    .active {
+        background-color: #8b5cf6 !important;
+        color: white !important;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    /* Responsive Grid */
+    @media (max-width: 768px) {
+        #signalsGrid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+    }
+
+    @media (min-width: 769px) and (max-width: 1200px) {
+        #signalsGrid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* Scrollbar Styling */
+    #filterSidebar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    #filterSidebar::-webkit-scrollbar-track {
+        background: #1f2937;
+    }
+
+    #filterSidebar::-webkit-scrollbar-thumb {
+        background: #4b5563;
+        border-radius: 2px;
+    }
+
+    /* Focus Styles for Accessibility */
+    .focus-ring:focus {
+        outline: 2px solid #8b5cf6;
+        outline-offset: 2px;
+    }
+
+    /* Performance Optimizations */
+    .gpu-accelerated {
+        transform: translateZ(0);
+        will-change: transform;
     }
 </style>
-
-<!-- Mobile Overlay -->
-<div class="mobile-overlay fixed inset-0 bg-black bg-opacity-50 hidden z-40" id="mobileOverlay"></div>
-
-<!-- Performance Stats Header -->
-<div class="mb-6 p-4 bg-gradient-to-r from-gray-900 to-gray-800 rounded-lg border border-gray-700">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-white">Market Signals</h1>
-            <p class="text-sm text-gray-400">Professional AI Trading Insights</p>
-        </div>
-        <div class="flex items-center gap-4">
-            <!-- Performance Stats -->
-            <div class="hidden md:flex items-center gap-4">
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
-                    <div class="text-lg font-bold text-purple-400">78%</div>
-                    <div class="text-xs text-gray-400">Win Rate</div>
-                </div>
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
-                    <div class="text-lg font-bold text-purple-400">2.4</div>
-                    <div class="text-xs text-gray-400">Avg R:R</div>
-                </div>
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
-                    <div class="text-lg font-bold text-purple-400">12</div>
-                    <div class="text-xs text-gray-400">Live Signals</div>
-                </div>
-            </div>
-            <!-- Filter Toggle -->
-            <button id="filterToggle" class="md:hidden p-2 bg-gray-800 rounded-lg border border-gray-700 text-white hover:bg-gray-700">
-                <i class="fas fa-filter"></i>
-            </button>
-        </div>
-    </div>
-</div>
-
-<div class="flex gap-6">
-    <!-- Filter Sidebar -->
-    <div id="filterSidebar" class="filter-sidebar w-64 p-6 hidden md:block rounded-lg">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-bold text-white">Filters</h2>
-            <button id="closeMobileFilter" class="md:hidden text-gray-400 hover:text-white">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        
-        <!-- Confidence Filter -->
-        <div class="filter-group">
-            <div class="filter-title">Confidence</div>
-            <div class="filter-option">
-                <input type="radio" name="confidence" value="20" id="conf20">
-                <label for="conf20">≥ 20%</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="confidence" value="40" id="conf40">
-                <label for="conf40">≥ 40%</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="confidence" value="60" id="conf60" checked>
-                <label for="conf60">≥ 60%</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="confidence" value="80" id="conf80">
-                <label for="conf80">≥ 80%</label>
-            </div>
-        </div>
-
-        <!-- Asset Class Filter -->
-        <div class="filter-group">
-            <div class="filter-title">Asset Class</div>
-            <div class="filter-option">
-                <input type="radio" name="asset" value="all" id="assetAll" checked>
-                <label for="assetAll">All Assets</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="asset" value="forex" id="forex">
-                <label for="forex">Forex</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="asset" value="indices" id="indices">
-                <label for="indices">Indices</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="asset" value="commodities" id="commodities">
-                <label for="commodities">Commodities</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="asset" value="crypto" id="crypto">
-                <label for="crypto">Crypto</label>
-            </div>
-        </div>
-
-        <!-- Pattern Filter -->
-        <div class="filter-group">
-            <div class="filter-title">Pattern Type</div>
-            <div class="filter-option">
-                <input type="radio" name="pattern" value="all" id="patternAll" checked>
-                <label for="patternAll">All Patterns</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="pattern" value="flag" id="flag">
-                <label for="flag">Flag</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="pattern" value="wedge" id="wedge">
-                <label for="wedge">Wedge</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="pattern" value="pennant" id="pennant">
-                <label for="pennant">Pennant</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="pattern" value="triangle" id="triangle">
-                <label for="triangle">Triangle</label>
-            </div>
-        </div>
-
-        <!-- Live Status Filter -->
-        <div class="filter-group">
-            <div class="filter-title">Live Status</div>
-            <div class="filter-option">
-                <input type="radio" name="status" value="all" id="statusAll" checked>
-                <label for="statusAll">All Signals</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="status" value="active" id="statusActive">
-                <label for="statusActive">Active Only</label>
-            </div>
-            <div class="filter-option">
-                <input type="radio" name="status" value="expired" id="statusExpired">
-                <label for="statusExpired">Expired</label>
-            </div>
-        </div>
-
-        <!-- Filter Actions -->
-        <div class="mt-8">
-            <button id="applyFilters" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium mb-2 hover:bg-purple-700 transition-colors">
-                Apply Filters
-            </button>
-            <button id="resetFilters" class="w-full bg-gray-700 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-600 transition-colors">
-                Reset
-            </button>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="flex-1">
-        <!-- Signal Type Tabs -->
-        <div class="flex gap-4 mb-6">
-            <button class="tab-button active" id="aiDrivenTab">
-                <i class="fas fa-robot mr-2"></i>
-                AI-Driven Trade Ideas
-            </button>
-            <button class="tab-button" id="patternTab">
-                <i class="fas fa-chart-line mr-2"></i>
-                Pattern Trade Ideas
-            </button>
-        </div>
-
-        <!-- Signals Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8" id="signalsGrid">
-            <!-- Signal cards will be populated by JavaScript -->
-            <div class="col-span-full text-center py-12">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                <p class="text-gray-400">Loading signals...</p>
-            </div>
-        </div>
-
-        <!-- Load More -->
-        <div class="text-center">
-            <button id="loadMoreBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg font-medium transition-colors">
-                Load More Signals
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Signal Details Modal -->
-<div id="signalModal" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50">
-    <div class="bg-gray-900 rounded-lg p-6 max-w-5xl max-h-[90vh] overflow-y-auto m-4 w-full border border-gray-700">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-white" id="modalTitle">Signal Details</h2>
-            <button id="closeModal" class="text-gray-400 hover:text-white">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        
-        <div id="modalContent">
-            <!-- Modal content will be populated by JavaScript -->
-            <div class="text-center py-8">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                <p class="text-gray-400">Loading analysis...</p>
-            </div>
-        </div>
-    </div>
-</div>

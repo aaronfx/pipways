@@ -1,5 +1,5 @@
 # Signals API — Production Clean Version
-# Deploy to: backend/signals.py
+# Deploy to: routes/signals.py
 #
 # ✅ ONLY returns real database records
 # ✅ NO mock/fake/placeholder data
@@ -12,7 +12,7 @@ from typing import Optional, List
 from datetime import datetime
 import json
 
-router = APIRouter(tags=["signals"])
+router = APIRouter(prefix="/signals", tags=["signals"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PYDANTIC MODELS

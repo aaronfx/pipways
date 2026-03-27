@@ -32,7 +32,8 @@ from backend.risk_calculator import router as risk_router
 from backend.database import database, init_database, run_migrations, run_unique_index_migrations
 
 # Define BASE_DIR before any route handlers
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent  # /app/backend
+FRONTEND_DIR = BASE_DIR.parent / "frontend"  # /app/frontend
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -364,15 +365,15 @@ app.include_router(learning_router, prefix="/learning", tags=["Learning Manageme
 app.include_router(risk_router, prefix="/risk", tags=["Risk Calculator"])
 
 # Mount static files
-app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
-app.mount("/js", StaticFiles(directory=BASE_DIR / "frontend" / "js"), name="js")
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
+app.mount("/js", StaticFiles(directory=FRONTEND_DIR / "js"), name="js")
 
 # Enhanced signals content endpoint
 @app.get("/static/enhanced_signals_content.html")
 async def get_enhanced_signals_content():
     """Serve the enhanced signals page content"""
     try:
-        content_path = BASE_DIR / "frontend" / "static" / "enhanced_signals_content.html"
+        content_path = FRONTEND_DIR / "static" / "enhanced_signals_content.html"
         if not content_path.exists():
             raise HTTPException(status_code=404, detail="Enhanced signals content not found")
         
@@ -396,7 +397,7 @@ async def get_active_signals_legacy(current_user: dict = Depends(get_current_use
 async def read_root():
     """Serve the landing page"""
     try:
-        index_path = BASE_DIR / "frontend" / "static" / "index.html"
+        index_path = FRONTEND_DIR / "static" / "index.html"
         if not index_path.exists():
             return HTMLResponse(content="<h1>Pipways API</h1><p>Welcome to Pipways - Nigeria's Trading Education Platform</p>")
         
@@ -412,7 +413,7 @@ async def read_root():
 async def get_dashboard():
     """Serve the main dashboard"""
     try:
-        dashboard_path = BASE_DIR / "frontend" / "static" / "dashboard.html"
+        dashboard_path = FRONTEND_DIR / "static" / "dashboard.html"
         if not dashboard_path.exists():
             raise HTTPException(status_code=404, detail="Dashboard not found")
         
@@ -430,7 +431,7 @@ async def get_dashboard():
 async def get_academy():
     """Serve the trading academy"""
     try:
-        academy_path = BASE_DIR / "frontend" / "static" / "academy.html"
+        academy_path = FRONTEND_DIR / "static" / "academy.html"
         if not academy_path.exists():
             raise HTTPException(status_code=404, detail="Academy not found")
         
@@ -448,7 +449,7 @@ async def get_academy():
 async def get_pricing():
     """Serve the pricing page"""
     try:
-        pricing_path = BASE_DIR / "frontend" / "static" / "pricing.html"
+        pricing_path = FRONTEND_DIR / "static" / "pricing.html"
         if not pricing_path.exists():
             raise HTTPException(status_code=404, detail="Pricing page not found")
         
@@ -466,7 +467,7 @@ async def get_pricing():
 async def get_risk_calculator():
     """Serve the public risk calculator"""
     try:
-        risk_calc_path = BASE_DIR / "frontend" / "static" / "risk_calculator.html"
+        risk_calc_path = FRONTEND_DIR / "static" / "risk_calculator.html"
         if not risk_calc_path.exists():
             raise HTTPException(status_code=404, detail="Risk calculator not found")
         
@@ -484,7 +485,7 @@ async def get_risk_calculator():
 async def get_stock_terminal():
     """Serve the stock research terminal"""
     try:
-        stock_terminal_path = BASE_DIR / "frontend" / "static" / "stock_terminal.html"
+        stock_terminal_path = FRONTEND_DIR / "static" / "stock_terminal.html"
         if not stock_terminal_path.exists():
             raise HTTPException(status_code=404, detail="Stock terminal not found")
         
@@ -554,7 +555,7 @@ async def api_info():
 @app.get("/favicon.ico")
 async def get_favicon():
     """Serve favicon"""
-    favicon_path = BASE_DIR / "frontend" / "static" / "favicon.ico"
+    favicon_path = FRONTEND_DIR / "static" / "favicon.ico"
     if favicon_path.exists():
         return FileResponse(favicon_path)
     else:

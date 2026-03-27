@@ -17,111 +17,188 @@
     // ═══════════════════════════════════════════════════════════════════════════
 
     const IQ_STYLES = `
+    /* ══════════════════════════════════════════════════════════════════════════
+       AnalysisIQ TradingView Edition — Professional Signal Cards
+       ══════════════════════════════════════════════════════════════════════════ */
+
+    /* Force 3-column grid for signals */
+    #signalsGrid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 20px !important;
+    }
+    @media (max-width: 1024px) {
+        #signalsGrid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    @media (max-width: 640px) {
+        #signalsGrid { grid-template-columns: 1fr !important; }
+    }
+
     /* ── AnalysisIQ Base Card ─────────────────────────────────────────────── */
     .aiq-card {
         position: relative;
-        background: #0B0E11;
-        border: 1px solid rgba(0, 243, 255, 0.08);
-        border-radius: 12px;
+        background: #131722;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
         overflow: hidden;
-        cursor: pointer;
+        cursor: default;
         transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
     }
 
     /* Active signal glow */
     .aiq-card.aiq-active {
-        box-shadow:
-            0 0 15px rgba(0, 243, 255, 0.05),
-            inset 0 0 10px rgba(0, 243, 255, 0.02);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
     }
 
     .aiq-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(0, 243, 255, 0.22);
-        box-shadow:
-            0 0 28px rgba(0, 243, 255, 0.10),
-            inset 0 0 16px rgba(0, 243, 255, 0.04);
-    }
-
-    /* Accent gradient line at top */
-    .aiq-card::before {
-        content: '';
-        display: block;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #00f3ff, transparent);
-        position: absolute;
-        top: 0; left: 0; right: 0;
+        transform: translateY(-4px);
+        border-color: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
 
     /* Closed states — dimmed glow */
-    .aiq-card.aiq-profit  { border-color: rgba(0, 255, 136, 0.15); }
-    .aiq-card.aiq-loss    { border-color: rgba(255, 56, 96, 0.15);  }
+    .aiq-card.aiq-profit  { border-color: rgba(0, 255, 136, 0.2); }
+    .aiq-card.aiq-loss    { border-color: rgba(255, 56, 96, 0.2);  }
     .aiq-card.aiq-expired { border-color: rgba(100, 100, 120, 0.15); opacity: 0.65; }
 
     /* Monospaced price figures */
     .aiq-price {
         font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.02em;
     }
 
-    /* Action badge */
-    .aiq-badge {
+    /* Live Trade Badge */
+    .aiq-live-badge {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 3px 10px;
+        padding: 4px 10px;
+        background: rgba(0, 200, 150, 0.15);
+        border: 1px solid rgba(0, 200, 150, 0.4);
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #00d4aa;
+        text-transform: uppercase;
+    }
+    .aiq-live-badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        background: #00d4aa;
+        border-radius: 50%;
+        animation: aiq-live-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes aiq-live-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* TradingView Icon Badge */
+    .aiq-tv-badge {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #2962ff, #1e88e5);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: bold;
+        color: white;
+    }
+
+    /* Order Type Badge */
+    .aiq-order-badge {
+        display: inline-block;
+        padding: 6px 16px;
         border-radius: 4px;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-    }
-    .aiq-badge-buy  { background: rgba(0, 200, 100, 0.15); color: #00e87a; border: 1px solid rgba(0, 200, 100, 0.3); }
-    .aiq-badge-sell { background: rgba(255, 56, 96, 0.15);  color: #ff4d6d; border: 1px solid rgba(255, 56, 96, 0.3);  }
-
-    /* Status pill */
-    .aiq-status {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-size: 10px;
-        font-weight: 600;
         letter-spacing: 0.06em;
         text-transform: uppercase;
     }
-    .aiq-status-live    { background: rgba(0, 243, 255, 0.10); color: #00f3ff; }
-    .aiq-status-profit  { background: rgba(0, 255, 136, 0.10); color: #00ff88; }
-    .aiq-status-loss    { background: rgba(255, 56, 96, 0.10);  color: #ff385f; }
-    .aiq-status-expired { background: rgba(100, 100, 120, 0.15); color: #8888aa; }
+    .aiq-order-buy  { background: #00c896; color: #000; }
+    .aiq-order-sell { background: #ff4757; color: #fff; }
 
-    /* Data grid */
-    .aiq-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1px;
-        background: rgba(0, 243, 255, 0.06);
-        border: 1px solid rgba(0, 243, 255, 0.06);
-        border-radius: 6px;
+    /* Flag Icon */
+    .aiq-flag {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Chart Container */
+    .aiq-chart-container {
+        width: 100%;
+        height: 160px;
+        background: #0d1117;
+        position: relative;
         overflow: hidden;
     }
-    .aiq-cell {
-        background: #0d1117;
-        padding: 8px 10px;
+    .aiq-chart-container iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
     }
-    .aiq-cell-label {
-        font-size: 9px;
-        font-weight: 600;
-        letter-spacing: 0.1em;
+
+    /* Price Row */
+    .aiq-price-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: rgba(0,0,0,0.2);
+    }
+    .aiq-price-item {
+        text-align: center;
+        flex: 1;
+    }
+    .aiq-price-label {
+        font-size: 10px;
+        color: #6b7280;
+        margin-bottom: 4px;
         text-transform: uppercase;
-        color: #4a5568;
-        margin-bottom: 3px;
+        letter-spacing: 0.05em;
     }
-    .aiq-cell-value {
-        font-size: 13px;
+    .aiq-price-value {
+        font-size: 15px;
         font-weight: 600;
-        color: #e2e8f0;
+    }
+
+    /* Expires Row */
+    .aiq-expires-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 16px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* Learn More Button */
+    .aiq-learn-btn {
+        display: inline-block;
+        padding: 10px 24px;
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 6px;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+    }
+    .aiq-learn-btn:hover {
+        background: rgba(255,255,255,0.05);
+        border-color: rgba(255,255,255,0.3);
     }
 
     /* Countdown */
@@ -136,38 +213,38 @@
     /* Tab toggle */
     .aiq-tab-bar {
         display: flex;
-        gap: 4px;
-        background: #0B0E11;
-        border: 1px solid rgba(0, 243, 255, 0.08);
-        border-radius: 8px;
-        padding: 4px;
+        gap: 16px;
+        margin-bottom: 24px;
+        align-items: center;
     }
-    .aiq-tab {
-        flex: 1;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.05em;
+    .aiq-tab-icon {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #6b7280;
         cursor: pointer;
-        transition: all 0.2s ease;
-        text-align: center;
-        color: #4a5568;
-        border: none;
-        background: transparent;
+        transition: color 0.2s ease;
     }
-    .aiq-tab.active {
-        background: rgba(0, 243, 255, 0.08);
-        color: #00f3ff;
-        border: 1px solid rgba(0, 243, 255, 0.20);
+    .aiq-tab-icon:hover { color: #9ca3af; }
+    .aiq-tab-icon.active { color: #fff; }
+    .aiq-tab-icon .icon-circle {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
     }
-    .aiq-tab:hover:not(.active) { color: #718096; background: rgba(255,255,255,0.02); }
+    .aiq-tab-icon.ai-driven .icon-circle { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .aiq-tab-icon.analysis-iq .icon-circle { background: linear-gradient(135deg, #2962ff, #1e88e5); }
 
-    /* ── Deep Insight Modal ───────────────────────────────────────────────── */
+    /* ── Deep Insight Modal with TradingView ───────────────────────────────── */
     .aiq-modal-overlay {
         position: fixed; inset: 0;
-        background: rgba(0, 5, 12, 0.85);
-        backdrop-filter: blur(6px);
+        background: rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(8px);
         z-index: 9999;
         display: flex;
         align-items: center;
@@ -183,89 +260,90 @@
     }
     .aiq-modal {
         position: relative;
-        background: #0B0E11;
-        border: 1px solid rgba(0, 243, 255, 0.15);
-        border-radius: 16px;
+        background: #131722;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
         width: 100%;
-        max-width: 720px;
+        max-width: 900px;
         max-height: 90vh;
         overflow-y: auto;
-        box-shadow:
-            0 0 60px rgba(0, 243, 255, 0.08),
-            0 32px 64px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.8);
         transform: translateY(12px);
         transition: transform 0.2s ease;
     }
     .aiq-modal-overlay.open .aiq-modal { transform: translateY(0); }
-    .aiq-modal::before {
-        content: '';
-        display: block;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #00f3ff 30%, #0070ff 70%, transparent);
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        border-radius: 16px 16px 0 0;
+
+    /* Modal Chart */
+    .aiq-modal-chart {
+        width: 100%;
+        height: 450px;
+        background: #0d1117;
+        position: relative;
+    }
+    .aiq-modal-chart iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+    @media (max-width: 768px) {
+        .aiq-modal-chart { height: 300px; }
     }
 
-    /* Chart placeholder */
-    .aiq-chart-placeholder {
-        background: linear-gradient(135deg, #0d1117 0%, #0f1923 100%);
-        border: 1px solid rgba(0, 243, 255, 0.08);
-        border-radius: 8px;
-        height: 180px;
+    /* Modal Header */
+    .aiq-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .aiq-modal-close {
+        width: 32px;
+        height: 32px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 6px;
+        color: #9ca3af;
         display: flex;
         align-items: center;
         justify-content: center;
-        position: relative;
-        overflow: hidden;
-    }
-    .aiq-chart-placeholder::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 20px,
-            rgba(0, 243, 255, 0.025) 20px,
-            rgba(0, 243, 255, 0.025) 21px
-        ),
-        repeating-linear-gradient(
-            90deg,
-            transparent,
-            transparent 40px,
-            rgba(0, 243, 255, 0.025) 40px,
-            rgba(0, 243, 255, 0.025) 41px
-        );
-    }
-
-    /* Live stats bar */
-    .aiq-stat-bar { height: 6px; border-radius: 3px; background: #1a2030; overflow: hidden; }
-    .aiq-stat-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
-    .aiq-stat-fill-cyan   { background: linear-gradient(90deg, #0070ff, #00f3ff); }
-    .aiq-stat-fill-green  { background: linear-gradient(90deg, #00c864, #00ff88); }
-    .aiq-stat-fill-orange { background: linear-gradient(90deg, #ff8c00, #ffd700); }
-
-    /* MT5 Copy button */
-    .aiq-copy-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 20px;
-        background: linear-gradient(135deg, rgba(0, 112, 255, 0.2), rgba(0, 243, 255, 0.15));
-        border: 1px solid rgba(0, 243, 255, 0.30);
-        border-radius: 8px;
-        color: #00f3ff;
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
         cursor: pointer;
+        font-size: 18px;
         transition: all 0.2s ease;
     }
-    .aiq-copy-btn:hover {
-        background: linear-gradient(135deg, rgba(0, 112, 255, 0.35), rgba(0, 243, 255, 0.25));
-        box-shadow: 0 0 16px rgba(0, 243, 255, 0.15);
-        transform: translateY(-1px);
+    .aiq-modal-close:hover {
+        background: rgba(255,255,255,0.1);
+        color: #fff;
+    }
+
+    /* Modal Info Grid */
+    .aiq-modal-info {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: rgba(255,255,255,0.05);
+        margin: 16px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .aiq-modal-info-item {
+        background: #1a1f2e;
+        padding: 12px 16px;
+        text-align: center;
+    }
+    .aiq-modal-info-label {
+        font-size: 10px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+    .aiq-modal-info-value {
+        font-size: 16px;
+        font-weight: 600;
+    }
+    @media (max-width: 640px) {
+        .aiq-modal-info { grid-template-columns: repeat(2, 1fr); }
     }
     `;
 
@@ -355,14 +433,16 @@
 
         const bar = document.createElement('div');
         bar.id = 'aiq-tab-bar';
-        bar.className = 'aiq-tab-bar mb-4';
+        bar.className = 'aiq-tab-bar';
         bar.innerHTML = `
-            <button id="aiq-tab-standard"   class="aiq-tab active" data-tab="ai-driven">
-                ◈ Standard AI Signals
-            </button>
-            <button id="aiq-tab-iq"         class="aiq-tab"        data-tab="analysis-iq">
-                ⬡ AnalysisIQ&nbsp;<span style="font-size:9px;opacity:.6;">INSTITUTIONAL</span>
-            </button>
+            <div id="aiq-tab-standard" class="aiq-tab-icon ai-driven active" data-tab="ai-driven">
+                <span class="icon-circle">✦</span>
+                AI-Driven Trade Ideas
+            </div>
+            <div id="aiq-tab-iq" class="aiq-tab-icon analysis-iq" data-tab="analysis-iq">
+                <span class="icon-circle">⟐</span>
+                Pattern Trade Ideas
+            </div>
         `;
 
         // Mount: prefer the existing container, fall back to grid parent
@@ -508,7 +588,7 @@
     function switchTab(tab) {
         currentTab = tab;
 
-        // Sync original tabs
+        // Sync original tabs (if they exist)
         const aiTab      = document.getElementById('aiDrivenTab');
         const patternTab = document.getElementById('patternTab');
         if (aiTab && patternTab) {
@@ -525,7 +605,7 @@
             }
         }
 
-        // Sync AnalysisIQ tab bar
+        // Sync AnalysisIQ tab bar (new design)
         const tabStd = document.getElementById('aiq-tab-standard');
         const tabIQ  = document.getElementById('aiq-tab-iq');
         if (tabStd && tabIQ) {
@@ -559,21 +639,51 @@
 
         if (currentTab === 'analysis-iq') {
             grid.innerHTML = filteredSignals.map(s => renderPatternCard(s)).join('');
-            // Attach click handlers + start countdowns
-            filteredSignals.forEach(s => {
-                const card = document.getElementById(`aiq-card-${s.id}`);
-                if (card) card.addEventListener('click', () => openDeepInsight(s));
-            });
             startCountdowns();
         } else {
-            // Original render path — zero regression
-            grid.innerHTML = filteredSignals.map(s => renderOriginalCard(s)).join('');
+            // AI-Driven signals also get TradingView cards now
+            grid.innerHTML = filteredSignals.map(s => renderPatternCard(s)).join('');
+            startCountdowns();
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PATTERN CARD (AnalysisIQ)
+    // PATTERN CARD (AnalysisIQ) — TradingView Mini-Chart Edition
     // ═══════════════════════════════════════════════════════════════════════════
+
+    function getTradingViewSymbol(symbol) {
+        // Map internal symbols to TradingView format
+        const tvMap = {
+            'EURUSD': 'FX:EURUSD',
+            'GBPUSD': 'FX:GBPUSD',
+            'USDJPY': 'FX:USDJPY',
+            'AUDUSD': 'FX:AUDUSD',
+            'AUDCAD': 'FX:AUDCAD',
+            'AUDNZD': 'FX:AUDNZD',
+            'NZDUSD': 'FX:NZDUSD',
+            'EURSEEK': 'FX:EURSEEK',
+            'GBPJPY': 'FX:GBPJPY',
+            'XAUUSD': 'TVC:GOLD',
+            'XAGUSD': 'TVC:SILVER',
+            'US30': 'TVC:DJI',
+            'CHINA50': 'SSE:000001',
+            'GER40': 'XETR:DAX',
+            'BTCUSD': 'BITSTAMP:BTCUSD',
+            'ETHUSD': 'BITSTAMP:ETHUSD',
+        };
+        return tvMap[symbol] || `FX:${symbol}`;
+    }
+
+    function getCountryFlag(country, assetType) {
+        const flags = {
+            'EU': '🇪🇺', 'UK': '🇬🇧', 'US': '🇺🇸', 'JP': '🇯🇵',
+            'AU': '🇦🇺', 'CA': '🇨🇦', 'NZ': '🇳🇿', 'CH': '🇨🇭',
+            'CN': '🇨🇳', 'DE': '🇩🇪', 'SE': '🇸🇪', 'all': '🌍',
+        };
+        if (assetType === 'crypto') return '₿';
+        if (assetType === 'commodities') return '🪙';
+        return flags[country] || '💹';
+    }
 
     function renderPatternCard(signal) {
         const iq = signal.analysis_iq || {};
@@ -583,7 +693,8 @@
         const tf       = iq.timeframe || signal.timeframe || '4H';
         const status   = iq.status || 'LIVE TRADE';
         const expIso   = iq.expiry_timestamp || (signal.expires_at ? signal.expires_at : null);
-        const flagEmoji = getAssetFlag(signal.asset_type, signal.country);
+        const flagEmoji = getCountryFlag(signal.country, signal.asset_type);
+        const tvSymbol = getTradingViewSymbol(signal.symbol);
 
         const cardClass = {
             'LIVE TRADE':      'aiq-active',
@@ -592,84 +703,83 @@
             'EXPIRED':         'aiq-expired',
         }[status] || 'aiq-active';
 
-        const statusClass = {
-            'LIVE TRADE':      'aiq-status-live',
-            'CLOSED - PROFIT': 'aiq-status-profit',
-            'CLOSED - LOSS':   'aiq-status-loss',
-            'EXPIRED':         'aiq-status-expired',
-        }[status] || 'aiq-status-live';
+        // TradingView Mini Chart Widget URL
+        const tvChartUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tv_chart_${signal.id}&symbol=${encodeURIComponent(tvSymbol)}&interval=${tf.replace('H','60').replace('D','D').replace('1','1')}&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=131722&studies=[]&theme=dark&style=1&timezone=Etc/UTC&withdateranges=0&showpopupbutton=0&hide_top_toolbar=1&hide_legend=1&allow_symbol_change=0&locale=en`;
 
         return `
         <div id="aiq-card-${signal.id}"
              class="aiq-card ${cardClass}"
-             style="padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;">
+             style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;">
 
-            <!-- Header -->
-            <div style="display:flex; align-items:center; justify-content:space-between; padding: 14px 16px 10px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:20px; line-height:1;">${flagEmoji}</span>
-                    <div>
-                        <div style="font-size:14px; font-weight:700; color:#e2e8f0; letter-spacing:0.04em;">
-                            ${escHtml(signal.symbol)}
-                            <span style="color:rgba(0,243,255,0.5); font-size:11px; font-weight:400; margin-left:4px;">
-                                | ${escHtml(pattern)}
-                            </span>
-                        </div>
-                        <div style="font-size:10px; color:#4a5568; margin-top:1px;">
-                            ${escHtml(signal.full_name || signal.symbol)}
-                        </div>
+            <!-- Header Row: Live Badge + TV Icon -->
+            <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px 16px;">
+                <span class="aiq-live-badge">Live Trade</span>
+                <div class="aiq-tv-badge" title="TradingView Chart">TV</div>
+            </div>
+
+            <!-- Symbol Row: Flag + Name + Pattern -->
+            <div style="display:flex; align-items:center; gap:12px; padding: 0 16px 12px;">
+                <div class="aiq-flag">${flagEmoji}</div>
+                <div style="flex:1;">
+                    <div style="font-size:16px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+                        ${escHtml(signal.symbol)}
+                        <span style="font-size:12px; font-weight:400; color:#6b7280;">
+                            ${escHtml(pattern)}
+                        </span>
                     </div>
                 </div>
-                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-                    <span class="aiq-badge ${isBuy ? 'aiq-badge-buy' : 'aiq-badge-sell'}">
-                        ${isBuy ? '▲' : '▼'} ${escHtml(iq.order_type || (isBuy ? 'BUY STOP' : 'SELL STOP'))}
-                    </span>
-                    <span class="aiq-status ${statusClass}">${escHtml(status)}</span>
+                <span class="aiq-order-badge ${isBuy ? 'aiq-order-buy' : 'aiq-order-sell'}">
+                    ${isBuy ? 'BUY STOP' : 'SELL STOP'}
+                </span>
+            </div>
+
+            <!-- TradingView Mini Chart -->
+            <div class="aiq-chart-container" id="aiq-chart-${signal.id}">
+                <iframe 
+                    src="${tvChartUrl}"
+                    allowtransparency="true"
+                    frameborder="0"
+                    loading="lazy">
+                </iframe>
+            </div>
+
+            <!-- Price Row: Entry / Target / Stop -->
+            <div class="aiq-price-row">
+                <div class="aiq-price-item">
+                    <div class="aiq-price-label">Entry</div>
+                    <div class="aiq-price-value aiq-price" style="color:#60a5fa;">${escHtml(signal.entry || '—')}</div>
+                </div>
+                <div class="aiq-price-item">
+                    <div class="aiq-price-label">Target</div>
+                    <div class="aiq-price-value aiq-price" style="color:#34d399;">${escHtml(signal.target || '—')}</div>
+                </div>
+                <div class="aiq-price-item">
+                    <div class="aiq-price-label">Stop</div>
+                    <div class="aiq-price-value aiq-price" style="color:#f87171;">${escHtml(signal.stop || '—')}</div>
                 </div>
             </div>
 
-            <!-- Timeframe tag -->
-            <div style="padding: 0 16px 10px; display:flex; gap:6px; align-items:center;">
-                <span style="font-size:10px; color:#4a5568; border:1px solid #1e2a3a; border-radius:3px; padding:1px 6px; font-weight:600;">
+            <!-- Expires Row -->
+            <div class="aiq-expires-row">
+                <div>
+                    <span style="font-size:11px; color:#6b7280;">Expires</span>
+                    <span class="aiq-countdown aiq-price" 
+                          id="aiq-exp-${signal.id}"
+                          data-expiry="${expIso || ''}"
+                          style="color:#f59e0b; margin-left:8px; font-size:13px; font-weight:600;">
+                        ${expIso ? formatCountdown(expIso) : '—'}
+                    </span>
+                </div>
+                <span style="font-size:11px; color:#4a5568; border:1px solid #2d3748; border-radius:4px; padding:2px 8px; font-weight:600;">
                     ${escHtml(tf)}
                 </span>
-                <span style="font-size:10px; color:#2d3a4a;">·</span>
-                <span style="font-size:10px; color:#4a5568;">
-                    ${signal.confidence || 0}% Confidence
-                </span>
             </div>
 
-            <!-- Price grid -->
-            <div style="padding: 0 12px 12px;">
-                <div class="aiq-grid">
-                    <div class="aiq-cell">
-                        <div class="aiq-cell-label">Entry</div>
-                        <div class="aiq-cell-value aiq-price" style="color:#60a5fa;">${escHtml(signal.entry || '—')}</div>
-                    </div>
-                    <div class="aiq-cell">
-                        <div class="aiq-cell-label">Target</div>
-                        <div class="aiq-cell-value aiq-price" style="color:#34d399;">${escHtml(signal.target || '—')}</div>
-                    </div>
-                    <div class="aiq-cell">
-                        <div class="aiq-cell-label">Stop Loss</div>
-                        <div class="aiq-cell-value aiq-price" style="color:#f87171;">${escHtml(signal.stop || '—')}</div>
-                    </div>
-                    <div class="aiq-cell">
-                        <div class="aiq-cell-label">Expires</div>
-                        <div class="aiq-cell-value aiq-price aiq-countdown"
-                             id="aiq-exp-${signal.id}"
-                             data-expiry="${expIso || ''}"
-                             style="color:#00f3ff; font-size:12px;">
-                            ${expIso ? formatCountdown(expIso) : '—'}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tap hint -->
-            <div style="padding: 8px 16px; border-top: 1px solid rgba(0,243,255,0.05);
-                        font-size:10px; color:#2d3a4a; text-align:center; letter-spacing:0.06em;">
-                TAP FOR DEEP INSIGHT
+            <!-- Learn More Button -->
+            <div style="padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <button class="aiq-learn-btn" style="width:100%;" onclick="window.EnhancedSignalsPage.openDeepInsight(${signal.id})">
+                    Learn More
+                </button>
             </div>
         </div>`;
     }
@@ -710,181 +820,140 @@
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DEEP INSIGHT MODAL
+    // DEEP INSIGHT MODAL — Full TradingView Chart
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function openDeepInsight(signal) {
+    function openDeepInsight(signalIdOrObj) {
         if (!iqModal) return;
+
+        // Support both signal object and signal ID
+        let signal;
+        if (typeof signalIdOrObj === 'object') {
+            signal = signalIdOrObj;
+        } else {
+            signal = allSignals.find(s => s.id === signalIdOrObj);
+            if (!signal) {
+                console.warn('[AnalysisIQ] Signal not found:', signalIdOrObj);
+                return;
+            }
+        }
 
         const iq       = signal.analysis_iq || {};
         const isBuy    = (iq.order_type || signal.direction || '').toUpperCase().includes('BUY');
         const pattern  = (iq.pattern_type || signal.pattern || 'PATTERN').replace(/_/g, ' ');
+        const tf       = iq.timeframe || signal.timeframe || '4H';
         const rr       = calculateRR(signal);
-        const bullish  = signal.sentiment_bullish || 50;
-        const bearish  = signal.sentiment_bearish || 50;
-        const volatility = iq.volatility_index || 50;
-        const ageMin   = iq.signal_age_minutes;
-        const ageDisplay = ageMin != null
-            ? (ageMin < 60 ? `${ageMin}m` : `${Math.floor(ageMin/60)}h ${ageMin%60}m`)
-            : '—';
-        const signalAgePercent = Math.min(100, Math.round((ageMin || 0) / (24*60) * 100));
+        const tvSymbol = getTradingViewSymbol(signal.symbol);
+        const flagEmoji = getCountryFlag(signal.country, signal.asset_type);
+
+        // Full TradingView Advanced Chart URL
+        const tvInterval = tf.replace('H','60').replace('D','D').replace('1','1');
+        const tvChartUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tv_modal_chart&symbol=${encodeURIComponent(tvSymbol)}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=0&saveimage=1&toolbarbg=131722&studies=[]&theme=dark&style=1&timezone=Etc/UTC&withdateranges=1&showpopupbutton=0&hide_top_toolbar=0&hide_legend=0&allow_symbol_change=0&locale=en&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]`;
 
         const body = document.getElementById('aiq-modal-body');
         body.innerHTML = `
-            <!-- Modal header -->
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
-                <div>
-                    <div style="font-size:18px; font-weight:800; color:#e2e8f0; letter-spacing:0.04em;">
-                        ${escHtml(signal.symbol)}
-                        <span style="color:rgba(0,243,255,0.6); font-weight:400; font-size:14px;">
-                            | ${escHtml(pattern)}
-                        </span>
-                    </div>
-                    <div style="font-size:11px; color:#4a5568; margin-top:2px;">
-                        ${escHtml(signal.full_name || signal.symbol)} · ${escHtml(iq.timeframe || signal.timeframe || '4H')}
+            <!-- Modal Header -->
+            <div class="aiq-modal-header">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div class="aiq-flag">${flagEmoji}</div>
+                    <div>
+                        <div style="font-size:18px; font-weight:700; color:#fff;">
+                            ${escHtml(signal.symbol)}
+                            <span style="color:#6b7280; font-weight:400; font-size:14px; margin-left:8px;">
+                                ${escHtml(pattern)}
+                            </span>
+                        </div>
+                        <div style="font-size:12px; color:#6b7280;">
+                            ${escHtml(signal.full_name || signal.symbol)} · ${escHtml(tf)}
+                        </div>
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span class="aiq-badge ${isBuy ? 'aiq-badge-buy' : 'aiq-badge-sell'}" style="font-size:12px; padding:5px 14px;">
-                        ${isBuy ? '▲' : '▼'} ${escHtml(iq.order_type || (isBuy ? 'BUY STOP' : 'SELL STOP'))}
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span class="aiq-order-badge ${isBuy ? 'aiq-order-buy' : 'aiq-order-sell'}">
+                        ${isBuy ? 'BUY STOP' : 'SELL STOP'}
                     </span>
-                    <button onclick="window.EnhancedSignalsPage.closeIQModal()"
-                            style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
-                                   color:#6b7280; border-radius:6px; width:30px; height:30px;
-                                   display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px;">
-                        ×
-                    </button>
+                    <button class="aiq-modal-close" onclick="window.EnhancedSignalsPage.closeIQModal()">×</button>
                 </div>
             </div>
 
-            <!-- Visual projection placeholder -->
-            <div class="aiq-chart-placeholder" style="margin-bottom:20px;">
-                <div style="position:relative; z-index:1; text-align:center;">
-                    <div style="font-size:11px; letter-spacing:0.15em; color:rgba(0,243,255,0.4); margin-bottom:4px;">
-                        PATTERN CHART
-                    </div>
-                    <div style="font-size:10px; color:#2d3a4a;">
-                        Chart integration via your price data provider
-                    </div>
-                    <!-- SVG pattern sketch -->
-                    <svg width="260" height="60" viewBox="0 0 260 60" style="margin-top:10px; opacity:0.35;">
-                        ${isBuy
-                            ? `<polyline points="10,50 60,30 90,35 100,25 130,28 160,15 200,18 250,8"
-                                        stroke="#00f3ff" stroke-width="1.5" fill="none" stroke-dasharray="4,2"/>
-                               <circle cx="160" cy="15" r="4" fill="#00f3ff" opacity="0.7"/>
-                               <line x1="160" y1="0" x2="160" y2="60" stroke="#00f3ff" stroke-width="0.5" stroke-dasharray="2,3"/>`
-                            : `<polyline points="10,10 60,30 90,25 100,35 130,32 160,45 200,42 250,55"
-                                        stroke="#ff4d6d" stroke-width="1.5" fill="none" stroke-dasharray="4,2"/>
-                               <circle cx="160" cy="45" r="4" fill="#ff4d6d" opacity="0.7"/>
-                               <line x1="160" y1="0" x2="160" y2="60" stroke="#ff4d6d" stroke-width="0.5" stroke-dasharray="2,3"/>`
-                        }
-                    </svg>
+            <!-- Full TradingView Chart -->
+            <div class="aiq-modal-chart" id="tv_modal_chart_container">
+                <iframe 
+                    id="tv_modal_chart"
+                    src="${tvChartUrl}"
+                    allowtransparency="true"
+                    frameborder="0">
+                </iframe>
+            </div>
+
+            <!-- Price Levels Grid -->
+            <div class="aiq-modal-info">
+                <div class="aiq-modal-info-item">
+                    <div class="aiq-modal-info-label">Entry</div>
+                    <div class="aiq-modal-info-value aiq-price" style="color:#60a5fa;">${escHtml(signal.entry || '—')}</div>
+                </div>
+                <div class="aiq-modal-info-item">
+                    <div class="aiq-modal-info-label">Target</div>
+                    <div class="aiq-modal-info-value aiq-price" style="color:#34d399;">${escHtml(signal.target || '—')}</div>
+                </div>
+                <div class="aiq-modal-info-item">
+                    <div class="aiq-modal-info-label">Stop Loss</div>
+                    <div class="aiq-modal-info-value aiq-price" style="color:#f87171;">${escHtml(signal.stop || '—')}</div>
+                </div>
+                <div class="aiq-modal-info-item">
+                    <div class="aiq-modal-info-label">Risk:Reward</div>
+                    <div class="aiq-modal-info-value" style="color:#a78bfa;">${escHtml(rr)}</div>
                 </div>
             </div>
 
-            <!-- 2-col content -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
-
-                <!-- Left: levels -->
-                <div>
-                    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:#4a5568; margin-bottom:8px;">
-                        EXECUTION LEVELS
+            <!-- Analysis Summary -->
+            <div style="padding: 0 16px 16px;">
+                <div style="background:#1a1f2e; border-radius:8px; padding:16px;">
+                    <div style="font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">
+                        Analysis Summary
                     </div>
-                    <div class="aiq-grid">
-                        <div class="aiq-cell">
-                            <div class="aiq-cell-label">Entry</div>
-                            <div class="aiq-cell-value aiq-price" style="color:#60a5fa;">${escHtml(signal.entry||'—')}</div>
-                        </div>
-                        <div class="aiq-cell">
-                            <div class="aiq-cell-label">Target</div>
-                            <div class="aiq-cell-value aiq-price" style="color:#34d399;">${escHtml(signal.target||'—')}</div>
-                        </div>
-                        <div class="aiq-cell">
-                            <div class="aiq-cell-label">Stop Loss</div>
-                            <div class="aiq-cell-value aiq-price" style="color:#f87171;">${escHtml(signal.stop||'—')}</div>
-                        </div>
-                        <div class="aiq-cell">
-                            <div class="aiq-cell-label">R:R Ratio</div>
-                            <div class="aiq-cell-value aiq-price" style="color:#a78bfa;">${escHtml(rr)}</div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:12px; font-size:10px; font-weight:700; letter-spacing:0.12em; color:#4a5568; margin-bottom:6px;">
-                        CURRENT PRICE
-                    </div>
-                    <div style="font-size:20px; font-weight:800; color:#e2e8f0; font-family:'JetBrains Mono',monospace;">
-                        ${escHtml(signal.current_price || '—')}
-                        <span style="font-size:12px; font-weight:400; color:${parseFloat(signal.price_change||0)>=0?'#34d399':'#f87171'}; margin-left:6px;">
-                            ${escHtml(signal.price_change_percent || '')}
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Right: technical summary -->
-                <div>
-                    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:#4a5568; margin-bottom:8px;">
-                        TECHNICAL SUMMARY
-                    </div>
-                    <div style="background:#0d1117; border:1px solid rgba(0,243,255,0.06); border-radius:8px; padding:14px;
-                                font-size:12px; line-height:1.7; color:#9ca3af; min-height:100px;">
-                        ${escHtml(iq.technical_summary || 'Professional technical analysis based on institutional order flow and pattern recognition.')}
+                    <div style="font-size:13px; color:#9ca3af; line-height:1.6;">
+                        ${escHtml(iq.technical_summary || signal.analysis || 'Professional technical analysis based on Smart Money Concepts and institutional order flow. Entry zone marked with pattern confluence confirmation.')}
                     </div>
                 </div>
             </div>
 
-            <!-- Live Stats Bar -->
-            <div style="background:#0d1117; border:1px solid rgba(0,243,255,0.06); border-radius:8px;
-                        padding:14px 16px; margin-bottom:20px;">
-                <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:#4a5568; margin-bottom:12px;">
-                    LIVE STATS
+            <!-- Sentiment Bars -->
+            <div style="padding: 0 16px 16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div style="background:#1a1f2e; border-radius:8px; padding:12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="font-size:11px; color:#6b7280;">Bullish Sentiment</span>
+                        <span style="font-size:11px; color:#34d399; font-family:monospace;">${signal.sentiment_bullish || 50}%</span>
+                    </div>
+                    <div style="height:6px; background:#0d1117; border-radius:3px; overflow:hidden;">
+                        <div style="height:100%; width:${signal.sentiment_bullish || 50}%; background:linear-gradient(90deg,#00c864,#34d399); border-radius:3px;"></div>
+                    </div>
                 </div>
-                <div style="display:grid; gap:10px;">
-                    <!-- Sentiment -->
-                    <div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                            <span style="font-size:10px; color:#6b7280;">Sentiment — Bullish</span>
-                            <span style="font-size:10px; color:#34d399; font-family:monospace;">${bullish}%</span>
-                        </div>
-                        <div class="aiq-stat-bar">
-                            <div class="aiq-stat-fill aiq-stat-fill-green" style="width:${bullish}%;"></div>
-                        </div>
+                <div style="background:#1a1f2e; border-radius:8px; padding:12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                        <span style="font-size:11px; color:#6b7280;">Confidence</span>
+                        <span style="font-size:11px; color:#a78bfa; font-family:monospace;">${signal.confidence || 75}%</span>
                     </div>
-                    <!-- Volatility -->
-                    <div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                            <span style="font-size:10px; color:#6b7280;">Volatility Index</span>
-                            <span style="font-size:10px; color:#f59e0b; font-family:monospace;">${volatility}</span>
-                        </div>
-                        <div class="aiq-stat-bar">
-                            <div class="aiq-stat-fill aiq-stat-fill-orange" style="width:${volatility}%;"></div>
-                        </div>
-                    </div>
-                    <!-- Signal Age -->
-                    <div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                            <span style="font-size:10px; color:#6b7280;">Signal Age</span>
-                            <span style="font-size:10px; color:#00f3ff; font-family:monospace;">${ageDisplay}</span>
-                        </div>
-                        <div class="aiq-stat-bar">
-                            <div class="aiq-stat-fill aiq-stat-fill-cyan" style="width:${signalAgePercent}%;"></div>
-                        </div>
+                    <div style="height:6px; background:#0d1117; border-radius:3px; overflow:hidden;">
+                        <div style="height:100%; width:${signal.confidence || 75}%; background:linear-gradient(90deg,#7c3aed,#a78bfa); border-radius:3px;"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Execution bar -->
-            <div style="display:flex; gap:10px; align-items:center;">
-                <button class="aiq-copy-btn" onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- Action Buttons -->
+            <div style="padding: 16px; border-top:1px solid rgba(255,255,255,0.05); display:flex; gap:12px;">
+                <button onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})"
+                        style="flex:1; padding:12px; background:linear-gradient(135deg,#2962ff,#1e88e5); border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M8 17H5a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v3"/>
                         <rect x="8" y="11" width="13" height="10" rx="2"/>
                     </svg>
                     Copy to MT5
                 </button>
-                <div style="font-size:10px; color:#2d3a4a; line-height:1.4;">
-                    Executes via your connected Copier account.<br>
-                    Risk management rules applied automatically.
-                </div>
+                <button onclick="window.EnhancedSignalsPage.closeIQModal()"
+                        style="padding:12px 24px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#9ca3af; font-size:13px; font-weight:600; cursor:pointer;">
+                    Close
+                </button>
             </div>
         `;
 
@@ -1157,6 +1226,10 @@
         closeIQModal,
         copyToMT5,
         switchTab,
+        openDeepInsight: function(signalId) {
+            const signal = allSignals.find(s => s.id === signalId);
+            if (signal) openDeepInsight(signal);
+        },
     };
 
 })();

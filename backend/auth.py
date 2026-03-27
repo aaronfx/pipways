@@ -1,6 +1,7 @@
 """
 Authentication module - Production Grade OAuth2 Implementation
 Updated: /auth/me returns subscription tier + full usage state
+Added: get_current_user dependency for other routers to import
 """
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -122,6 +123,55 @@ async def create_user(user_data: dict):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# AUTH DEPENDENCY (for use in other routers)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    FastAPI dependency to get the current authenticated user.
+    
+    Import in other modules:
+        from .auth import get_current_user
+    
+    Use in routes:
+        @router.get("/protected")
+        async def protected_route(current_user: dict = Depends(get_current_user)):
+            user_id = current_user["id"]
+            ...
+    
+    Returns dict with keys:
+        id, email, full_name, is_active, is_admin, role, subscription_tier
+    """
+    cred_exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        user_id: int = payload.get("user_id")
+        if not email:
+            raise cred_exc
+    except JWTError:
+        raise cred_exc
+
+    user = await get_user_by_email(email)
+    if not user:
+        raise cred_exc
+
+    return {
+        "id":                _extract(user, "id") or user_id,
+        "email":             email,
+        "full_name":         _extract(user, "full_name", ""),
+        "is_active":         _extract(user, "is_active", True),
+        "is_admin":          _extract(user, "is_admin", False),
+        "role":              _extract(user, "role", "user"),
+        "subscription_tier": _normalise_tier(_extract(user, "subscription_tier", "free")),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ROUTES
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -195,32 +245,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 
 @router.get("/me")
-async def get_current_user_info(token: str = Depends(oauth2_scheme)):
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """
     Returns the authenticated user's full profile including subscription tier
     and feature usage state. Called by usage.js on every page load.
     """
-    cred_exc = HTTPException(
-        status_code=401, detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if not email:
-            raise cred_exc
-    except JWTError:
-        raise cred_exc
-
-    user = await get_user_by_email(email)
-    if not user:
-        raise cred_exc
-
-    user_id   = _extract(user, "id")
-    is_admin  = _extract(user, "is_admin", False)
-    full_name = _extract(user, "full_name", "")
-    is_active = _extract(user, "is_active", True)
-    tier      = _normalise_tier(_extract(user, "subscription_tier", "free"))
+    user_id = current_user["id"]
 
     # Fetch full usage state — non-fatal if subscriptions module not ready
     usage_state = None
@@ -231,11 +261,6 @@ async def get_current_user_info(token: str = Depends(oauth2_scheme)):
         print(f"[Auth /me] usage state load error: {e}", flush=True)
 
     return {
-        "id":                user_id,
-        "email":             email,
-        "full_name":         full_name,
-        "is_active":         is_active,
-        "is_admin":          is_admin,
-        "subscription_tier": tier,
-        "usage":             usage_state,
+        **current_user,
+        "usage": usage_state,
     }

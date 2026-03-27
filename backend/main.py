@@ -6,10 +6,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import os
 from pathlib import Path
-from sqlalchemy import text
 
 # Import all route modules
-from backend.auth import router as auth_router
+from backend.auth import router as auth_router, get_current_user
 from backend.signals import router as signals_router  # Enhanced signals
 from backend.courses import router as courses_router
 from backend.courses_enhanced import router as courses_enhanced_router
@@ -29,24 +28,28 @@ from backend.email_service import router as email_router
 from backend.academy_routes import router as learning_router
 from backend.risk_calculator import router as risk_router
 
-# Import database and auth dependencies
-from backend.database import init_database, get_database
-from backend.auth import get_current_user
+# Import database (databases library pattern - no get_database needed)
+from backend.database import database, init_database, run_migrations, run_unique_index_migrations
 
 # Define BASE_DIR before any route handlers
 BASE_DIR = Path(__file__).parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database on startup (your existing system)
+    # Initialize database on startup
     await init_database()
     print("✅ Database initialized")
     
-    # Enhanced Signals Auto-Migration - runs after your existing init
+    # Run schema migrations (from database.py)
+    await run_migrations()
+    await run_unique_index_migrations()
+    
+    # Enhanced Signals Auto-Migration
     await run_enhanced_signals_migration()
     
     yield
     # Cleanup on shutdown
+    await database.disconnect()
     print("🔄 Application shutting down")
 
 async def run_enhanced_signals_migration():
@@ -55,115 +58,116 @@ async def run_enhanced_signals_migration():
     try:
         print("[ENHANCED SIGNALS] Checking migration status...")
         
-        async with get_database() as db:
-            # Check if migration is needed
-            result = await db.execute(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'signals' 
-                AND table_schema = 'public'
-                AND column_name IN ('pattern', 'full_name', 'asset_type');
-            """))
-            
-            enhanced_columns = [row[0] for row in result.fetchall()]
-            
-            if len(enhanced_columns) >= 3:
-                print("[ENHANCED SIGNALS] ✅ Migration already applied")
-                return True
-                
-            print("[ENHANCED SIGNALS] 🔄 Running migration...")
-            
-            # Add new columns
-            new_columns = [
-                ('pattern', 'VARCHAR(50)'),
-                ('full_name', 'TEXT'),
-                ('asset_type', 'VARCHAR(50) DEFAULT \'forex\''),
-                ('country', 'VARCHAR(10) DEFAULT \'all\''),
-                ('sentiment_bearish', 'INTEGER DEFAULT 50'),
-                ('sentiment_bullish', 'INTEGER DEFAULT 50'),
-                ('current_price', 'VARCHAR(20)'),
-                ('price_change', 'VARCHAR(20)'),
-                ('price_change_percent', 'VARCHAR(20)'),
-                ('chart_data', 'TEXT'),
-                ('expires_at', 'TIMESTAMP'),
-                ('ai_confidence', 'INTEGER')
-            ]
-            
-            # Get existing columns
-            result = await db.execute(text("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'signals' AND table_schema = 'public';
-            """))
-            existing_columns = [row[0] for row in result.fetchall()]
-            
-            # Add missing columns
-            columns_added = 0
-            for column_name, column_type in new_columns:
-                if column_name not in existing_columns:
-                    try:
-                        await db.execute(
-                            text(f"ALTER TABLE signals ADD COLUMN {column_name} {column_type};")
-                        )
-                        print(f"[ENHANCED SIGNALS] ✅ Added column: {column_name}")
-                        columns_added += 1
-                    except Exception as e:
-                        print(f"[ENHANCED SIGNALS] ⚠️  Error adding column {column_name}: {e}")
-            
-            # Add performance indexes
-            indexes = [
-                'CREATE INDEX IF NOT EXISTS idx_signals_pattern ON signals(pattern);',
-                'CREATE INDEX IF NOT EXISTS idx_signals_asset_type ON signals(asset_type);',
-                'CREATE INDEX IF NOT EXISTS idx_signals_confidence ON signals(confidence);',
-                'CREATE INDEX IF NOT EXISTS idx_signals_expires_at ON signals(expires_at);',
-                'CREATE INDEX IF NOT EXISTS idx_signals_country ON signals(country);'
-            ]
-            
-            for index_sql in indexes:
-                try:
-                    await db.execute(text(index_sql))
-                except Exception as e:
-                    print(f"[ENHANCED SIGNALS] ⚠️  Error adding index: {e}")
-            
-            # Update existing records with defaults
-            update_queries = [
-                "UPDATE signals SET asset_type = 'forex' WHERE asset_type IS NULL;",
-                "UPDATE signals SET country = 'all' WHERE country IS NULL;",
-                "UPDATE signals SET sentiment_bearish = 50 WHERE sentiment_bearish IS NULL;",
-                "UPDATE signals SET sentiment_bullish = 50 WHERE sentiment_bullish IS NULL;",
-                "UPDATE signals SET ai_confidence = confidence WHERE ai_confidence IS NULL AND confidence IS NOT NULL;"
-            ]
-            
-            for query in update_queries:
-                try:
-                    await db.execute(text(query))
-                except Exception as e:
-                    print(f"[ENHANCED SIGNALS] ⚠️  Error updating data: {e}")
-            
-            # Add sample data if needed
-            await add_sample_enhanced_signals(db)
-            
-            # Add site settings for enhanced signals
-            await add_enhanced_signals_site_settings(db)
-            
-            await db.commit()
-            
-            print(f"[ENHANCED SIGNALS] 🎉 Migration completed: {columns_added} columns added")
+        # Check if migration is needed - using databases library pattern
+        check_query = """
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'signals' 
+            AND table_schema = 'public'
+            AND column_name IN ('pattern', 'full_name', 'asset_type')
+        """
+        rows = await database.fetch_all(check_query)
+        enhanced_columns = [row["column_name"] for row in rows]
+        
+        if len(enhanced_columns) >= 3:
+            print("[ENHANCED SIGNALS] ✅ Migration already applied")
             return True
+            
+        print("[ENHANCED SIGNALS] 🔄 Running migration...")
+        
+        # Add new columns
+        new_columns = [
+            ('pattern', 'VARCHAR(50)'),
+            ('full_name', 'TEXT'),
+            ('asset_type', "VARCHAR(50) DEFAULT 'forex'"),
+            ('country', "VARCHAR(10) DEFAULT 'all'"),
+            ('sentiment_bearish', 'INTEGER DEFAULT 50'),
+            ('sentiment_bullish', 'INTEGER DEFAULT 50'),
+            ('current_price', 'VARCHAR(20)'),
+            ('price_change', 'VARCHAR(20)'),
+            ('price_change_percent', 'VARCHAR(20)'),
+            ('chart_data', 'TEXT'),
+            ('expires_at', 'TIMESTAMP'),
+            ('ai_confidence', 'INTEGER'),
+            ('confidence', 'INTEGER DEFAULT 75'),
+            ('entry', 'VARCHAR(50)'),
+            ('target', 'VARCHAR(50)'),
+            ('stop', 'VARCHAR(50)'),
+        ]
+        
+        # Get existing columns
+        existing_query = """
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'signals' AND table_schema = 'public'
+        """
+        existing_rows = await database.fetch_all(existing_query)
+        existing_columns = [row["column_name"] for row in existing_rows]
+        
+        # Add missing columns
+        columns_added = 0
+        for column_name, column_type in new_columns:
+            if column_name not in existing_columns:
+                try:
+                    await database.execute(
+                        f"ALTER TABLE signals ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+                    )
+                    print(f"[ENHANCED SIGNALS] ✅ Added column: {column_name}")
+                    columns_added += 1
+                except Exception as e:
+                    print(f"[ENHANCED SIGNALS] ⚠️  Error adding column {column_name}: {e}")
+        
+        # Add performance indexes
+        indexes = [
+            'CREATE INDEX IF NOT EXISTS idx_signals_pattern ON signals(pattern)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_asset_type ON signals(asset_type)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_confidence ON signals(confidence)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_expires_at ON signals(expires_at)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_country ON signals(country)'
+        ]
+        
+        for index_sql in indexes:
+            try:
+                await database.execute(index_sql)
+            except Exception as e:
+                print(f"[ENHANCED SIGNALS] ⚠️  Error adding index: {e}")
+        
+        # Update existing records with defaults
+        update_queries = [
+            "UPDATE signals SET asset_type = 'forex' WHERE asset_type IS NULL",
+            "UPDATE signals SET country = 'all' WHERE country IS NULL",
+            "UPDATE signals SET sentiment_bearish = 50 WHERE sentiment_bearish IS NULL",
+            "UPDATE signals SET sentiment_bullish = 50 WHERE sentiment_bullish IS NULL",
+            "UPDATE signals SET ai_confidence = confidence WHERE ai_confidence IS NULL AND confidence IS NOT NULL"
+        ]
+        
+        for query in update_queries:
+            try:
+                await database.execute(query)
+            except Exception as e:
+                print(f"[ENHANCED SIGNALS] ⚠️  Error updating data: {e}")
+        
+        # Add sample data if needed
+        await add_sample_enhanced_signals()
+        
+        # Add site settings for enhanced signals
+        await add_enhanced_signals_site_settings()
+        
+        print(f"[ENHANCED SIGNALS] 🎉 Migration completed: {columns_added} columns added")
+        return True
             
     except Exception as e:
         print(f"[ENHANCED SIGNALS] ❌ Migration error: {e}")
         return False
 
-async def add_sample_enhanced_signals(db):
+async def add_sample_enhanced_signals():
     """Add sample enhanced signals if none exist"""
     
     try:
         # Check if we have enhanced signals
-        result = await db.execute(text("SELECT COUNT(*) FROM signals WHERE pattern IS NOT NULL;"))
-        enhanced_count = result.scalar()
+        result = await database.fetch_val("SELECT COUNT(*) FROM signals WHERE pattern IS NOT NULL")
         
-        if enhanced_count > 0:
-            print(f"[ENHANCED SIGNALS] ⏭️  Found {enhanced_count} existing enhanced signals")
+        if result and result > 0:
+            print(f"[ENHANCED SIGNALS] ⏭️  Found {result} existing enhanced signals")
             return
         
         print("[ENHANCED SIGNALS] 🧪 Adding sample enhanced signals...")
@@ -173,12 +177,15 @@ async def add_sample_enhanced_signals(db):
             {
                 'symbol': 'AUDCAD',
                 'full_name': 'Australian Dollar vs Canadian Dollar',
-                'direction': 'BUY STOP',
+                'direction': 'BUY',
                 'pattern': 'FLAG',
                 'timeframe': '1H',
                 'entry': '0.95426',
                 'target': '0.95800',
                 'stop': '0.95200',
+                'entry_price': 0.95426,
+                'take_profit': 0.95800,
+                'stop_loss': 0.95200,
                 'confidence': 78,
                 'asset_type': 'forex',
                 'country': 'AU',
@@ -191,14 +198,17 @@ async def add_sample_enhanced_signals(db):
                 'ai_confidence': 78
             },
             {
-                'symbol': 'EUR/SEK',
+                'symbol': 'EURSEEK',
                 'full_name': 'Euro vs Swedish Krona',
-                'direction': 'SELL STOP',
+                'direction': 'SELL',
                 'pattern': 'WEDGE',
                 'timeframe': '4H',
                 'entry': '10.8830',
                 'target': '10.8400',
                 'stop': '10.9100',
+                'entry_price': 10.8830,
+                'take_profit': 10.8400,
+                'stop_loss': 10.9100,
                 'confidence': 72,
                 'asset_type': 'forex',
                 'country': 'EU',
@@ -213,12 +223,15 @@ async def add_sample_enhanced_signals(db):
             {
                 'symbol': 'CHINA50',
                 'full_name': 'China A50 Index',
-                'direction': 'BUY STOP',
+                'direction': 'BUY',
                 'pattern': 'PENNANT',
                 'timeframe': '1H',
                 'entry': '14495',
                 'target': '14650',
                 'stop': '14380',
+                'entry_price': 14495,
+                'take_profit': 14650,
+                'stop_loss': 14380,
                 'confidence': 81,
                 'asset_type': 'indices',
                 'country': 'CN',
@@ -233,65 +246,68 @@ async def add_sample_enhanced_signals(db):
         ]
         
         for signal in sample_signals:
-            columns = ', '.join(signal.keys())
-            placeholders = ', '.join([f":{key}" for key in signal.keys()])
-            
-            insert_sql = f"""
-            INSERT INTO signals ({columns}, created_at, updated_at)
-            VALUES ({placeholders}, NOW(), NOW());
-            """
-            
-            await db.execute(text(insert_sql), signal)
-            print(f"[ENHANCED SIGNALS] ✅ Added sample signal: {signal['symbol']} ({signal['pattern']})")
+            try:
+                columns = ', '.join(signal.keys())
+                placeholders = ', '.join([f":{key}" for key in signal.keys()])
+                
+                insert_sql = f"""
+                INSERT INTO signals ({columns}, created_at)
+                VALUES ({placeholders}, NOW())
+                """
+                
+                await database.execute(insert_sql, signal)
+                print(f"[ENHANCED SIGNALS] ✅ Added sample signal: {signal['symbol']} ({signal['pattern']})")
+            except Exception as e:
+                print(f"[ENHANCED SIGNALS] ⚠️  Error adding signal {signal['symbol']}: {e}")
             
     except Exception as e:
         print(f"[ENHANCED SIGNALS] ⚠️  Error adding sample signals: {e}")
 
-async def add_enhanced_signals_site_settings(db):
+async def add_enhanced_signals_site_settings():
     """Add site settings for enhanced signals features"""
     
     try:
         # Check if site_settings table exists
-        result = await db.execute(text("""
+        result = await database.fetch_val("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
                 WHERE table_schema = 'public' 
                 AND table_name = 'site_settings'
-            );
-        """))
+            )
+        """)
         
-        if not result.scalar():
+        if not result:
             print("[ENHANCED SIGNALS] ⚠️  site_settings table not found, skipping settings")
             return
         
         settings = [
-            ('signals_visible_free', '3', 'Signals visible to free users'),
-            ('signals_visible_pro', 'none', 'Signals visible to pro users'),
-            ('signals_detailed_analysis_free', '1', 'Detailed analysis for free users per day'),
-            ('signals_detailed_analysis_pro', 'none', 'Detailed analysis for pro users'),
-            ('signals_chart_access_free', 'false', 'Chart access for free users'),
-            ('signals_chart_access_pro', 'true', 'Chart access for pro users'),
-            ('signals_pattern_filtering_free', 'false', 'Pattern filtering for free users'),
-            ('signals_pattern_filtering_pro', 'true', 'Pattern filtering for pro users'),
-            ('signals_email_alerts_free', 'false', 'Email alerts for free users'),
-            ('signals_email_alerts_pro', 'true', 'Email alerts for pro users')
+            ('signals_visible_free', '3'),
+            ('signals_visible_pro', 'none'),
+            ('signals_detailed_analysis_free', '1'),
+            ('signals_detailed_analysis_pro', 'none'),
+            ('signals_chart_access_free', 'false'),
+            ('signals_chart_access_pro', 'true'),
+            ('signals_pattern_filtering_free', 'false'),
+            ('signals_pattern_filtering_pro', 'true'),
+            ('signals_email_alerts_free', 'false'),
+            ('signals_email_alerts_pro', 'true')
         ]
         
         settings_added = 0
-        for key, value, description in settings:
+        for key, value in settings:
             try:
                 # Check if setting exists
-                result = await db.execute(
-                    text("SELECT COUNT(*) FROM site_settings WHERE key = :key"),
+                exists = await database.fetch_val(
+                    "SELECT COUNT(*) FROM site_settings WHERE key = :key",
                     {'key': key}
                 )
                 
-                if result.scalar() == 0:
-                    # Add new setting
-                    await db.execute(text("""
-                        INSERT INTO site_settings (key, value, description, created_at, updated_at)
-                        VALUES (:key, :value, :description, NOW(), NOW())
-                    """), {'key': key, 'value': value, 'description': description})
+                if not exists or exists == 0:
+                    # Add new setting (site_settings has key, value, updated_at columns)
+                    await database.execute(
+                        "INSERT INTO site_settings (key, value, updated_at) VALUES (:key, :value, NOW())",
+                        {'key': key, 'value': value}
+                    )
                     settings_added += 1
                     
             except Exception as e:
@@ -494,7 +510,7 @@ async def health_check():
             "AI Chart Analysis", 
             "AI Mentor",
             "Performance Analytics",
-            "Enhanced Market Signals",  # New feature
+            "Enhanced Market Signals",
             "Risk Calculator",
             "AI Stock Research",
             "Blog & Content",
@@ -514,8 +530,8 @@ async def api_info():
         "description": "Nigerian Forex Trading Education & AI Tools Platform",
         "features": {
             "authentication": "/auth",
-            "signals": "/signals",  # Enhanced signals
-            "enhanced_signals": "/signals/enhanced",  # New enhanced endpoint
+            "signals": "/signals",
+            "enhanced_signals": "/signals/enhanced",
             "courses": "/courses", 
             "webinars": "/webinars",
             "blog": "/blog",
@@ -542,7 +558,6 @@ async def get_favicon():
     if favicon_path.exists():
         return FileResponse(favicon_path)
     else:
-        # Return a basic response if no favicon exists
         return HTMLResponse(content="", status_code=204)
 
 # Error handlers
@@ -550,10 +565,8 @@ async def get_favicon():
 async def not_found_handler(request: Request, exc: HTTPException):
     """Custom 404 handler"""
     if request.url.path.startswith("/api/") or request.url.path.startswith("/auth/"):
-        # Return JSON for API endpoints
         return {"detail": "Endpoint not found"}
     else:
-        # Return HTML for web pages - redirect to home
         return RedirectResponse(url="/", status_code=302)
 
 @app.exception_handler(500)
@@ -562,10 +575,8 @@ async def internal_error_handler(request: Request, exc: Exception):
     print(f"Internal server error: {exc}")
     
     if request.url.path.startswith("/api/") or request.url.path.startswith("/auth/"):
-        # Return JSON for API endpoints
         return {"detail": "Internal server error"}
     else:
-        # Return HTML error page
         return HTMLResponse(
             content="""
             <html>
@@ -579,40 +590,6 @@ async def internal_error_handler(request: Request, exc: Exception):
             """,
             status_code=500
         )
-
-# Startup message
-@app.on_event("startup")
-async def startup_event():
-    """Print startup information"""
-    print("🚀 Pipways API starting up...")
-    print(f"📂 BASE_DIR: {BASE_DIR}")
-    print("🔗 Routes mounted:")
-    print("   • /auth - Authentication")
-    print("   • /signals - Enhanced Trading Signals")
-    print("   • /signals/enhanced - Enhanced Signals API")
-    print("   • /courses - Course Management")
-    print("   • /webinars - Webinar System")
-    print("   • /blog - Blog & Content")
-    print("   • /admin - Admin Panel")
-    print("   • /ai - AI Services")
-    print("   • /ai/chart - Chart Analysis")
-    print("   • /ai/performance - Performance Analytics")
-    print("   • /ai/mentor - AI Mentor")
-    print("   • /api/stock - Stock Research")
-    print("   • /cms - Content Management")
-    print("   • /payments - Paystack Integration")
-    print("   • /email - Email Services")
-    print("   • /learning - Learning Management")
-    print("   • /risk - Risk Calculator")
-    print("📱 Frontend pages:")
-    print("   • / - Landing Page")
-    print("   • /dashboard - Main Dashboard")
-    print("   • /dashboard#enhanced-signals - Enhanced Signals Interface")
-    print("   • /academy - Trading Academy")
-    print("   • /pricing - Pricing Plans")
-    print("   • /risk-calculator - Public Risk Calculator")
-    print("   • /stock-terminal - Stock Research")
-    print("✨ Enhanced Market Signals with auto-migration is now active!")
 
 if __name__ == "__main__":
     import uvicorn

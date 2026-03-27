@@ -1,0 +1,458 @@
+<!-- Enhanced Signals Content - frontend/static/enhanced_signals_content.html -->
+<style>
+    /* Include all the CSS from the professional signals page */
+    :root {
+        --bg-primary: #0a0c0f;
+        --bg-secondary: #0f1419;
+        --bg-tertiary: #1a1e24;
+        --accent-orange: #ff8c2a;
+        --accent-purple: #8b5cf6;
+        --accent-cyan: #22d3ee;
+        --text-primary: #ffffff;
+        --text-secondary: #9ca3af;
+        --text-muted: #6b7280;
+        --success-green: #10b981;
+        --danger-red: #ef4444;
+        --warning-yellow: #f59e0b;
+        --border-primary: #374151;
+        --border-secondary: #1f2937;
+    }
+
+    .signal-card {
+        background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+        border: 1px solid var(--border-secondary);
+        border-radius: 12px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .signal-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--accent-orange), var(--accent-purple));
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .signal-card:hover::before {
+        opacity: 1;
+    }
+
+    .signal-card:hover {
+        border-color: var(--accent-purple);
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(139, 92, 246, 0.1);
+    }
+
+    .live-badge {
+        background: linear-gradient(90deg, var(--accent-orange), #ff6b1a);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        animation: pulse-glow 2s infinite;
+    }
+
+    @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 8px rgba(255, 140, 42, 0.4); }
+        50% { box-shadow: 0 0 16px rgba(255, 140, 42, 0.8); }
+    }
+
+    .pattern-badge {
+        background: linear-gradient(90deg, var(--accent-purple), #7c3aed);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .buy-stop { 
+        background: linear-gradient(90deg, var(--success-green), #059669);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    .sell-stop { 
+        background: linear-gradient(90deg, var(--danger-red), #dc2626);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    .mini-chart {
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.05), rgba(139, 92, 246, 0.05));
+        border-radius: 8px;
+        height: 120px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--border-secondary);
+    }
+
+    .chart-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: center;
+    }
+
+    .filter-sidebar {
+        background: linear-gradient(180deg, var(--bg-secondary), var(--bg-tertiary));
+        border-right: 1px solid var(--border-primary);
+        min-height: calc(100vh - 120px);
+    }
+
+    .filter-group { margin-bottom: 24px; }
+    .filter-title { color: var(--accent-orange); font-weight: 600; font-size: 1rem; margin-bottom: 12px; }
+    
+    .filter-option {
+        display: flex;
+        align-items: center;
+        padding: 8px 0;
+        cursor: pointer;
+        transition: color 0.2s ease;
+    }
+    .filter-option:hover { color: var(--accent-purple); }
+    
+    .filter-option input[type="radio"] {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--border-primary);
+        border-radius: 50%;
+        margin-right: 12px;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+    .filter-option input[type="radio"]:checked { border-color: var(--accent-purple); }
+    .filter-option input[type="radio"]:checked::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-purple);
+    }
+
+    .sentiment-bar {
+        background: var(--bg-tertiary);
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .sentiment-fill {
+        height: 100%;
+        transition: width 0.6s ease;
+        position: relative;
+    }
+
+    .sentiment-bearish { background: linear-gradient(90deg, var(--danger-red), #dc2626); }
+    .sentiment-bullish { background: linear-gradient(90deg, var(--success-green), #059669); }
+
+    .timeframe-badge {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-secondary);
+        color: var(--text-secondary);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .learn-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: var(--text-primary);
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .learn-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: var(--accent-purple);
+    }
+
+    .install-ea-btn {
+        background: linear-gradient(90deg, var(--accent-purple), #7c3aed);
+        color: white;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .install-ea-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+
+    .trade-levels {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 16px;
+        margin: 16px 0;
+    }
+
+    .level-item { text-align: center; }
+    .level-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+    .level-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 0.875rem; }
+    .level-entry { color: var(--accent-cyan); }
+    .level-target { color: var(--success-green); }
+    .level-stop { color: var(--danger-red); }
+
+    .expiry-time { color: var(--warning-yellow); font-weight: 600; }
+
+    .tab-button {
+        background: transparent;
+        border: 1px solid var(--border-secondary);
+        color: var(--text-secondary);
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .tab-button.active {
+        background: var(--accent-orange);
+        color: white;
+        border-color: var(--accent-orange);
+    }
+
+    .tab-button:not(.active):hover {
+        background: var(--accent-purple);
+        color: white;
+        border-color: var(--accent-purple);
+    }
+
+    @media (max-width: 768px) {
+        .filter-sidebar {
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 280px;
+            z-index: 50;
+            transition: left 0.3s ease;
+            height: 100vh;
+        }
+        .filter-sidebar.active { left: 0; }
+    }
+</style>
+
+<!-- Mobile Overlay -->
+<div class="mobile-overlay fixed inset-0 bg-black bg-opacity-50 hidden z-40" id="mobileOverlay"></div>
+
+<!-- Performance Stats Header -->
+<div class="mb-6 p-4 bg-gradient-to-r from-gray-900 to-gray-800 rounded-lg border border-gray-700">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Market Signals</h1>
+            <p class="text-sm text-gray-400">Professional AI Trading Insights</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- Performance Stats -->
+            <div class="hidden md:flex items-center gap-4">
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
+                    <div class="text-lg font-bold text-purple-400">78%</div>
+                    <div class="text-xs text-gray-400">Win Rate</div>
+                </div>
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
+                    <div class="text-lg font-bold text-purple-400">2.4</div>
+                    <div class="text-xs text-gray-400">Avg R:R</div>
+                </div>
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-center">
+                    <div class="text-lg font-bold text-purple-400">12</div>
+                    <div class="text-xs text-gray-400">Live Signals</div>
+                </div>
+            </div>
+            <!-- Filter Toggle -->
+            <button id="filterToggle" class="md:hidden p-2 bg-gray-800 rounded-lg border border-gray-700 text-white hover:bg-gray-700">
+                <i class="fas fa-filter"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="flex gap-6">
+    <!-- Filter Sidebar -->
+    <div id="filterSidebar" class="filter-sidebar w-64 p-6 hidden md:block rounded-lg">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-bold text-white">Filters</h2>
+            <button id="closeMobileFilter" class="md:hidden text-gray-400 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Confidence Filter -->
+        <div class="filter-group">
+            <div class="filter-title">Confidence</div>
+            <div class="filter-option">
+                <input type="radio" name="confidence" value="20" id="conf20">
+                <label for="conf20">≥ 20%</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="confidence" value="40" id="conf40">
+                <label for="conf40">≥ 40%</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="confidence" value="60" id="conf60" checked>
+                <label for="conf60">≥ 60%</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="confidence" value="80" id="conf80">
+                <label for="conf80">≥ 80%</label>
+            </div>
+        </div>
+
+        <!-- Asset Class Filter -->
+        <div class="filter-group">
+            <div class="filter-title">Asset Class</div>
+            <div class="filter-option">
+                <input type="radio" name="asset" value="all" id="assetAll" checked>
+                <label for="assetAll">All Assets</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="asset" value="forex" id="forex">
+                <label for="forex">Forex</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="asset" value="indices" id="indices">
+                <label for="indices">Indices</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="asset" value="commodities" id="commodities">
+                <label for="commodities">Commodities</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="asset" value="crypto" id="crypto">
+                <label for="crypto">Crypto</label>
+            </div>
+        </div>
+
+        <!-- Pattern Filter -->
+        <div class="filter-group">
+            <div class="filter-title">Pattern Type</div>
+            <div class="filter-option">
+                <input type="radio" name="pattern" value="all" id="patternAll" checked>
+                <label for="patternAll">All Patterns</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="pattern" value="flag" id="flag">
+                <label for="flag">Flag</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="pattern" value="wedge" id="wedge">
+                <label for="wedge">Wedge</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="pattern" value="pennant" id="pennant">
+                <label for="pennant">Pennant</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="pattern" value="triangle" id="triangle">
+                <label for="triangle">Triangle</label>
+            </div>
+        </div>
+
+        <!-- Live Status Filter -->
+        <div class="filter-group">
+            <div class="filter-title">Live Status</div>
+            <div class="filter-option">
+                <input type="radio" name="status" value="all" id="statusAll" checked>
+                <label for="statusAll">All Signals</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="status" value="active" id="statusActive">
+                <label for="statusActive">Active Only</label>
+            </div>
+            <div class="filter-option">
+                <input type="radio" name="status" value="expired" id="statusExpired">
+                <label for="statusExpired">Expired</label>
+            </div>
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="mt-8">
+            <button id="applyFilters" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium mb-2 hover:bg-purple-700 transition-colors">
+                Apply Filters
+            </button>
+            <button id="resetFilters" class="w-full bg-gray-700 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-600 transition-colors">
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1">
+        <!-- Signal Type Tabs -->
+        <div class="flex gap-4 mb-6">
+            <button class="tab-button active" id="aiDrivenTab">
+                <i class="fas fa-robot mr-2"></i>
+                AI-Driven Trade Ideas
+            </button>
+            <button class="tab-button" id="patternTab">
+                <i class="fas fa-chart-line mr-2"></i>
+                Pattern Trade Ideas
+            </button>
+        </div>
+
+        <!-- Signals Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8" id="signalsGrid">
+            <!-- Signal cards will be populated by JavaScript -->
+            <div class="col-span-full text-center py-12">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                <p class="text-gray-400">Loading signals...</p>
+            </div>
+        </div>
+
+        <!-- Load More -->
+        <div class="text-center">
+            <button id="loadMoreBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-8 py-3 rounded-lg font-medium transition-colors">
+                Load More Signals
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Signal Details Modal -->
+<div id="signalModal" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50">
+    <div class="bg-gray-900 rounded-lg p-6 max-w-5xl max-h-[90vh] overflow-y-auto m-4 w-full border border-gray-700">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-white" id="modalTitle">Signal Details</h2>
+            <button id="closeModal" class="text-gray-400 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <div id="modalContent">
+            <!-- Modal content will be populated by JavaScript -->
+            <div class="text-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                <p class="text-gray-400">Loading analysis...</p>
+            </div>
+        </div>
+    </div>
+</div>

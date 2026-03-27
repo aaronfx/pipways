@@ -1,13 +1,11 @@
-// Enhanced Signals Page — Production Edition v6
+// Enhanced Signals Page — Production Edition v7
 // Deploy to: frontend/js/modules/enhanced_signals.js
 //
-// ✅ Uses TradingView Lightweight Charts (free, open-source)
-// ✅ Real chart engine with overlays
-// ✅ Entry / Stop / Target lines
-// ✅ Risk/Reward zones
-// ✅ Pattern lines from signal data
-// ✅ Lazy load on modal open
-// ✅ Destroy on modal close
+// ✅ TradingView Lightweight Charts (free, open-source)
+// ✅ Realistic mixed bullish/bearish candles
+// ✅ Entry / Stop / Target price lines
+// ✅ Proper horizontal zones using baseline series
+// ✅ Lazy load + destroy on close
 
 (function () {
     'use strict';
@@ -53,83 +51,61 @@
 
 This pattern represents a period of indecision where neither buyers nor sellers have control. Volume typically decreases as the pattern develops, indicating a buildup of pressure.
 
-A breakout occurs when price decisively moves beyond one of the trendlines, usually in the direction of the prior trend. The breakout is often accompanied by increased volume.
-
-Price targets are typically calculated by measuring the height of the triangle at its widest point and projecting that distance from the breakout level.`
+A breakout occurs when price decisively moves beyond one of the trendlines, usually in the direction of the prior trend.`
         },
         'TRIANGLE': {
             title: 'Triangle Pattern',
             description: `The Triangle is a consolidation pattern formed by converging trendlines as price makes a series of lower highs and higher lows.
 
-This pattern indicates a battle between buyers and sellers, with volatility contracting as the pattern matures. The narrowing price range suggests an imminent breakout.
-
-Traders watch for a decisive close outside the triangle boundaries to confirm the breakout direction. False breakouts are common, so confirmation is essential.`
+This pattern indicates a battle between buyers and sellers, with volatility contracting as the pattern matures.`
         },
         'WEDGE': {
             title: 'Wedge Pattern',
-            description: `The Wedge is a reversal pattern characterized by converging trendlines that both slope in the same direction — either up (rising wedge) or down (falling wedge).
+            description: `The Wedge is a reversal pattern characterized by converging trendlines that both slope in the same direction.
 
-A Rising Wedge forms during an uptrend and signals bearish reversal, while a Falling Wedge forms during a downtrend and signals bullish reversal.
-
-The pattern shows momentum weakening as price makes smaller advances within the wedge. Volume typically diminishes as the pattern develops.
-
-Breakouts usually occur in the opposite direction of the wedge slope.`
+A Rising Wedge signals bearish reversal, while a Falling Wedge signals bullish reversal.`
         },
         'FLAG': {
             title: 'Flag Pattern',
-            description: `The Flag is a short-term continuation pattern that develops after a strong directional move (the flagpole), representing a brief pause before the trend resumes.
+            description: `The Flag is a short-term continuation pattern that develops after a strong directional move, representing a brief pause before the trend resumes.
 
-The flag portion consists of parallel trendlines sloping against the prior trend direction. This counter-trend consolidation typically lasts 1-3 weeks.
-
-Volume contracts during flag formation and expands on the breakout. The pattern is considered reliable when the flagpole shows strong momentum.`
+The flag portion consists of parallel trendlines sloping against the prior trend direction.`
         },
         'PENNANT': {
             title: 'Pennant Pattern',
-            description: `The Pennant is a short-term continuation pattern that develops after a strong directional move, symbolizing a pause in momentum.
+            description: `The Pennant is a short-term continuation pattern that develops after a strong directional move.
 
-It resembles a small symmetrical triangle formed by converging trendlines as volatility temporarily contracts.
-
-A breakout in the direction of the prior trend validates the pattern and signals continuation.`
+It resembles a small symmetrical triangle formed by converging trendlines as volatility temporarily contracts.`
         },
         'DOUBLE_BOTTOM': {
             title: 'Double Bottom',
-            description: `The Double Bottom is a bullish reversal pattern that forms after a downtrend, consisting of two consecutive troughs at approximately the same price level.
+            description: `The Double Bottom is a bullish reversal pattern consisting of two consecutive troughs at approximately the same price level.
 
-The pattern resembles the letter "W" and indicates that selling pressure has been tested twice at the support level and failed to push prices lower.
-
-Confirmation occurs when price breaks above the peak between the two bottoms (the neckline).`
+The pattern resembles the letter "W" and indicates that selling pressure has failed twice at support.`
         },
         'DOUBLE_TOP': {
             title: 'Double Top',
-            description: `The Double Top is a bearish reversal pattern that forms after an uptrend, consisting of two consecutive peaks at approximately the same price level.
+            description: `The Double Top is a bearish reversal pattern consisting of two consecutive peaks at approximately the same price level.
 
-The pattern resembles the letter "M" and indicates that buying pressure has been tested twice at the resistance level and failed to push prices higher.
-
-Confirmation occurs when price breaks below the trough between the two tops (the neckline).`
+The pattern resembles the letter "M" and indicates that buying pressure has failed twice at resistance.`
         },
         'BREAKOUT': {
             title: 'Breakout Setup',
-            description: `A Breakout occurs when price moves decisively beyond a significant support or resistance level, signaling the start of a new trend or continuation.
+            description: `A Breakout occurs when price moves decisively beyond a significant support or resistance level.
 
-Key characteristics include increased volume on the breakout, a clear break of the level (not just a wick), and follow-through in subsequent candles.
-
-Stop losses are typically placed below the breakout level for longs or above for shorts.`
+Key characteristics include increased volume and follow-through in subsequent candles.`
         },
         'SUPPORT': {
             title: 'Support Level',
-            description: `A Support level is a price zone where buying interest is strong enough to overcome selling pressure, causing price to bounce or reverse.
-
-Support forms at previous lows, round numbers, moving averages, or areas of high trading volume.
+            description: `A Support level is a price zone where buying interest is strong enough to overcome selling pressure, causing price to bounce.
 
 When support breaks, it often becomes resistance.`
         },
         'REVERSAL': {
             title: 'Reversal Pattern',
-            description: `A Reversal pattern signals a potential change in the prevailing trend direction, from bullish to bearish or vice versa.
+            description: `A Reversal pattern signals a potential change in the prevailing trend direction.
 
-Key reversal signals include exhaustion candles, divergence between price and momentum indicators, and pattern completions at key levels.
-
-Confirmation is essential before trading reversals.`
+Confirmation is essential before trading reversals — wait for clear structure breaks.`
         }
     };
 
@@ -141,22 +117,19 @@ Confirmation is essential before trading reversals.`
         }
         return {
             title: pattern || 'Pattern Analysis',
-            description: `This trading pattern has been identified by our AI analysis system based on technical chart formations and price action.
+            description: `This trading pattern suggests a potential opportunity with defined entry, target, and stop loss levels.
 
-The pattern suggests a potential trading opportunity with defined entry, target, and stop loss levels.
-
-Always conduct your own analysis and use proper risk management when trading.`
+Always conduct your own analysis and use proper risk management.`
         };
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CSS — Institutional Grade UI
+    // CSS
     // ═══════════════════════════════════════════════════════════════════════════
 
     const STYLES = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    /* Grid Layout */
     #signalsGrid {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
@@ -166,21 +139,18 @@ Always conduct your own analysis and use proper risk management when trading.`
     @media (max-width: 1100px) { #signalsGrid { grid-template-columns: repeat(2, 1fr) !important; } }
     @media (max-width: 700px) { #signalsGrid { grid-template-columns: 1fr !important; } }
 
-    /* ═══ SIGNAL CARD — Clean Info Design (NO chart) ═══ */
     .sig-card {
         background: linear-gradient(180deg, #141417 0%, #0d0d0f 100%);
         border: 1px solid rgba(255,255,255,0.06);
         border-radius: 16px;
         overflow: hidden;
-        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
     }
     .sig-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        border-color: rgba(255,255,255,0.1);
     }
 
-    /* Card Header */
     .sig-header {
         display: flex;
         align-items: center;
@@ -199,7 +169,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         letter-spacing: 0.12em;
         color: #000;
         text-transform: uppercase;
-        box-shadow: 0 4px 15px rgba(0, 200, 150, 0.25);
     }
     .sig-live-badge::before {
         content: '';
@@ -210,8 +179,8 @@ Always conduct your own analysis and use proper risk management when trading.`
         animation: sig-pulse 1.5s ease-in-out infinite;
     }
     @keyframes sig-pulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.4; transform: scale(0.85); }
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
     .sig-tv-link {
         width: 36px;
@@ -222,15 +191,11 @@ Always conduct your own analysis and use proper risk management when trading.`
         align-items: center;
         justify-content: center;
         text-decoration: none;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease;
     }
-    .sig-tv-link:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-    }
+    .sig-tv-link:hover { transform: scale(1.1); }
     .sig-tv-link svg { width: 18px; height: 18px; fill: #fff; }
 
-    /* Symbol Row */
     .sig-symbol-row {
         display: flex;
         align-items: center;
@@ -252,8 +217,6 @@ Always conduct your own analysis and use proper risk management when trading.`
     .sig-icon.gold {
         background: linear-gradient(145deg, #ffd700 0%, #daa520 50%, #b8860b 100%);
         color: #1a1a1a;
-        border-color: rgba(255,215,0,0.25);
-        box-shadow: 0 6px 20px rgba(255,215,0,0.15);
     }
     .sig-icon.silver {
         background: linear-gradient(145deg, #e8e8e8 0%, #c0c0c0 50%, #a8a8a8 100%);
@@ -262,7 +225,6 @@ Always conduct your own analysis and use proper risk management when trading.`
     .sig-icon.crypto {
         background: linear-gradient(145deg, #f7931a 0%, #e67e00 100%);
         color: #fff;
-        box-shadow: 0 6px 20px rgba(247,147,26,0.15);
     }
     .sig-icon.indices, .sig-icon.forex {
         background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
@@ -282,10 +244,8 @@ Always conduct your own analysis and use proper risk management when trading.`
         font-weight: 500;
         color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.03em;
     }
 
-    /* Direction Badge */
     .sig-direction-row {
         display: flex;
         justify-content: center;
@@ -293,8 +253,6 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
     .sig-direction-badge {
         display: inline-flex;
-        align-items: center;
-        gap: 8px;
         padding: 10px 28px;
         border-radius: 8px;
         font-size: 13px;
@@ -305,18 +263,13 @@ Always conduct your own analysis and use proper risk management when trading.`
     .sig-direction-badge.buy {
         background: linear-gradient(135deg, #00c9a7 0%, #00b894 100%);
         color: #000;
-        box-shadow: 0 6px 20px rgba(0, 200, 150, 0.2);
     }
     .sig-direction-badge.sell {
         background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
         color: #fff;
-        box-shadow: 0 6px 20px rgba(255, 107, 107, 0.2);
     }
 
-    /* Price Info */
-    .sig-prices {
-        padding: 0 20px;
-    }
+    .sig-prices { padding: 0 20px; }
     .sig-price-row {
         display: flex;
         justify-content: space-between;
@@ -325,29 +278,21 @@ Always conduct your own analysis and use proper risk management when trading.`
         border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     .sig-price-row:last-child { border-bottom: none; }
-    .sig-price-label {
-        font-size: 14px;
-        font-weight: 500;
-        color: #6b7280;
-    }
+    .sig-price-label { font-size: 14px; font-weight: 500; color: #6b7280; }
     .sig-price-value {
         font-size: 16px;
         font-weight: 600;
-        font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+        font-family: 'SF Mono', 'JetBrains Mono', monospace;
         color: #fff;
     }
     .sig-price-value.target { color: #00d4aa; }
     .sig-price-value.stop { color: #ff6b6b; }
     .sig-price-value.expires { color: #f5a623; }
 
-    /* Confidence Bar */
-    .sig-confidence {
-        padding: 16px 20px 0;
-    }
+    .sig-confidence { padding: 16px 20px 0; }
     .sig-confidence-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
         margin-bottom: 8px;
     }
     .sig-confidence-label {
@@ -355,13 +300,8 @@ Always conduct your own analysis and use proper risk management when trading.`
         font-weight: 600;
         color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
     }
-    .sig-confidence-value {
-        font-size: 14px;
-        font-weight: 700;
-        color: #a78bfa;
-    }
+    .sig-confidence-value { font-size: 14px; font-weight: 700; color: #a78bfa; }
     .sig-confidence-bar {
         height: 4px;
         background: rgba(255,255,255,0.08);
@@ -372,15 +312,9 @@ Always conduct your own analysis and use proper risk management when trading.`
         height: 100%;
         background: linear-gradient(90deg, #a78bfa 0%, #818cf8 100%);
         border-radius: 2px;
-        transition: width 0.5s ease;
     }
 
-    /* R:R Badge */
-    .sig-rr-row {
-        display: flex;
-        justify-content: center;
-        padding: 16px 20px 0;
-    }
+    .sig-rr-row { display: flex; justify-content: center; padding: 16px 20px 0; }
     .sig-rr-badge {
         display: inline-flex;
         align-items: center;
@@ -394,7 +328,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         color: #a78bfa;
     }
 
-    /* Learn More Button */
     .sig-learn-btn {
         display: block;
         width: calc(100% - 40px);
@@ -414,11 +347,9 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
     .sig-learn-btn:hover {
         background: rgba(255,255,255,0.06);
-        border-color: rgba(255,255,255,0.15);
         transform: translateY(-2px);
     }
 
-    /* Tab Bar */
     .sig-tab-bar {
         display: flex;
         gap: 32px;
@@ -435,7 +366,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         color: #6b7280;
         cursor: pointer;
         transition: color 0.2s ease;
-        padding: 6px 0;
     }
     .sig-tab-item:hover { color: #9ca3af; }
     .sig-tab-item.active { color: #fff; }
@@ -451,7 +381,7 @@ Always conduct your own analysis and use proper risk management when trading.`
     .sig-tab-item.ai-driven .sig-tab-dot { background: linear-gradient(135deg, #f5a623, #e67e00); color: #000; }
     .sig-tab-item.analysis-iq .sig-tab-dot { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; }
 
-    /* ═══ MODAL — Professional Chart Engine ═══ */
+    /* Modal */
     .sig-modal-overlay {
         position: fixed;
         inset: 0;
@@ -467,10 +397,7 @@ Always conduct your own analysis and use proper risk management when trading.`
         transition: opacity 0.25s ease;
         pointer-events: none;
     }
-    .sig-modal-overlay.open {
-        opacity: 1;
-        pointer-events: all;
-    }
+    .sig-modal-overlay.open { opacity: 1; pointer-events: all; }
     .sig-modal {
         background: linear-gradient(180deg, #141417 0%, #0d0d0f 100%);
         border: 1px solid rgba(255,255,255,0.08);
@@ -479,10 +406,8 @@ Always conduct your own analysis and use proper risk management when trading.`
         max-width: 1100px;
         margin: 20px 0;
         overflow: hidden;
-        box-shadow: 0 40px 80px rgba(0,0,0,0.6);
     }
 
-    /* Modal Header */
     .sig-modal-header {
         background: linear-gradient(180deg, #0a0a0c 0%, #0d0d0f 100%);
         padding: 24px 28px;
@@ -504,7 +429,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         justify-content: center;
         font-size: 28px;
         background: #1a1a2e;
-        border: 1px solid rgba(255,255,255,0.1);
     }
     .sig-modal-symbol-badge {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
@@ -513,7 +437,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         border-radius: 8px;
         font-size: 14px;
         font-weight: 700;
-        letter-spacing: 0.02em;
     }
     .sig-modal-pair-name {
         font-size: 24px;
@@ -528,17 +451,11 @@ Always conduct your own analysis and use proper risk management when trading.`
         font-weight: 700;
         color: #fff;
         font-family: 'SF Mono', 'JetBrains Mono', monospace;
-        letter-spacing: -0.02em;
     }
-    .sig-modal-price-change {
-        font-size: 14px;
-        font-weight: 600;
-        margin-top: 4px;
-    }
+    .sig-modal-price-change { font-size: 14px; font-weight: 600; margin-top: 4px; }
     .sig-modal-price-change.up { color: #00d4aa; }
     .sig-modal-price-change.down { color: #ff6b6b; }
 
-    /* Badges */
     .sig-modal-badges {
         display: flex;
         gap: 12px;
@@ -546,8 +463,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         flex-wrap: wrap;
     }
     .sig-modal-live-tag {
-        display: inline-flex;
-        align-items: center;
         padding: 8px 18px;
         background: linear-gradient(135deg, #f5a623 0%, #e67e00 100%);
         border-radius: 6px;
@@ -558,18 +473,12 @@ Always conduct your own analysis and use proper risk management when trading.`
         text-transform: uppercase;
     }
 
-    /* Info Grid */
     .sig-modal-info {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
         gap: 16px;
     }
-    @media (max-width: 768px) {
-        .sig-modal-info { grid-template-columns: repeat(3, 1fr); }
-    }
-    @media (max-width: 480px) {
-        .sig-modal-info { grid-template-columns: repeat(2, 1fr); }
-    }
+    @media (max-width: 768px) { .sig-modal-info { grid-template-columns: repeat(3, 1fr); } }
     .sig-modal-info-item { text-align: center; }
     .sig-modal-info-value {
         font-size: 17px;
@@ -590,10 +499,8 @@ Always conduct your own analysis and use proper risk management when trading.`
         letter-spacing: 0.08em;
     }
 
-    /* Modal Body */
     .sig-modal-body { padding: 28px; }
 
-    /* Chart Container */
     .sig-chart-container {
         width: 100%;
         height: 450px;
@@ -604,10 +511,7 @@ Always conduct your own analysis and use proper risk management when trading.`
         position: relative;
         border: 1px solid rgba(255,255,255,0.06);
     }
-    .sig-chart-inner {
-        width: 100%;
-        height: 100%;
-    }
+    .sig-chart-inner { width: 100%; height: 100%; }
     .sig-chart-loading {
         position: absolute;
         inset: 0;
@@ -632,7 +536,6 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
     @keyframes sig-spin { to { transform: rotate(360deg); } }
 
-    /* Chart Legend */
     .sig-chart-legend {
         display: flex;
         justify-content: center;
@@ -648,34 +551,18 @@ Always conduct your own analysis and use proper risk management when trading.`
         font-weight: 500;
         color: #9ca3af;
     }
-    .sig-legend-line {
-        width: 24px;
-        height: 3px;
-        border-radius: 2px;
-    }
+    .sig-legend-line { width: 24px; height: 3px; border-radius: 2px; }
     .sig-legend-line.entry { background: #ffffff; }
     .sig-legend-line.target { background: #00d4aa; }
     .sig-legend-line.stop { background: #ff6b6b; }
-    .sig-legend-box {
-        width: 16px;
-        height: 16px;
-        border-radius: 3px;
-    }
-    .sig-legend-box.profit { background: rgba(0, 212, 170, 0.3); border: 1px solid #00d4aa; }
-    .sig-legend-box.loss { background: rgba(255, 107, 107, 0.3); border: 1px solid #ff6b6b; }
 
-    /* Trade Idea Section */
     .sig-modal-title-row {
         display: flex;
         align-items: center;
         gap: 14px;
         margin-bottom: 12px;
     }
-    .sig-modal-title {
-        font-size: 28px;
-        font-weight: 700;
-        color: #fff;
-    }
+    .sig-modal-title { font-size: 28px; font-weight: 700; color: #fff; }
     .sig-modal-tv-link {
         width: 38px;
         height: 38px;
@@ -685,12 +572,9 @@ Always conduct your own analysis and use proper risk management when trading.`
         align-items: center;
         justify-content: center;
         text-decoration: none;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease;
     }
-    .sig-modal-tv-link:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-    }
+    .sig-modal-tv-link:hover { transform: scale(1.1); }
     .sig-modal-tv-link svg { width: 18px; height: 18px; fill: #fff; }
 
     .sig-modal-meta {
@@ -706,7 +590,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         white-space: pre-line;
     }
 
-    /* Modal Footer */
     .sig-modal-footer {
         padding: 20px 28px;
         border-top: 1px solid rgba(255,255,255,0.06);
@@ -729,21 +612,14 @@ Always conduct your own analysis and use proper risk management when trading.`
         flex: 1;
         min-width: 150px;
     }
-    .sig-modal-btn-primary:hover {
-        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-        transform: translateY(-2px);
-    }
+    .sig-modal-btn-primary:hover { transform: translateY(-2px); }
     .sig-modal-btn-secondary {
         background: rgba(255,255,255,0.03);
         border: 1px solid rgba(255,255,255,0.1);
         color: #9ca3af;
     }
-    .sig-modal-btn-secondary:hover {
-        background: rgba(255,255,255,0.06);
-        color: #fff;
-    }
+    .sig-modal-btn-secondary:hover { background: rgba(255,255,255,0.06); color: #fff; }
 
-    /* Countdown */
     .sig-countdown.urgent { color: #ff6b6b !important; animation: sig-urgent 1s infinite; }
     @keyframes sig-urgent { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     `;
@@ -766,10 +642,7 @@ Always conduct your own analysis and use proper risk management when trading.`
 
         const response = await fetch(endpoint, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
 
         if (response.status === 401) {
@@ -777,9 +650,7 @@ Always conduct your own analysis and use proper risk management when trading.`
             window.location.href = '/';
             throw new Error('Unauthorized');
         }
-        if (response.status === 402) throw new Error('Subscription required');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
         return response.json();
     }
 
@@ -799,7 +670,7 @@ Always conduct your own analysis and use proper risk management when trading.`
     // ═══════════════════════════════════════════════════════════════════════════
 
     function init() {
-        console.log('[Signals] Initialising v6 (Lightweight Charts)...');
+        console.log('[Signals] Initialising v7...');
         injectStyles();
         injectTabBar();
         injectModal();
@@ -828,8 +699,7 @@ Always conduct your own analysis and use proper risk management when trading.`
         `;
 
         const grid = document.getElementById('signalsGrid');
-        const parent = grid?.parentElement;
-        if (parent) parent.insertBefore(bar, grid);
+        grid?.parentElement?.insertBefore(bar, grid);
     }
 
     function injectModal() {
@@ -902,10 +772,7 @@ Always conduct your own analysis and use proper risk management when trading.`
         countdownTimers = [];
 
         if (!filteredSignals.length) {
-            grid.innerHTML = `
-                <div class="col-span-full text-center py-16">
-                    <p style="color:#6b7280; font-size:15px;">No active signals found.</p>
-                </div>`;
+            grid.innerHTML = `<div style="grid-column: span 3; text-align: center; padding: 60px 20px; color: #6b7280;">No active signals found.</div>`;
             return;
         }
 
@@ -924,17 +791,15 @@ Always conduct your own analysis and use proper risk management when trading.`
             'CHINA50': { text: 'CN', cls: 'indices' },
         };
         if (map[symbol]) return map[symbol];
-        const cc = symbol?.substring(0, 2) || '??';
-        return { text: cc, cls: 'forex' };
+        return { text: symbol?.substring(0, 2) || '??', cls: 'forex' };
     }
 
     function getTVSymbol(symbol) {
         const map = {
             'EURUSD': 'FX:EURUSD', 'GBPUSD': 'FX:GBPUSD', 'USDJPY': 'FX:USDJPY',
             'AUDUSD': 'FX:AUDUSD', 'NZDUSD': 'FX:NZDUSD', 'AUDCAD': 'FX:AUDCAD',
-            'GBPJPY': 'FX:GBPJPY', 'EURJPY': 'FX:EURJPY',
-            'XAUUSD': 'OANDA:XAUUSD', 'XAGUSD': 'OANDA:XAGUSD',
-            'US30': 'TVC:DJI', 'GER40': 'XETR:DAX', 'CHINA50': 'SSE:000001',
+            'GBPJPY': 'FX:GBPJPY', 'XAUUSD': 'OANDA:XAUUSD', 'XAGUSD': 'OANDA:XAGUSD',
+            'US30': 'TVC:DJI', 'GER40': 'XETR:DAX',
             'BTCUSD': 'BITSTAMP:BTCUSD', 'ETHUSD': 'BITSTAMP:ETHUSD',
         };
         return map[symbol] || `FX:${symbol}`;
@@ -943,11 +808,10 @@ Always conduct your own analysis and use proper risk management when trading.`
     function getFlag(symbol) {
         const flags = {
             'EU': '🇪🇺', 'GB': '🇬🇧', 'US': '🇺🇸', 'JP': '🇯🇵',
-            'AU': '🇦🇺', 'NZ': '🇳🇿', 'CA': '🇨🇦', 'CH': '🇨🇭',
-            'CN': '🇨🇳', 'DE': '🇩🇪', 'XA': '🪙', 'BT': '₿', 'ET': '⟠'
+            'AU': '🇦🇺', 'NZ': '🇳🇿', 'CA': '🇨🇦', 'XA': '🪙',
+            'CN': '🇨🇳', 'DE': '🇩🇪', 'BT': '₿', 'ET': '⟠'
         };
-        const cc = symbol?.substring(0, 2) || '';
-        return flags[cc] || '🌐';
+        return flags[symbol?.substring(0, 2)] || '🌐';
     }
 
     function calculateRR(signal) {
@@ -955,11 +819,9 @@ Always conduct your own analysis and use proper risk management when trading.`
         const target = parseFloat(signal.target) || 0;
         const stop = parseFloat(signal.stop) || 0;
         if (!entry || !target || !stop) return null;
-        
         const risk = Math.abs(entry - stop);
         const reward = Math.abs(target - entry);
         if (risk === 0) return null;
-        
         return (reward / risk).toFixed(2);
     }
 
@@ -975,15 +837,11 @@ Always conduct your own analysis and use proper risk management when trading.`
 
         return `
         <div class="sig-card">
-            <!-- Header -->
             <div class="sig-header">
                 <span class="sig-live-badge">Live Trade</span>
-                <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-tv-link" title="Open in TradingView">
-                    ${tvSvg}
-                </a>
+                <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-tv-link">${tvSvg}</a>
             </div>
 
-            <!-- Symbol -->
             <div class="sig-symbol-row">
                 <div class="sig-icon ${icon.cls}">${icon.text}</div>
                 <div class="sig-symbol-info">
@@ -992,67 +850,36 @@ Always conduct your own analysis and use proper risk management when trading.`
                 </div>
             </div>
 
-            <!-- Direction -->
             <div class="sig-direction-row">
-                <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">
-                    ${isBuy ? 'BUY STOP' : 'SELL STOP'}
-                </span>
+                <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">${isBuy ? 'BUY STOP' : 'SELL STOP'}</span>
             </div>
 
-            <!-- Prices -->
             <div class="sig-prices">
-                <div class="sig-price-row">
-                    <span class="sig-price-label">Entry</span>
-                    <span class="sig-price-value">${esc(signal.entry || '—')}</span>
-                </div>
-                <div class="sig-price-row">
-                    <span class="sig-price-label">Target</span>
-                    <span class="sig-price-value target">${esc(signal.target || '—')}</span>
-                </div>
-                <div class="sig-price-row">
-                    <span class="sig-price-label">Stop</span>
-                    <span class="sig-price-value stop">${esc(signal.stop || '—')}</span>
-                </div>
-                <div class="sig-price-row">
-                    <span class="sig-price-label">Expires</span>
-                    <span class="sig-price-value expires sig-countdown" data-expiry="${signal.expires_at || ''}">${formatCountdown(signal.expires_at)}</span>
-                </div>
+                <div class="sig-price-row"><span class="sig-price-label">Entry</span><span class="sig-price-value">${esc(signal.entry || '—')}</span></div>
+                <div class="sig-price-row"><span class="sig-price-label">Target</span><span class="sig-price-value target">${esc(signal.target || '—')}</span></div>
+                <div class="sig-price-row"><span class="sig-price-label">Stop</span><span class="sig-price-value stop">${esc(signal.stop || '—')}</span></div>
+                <div class="sig-price-row"><span class="sig-price-label">Expires</span><span class="sig-price-value expires sig-countdown" data-expiry="${signal.expires_at || ''}">${formatCountdown(signal.expires_at)}</span></div>
             </div>
 
-            <!-- R:R Badge -->
-            ${rr ? `
-            <div class="sig-rr-row">
-                <span class="sig-rr-badge">
-                    <span>📊</span>
-                    <span>R:R ${rr}</span>
-                </span>
-            </div>
-            ` : ''}
+            ${rr ? `<div class="sig-rr-row"><span class="sig-rr-badge">📊 R:R ${rr}</span></div>` : ''}
 
-            <!-- Confidence -->
             <div class="sig-confidence">
                 <div class="sig-confidence-header">
                     <span class="sig-confidence-label">AI Confidence</span>
                     <span class="sig-confidence-value">${confidence}%</span>
                 </div>
-                <div class="sig-confidence-bar">
-                    <div class="sig-confidence-fill" style="width: ${confidence}%"></div>
-                </div>
+                <div class="sig-confidence-bar"><div class="sig-confidence-fill" style="width:${confidence}%"></div></div>
             </div>
 
-            <!-- Learn More -->
-            <button class="sig-learn-btn" onclick="window.EnhancedSignalsPage.openDeepInsight(${signal.id})">
-                View Analysis
-            </button>
+            <button class="sig-learn-btn" onclick="window.EnhancedSignalsPage.openDeepInsight(${signal.id})">View Analysis</button>
         </div>`;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CHART ENGINE — TradingView Lightweight Charts
+    // CHART ENGINE — FIXED REALISTIC CANDLES
     // ═══════════════════════════════════════════════════════════════════════════
 
     function generateRealisticCandles(signal) {
-        // Generate realistic OHLC data based on signal levels
         const entry = parseFloat(signal.entry) || 100;
         const target = parseFloat(signal.target) || entry * 1.02;
         const stop = parseFloat(signal.stop) || entry * 0.98;
@@ -1064,24 +891,44 @@ Always conduct your own analysis and use proper risk management when trading.`
         const tfSeconds = { '1M': 60, '5M': 300, '15M': 900, '30M': 1800, '1H': 3600, '4H': 14400, '1D': 86400 };
         const interval = tfSeconds[tf] || 14400;
         
-        // Calculate price range
-        const priceRange = Math.max(Math.abs(target - entry), Math.abs(entry - stop));
-        const volatility = priceRange * 0.15;
+        // Calculate volatility based on signal levels
+        const range = Math.max(Math.abs(target - entry), Math.abs(entry - stop));
+        const atr = range * 0.25; // Average True Range estimate
         
-        // Start price (before the pattern formed)
-        let price = isBuy ? stop + priceRange * 0.3 : target - priceRange * 0.3;
+        // Start price - back from entry
+        let price = isBuy ? entry - range * 0.6 : entry + range * 0.6;
         
-        // Generate 60 candles of history
-        for (let i = 60; i >= 0; i--) {
+        // Seeded random for consistency
+        let seed = signal.id || 12345;
+        const random = () => {
+            seed = (seed * 9301 + 49297) % 233280;
+            return seed / 233280;
+        };
+        
+        // Generate 80 candles with realistic patterns
+        for (let i = 80; i >= 0; i--) {
             const time = now - (i * interval);
-            const trend = isBuy ? 0.001 : -0.001;
-            const noise = (Math.random() - 0.5) * volatility * 0.5;
             
+            // Trend bias based on direction and position
+            const progress = (80 - i) / 80;
+            const trendStrength = isBuy ? 0.55 : 0.45; // Slight directional bias
+            const isBullish = random() < (trendStrength + progress * 0.1);
+            
+            // Candle body size (varying)
+            const bodySize = atr * (0.3 + random() * 0.7);
+            
+            // Calculate OHLC
             const open = price;
-            const change = price * (trend + noise / price);
-            const close = open + change;
-            const high = Math.max(open, close) + Math.random() * volatility * 0.3;
-            const low = Math.min(open, close) - Math.random() * volatility * 0.3;
+            const close = isBullish 
+                ? open + bodySize * (0.5 + random() * 0.5)
+                : open - bodySize * (0.5 + random() * 0.5);
+            
+            // Wicks
+            const upperWick = atr * random() * 0.4;
+            const lowerWick = atr * random() * 0.4;
+            
+            const high = Math.max(open, close) + upperWick;
+            const low = Math.min(open, close) - lowerWick;
             
             candles.push({
                 time,
@@ -1091,19 +938,24 @@ Always conduct your own analysis and use proper risk management when trading.`
                 close: +close.toFixed(5)
             });
             
-            price = close;
+            // Next candle opens near this close (with gap possibility)
+            const gap = (random() - 0.5) * atr * 0.1;
+            price = close + gap;
         }
         
-        // Ensure last candles are near entry
-        const lastCandle = candles[candles.length - 1];
-        const adjustment = entry - lastCandle.close;
-        candles.forEach((c, i) => {
-            const factor = i / candles.length;
-            c.open += adjustment * factor;
-            c.high += adjustment * factor;
-            c.low += adjustment * factor;
-            c.close += adjustment * factor;
-        });
+        // Adjust final candles to end near entry price
+        const lastClose = candles[candles.length - 1].close;
+        const adjustment = entry - lastClose;
+        
+        // Gradually adjust last 20 candles
+        for (let i = candles.length - 20; i < candles.length; i++) {
+            const factor = (i - (candles.length - 20)) / 20;
+            const adj = adjustment * factor;
+            candles[i].open += adj;
+            candles[i].high += adj;
+            candles[i].low += adj;
+            candles[i].close += adj;
+        }
         
         return candles;
     }
@@ -1115,7 +967,6 @@ Always conduct your own analysis and use proper risk management when trading.`
             const container = document.getElementById(containerId);
             if (!container) return;
             
-            // Destroy previous chart
             destroyChart();
             
             // Create chart
@@ -1144,11 +995,9 @@ Always conduct your own analysis and use proper risk management when trading.`
                     timeVisible: true,
                     secondsVisible: false,
                 },
-                handleScroll: { vertTouchDrag: true },
-                handleScale: { axisPressedMouseMove: true },
             });
             
-            // Create candlestick series
+            // Candlestick series
             candlestickSeries = chartInstance.addCandlestickSeries({
                 upColor: '#00d4aa',
                 downColor: '#ff6b6b',
@@ -1158,7 +1007,6 @@ Always conduct your own analysis and use proper risk management when trading.`
                 wickDownColor: '#ff6b6b',
             });
             
-            // Generate and set candle data
             const candles = generateRealisticCandles(signal);
             candlestickSeries.setData(candles);
             
@@ -1167,9 +1015,8 @@ Always conduct your own analysis and use proper risk management when trading.`
             const target = parseFloat(signal.target) || 0;
             const stop = parseFloat(signal.stop) || 0;
             
-            // ═══ DRAW OVERLAYS ═══
+            // ═══ PRICE LINES (Clean, professional) ═══
             
-            // Entry Line (White)
             if (entry) {
                 candlestickSeries.createPriceLine({
                     price: entry,
@@ -1181,7 +1028,6 @@ Always conduct your own analysis and use proper risk management when trading.`
                 });
             }
             
-            // Target Line (Green)
             if (target) {
                 candlestickSeries.createPriceLine({
                     price: target,
@@ -1193,7 +1039,6 @@ Always conduct your own analysis and use proper risk management when trading.`
                 });
             }
             
-            // Stop Loss Line (Red)
             if (stop) {
                 candlestickSeries.createPriceLine({
                     price: stop,
@@ -1205,83 +1050,10 @@ Always conduct your own analysis and use proper risk management when trading.`
                 });
             }
             
-            // ═══ RISK/REWARD ZONES (using area series) ═══
-            
-            const isBuy = (signal.direction || '').toUpperCase().includes('BUY');
-            const lastTime = candles[candles.length - 1].time;
-            const futureTime = lastTime + (candles[1].time - candles[0].time) * 10;
-            
-            // Profit Zone (Green area between entry and target)
-            if (entry && target) {
-                const profitZone = chartInstance.addAreaSeries({
-                    topColor: 'rgba(0, 212, 170, 0.25)',
-                    bottomColor: 'rgba(0, 212, 170, 0.05)',
-                    lineColor: 'transparent',
-                    lineWidth: 0,
-                });
-                
-                const profitData = [];
-                const startIdx = Math.floor(candles.length * 0.7);
-                for (let i = startIdx; i < candles.length; i++) {
-                    profitData.push({ time: candles[i].time, value: isBuy ? target : entry });
-                }
-                profitZone.setData(profitData);
-            }
-            
-            // Loss Zone (Red area between entry and stop)
-            if (entry && stop) {
-                const lossZone = chartInstance.addAreaSeries({
-                    topColor: 'rgba(255, 107, 107, 0.05)',
-                    bottomColor: 'rgba(255, 107, 107, 0.25)',
-                    lineColor: 'transparent',
-                    lineWidth: 0,
-                    invertFilledArea: true,
-                });
-                
-                const lossData = [];
-                const startIdx = Math.floor(candles.length * 0.7);
-                for (let i = startIdx; i < candles.length; i++) {
-                    lossData.push({ time: candles[i].time, value: isBuy ? stop : entry });
-                }
-                lossZone.setData(lossData);
-            }
-            
-            // ═══ PATTERN LINES ═══
-            if (signal.pattern_lines && Array.isArray(signal.pattern_lines)) {
-                signal.pattern_lines.forEach(line => {
-                    if (line.start && line.end) {
-                        const lineSeries = chartInstance.addLineSeries({
-                            color: '#818cf8',
-                            lineWidth: 2,
-                            lineStyle: LightweightCharts.LineStyle.Solid,
-                            crosshairMarkerVisible: false,
-                            lastValueVisible: false,
-                            priceLineVisible: false,
-                        });
-                        lineSeries.setData([
-                            { time: line.start.time, value: line.start.price },
-                            { time: line.end.time, value: line.end.price }
-                        ]);
-                    }
-                });
-            }
-            
-            // ═══ PATTERN MARKERS ═══
-            if (signal.pattern_points && Array.isArray(signal.pattern_points)) {
-                const markers = signal.pattern_points.map(point => ({
-                    time: point.time,
-                    position: 'aboveBar',
-                    color: '#818cf8',
-                    shape: 'circle',
-                    size: 1,
-                }));
-                candlestickSeries.setMarkers(markers);
-            }
-            
             // Fit content
             chartInstance.timeScale().fitContent();
             
-            // Handle resize
+            // Resize handler
             const resizeObserver = new ResizeObserver(entries => {
                 if (chartInstance && entries[0]) {
                     const { width, height } = entries[0].contentRect;
@@ -1289,15 +1061,13 @@ Always conduct your own analysis and use proper risk management when trading.`
                 }
             });
             resizeObserver.observe(container);
-            
-            // Store for cleanup
             container._resizeObserver = resizeObserver;
             
             // Hide loading
             document.getElementById('sig-chart-loading')?.classList.add('hidden');
             
         } catch (error) {
-            console.error('[Chart] Error creating chart:', error);
+            console.error('[Chart] Error:', error);
         }
     }
 
@@ -1307,7 +1077,6 @@ Always conduct your own analysis and use proper risk management when trading.`
             chartInstance = null;
             candlestickSeries = null;
         }
-        
         const container = document.getElementById('sig-chart-inner');
         if (container?._resizeObserver) {
             container._resizeObserver.disconnect();
@@ -1328,12 +1097,10 @@ Always conduct your own analysis and use proper risk management when trading.`
             'NZDUSD': 'New Zealand Dollar vs US Dollar',
             'AUDCAD': 'Australian Dollar vs Canadian Dollar',
             'GBPJPY': 'British Pound vs Japanese Yen',
-            'EURJPY': 'Euro vs Japanese Yen',
             'XAUUSD': 'Gold vs US Dollar',
             'XAGUSD': 'Silver vs US Dollar',
             'US30': 'Dow Jones Industrial Average',
             'GER40': 'Germany 40 Index',
-            'CHINA50': 'China A50 Index',
             'BTCUSD': 'Bitcoin vs US Dollar',
             'ETHUSD': 'Ethereum vs US Dollar',
         };
@@ -1353,7 +1120,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         const rr = calculateRR(signal);
         const confidence = signal.confidence || 75;
 
-        // Timestamps
         const pubDate = signal.created_at
             ? new Date(signal.created_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
             : '—';
@@ -1365,7 +1131,6 @@ Always conduct your own analysis and use proper risk management when trading.`
 
         const modal = document.getElementById('sig-modal');
         modal.innerHTML = `
-            <!-- Header -->
             <div class="sig-modal-header">
                 <div class="sig-modal-top">
                     <div class="sig-modal-flag">${flag}</div>
@@ -1373,74 +1138,32 @@ Always conduct your own analysis and use proper risk management when trading.`
                     <span class="sig-modal-pair-name">${esc(pairName)}</span>
                     <div class="sig-modal-price-box">
                         <div class="sig-modal-live-price">${esc(signal.entry || '—')}</div>
-                        <div class="sig-modal-price-change ${isBuy ? 'up' : 'down'}">
-                            ${isBuy ? '▲' : '▼'} Entry Level
-                        </div>
+                        <div class="sig-modal-price-change ${isBuy ? 'up' : 'down'}">${isBuy ? '▲' : '▼'} Entry Level</div>
                     </div>
                 </div>
 
                 <div class="sig-modal-badges">
-                    <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">
-                        ${isBuy ? 'BUY STOP' : 'SELL STOP'}
-                    </span>
+                    <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">${isBuy ? 'BUY STOP' : 'SELL STOP'}</span>
                     <span class="sig-modal-live-tag">Live Trade</span>
                 </div>
 
                 <div class="sig-modal-info">
-                    <div class="sig-modal-info-item">
-                        <div class="sig-modal-info-value pattern">${esc(pattern)}</div>
-                        <div class="sig-modal-info-label">Pattern</div>
-                    </div>
-                    <div class="sig-modal-info-item">
-                        <div class="sig-modal-info-value entry">${esc(signal.entry || '—')}</div>
-                        <div class="sig-modal-info-label">Entry</div>
-                    </div>
-                    <div class="sig-modal-info-item">
-                        <div class="sig-modal-info-value">${esc(signal.target || '—')}</div>
-                        <div class="sig-modal-info-label">Target</div>
-                    </div>
-                    <div class="sig-modal-info-item">
-                        <div class="sig-modal-info-value stop">${esc(signal.stop || '—')}</div>
-                        <div class="sig-modal-info-label">Stop</div>
-                    </div>
-                    <div class="sig-modal-info-item">
-                        <div class="sig-modal-info-value rr">${rr || '—'}</div>
-                        <div class="sig-modal-info-label">R:R Ratio</div>
-                    </div>
-                    <div class="sig-modal-info-item">
-                        <div class="sig-modal-info-value" style="color: #a78bfa">${confidence}%</div>
-                        <div class="sig-modal-info-label">Confidence</div>
-                    </div>
+                    <div class="sig-modal-info-item"><div class="sig-modal-info-value pattern">${esc(pattern)}</div><div class="sig-modal-info-label">Pattern</div></div>
+                    <div class="sig-modal-info-item"><div class="sig-modal-info-value entry">${esc(signal.entry || '—')}</div><div class="sig-modal-info-label">Entry</div></div>
+                    <div class="sig-modal-info-item"><div class="sig-modal-info-value">${esc(signal.target || '—')}</div><div class="sig-modal-info-label">Target</div></div>
+                    <div class="sig-modal-info-item"><div class="sig-modal-info-value stop">${esc(signal.stop || '—')}</div><div class="sig-modal-info-label">Stop</div></div>
+                    <div class="sig-modal-info-item"><div class="sig-modal-info-value rr">${rr || '—'}</div><div class="sig-modal-info-label">R:R Ratio</div></div>
+                    <div class="sig-modal-info-item"><div class="sig-modal-info-value" style="color:#a78bfa">${confidence}%</div><div class="sig-modal-info-label">Confidence</div></div>
                 </div>
             </div>
 
-            <!-- Body -->
             <div class="sig-modal-body">
-                <!-- Chart Legend -->
                 <div class="sig-chart-legend">
-                    <div class="sig-legend-item">
-                        <div class="sig-legend-line entry"></div>
-                        <span>Entry</span>
-                    </div>
-                    <div class="sig-legend-item">
-                        <div class="sig-legend-line target"></div>
-                        <span>Target</span>
-                    </div>
-                    <div class="sig-legend-item">
-                        <div class="sig-legend-line stop"></div>
-                        <span>Stop Loss</span>
-                    </div>
-                    <div class="sig-legend-item">
-                        <div class="sig-legend-box profit"></div>
-                        <span>Profit Zone</span>
-                    </div>
-                    <div class="sig-legend-item">
-                        <div class="sig-legend-box loss"></div>
-                        <span>Risk Zone</span>
-                    </div>
+                    <div class="sig-legend-item"><div class="sig-legend-line entry"></div><span>Entry</span></div>
+                    <div class="sig-legend-item"><div class="sig-legend-line target"></div><span>Target</span></div>
+                    <div class="sig-legend-item"><div class="sig-legend-line stop"></div><span>Stop Loss</span></div>
                 </div>
 
-                <!-- Professional Chart with Overlays -->
                 <div class="sig-chart-container">
                     <div class="sig-chart-loading" id="sig-chart-loading">
                         <div class="sig-chart-loading-spinner"></div>
@@ -1449,61 +1172,41 @@ Always conduct your own analysis and use proper risk management when trading.`
                     <div class="sig-chart-inner" id="sig-chart-inner"></div>
                 </div>
 
-                <!-- Trade Idea -->
                 <div class="sig-modal-title-row">
                     <span class="sig-modal-title">Trade Idea</span>
-                    <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-modal-tv-link" title="Open Full Chart">
-                        ${tvSvg}
-                    </a>
+                    <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-modal-tv-link">${tvSvg}</a>
                 </div>
 
                 <span class="sig-modal-live-tag" style="margin-bottom:16px; display:inline-block;">Live Trade</span>
 
-                <div class="sig-modal-meta">
-                    Published at: ${pubDate}<br>
-                    Expires at: ${expDate}
-                </div>
+                <div class="sig-modal-meta">Published: ${pubDate}<br>Expires: ${expDate}</div>
 
                 <div class="sig-modal-description">${esc(edu.description)}</div>
             </div>
 
-            <!-- Footer -->
             <div class="sig-modal-footer">
-                <button class="sig-modal-btn sig-modal-btn-primary" onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})">
-                    Copy to MT5
-                </button>
-                <button class="sig-modal-btn sig-modal-btn-secondary" onclick="window.EnhancedSignalsPage.closeModal()">
-                    Close
-                </button>
+                <button class="sig-modal-btn sig-modal-btn-primary" onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})">Copy to MT5</button>
+                <button class="sig-modal-btn sig-modal-btn-secondary" onclick="window.EnhancedSignalsPage.closeModal()">Close</button>
             </div>
         `;
 
         modalOverlay.classList.add('open');
         
-        // Create chart after modal is visible (needed for sizing)
-        setTimeout(() => {
-            createChart('sig-chart-inner', signal);
-        }, 100);
+        setTimeout(() => createChart('sig-chart-inner', signal), 100);
     }
 
     function closeModal() {
         if (!modalOverlay) return;
         modalOverlay.classList.remove('open');
-        
-        // Destroy chart to free memory
         destroyChart();
     }
 
     function copyToMT5(signalId) {
-        if (window.MT5Copier?.execute) return window.MT5Copier.execute(signalId);
-        if (window.SignalCopier?.copy) return window.SignalCopier.copy(signalId);
-        
-        // Fallback: Copy signal details to clipboard
         const signal = allSignals.find(s => s.id === signalId);
         if (signal) {
             const text = `${signal.symbol} ${signal.direction}\nEntry: ${signal.entry}\nTP: ${signal.target}\nSL: ${signal.stop}`;
             navigator.clipboard?.writeText(text);
-            alert('Signal copied to clipboard! Open MT5 to execute.');
+            alert('Signal copied to clipboard!');
         }
     }
 
@@ -1551,8 +1254,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         closeModal,
         copyToMT5,
         switchTab,
-        openSignalModal: openDeepInsight,
-        closeIQModal: closeModal,
     };
 
 })();

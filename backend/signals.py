@@ -9,7 +9,7 @@ from backend.database import database, signals
 from backend.auth import get_current_user
 import json
 
-router = APIRouter(prefix="/signals", tags=["signals"])
+router = APIRouter(tags=["signals"])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

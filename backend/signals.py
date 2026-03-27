@@ -1,32 +1,22 @@
-# signals.py — Enhanced Signals API with Pattern Coordinates
+# Signals API — Production Clean Version
 # Deploy to: backend/signals.py
+#
+# ✅ ONLY returns real database records
+# ✅ NO mock/fake/placeholder data
+# ✅ NO seed data injection
+# ✅ Bot writes → DB → API reads → Frontend displays
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
-from backend.database import database, signals
-from backend.auth import get_current_user
+from typing import Optional, List
+from datetime import datetime
 import json
 
 router = APIRouter(tags=["signals"])
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODELS
+# PYDANTIC MODELS
 # ═══════════════════════════════════════════════════════════════════════════════
-
-class PatternPoint(BaseModel):
-    """Single point in a pattern (time + price)"""
-    time: int  # Unix timestamp
-    price: float
-
-
-class PatternLine(BaseModel):
-    """A line connecting two points"""
-    start: PatternPoint
-    end: PatternPoint
-
 
 class SignalCreate(BaseModel):
     symbol: str
@@ -34,620 +24,382 @@ class SignalCreate(BaseModel):
     entry: str
     target: str
     stop: str
-    timeframe: str = "4H"
     pattern: Optional[str] = None
-    pattern_points: Optional[List[Dict[str, Any]]] = None  # Array of {time, price} pairs
-    pattern_lines: Optional[List[Dict[str, Any]]] = None   # Array of line definitions
-    confidence: int = 75
-    technical_summary: Optional[str] = None
-    is_pattern_idea: bool = False
-    expires_at: Optional[datetime] = None
-
-
-class SignalResponse(BaseModel):
-    id: int
-    symbol: str
-    direction: str
-    entry: str
-    target: str
-    stop: str
-    timeframe: str
-    pattern: Optional[str]
-    pattern_points: Optional[List[Dict[str, Any]]]
-    pattern_lines: Optional[List[Dict[str, Any]]]
-    confidence: int
-    technical_summary: Optional[str]
-    is_pattern_idea: bool
-    status: str
-    created_at: datetime
-    expires_at: Optional[datetime]
+    timeframe: Optional[str] = "4H"
+    confidence: Optional[int] = 75
+    asset_type: Optional[str] = "forex"
+    country: Optional[str] = "all"
+    is_pattern_idea: Optional[bool] = False
     full_name: Optional[str] = None
+    technical_summary: Optional[str] = None
+    pattern_points: Optional[str] = None  # JSON string
+    pattern_lines: Optional[str] = None   # JSON string
 
-
-class CandleData(BaseModel):
-    """OHLC candle data"""
-    time: int  # Unix timestamp
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: Optional[float] = None
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SYMBOL METADATA
-# ═══════════════════════════════════════════════════════════════════════════════
-
-SYMBOL_INFO = {
-    "EURUSD": {"name": "Euro vs US Dollar", "type": "forex", "digits": 5},
-    "GBPUSD": {"name": "British Pound vs US Dollar", "type": "forex", "digits": 5},
-    "USDJPY": {"name": "US Dollar vs Japanese Yen", "type": "forex", "digits": 3},
-    "AUDUSD": {"name": "Australian Dollar vs US Dollar", "type": "forex", "digits": 5},
-    "NZDUSD": {"name": "New Zealand Dollar vs US Dollar", "type": "forex", "digits": 5},
-    "AUDCAD": {"name": "Australian Dollar vs Canadian Dollar", "type": "forex", "digits": 5},
-    "GBPJPY": {"name": "British Pound vs Japanese Yen", "type": "forex", "digits": 3},
-    "EURJPY": {"name": "Euro vs Japanese Yen", "type": "forex", "digits": 3},
-    "XAUUSD": {"name": "Gold vs US Dollar", "type": "commodity", "digits": 2},
-    "XAGUSD": {"name": "Silver vs US Dollar", "type": "commodity", "digits": 3},
-    "US30": {"name": "Dow Jones Industrial Average", "type": "indices", "digits": 0},
-    "GER40": {"name": "Germany 40 Index", "type": "indices", "digits": 0},
-    "CHINA50": {"name": "China A50 Index", "type": "indices", "digits": 0},
-    "BTCUSD": {"name": "Bitcoin vs US Dollar", "type": "crypto", "digits": 2},
-    "ETHUSD": {"name": "Ethereum vs US Dollar", "type": "crypto", "digits": 2},
-}
-
+class SignalUpdate(BaseModel):
+    symbol: Optional[str] = None
+    direction: Optional[str] = None
+    entry: Optional[str] = None
+    target: Optional[str] = None
+    stop: Optional[str] = None
+    pattern: Optional[str] = None
+    timeframe: Optional[str] = None
+    confidence: Optional[int] = None
+    status: Optional[str] = None
+    is_pattern_idea: Optional[bool] = None
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DATABASE MIGRATION
+# DATABASE CONNECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_database():
+    """Get database connection from main app"""
+    from backend.database import database
+    return database
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MIGRATION — Run on startup to ensure columns exist
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def run_signals_migration():
     """Add missing columns to signals table"""
-    _COLUMN_MIGRATIONS = [
-        ("pattern", "VARCHAR(100)"),
-        ("confidence", "INTEGER DEFAULT 75"),
-        ("timeframe", "VARCHAR(10) DEFAULT '4H'"),
+    db = get_database()
+    
+    columns_to_add = [
+        ("full_name", "VARCHAR(255)"),
+        ("ai_confidence", "INTEGER"),
+        ("sentiment_bullish", "INTEGER"),
+        ("sentiment_bearish", "INTEGER"),
+        ("is_pattern_idea", "BOOLEAN DEFAULT FALSE"),
         ("technical_summary", "TEXT"),
         ("volatility_index", "FLOAT"),
-        ("is_pattern_idea", "BOOLEAN DEFAULT FALSE"),
-        ("is_published", "BOOLEAN DEFAULT TRUE"),
-        ("expires_at", "TIMESTAMP"),
-        ("pattern_points", "TEXT"),  # JSON array of {time, price}
-        ("pattern_lines", "TEXT"),   # JSON array of line definitions
+        ("pattern_points", "TEXT"),
+        ("pattern_lines", "TEXT"),
     ]
-
-    for col_name, col_type in _COLUMN_MIGRATIONS:
+    
+    for col_name, col_type in columns_to_add:
         try:
-            await database.execute(f"ALTER TABLE signals ADD COLUMN {col_name} {col_type}")
-            print(f"[Signals] Added column: {col_name}")
+            check_sql = f"""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'signals' AND column_name = '{col_name}'
+            """
+            result = await db.fetch_one(check_sql)
+            
+            if not result:
+                alter_sql = f"ALTER TABLE signals ADD COLUMN {col_name} {col_type}"
+                await db.execute(alter_sql)
+                print(f"[SIGNALS] ✅ Added column: {col_name}")
         except Exception as e:
-            if "already exists" in str(e).lower() or "duplicate" in str(e).lower():
-                pass
-            else:
-                print(f"[Signals] Column {col_name} migration note: {e}")
-
+            print(f"[SIGNALS] ⚠️ Column {col_name}: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CANDLES ENDPOINT (FOR CHART DATAFEED)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/candles")
-async def get_candles(
-    symbol: str = Query(..., description="Trading symbol"),
-    timeframe: str = Query("1H", description="Timeframe: 1M, 5M, 15M, 1H, 4H, 1D"),
-    from_ts: Optional[int] = Query(None, description="Start timestamp (unix)"),
-    to_ts: Optional[int] = Query(None, description="End timestamp (unix)"),
-    limit: int = Query(500, description="Number of candles"),
-    _user: dict = Depends(get_current_user)
-):
-    """
-    Get OHLC candle data for charting.
-    
-    This endpoint is designed to be connected to a real data source:
-    - MT5 bridge
-    - TwelveData API
-    - Binance API
-    - EODHD API
-    
-    For now, returns placeholder structure that frontend can handle.
-    """
-    
-    # TODO: Replace with real data source integration
-    # Example integrations:
-    #
-    # MT5:
-    #   from mt5_bridge import get_rates
-    #   candles = get_rates(symbol, timeframe, limit)
-    #
-    # TwelveData:
-    #   response = httpx.get(f"https://api.twelvedata.com/time_series?symbol={symbol}&interval={timeframe}")
-    #   candles = parse_twelvedata(response.json())
-    #
-    # Binance:
-    #   response = httpx.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={timeframe}")
-    #   candles = parse_binance(response.json())
-    
-    return {
-        "symbol": symbol,
-        "timeframe": timeframe,
-        "candles": [],  # Empty = frontend will use TradingView widget fallback
-        "source": "pending_integration",
-        "message": "Connect MT5/API for real data"
-    }
-
-
-@router.get("/symbol-info/{symbol}")
-async def get_symbol_info(
-    symbol: str,
-    _user: dict = Depends(get_current_user)
-):
-    """Get symbol metadata for charting"""
-    info = SYMBOL_INFO.get(symbol, {
-        "name": symbol,
-        "type": "forex",
-        "digits": 5
-    })
-    return {
-        "symbol": symbol,
-        **info,
-        "exchange": "FOREX" if info.get("type") == "forex" else "INDEX",
-        "timezone": "Etc/UTC"
-    }
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SIGNAL ENDPOINTS
+# API ENDPOINTS — REAL DATA ONLY
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/enhanced")
-async def get_enhanced_signals(
-    status: str = "active",
-    _user: dict = Depends(get_current_user)
-) -> List[dict]:
-    """Get all enhanced signals with pattern data"""
-    
-    # Use raw SQL to avoid column mismatch with SQLAlchemy Table definition
-    # This handles cases where new columns haven't been added to the DB yet
-    query = """
-        SELECT * FROM signals WHERE status = :status
-        ORDER BY created_at DESC
+async def get_enhanced_signals():
     """
-    rows = await database.fetch_all(query, {"status": status})
+    GET /signals/enhanced
     
-    result = []
-    for row in rows:
-        row_dict = dict(row._mapping)
-        
-        # Parse JSON fields (if they exist)
-        if row_dict.get("pattern_points"):
-            try:
-                row_dict["pattern_points"] = json.loads(row_dict["pattern_points"])
-            except:
-                row_dict["pattern_points"] = None
-        else:
-            row_dict["pattern_points"] = None
-                
-        if row_dict.get("pattern_lines"):
-            try:
-                row_dict["pattern_lines"] = json.loads(row_dict["pattern_lines"])
-            except:
-                row_dict["pattern_lines"] = None
-        else:
-            row_dict["pattern_lines"] = None
-        
-        # Add full name from SYMBOL_INFO
-        symbol = row_dict.get("symbol", "")
-        info = SYMBOL_INFO.get(symbol, {})
-        row_dict["full_name"] = info.get("name", symbol)
-        row_dict["asset_type"] = row_dict.get("asset_type") or info.get("type", "forex")
-        row_dict["digits"] = info.get("digits", 5)
-        
-        result.append(row_dict)
+    Returns ALL active signals from the database.
+    NO fake data. NO fallbacks. ONLY real bot signals.
+    """
+    db = get_database()
     
-    return result
+    try:
+        # Query ONLY real database records
+        query = """
+            SELECT * FROM signals 
+            WHERE status = 'active' 
+            ORDER BY created_at DESC
+        """
+        rows = await db.fetch_all(query)
+        
+        if not rows:
+            print("[SIGNALS] ℹ️ No active signals in database")
+            return []  # Return empty array, NOT fake data
+        
+        # Convert rows to dicts
+        signals = []
+        for row in rows:
+            signal = dict(row)
+            
+            # Parse JSON fields if present
+            if signal.get('pattern_points'):
+                try:
+                    signal['pattern_points'] = json.loads(signal['pattern_points'])
+                except:
+                    signal['pattern_points'] = None
+                    
+            if signal.get('pattern_lines'):
+                try:
+                    signal['pattern_lines'] = json.loads(signal['pattern_lines'])
+                except:
+                    signal['pattern_lines'] = None
+            
+            signals.append(signal)
+        
+        print(f"[SIGNALS] ✅ Returning {len(signals)} real signals")
+        return signals
+        
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error fetching signals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/active")
+async def get_active_signals(
+    country: str = "all",
+    asset_type: str = "forex"
+):
+    """
+    GET /signals/active
+    
+    Returns filtered active signals. Now has default params to avoid 422 errors.
+    """
+    db = get_database()
+    
+    try:
+        # Build query with optional filters
+        query = "SELECT * FROM signals WHERE status = 'active'"
+        params = {}
+        
+        if country and country != "all":
+            query += " AND country = :country"
+            params["country"] = country
+            
+        if asset_type and asset_type != "all":
+            query += " AND asset_type = :asset_type"
+            params["asset_type"] = asset_type
+        
+        query += " ORDER BY created_at DESC"
+        
+        rows = await db.fetch_all(query, params)
+        
+        signals = [dict(row) for row in rows] if rows else []
+        print(f"[SIGNALS] ✅ /active returning {len(signals)} signals (country={country}, asset={asset_type})")
+        return signals
+        
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{signal_id}")
-async def get_signal(
-    signal_id: int,
-    _user: dict = Depends(get_current_user)
-) -> dict:
-    """Get single signal with full details"""
+async def get_signal(signal_id: int):
+    """
+    GET /signals/{id}
     
-    query = "SELECT * FROM signals WHERE id = :signal_id"
-    row = await database.fetch_one(query, {"signal_id": signal_id})
+    Returns a single signal by ID.
+    """
+    db = get_database()
     
-    if not row:
-        raise HTTPException(status_code=404, detail="Signal not found")
-    
-    row_dict = dict(row._mapping)
-    
-    # Parse JSON fields
-    if row_dict.get("pattern_points"):
-        try:
-            row_dict["pattern_points"] = json.loads(row_dict["pattern_points"])
-        except:
-            row_dict["pattern_points"] = None
-            
-    if row_dict.get("pattern_lines"):
-        try:
-            row_dict["pattern_lines"] = json.loads(row_dict["pattern_lines"])
-        except:
-            row_dict["pattern_lines"] = None
-    
-    # Add metadata
-    symbol = row_dict.get("symbol", "")
-    info = SYMBOL_INFO.get(symbol, {})
-    row_dict["full_name"] = info.get("name", symbol)
-    row_dict["asset_type"] = info.get("type", "forex")
-    row_dict["digits"] = info.get("digits", 5)
-    
-    return row_dict
+    try:
+        query = "SELECT * FROM signals WHERE id = :signal_id"
+        row = await db.fetch_one(query, {"signal_id": signal_id})
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Signal not found")
+        
+        signal = dict(row)
+        
+        # Parse JSON fields
+        if signal.get('pattern_points'):
+            try:
+                signal['pattern_points'] = json.loads(signal['pattern_points'])
+            except:
+                pass
+                
+        if signal.get('pattern_lines'):
+            try:
+                signal['pattern_lines'] = json.loads(signal['pattern_lines'])
+            except:
+                pass
+        
+        return signal
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/")
-async def create_signal(
-    signal: SignalCreate,
-    _user: dict = Depends(get_current_user)
-) -> dict:
-    """Create a new signal with pattern coordinates"""
+async def create_signal(signal: SignalCreate):
+    """
+    POST /signals/
     
-    # Serialize JSON fields
-    pattern_points_json = json.dumps(signal.pattern_points) if signal.pattern_points else None
-    pattern_lines_json = json.dumps(signal.pattern_lines) if signal.pattern_lines else None
+    Creates a new signal. Used by the trading bot.
+    """
+    db = get_database()
     
-    # Default expiry if not set
-    expires_at = signal.expires_at or (datetime.utcnow() + timedelta(days=2))
-    
-    query = signals.insert().values(
-        symbol=signal.symbol,
-        direction=signal.direction,
-        entry=signal.entry,
-        target=signal.target,
-        stop=signal.stop,
-        timeframe=signal.timeframe,
-        pattern=signal.pattern,
-        pattern_points=pattern_points_json,
-        pattern_lines=pattern_lines_json,
-        confidence=signal.confidence,
-        technical_summary=signal.technical_summary,
-        is_pattern_idea=signal.is_pattern_idea,
-        is_published=True,
-        status="active",
-        created_at=datetime.utcnow(),
-        expires_at=expires_at
-    )
-    
-    signal_id = await database.execute(query)
-    
-    return {"id": signal_id, "status": "created"}
+    try:
+        # Prepare pattern data as JSON strings
+        pattern_points_json = signal.pattern_points if signal.pattern_points else None
+        pattern_lines_json = signal.pattern_lines if signal.pattern_lines else None
+        
+        query = """
+            INSERT INTO signals (
+                symbol, direction, entry, target, stop,
+                pattern, timeframe, confidence, ai_confidence,
+                asset_type, country, is_pattern_idea, full_name,
+                technical_summary, pattern_points, pattern_lines,
+                status, is_published, created_at, expires_at
+            ) VALUES (
+                :symbol, :direction, :entry, :target, :stop,
+                :pattern, :timeframe, :confidence, :confidence,
+                :asset_type, :country, :is_pattern_idea, :full_name,
+                :technical_summary, :pattern_points, :pattern_lines,
+                'active', TRUE, NOW(), NOW() + INTERVAL '24 hours'
+            )
+            RETURNING id
+        """
+        
+        params = {
+            "symbol": signal.symbol,
+            "direction": signal.direction.upper(),
+            "entry": signal.entry,
+            "target": signal.target,
+            "stop": signal.stop,
+            "pattern": signal.pattern or "BREAKOUT",
+            "timeframe": signal.timeframe or "4H",
+            "confidence": signal.confidence or 75,
+            "asset_type": signal.asset_type or "forex",
+            "country": signal.country or "all",
+            "is_pattern_idea": signal.is_pattern_idea or False,
+            "full_name": signal.full_name,
+            "technical_summary": signal.technical_summary,
+            "pattern_points": pattern_points_json,
+            "pattern_lines": pattern_lines_json,
+        }
+        
+        result = await db.fetch_one(query, params)
+        signal_id = result["id"] if result else None
+        
+        print(f"[SIGNALS] ✅ Created signal #{signal_id}: {signal.symbol} {signal.direction}")
+        
+        return {"id": signal_id, "status": "created", "symbol": signal.symbol}
+        
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error creating signal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/{signal_id}")
-async def update_signal(
-    signal_id: int,
-    updates: dict,
-    _user: dict = Depends(get_current_user)
-) -> dict:
-    """Update signal fields"""
+async def update_signal(signal_id: int, signal: SignalUpdate):
+    """
+    PUT /signals/{id}
     
-    # Handle JSON fields
-    if "pattern_points" in updates and updates["pattern_points"] is not None:
-        updates["pattern_points"] = json.dumps(updates["pattern_points"])
-    if "pattern_lines" in updates and updates["pattern_lines"] is not None:
-        updates["pattern_lines"] = json.dumps(updates["pattern_lines"])
+    Updates an existing signal.
+    """
+    db = get_database()
     
-    query = signals.update().where(signals.c.id == signal_id).values(**updates)
-    await database.execute(query)
-    
-    return {"id": signal_id, "status": "updated"}
+    try:
+        # Build dynamic update query
+        updates = []
+        params = {"signal_id": signal_id}
+        
+        if signal.symbol is not None:
+            updates.append("symbol = :symbol")
+            params["symbol"] = signal.symbol
+        if signal.direction is not None:
+            updates.append("direction = :direction")
+            params["direction"] = signal.direction.upper()
+        if signal.entry is not None:
+            updates.append("entry = :entry")
+            params["entry"] = signal.entry
+        if signal.target is not None:
+            updates.append("target = :target")
+            params["target"] = signal.target
+        if signal.stop is not None:
+            updates.append("stop = :stop")
+            params["stop"] = signal.stop
+        if signal.pattern is not None:
+            updates.append("pattern = :pattern")
+            params["pattern"] = signal.pattern
+        if signal.timeframe is not None:
+            updates.append("timeframe = :timeframe")
+            params["timeframe"] = signal.timeframe
+        if signal.confidence is not None:
+            updates.append("confidence = :confidence")
+            updates.append("ai_confidence = :confidence")
+            params["confidence"] = signal.confidence
+        if signal.status is not None:
+            updates.append("status = :status")
+            params["status"] = signal.status
+        if signal.is_pattern_idea is not None:
+            updates.append("is_pattern_idea = :is_pattern_idea")
+            params["is_pattern_idea"] = signal.is_pattern_idea
+        
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        query = f"UPDATE signals SET {', '.join(updates)} WHERE id = :signal_id RETURNING id"
+        result = await db.fetch_one(query, params)
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Signal not found")
+        
+        print(f"[SIGNALS] ✅ Updated signal #{signal_id}")
+        return {"id": signal_id, "status": "updated"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error updating signal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{signal_id}")
-async def delete_signal(
-    signal_id: int,
-    _user: dict = Depends(get_current_user)
-) -> dict:
-    """Delete a signal"""
+async def delete_signal(signal_id: int):
+    """
+    DELETE /signals/{id}
     
-    query = signals.delete().where(signals.c.id == signal_id)
-    await database.execute(query)
+    Deletes a signal (or marks as inactive).
+    """
+    db = get_database()
     
-    return {"id": signal_id, "status": "deleted"}
+    try:
+        # Soft delete - mark as inactive
+        query = "UPDATE signals SET status = 'inactive' WHERE id = :signal_id RETURNING id"
+        result = await db.fetch_one(query, {"signal_id": signal_id})
+        
+        if not result:
+            raise HTTPException(status_code=404, detail="Signal not found")
+        
+        print(f"[SIGNALS] ✅ Deleted signal #{signal_id}")
+        return {"id": signal_id, "status": "deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error deleting signal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SAMPLE DATA SEEDING
-# ═══════════════════════════════════════════════════════════════════════════════
-
-async def seed_enhanced_signals():
-    """Seed sample signals with pattern coordinates"""
+@router.post("/expire-old")
+async def expire_old_signals():
+    """
+    POST /signals/expire-old
     
-    # Check if signals exist
-    count = await database.fetch_val("SELECT COUNT(*) FROM signals WHERE status = 'active'")
-    if count and count > 0:
-        print(f"[Signals] {count} active signals exist, skipping seed")
-        return
+    Marks expired signals as inactive. Can be called by cron job.
+    """
+    db = get_database()
     
-    now = datetime.utcnow()
-    base_time = int(now.timestamp())
-    hour = 3600
-    
-    sample_signals = [
-        # ═══ AI-DRIVEN SIGNALS ═══
-        {
-            "symbol": "EURUSD",
-            "direction": "BUY",
-            "entry": "1.08250",
-            "target": "1.08850",
-            "stop": "1.07850",
-            "timeframe": "4H",
-            "pattern": "BREAKOUT",
-            "confidence": 82,
-            "is_pattern_idea": False,
-            "technical_summary": "Strong bullish momentum with breakout above key resistance",
-            "pattern_lines": [
-                {"start": {"time": base_time - 48*hour, "price": 1.0810}, "end": {"time": base_time, "price": 1.0810}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
-        {
-            "symbol": "GBPUSD",
-            "direction": "BUY",
-            "entry": "1.29450",
-            "target": "1.30150",
-            "stop": "1.28950",
-            "timeframe": "1H",
-            "pattern": "SUPPORT",
-            "confidence": 78,
-            "is_pattern_idea": False,
-            "technical_summary": "Price bouncing from strong support zone",
-            "pattern_lines": [
-                {"start": {"time": base_time - 24*hour, "price": 1.2940}, "end": {"time": base_time, "price": 1.2940}}
-            ],
-            "expires_at": now + timedelta(hours=24)
-        },
-        {
-            "symbol": "XAUUSD",
-            "direction": "BUY",
-            "entry": "2345.50",
-            "target": "2385.00",
-            "stop": "2320.00",
-            "timeframe": "4H",
-            "pattern": "SUPPORT",
-            "confidence": 85,
-            "is_pattern_idea": False,
-            "technical_summary": "Gold finding support at key psychological level",
-            "pattern_lines": [
-                {"start": {"time": base_time - 72*hour, "price": 2340}, "end": {"time": base_time, "price": 2340}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
-        {
-            "symbol": "BTCUSD",
-            "direction": "BUY",
-            "entry": "67500",
-            "target": "72000",
-            "stop": "64500",
-            "timeframe": "4H",
-            "pattern": "BREAKOUT",
-            "confidence": 80,
-            "is_pattern_idea": False,
-            "technical_summary": "Bitcoin breaking above consolidation range",
-            "pattern_lines": [
-                {"start": {"time": base_time - 96*hour, "price": 67000}, "end": {"time": base_time, "price": 67000}}
-            ],
-            "expires_at": now + timedelta(hours=72)
-        },
-        {
-            "symbol": "US30",
-            "direction": "BUY",
-            "entry": "38950",
-            "target": "39250",
-            "stop": "38700",
-            "timeframe": "1H",
-            "pattern": "BREAKOUT",
-            "confidence": 76,
-            "is_pattern_idea": False,
-            "technical_summary": "Dow Jones showing bullish continuation",
-            "pattern_lines": [
-                {"start": {"time": base_time - 24*hour, "price": 38900}, "end": {"time": base_time, "price": 38900}}
-            ],
-            "expires_at": now + timedelta(hours=24)
-        },
-        {
-            "symbol": "USDJPY",
-            "direction": "SELL",
-            "entry": "154.850",
-            "target": "153.500",
-            "stop": "155.600",
-            "timeframe": "4H",
-            "pattern": "REVERSAL",
-            "confidence": 74,
-            "is_pattern_idea": False,
-            "technical_summary": "Bearish reversal at resistance",
-            "pattern_lines": [
-                {"start": {"time": base_time - 48*hour, "price": 155.0}, "end": {"time": base_time, "price": 155.0}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
-        {
-            "symbol": "AUDUSD",
-            "direction": "BUY",
-            "entry": "0.65280",
-            "target": "0.66000",
-            "stop": "0.64800",
-            "timeframe": "4H",
-            "pattern": "SUPPORT",
-            "confidence": 77,
-            "is_pattern_idea": False,
-            "technical_summary": "Aussie bouncing from demand zone",
-            "pattern_lines": [
-                {"start": {"time": base_time - 48*hour, "price": 0.6520}, "end": {"time": base_time, "price": 0.6520}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
+    try:
+        query = """
+            UPDATE signals 
+            SET status = 'expired' 
+            WHERE status = 'active' 
+            AND expires_at < NOW()
+            RETURNING id
+        """
+        rows = await db.fetch_all(query)
+        count = len(rows) if rows else 0
         
-        # ═══ PATTERN TRADE IDEAS (AnalysisIQ) ═══
-        {
-            "symbol": "NZDUSD",
-            "direction": "BUY",
-            "entry": "0.61250",
-            "target": "0.61750",
-            "stop": "0.60900",
-            "timeframe": "4H",
-            "pattern": "FLAG",
-            "confidence": 79,
-            "is_pattern_idea": True,
-            "technical_summary": "Bullish flag forming after strong impulse move",
-            "pattern_lines": [
-                {"start": {"time": base_time - 36*hour, "price": 0.6140}, "end": {"time": base_time - 6*hour, "price": 0.6120}},
-                {"start": {"time": base_time - 36*hour, "price": 0.6115}, "end": {"time": base_time - 6*hour, "price": 0.6095}}
-            ],
-            "expires_at": now + timedelta(hours=24)
-        },
-        {
-            "symbol": "AUDCAD",
-            "direction": "BUY",
-            "entry": "0.95426",
-            "target": "0.95800",
-            "stop": "0.95200",
-            "timeframe": "1H",
-            "pattern": "FLAG",
-            "confidence": 75,
-            "is_pattern_idea": True,
-            "technical_summary": "Continuation flag pattern",
-            "pattern_lines": [
-                {"start": {"time": base_time - 24*hour, "price": 0.9550}, "end": {"time": base_time - 4*hour, "price": 0.9535}},
-                {"start": {"time": base_time - 24*hour, "price": 0.9530}, "end": {"time": base_time - 4*hour, "price": 0.9515}}
-            ],
-            "expires_at": now + timedelta(hours=72)
-        },
-        {
-            "symbol": "GBPJPY",
-            "direction": "BUY",
-            "entry": "189.450",
-            "target": "190.450",
-            "stop": "188.750",
-            "timeframe": "1H",
-            "pattern": "WEDGE",
-            "confidence": 81,
-            "is_pattern_idea": True,
-            "technical_summary": "Falling wedge breakout imminent",
-            "pattern_lines": [
-                {"start": {"time": base_time - 48*hour, "price": 190.5}, "end": {"time": base_time - 4*hour, "price": 189.8}},
-                {"start": {"time": base_time - 48*hour, "price": 188.5}, "end": {"time": base_time - 4*hour, "price": 189.2}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
-        {
-            "symbol": "EURSEEK",
-            "direction": "SELL",
-            "entry": "10.8830",
-            "target": "10.8400",
-            "stop": "10.9100",
-            "timeframe": "4H",
-            "pattern": "WEDGE",
-            "confidence": 73,
-            "is_pattern_idea": True,
-            "technical_summary": "Rising wedge reversal pattern",
-            "pattern_lines": [
-                {"start": {"time": base_time - 72*hour, "price": 10.82}, "end": {"time": base_time - 4*hour, "price": 10.90}},
-                {"start": {"time": base_time - 72*hour, "price": 10.78}, "end": {"time": base_time - 4*hour, "price": 10.86}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
-        {
-            "symbol": "CHINA50",
-            "direction": "BUY",
-            "entry": "14495",
-            "target": "14650",
-            "stop": "14380",
-            "timeframe": "1H",
-            "pattern": "PENNANT",
-            "confidence": 77,
-            "is_pattern_idea": True,
-            "technical_summary": "Bullish pennant continuation",
-            "pattern_lines": [
-                {"start": {"time": base_time - 24*hour, "price": 14550}, "end": {"time": base_time - 2*hour, "price": 14500}},
-                {"start": {"time": base_time - 24*hour, "price": 14420}, "end": {"time": base_time - 2*hour, "price": 14480}}
-            ],
-            "expires_at": now + timedelta(hours=72)
-        },
-        {
-            "symbol": "XAGUSD",
-            "direction": "BUY",
-            "entry": "27.850",
-            "target": "28.450",
-            "stop": "27.450",
-            "timeframe": "4H",
-            "pattern": "SYMMETRICAL_TRIANGLE",
-            "confidence": 83,
-            "is_pattern_idea": True,
-            "technical_summary": "Silver forming symmetrical triangle near apex",
-            "pattern_lines": [
-                {"start": {"time": base_time - 96*hour, "price": 28.50}, "end": {"time": base_time - 4*hour, "price": 27.90}},
-                {"start": {"time": base_time - 96*hour, "price": 27.20}, "end": {"time": base_time - 4*hour, "price": 27.75}}
-            ],
-            "expires_at": now + timedelta(hours=48)
-        },
-        {
-            "symbol": "ETHUSD",
-            "direction": "BUY",
-            "entry": "3450",
-            "target": "3650",
-            "stop": "3300",
-            "timeframe": "4H",
-            "pattern": "DOUBLE_BOTTOM",
-            "confidence": 80,
-            "is_pattern_idea": True,
-            "technical_summary": "Double bottom reversal pattern",
-            "pattern_points": [
-                {"time": base_time - 72*hour, "price": 3320},
-                {"time": base_time - 24*hour, "price": 3325}
-            ],
-            "pattern_lines": [
-                {"start": {"time": base_time - 72*hour, "price": 3320}, "end": {"time": base_time - 24*hour, "price": 3325}}
-            ],
-            "expires_at": now + timedelta(hours=72)
-        },
-        {
-            "symbol": "GER40",
-            "direction": "SELL",
-            "entry": "18250",
-            "target": "18050",
-            "stop": "18400",
-            "timeframe": "1H",
-            "pattern": "DOUBLE_TOP",
-            "confidence": 76,
-            "is_pattern_idea": True,
-            "technical_summary": "Double top reversal at resistance",
-            "pattern_points": [
-                {"time": base_time - 48*hour, "price": 18380},
-                {"time": base_time - 12*hour, "price": 18375}
-            ],
-            "pattern_lines": [
-                {"start": {"time": base_time - 48*hour, "price": 18380}, "end": {"time": base_time - 12*hour, "price": 18375}}
-            ],
-            "expires_at": now + timedelta(hours=36)
-        },
-    ]
-    
-    for sig in sample_signals:
-        # Serialize JSON fields
-        if sig.get("pattern_points"):
-            sig["pattern_points"] = json.dumps(sig["pattern_points"])
-        if sig.get("pattern_lines"):
-            sig["pattern_lines"] = json.dumps(sig["pattern_lines"])
+        print(f"[SIGNALS] ✅ Expired {count} old signals")
+        return {"expired_count": count}
         
-        sig["status"] = "active"
-        sig["is_published"] = True
-        sig["created_at"] = now
-        
-        try:
-            query = signals.insert().values(**sig)
-            await database.execute(query)
-        except Exception as e:
-            print(f"[Signals] Seed error: {e}")
-    
-    print(f"[Signals] Seeded {len(sample_signals)} enhanced signals")
+    except Exception as e:
+        print(f"[SIGNALS] ❌ Error expiring signals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

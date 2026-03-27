@@ -3,7 +3,7 @@ Database configuration - PRODUCTION READY
 Contains all table definitions for core + enhanced features
 """
 import os
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, inspect
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, inspect, JSON
 from databases import Database
 from datetime import datetime
 
@@ -85,21 +85,58 @@ blog_posts = Table(
     Column("og_image_url", String(500), default="")
 )
 
+# ══════════════════════════════════════════════════════════════════════════════
+# SIGNALS TABLE - Complete with all Enhanced Signals + AnalysisIQ columns
+# ══════════════════════════════════════════════════════════════════════════════
 signals = Table(
     "signals",
     metadata,
     Column("id", Integer, primary_key=True),
+    # Core fields
     Column("symbol", String(20), nullable=False),
+    Column("full_name", String(255), default=""),
     Column("direction", String(10), nullable=False),
-    Column("entry_price", Float, nullable=False),
-    Column("stop_loss", Float, nullable=False),
-    Column("take_profit", Float, nullable=False),
     Column("timeframe", String(10), default="1H"),
     Column("status", String(20), default="active"),
-    Column("ai_confidence", Float, default=None),
     Column("created_at", DateTime, default=datetime.utcnow),
     Column("closed_at", DateTime, nullable=True),
-    Column("result_pips", Float, nullable=True)
+    # Price levels (numeric for calculations)
+    Column("entry_price", Float, nullable=True),
+    Column("stop_loss", Float, nullable=True),
+    Column("take_profit", Float, nullable=True),
+    # Price levels (string for display)
+    Column("entry", String(50), default=""),
+    Column("target", String(50), default=""),
+    Column("stop", String(50), default=""),
+    # Pattern and analysis
+    Column("pattern", String(50), default=""),
+    Column("analysis", Text, default=""),
+    # Confidence scores
+    Column("confidence", Integer, default=75),
+    Column("ai_confidence", Float, default=None),
+    # Asset classification
+    Column("asset_type", String(50), default="forex"),
+    Column("country", String(50), default="all"),
+    # Sentiment
+    Column("sentiment_bearish", Integer, default=50),
+    Column("sentiment_bullish", Integer, default=50),
+    # Publishing and timing
+    Column("is_published", Boolean, default=True),
+    Column("expires_at", DateTime, nullable=True),
+    # AnalysisIQ / Pattern Ideas
+    Column("is_pattern_idea", Boolean, default=False),
+    Column("technical_summary", Text, default=""),
+    Column("volatility_index", Integer, nullable=True),
+    # Live price tracking
+    Column("current_price", String(20), default=""),
+    Column("price_change", String(20), default=""),
+    Column("price_change_percent", String(20), default=""),
+    # Chart data (JSON)
+    Column("chart_data", JSON, nullable=True),
+    # Result tracking
+    Column("result_pips", Float, nullable=True),
+    Column("outcome", String(20), default=""),
+    Column("created_by", Integer, nullable=True),
 )
 
 user_progress = Table(
@@ -245,7 +282,7 @@ _COLUMN_MIGRATIONS = [
     ("blog_posts", "seo_keywords",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
     ("blog_posts", "og_image_url",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
 
-    # ── signals (core + enhanced) ─────────────────────────────────────────────
+    # ── signals (core + enhanced + AnalysisIQ) ─────────────────────────────────
     # Core columns (may already exist from original schema)
     ("signals", "symbol",             "VARCHAR(20)",  "DEFAULT ''"),
     ("signals", "direction",          "VARCHAR(10)",  "DEFAULT 'BUY'"),
@@ -256,11 +293,11 @@ _COLUMN_MIGRATIONS = [
     ("signals", "analysis",           "TEXT",         "DEFAULT ''"),
     ("signals", "outcome",            "VARCHAR(20)",  ""),
     ("signals", "ai_confidence",      "FLOAT",        ""),
-    ("signals", "is_published",       "BOOLEAN",      "DEFAULT FALSE"),
+    ("signals", "is_published",       "BOOLEAN",      "DEFAULT TRUE"),
     ("signals", "created_by",         "INTEGER",      ""),
     ("signals", "result_pips",        "FLOAT",        ""),
     ("signals", "closed_at",          "TIMESTAMP",    ""),
-    # Enhanced signals columns (new)
+    # Enhanced signals columns
     ("signals", "full_name",          "VARCHAR(255)", "DEFAULT ''"),
     ("signals", "pattern",            "VARCHAR(50)",  "DEFAULT ''"),
     ("signals", "entry",              "VARCHAR(50)",  "DEFAULT ''"),
@@ -276,6 +313,10 @@ _COLUMN_MIGRATIONS = [
     ("signals", "current_price",      "VARCHAR(20)",  "DEFAULT ''"),
     ("signals", "price_change",       "VARCHAR(20)",  "DEFAULT ''"),
     ("signals", "price_change_percent", "VARCHAR(20)", "DEFAULT ''"),
+    # AnalysisIQ columns (Pattern Trade Ideas)
+    ("signals", "is_pattern_idea",    "BOOLEAN",      "DEFAULT FALSE"),
+    ("signals", "technical_summary",  "TEXT",         "DEFAULT ''"),
+    ("signals", "volatility_index",   "INTEGER",      ""),
 
     # ── webinars ──────────────────────────────────────────────────────────────
     # presenter + recording_url are in the ORM but missing from some live DBs

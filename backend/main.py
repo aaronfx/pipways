@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Import all route modules
 from backend.auth import router as auth_router, get_current_user
-from routes import signals  # Enhanced signals — router has /signals prefix built-in
+from backend.signals import router as signals_router  # GreenXTrades signals
 from backend.courses import router as courses_router
 from backend.courses_enhanced import router as courses_enhanced_router
 from backend.webinars import router as webinars_router
@@ -183,7 +183,7 @@ app.add_middleware(
 
 # Include all routers with their prefixes
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
-app.include_router(signals.router)  # No prefix — routes defined as /signals/* in router
+app.include_router(signals_router)  # No prefix — routes are /signals, /signals/enhanced
 app.include_router(courses_router, prefix="/courses", tags=["Courses"])
 app.include_router(courses_enhanced_router, prefix="/courses", tags=["Enhanced Courses"])
 app.include_router(webinars_router, prefix="/webinars", tags=["Webinars"])

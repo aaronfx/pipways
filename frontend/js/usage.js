@@ -517,6 +517,148 @@ window.PipwaysUsage = (function() {
         return featureLimit?.has_access || false;
     }
 
+    // ══════════════════════════════════════════════════════════════════════════════
+    // RENDER BADGE FUNCTION - This was missing and causing the error
+    // ══════════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * Render a usage badge or subscription tier badge into a target element
+     * @param {string} targetSelector - CSS selector for the target element
+     * @param {object} options - Optional configuration
+     * @returns {HTMLElement|null} - The rendered badge element or null
+     */
+    function renderBadge(targetSelector, options = {}) {
+        try {
+            const target = typeof targetSelector === 'string' 
+                ? document.querySelector(targetSelector) 
+                : targetSelector;
+            
+            if (!target) {
+                console.warn('PipwaysUsage.renderBadge: Target element not found:', targetSelector);
+                return null;
+            }
+            
+            const user = window.Store?.getUser();
+            const tier = user?.subscription_tier || 'free';
+            
+            // Determine badge type based on options or tier
+            const badgeType = options.type || tier;
+            
+            // Badge configurations
+            const badgeConfigs = {
+                'free': {
+                    text: 'Free',
+                    classes: 'bg-gray-600 text-gray-200',
+                    icon: ''
+                },
+                'basic': {
+                    text: 'Basic',
+                    classes: 'bg-blue-600 text-white',
+                    icon: '<i class="fas fa-star mr-1"></i>'
+                },
+                'pro': {
+                    text: 'Pro',
+                    classes: 'bg-gradient-to-r from-purple-600 to-orange-600 text-white',
+                    icon: '<i class="fas fa-crown mr-1"></i>'
+                },
+                'enterprise': {
+                    text: 'Enterprise',
+                    classes: 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white',
+                    icon: '<i class="fas fa-building mr-1"></i>'
+                },
+                'usage': {
+                    text: options.text || 'Usage',
+                    classes: options.classes || 'bg-gray-700 text-gray-300',
+                    icon: options.icon || ''
+                }
+            };
+            
+            const config = badgeConfigs[badgeType] || badgeConfigs['free'];
+            
+            // Create badge HTML
+            const badgeHTML = `
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${config.classes}">
+                    ${config.icon}${options.text || config.text}
+                </span>
+            `;
+            
+            // Render based on mode
+            if (options.append) {
+                target.insertAdjacentHTML('beforeend', badgeHTML);
+            } else if (options.prepend) {
+                target.insertAdjacentHTML('afterbegin', badgeHTML);
+            } else {
+                target.innerHTML = badgeHTML;
+            }
+            
+            return target.querySelector('span');
+            
+        } catch (error) {
+            console.error('PipwaysUsage.renderBadge error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Render a feature usage indicator (e.g., "2/5 remaining")
+     * @param {string} targetSelector - CSS selector for the target element
+     * @param {string} feature - Feature key
+     * @param {object} options - Optional configuration
+     */
+    function renderUsageIndicator(targetSelector, feature, options = {}) {
+        try {
+            const target = typeof targetSelector === 'string' 
+                ? document.querySelector(targetSelector) 
+                : targetSelector;
+            
+            if (!target) {
+                console.warn('PipwaysUsage.renderUsageIndicator: Target not found:', targetSelector);
+                return null;
+            }
+            
+            const featureLimit = getFeatureLimit(feature);
+            if (!featureLimit) {
+                target.innerHTML = '';
+                return null;
+            }
+            
+            let indicatorHTML = '';
+            
+            if (featureLimit.limit === null || featureLimit.remaining === 'unlimited') {
+                indicatorHTML = `
+                    <span class="text-xs text-green-400">
+                        <i class="fas fa-infinity mr-1"></i>Unlimited
+                    </span>
+                `;
+            } else if (typeof featureLimit.limit === 'number') {
+                const remaining = featureLimit.remaining;
+                const total = featureLimit.limit;
+                const percentage = (remaining / total) * 100;
+                
+                let colorClass = 'text-green-400';
+                if (percentage <= 20) colorClass = 'text-red-400';
+                else if (percentage <= 50) colorClass = 'text-yellow-400';
+                
+                indicatorHTML = `
+                    <span class="text-xs ${colorClass}">
+                        ${remaining}/${total} remaining
+                    </span>
+                `;
+            } else if (typeof featureLimit.limit === 'boolean') {
+                indicatorHTML = featureLimit.limit 
+                    ? `<span class="text-xs text-green-400"><i class="fas fa-check mr-1"></i>Available</span>`
+                    : `<span class="text-xs text-red-400"><i class="fas fa-lock mr-1"></i>Pro only</span>`;
+            }
+            
+            target.innerHTML = indicatorHTML;
+            return target;
+            
+        } catch (error) {
+            console.error('PipwaysUsage.renderUsageIndicator error:', error);
+            return null;
+        }
+    }
+
     // Enhanced signals-specific helper functions
     function canViewAllSignals() {
         return canAccessFeature('signals_visible') && userLimits.features?.['signals_visible']?.limit === null;
@@ -548,6 +690,10 @@ window.PipwaysUsage = (function() {
         getUserTier,
         canAccessFeature,
         loadUserLimits,
+        
+        // Badge rendering functions - THESE WERE MISSING
+        renderBadge,
+        renderUsageIndicator,
         
         // Enhanced signals helpers
         canViewAllSignals,

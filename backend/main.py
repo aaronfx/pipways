@@ -38,33 +38,24 @@ BASE_DIR = Path(__file__).parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database on startup
+    # Initialize database on startup (your existing system)
     await init_database()
     print("✅ Database initialized")
     
-    # Railway Auto-Migration: Run enhanced signals migration
-    if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('DATABASE_URL'):
-        print("🚄 Railway deployment detected, running enhanced signals auto-migration...")
-        
-        try:
-            # Run enhanced signals migration
-            await railway_auto_migrate_enhanced_signals()
-        except Exception as e:
-            print(f"⚠️  Railway auto-migration error: {e}")
-            # Don't fail startup for migration errors
+    # Enhanced Signals Auto-Migration - runs after your existing init
+    await run_enhanced_signals_migration()
     
-    print("✨ Enhanced signals features are now active!")
     yield
     # Cleanup on shutdown
     print("🔄 Application shutting down")
 
-async def railway_auto_migrate_enhanced_signals():
-    """Auto-migrate enhanced signals on Railway"""
+async def run_enhanced_signals_migration():
+    """Run enhanced signals migration after existing database initialization"""
     
     try:
+        print("[ENHANCED SIGNALS] Checking migration status...")
+        
         async with get_database() as db:
-            print("🔍 Checking enhanced signals migration status...")
-            
             # Check if migration is needed
             result = await db.execute(text("""
                 SELECT column_name 
@@ -77,10 +68,10 @@ async def railway_auto_migrate_enhanced_signals():
             enhanced_columns = [row[0] for row in result.fetchall()]
             
             if len(enhanced_columns) >= 3:
-                print("✅ Enhanced signals migration already applied")
+                print("[ENHANCED SIGNALS] ✅ Migration already applied")
                 return True
                 
-            print("🔄 Running enhanced signals migration...")
+            print("[ENHANCED SIGNALS] 🔄 Running migration...")
             
             # Add new columns
             new_columns = [
@@ -113,10 +104,10 @@ async def railway_auto_migrate_enhanced_signals():
                         await db.execute(
                             text(f"ALTER TABLE signals ADD COLUMN {column_name} {column_type};")
                         )
-                        print(f"✅ Added column: {column_name}")
+                        print(f"[ENHANCED SIGNALS] ✅ Added column: {column_name}")
                         columns_added += 1
                     except Exception as e:
-                        print(f"⚠️  Error adding column {column_name}: {e}")
+                        print(f"[ENHANCED SIGNALS] ⚠️  Error adding column {column_name}: {e}")
             
             # Add performance indexes
             indexes = [
@@ -131,7 +122,7 @@ async def railway_auto_migrate_enhanced_signals():
                 try:
                     await db.execute(text(index_sql))
                 except Exception as e:
-                    print(f"⚠️  Error adding index: {e}")
+                    print(f"[ENHANCED SIGNALS] ⚠️  Error adding index: {e}")
             
             # Update existing records with defaults
             update_queries = [
@@ -146,25 +137,25 @@ async def railway_auto_migrate_enhanced_signals():
                 try:
                     await db.execute(text(query))
                 except Exception as e:
-                    print(f"⚠️  Error updating data: {e}")
+                    print(f"[ENHANCED SIGNALS] ⚠️  Error updating data: {e}")
             
             # Add sample data if needed
-            await add_railway_sample_signals(db)
+            await add_sample_enhanced_signals(db)
             
             # Add site settings for enhanced signals
-            await add_railway_site_settings(db)
+            await add_enhanced_signals_site_settings(db)
             
             await db.commit()
             
-            print(f"🎉 Railway enhanced signals migration completed: {columns_added} columns added")
+            print(f"[ENHANCED SIGNALS] 🎉 Migration completed: {columns_added} columns added")
             return True
             
     except Exception as e:
-        print(f"❌ Railway migration error: {e}")
+        print(f"[ENHANCED SIGNALS] ❌ Migration error: {e}")
         return False
 
-async def add_railway_sample_signals(db):
-    """Add sample enhanced signals for Railway deployment"""
+async def add_sample_enhanced_signals(db):
+    """Add sample enhanced signals if none exist"""
     
     try:
         # Check if we have enhanced signals
@@ -172,10 +163,10 @@ async def add_railway_sample_signals(db):
         enhanced_count = result.scalar()
         
         if enhanced_count > 0:
-            print(f"⏭️  Found {enhanced_count} existing enhanced signals")
+            print(f"[ENHANCED SIGNALS] ⏭️  Found {enhanced_count} existing enhanced signals")
             return
         
-        print("🧪 Adding sample enhanced signals...")
+        print("[ENHANCED SIGNALS] 🧪 Adding sample enhanced signals...")
         
         # Add sample signals
         sample_signals = [
@@ -251,12 +242,12 @@ async def add_railway_sample_signals(db):
             """
             
             await db.execute(text(insert_sql), signal)
-            print(f"✅ Added sample signal: {signal['symbol']} ({signal['pattern']})")
+            print(f"[ENHANCED SIGNALS] ✅ Added sample signal: {signal['symbol']} ({signal['pattern']})")
             
     except Exception as e:
-        print(f"⚠️  Error adding sample signals: {e}")
+        print(f"[ENHANCED SIGNALS] ⚠️  Error adding sample signals: {e}")
 
-async def add_railway_site_settings(db):
+async def add_enhanced_signals_site_settings(db):
     """Add site settings for enhanced signals features"""
     
     try:
@@ -270,7 +261,7 @@ async def add_railway_site_settings(db):
         """))
         
         if not result.scalar():
-            print("⚠️  site_settings table not found, skipping settings")
+            print("[ENHANCED SIGNALS] ⚠️  site_settings table not found, skipping settings")
             return
         
         settings = [
@@ -304,13 +295,13 @@ async def add_railway_site_settings(db):
                     settings_added += 1
                     
             except Exception as e:
-                print(f"⚠️  Error adding setting {key}: {e}")
+                print(f"[ENHANCED SIGNALS] ⚠️  Error adding setting {key}: {e}")
         
         if settings_added > 0:
-            print(f"✅ Added {settings_added} enhanced signals site settings")
+            print(f"[ENHANCED SIGNALS] ✅ Added {settings_added} site settings")
                 
     except Exception as e:
-        print(f"⚠️  Error updating site settings: {e}")
+        print(f"[ENHANCED SIGNALS] ⚠️  Error updating site settings: {e}")
 
 # Create FastAPI app with lifespan
 app = FastAPI(
@@ -621,7 +612,7 @@ async def startup_event():
     print("   • /pricing - Pricing Plans")
     print("   • /risk-calculator - Public Risk Calculator")
     print("   • /stock-terminal - Stock Research")
-    print("✨ Enhanced Market Signals with Railway auto-migration is now active!")
+    print("✨ Enhanced Market Signals with auto-migration is now active!")
 
 if __name__ == "__main__":
     import uvicorn

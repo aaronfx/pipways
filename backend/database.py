@@ -133,6 +133,9 @@ signals = Table(
     Column("price_change_percent", String(20), default=""),
     # Chart data (JSON)
     Column("chart_data", JSON, nullable=True),
+    # Pattern coordinates for charting overlays
+    Column("pattern_points", Text, nullable=True),  # JSON: [{time, price}, ...]
+    Column("pattern_lines", Text, nullable=True),   # JSON: [{start: {time, price}, end: {time, price}}, ...]
     # Result tracking
     Column("result_pips", Float, nullable=True),
     Column("outcome", String(20), default=""),

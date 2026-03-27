@@ -224,7 +224,7 @@ async def init_database():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DATABASE MIGRATIONS  ─  added for CMS v2
+# DATABASE MIGRATIONS  ─  added for CMS v2 + Enhanced Signals
 # Safe to call every startup: every statement is fully idempotent.
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -245,22 +245,37 @@ _COLUMN_MIGRATIONS = [
     ("blog_posts", "seo_keywords",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
     ("blog_posts", "og_image_url",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
 
-    # ── signals ───────────────────────────────────────────────────────────────
-    # Production signals table may have been created with a minimal schema
-    # (id, title, status …) before the trading-specific columns were added.
-    ("signals", "symbol",        "VARCHAR(20)",  "DEFAULT ''"),
-    ("signals", "direction",     "VARCHAR(10)",  "DEFAULT 'BUY'"),
-    ("signals", "entry_price",   "FLOAT",        "DEFAULT 0"),
-    ("signals", "stop_loss",     "FLOAT",        "DEFAULT 0"),
-    ("signals", "take_profit",   "FLOAT",        "DEFAULT 0"),
-    ("signals", "timeframe",     "VARCHAR(10)",  "DEFAULT '1H'"),
-    ("signals", "analysis",      "TEXT",         "DEFAULT ''"),
-    ("signals", "outcome",       "VARCHAR(20)",  ""),
-    ("signals", "ai_confidence", "FLOAT",        ""),
-    ("signals", "is_published",  "BOOLEAN",      "DEFAULT FALSE"),  # was missing — caused COALESCE to fail
-    ("signals", "created_by",    "INTEGER",      ""),
-    ("signals", "result_pips",   "FLOAT",        ""),
-    # status / closed_at already exist per the ORM definition
+    # ── signals (core + enhanced) ─────────────────────────────────────────────
+    # Core columns (may already exist from original schema)
+    ("signals", "symbol",             "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "direction",          "VARCHAR(10)",  "DEFAULT 'BUY'"),
+    ("signals", "entry_price",        "FLOAT",        "DEFAULT 0"),
+    ("signals", "stop_loss",          "FLOAT",        "DEFAULT 0"),
+    ("signals", "take_profit",        "FLOAT",        "DEFAULT 0"),
+    ("signals", "timeframe",          "VARCHAR(10)",  "DEFAULT '1H'"),
+    ("signals", "analysis",           "TEXT",         "DEFAULT ''"),
+    ("signals", "outcome",            "VARCHAR(20)",  ""),
+    ("signals", "ai_confidence",      "FLOAT",        ""),
+    ("signals", "is_published",       "BOOLEAN",      "DEFAULT FALSE"),
+    ("signals", "created_by",         "INTEGER",      ""),
+    ("signals", "result_pips",        "FLOAT",        ""),
+    ("signals", "closed_at",          "TIMESTAMP",    ""),
+    # Enhanced signals columns (new)
+    ("signals", "full_name",          "VARCHAR(255)", "DEFAULT ''"),
+    ("signals", "pattern",            "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "entry",              "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "target",             "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "stop",               "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "confidence",         "INTEGER",      "DEFAULT 75"),
+    ("signals", "asset_type",         "VARCHAR(50)",  "DEFAULT 'forex'"),
+    ("signals", "country",            "VARCHAR(50)",  "DEFAULT 'all'"),
+    ("signals", "sentiment_bearish",  "INTEGER",      "DEFAULT 50"),
+    ("signals", "sentiment_bullish",  "INTEGER",      "DEFAULT 50"),
+    ("signals", "expires_at",         "TIMESTAMP",    ""),
+    ("signals", "chart_data",         "JSONB",        ""),
+    ("signals", "current_price",      "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "price_change",       "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "price_change_percent", "VARCHAR(20)", "DEFAULT ''"),
 
     # ── webinars ──────────────────────────────────────────────────────────────
     # presenter + recording_url are in the ORM but missing from some live DBs

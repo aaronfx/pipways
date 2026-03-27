@@ -175,108 +175,78 @@ async def run_enhanced_signals_migration():
         return False
 
 async def add_sample_enhanced_signals():
-    """Add sample enhanced signals if none exist"""
+    """Add sample enhanced signals if none exist — includes AI-Driven + AnalysisIQ signals"""
     
     try:
-        # Check if we have enhanced signals
-        result = await database.fetch_val("SELECT COUNT(*) FROM signals WHERE pattern IS NOT NULL")
+        # Check if we have any active signals
+        result = await database.fetch_val("SELECT COUNT(*) FROM signals WHERE status = 'active'")
         
         if result and result > 0:
-            print(f"[ENHANCED SIGNALS] ⏭️  Found {result} existing enhanced signals")
+            print(f"[ENHANCED SIGNALS] ⏭️  Found {result} existing active signals, skipping seed")
             return
         
-        print("[ENHANCED SIGNALS] 🧪 Adding sample enhanced signals...")
+        print("[ENHANCED SIGNALS] 🧪 Seeding 15 sample signals (7 AI-Driven + 8 AnalysisIQ)...")
         
-        # Add sample signals
+        # Complete seed data: 7 AI-Driven (confidence >= 75) + 8 AnalysisIQ (is_pattern_idea = True)
         sample_signals = [
-            {
-                'symbol': 'AUDCAD',
-                'full_name': 'Australian Dollar vs Canadian Dollar',
-                'direction': 'BUY',
-                'pattern': 'FLAG',
-                'timeframe': '1H',
-                'entry': '0.95426',
-                'target': '0.95800',
-                'stop': '0.95200',
-                'entry_price': 0.95426,
-                'take_profit': 0.95800,
-                'stop_loss': 0.95200,
-                'confidence': 78,
-                'asset_type': 'forex',
-                'country': 'AU',
-                'sentiment_bearish': 35,
-                'sentiment_bullish': 65,
-                'current_price': '0.95523',
-                'price_change': '+0.00096',
-                'price_change_percent': '+0.10%',
-                'status': 'active',
-                'ai_confidence': 78
-            },
-            {
-                'symbol': 'EURSEEK',
-                'full_name': 'Euro vs Swedish Krona',
-                'direction': 'SELL',
-                'pattern': 'WEDGE',
-                'timeframe': '4H',
-                'entry': '10.8830',
-                'target': '10.8400',
-                'stop': '10.9100',
-                'entry_price': 10.8830,
-                'take_profit': 10.8400,
-                'stop_loss': 10.9100,
-                'confidence': 72,
-                'asset_type': 'forex',
-                'country': 'EU',
-                'sentiment_bearish': 68,
-                'sentiment_bullish': 32,
-                'current_price': '10.8795',
-                'price_change': '-0.0035',
-                'price_change_percent': '-0.03%',
-                'status': 'active',
-                'ai_confidence': 72
-            },
-            {
-                'symbol': 'CHINA50',
-                'full_name': 'China A50 Index',
-                'direction': 'BUY',
-                'pattern': 'PENNANT',
-                'timeframe': '1H',
-                'entry': '14495',
-                'target': '14650',
-                'stop': '14380',
-                'entry_price': 14495,
-                'take_profit': 14650,
-                'stop_loss': 14380,
-                'confidence': 81,
-                'asset_type': 'indices',
-                'country': 'CN',
-                'sentiment_bearish': 28,
-                'sentiment_bullish': 72,
-                'current_price': '14512',
-                'price_change': '+17',
-                'price_change_percent': '+0.12%',
-                'status': 'active',
-                'ai_confidence': 81
-            }
+            # ══════════════════════════════════════════════════════════════════════
+            # AI-DRIVEN SIGNALS (confidence >= 75, is_pattern_idea = False)
+            # ══════════════════════════════════════════════════════════════════════
+            {'symbol': 'EURUSD', 'full_name': 'Euro vs US Dollar', 'direction': 'BUY', 'pattern': 'BREAKOUT', 'timeframe': '4H', 'entry': '1.08250', 'target': '1.08850', 'stop': '1.07850', 'entry_price': 1.08250, 'take_profit': 1.08850, 'stop_loss': 1.07850, 'confidence': 88, 'ai_confidence': 88, 'asset_type': 'forex', 'country': 'EU', 'sentiment_bearish': 25, 'sentiment_bullish': 75, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 24},
+            {'symbol': 'GBPUSD', 'full_name': 'British Pound vs US Dollar', 'direction': 'BUY', 'pattern': 'FLAG', 'timeframe': '1H', 'entry': '1.26750', 'target': '1.27350', 'stop': '1.26350', 'entry_price': 1.26750, 'take_profit': 1.27350, 'stop_loss': 1.26350, 'confidence': 82, 'ai_confidence': 82, 'asset_type': 'forex', 'country': 'UK', 'sentiment_bearish': 30, 'sentiment_bullish': 70, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 36},
+            {'symbol': 'USDJPY', 'full_name': 'US Dollar vs Japanese Yen', 'direction': 'SELL', 'pattern': 'REVERSAL', 'timeframe': '4H', 'entry': '149.850', 'target': '148.850', 'stop': '150.350', 'entry_price': 149.850, 'take_profit': 148.850, 'stop_loss': 150.350, 'confidence': 79, 'ai_confidence': 79, 'asset_type': 'forex', 'country': 'JP', 'sentiment_bearish': 65, 'sentiment_bullish': 35, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 48},
+            {'symbol': 'AUDUSD', 'full_name': 'Australian Dollar vs US Dollar', 'direction': 'BUY', 'pattern': 'SUPPORT', 'timeframe': '1H', 'entry': '0.67850', 'target': '0.68450', 'stop': '0.67450', 'entry_price': 0.67850, 'take_profit': 0.68450, 'stop_loss': 0.67450, 'confidence': 85, 'ai_confidence': 85, 'asset_type': 'forex', 'country': 'AU', 'sentiment_bearish': 28, 'sentiment_bullish': 72, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 72},
+            {'symbol': 'US30', 'full_name': 'Dow Jones Industrial Average', 'direction': 'BUY', 'pattern': 'BREAKOUT', 'timeframe': '1H', 'entry': '38950', 'target': '39250', 'stop': '38700', 'entry_price': 38950, 'take_profit': 39250, 'stop_loss': 38700, 'confidence': 84, 'ai_confidence': 84, 'asset_type': 'indices', 'country': 'US', 'sentiment_bearish': 22, 'sentiment_bullish': 78, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 24},
+            {'symbol': 'XAUUSD', 'full_name': 'Gold vs US Dollar', 'direction': 'BUY', 'pattern': 'SUPPORT', 'timeframe': '4H', 'entry': '2345.50', 'target': '2385.00', 'stop': '2320.00', 'entry_price': 2345.50, 'take_profit': 2385.00, 'stop_loss': 2320.00, 'confidence': 86, 'ai_confidence': 86, 'asset_type': 'commodities', 'country': 'all', 'sentiment_bearish': 20, 'sentiment_bullish': 80, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 36},
+            {'symbol': 'BTCUSD', 'full_name': 'Bitcoin vs US Dollar', 'direction': 'BUY', 'pattern': 'BREAKOUT', 'timeframe': '4H', 'entry': '67500', 'target': '72000', 'stop': '64500', 'entry_price': 67500, 'take_profit': 72000, 'stop_loss': 64500, 'confidence': 77, 'ai_confidence': 77, 'asset_type': 'crypto', 'country': 'all', 'sentiment_bearish': 32, 'sentiment_bullish': 68, 'status': 'active', 'is_published': True, 'is_pattern_idea': False, 'expires_hours': 48},
+
+            # ══════════════════════════════════════════════════════════════════════
+            # ANALYSISIQ / PATTERN IDEAS (is_pattern_idea = True)
+            # ══════════════════════════════════════════════════════════════════════
+            {'symbol': 'AUDCAD', 'full_name': 'Australian Dollar vs Canadian Dollar', 'direction': 'BUY', 'pattern': 'FLAG', 'timeframe': '1H', 'entry': '0.95426', 'target': '0.95800', 'stop': '0.95200', 'entry_price': 0.95426, 'take_profit': 0.95800, 'stop_loss': 0.95200, 'confidence': 72, 'ai_confidence': 72, 'asset_type': 'forex', 'country': 'AU', 'sentiment_bearish': 35, 'sentiment_bullish': 65, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 72},
+            {'symbol': 'NZDUSD', 'full_name': 'New Zealand Dollar vs US Dollar', 'direction': 'BUY', 'pattern': 'FLAG', 'timeframe': '4H', 'entry': '0.61250', 'target': '0.61750', 'stop': '0.60900', 'entry_price': 0.61250, 'take_profit': 0.61750, 'stop_loss': 0.60900, 'confidence': 68, 'ai_confidence': 68, 'asset_type': 'forex', 'country': 'NZ', 'sentiment_bearish': 38, 'sentiment_bullish': 62, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 24},
+            {'symbol': 'EURSEEK', 'full_name': 'Euro vs Swedish Krona', 'direction': 'SELL', 'pattern': 'WEDGE', 'timeframe': '4H', 'entry': '10.8830', 'target': '10.8400', 'stop': '10.9100', 'entry_price': 10.8830, 'take_profit': 10.8400, 'stop_loss': 10.9100, 'confidence': 70, 'ai_confidence': 70, 'asset_type': 'forex', 'country': 'EU', 'sentiment_bearish': 58, 'sentiment_bullish': 42, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 36},
+            {'symbol': 'GBPJPY', 'full_name': 'British Pound vs Japanese Yen', 'direction': 'BUY', 'pattern': 'WEDGE', 'timeframe': '1H', 'entry': '189.450', 'target': '190.450', 'stop': '188.750', 'entry_price': 189.450, 'take_profit': 190.450, 'stop_loss': 188.750, 'confidence': 74, 'ai_confidence': 74, 'asset_type': 'forex', 'country': 'UK', 'sentiment_bearish': 32, 'sentiment_bullish': 68, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 48},
+            {'symbol': 'CHINA50', 'full_name': 'China A50 Index', 'direction': 'BUY', 'pattern': 'PENNANT', 'timeframe': '1H', 'entry': '14495', 'target': '14650', 'stop': '14380', 'entry_price': 14495, 'take_profit': 14650, 'stop_loss': 14380, 'confidence': 78, 'ai_confidence': 78, 'asset_type': 'indices', 'country': 'CN', 'sentiment_bearish': 28, 'sentiment_bullish': 72, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 72},
+            {'symbol': 'XAGUSD', 'full_name': 'Silver vs US Dollar', 'direction': 'BUY', 'pattern': 'TRIANGLE', 'timeframe': '4H', 'entry': '27.850', 'target': '28.550', 'stop': '27.350', 'entry_price': 27.850, 'take_profit': 28.550, 'stop_loss': 27.350, 'confidence': 71, 'ai_confidence': 71, 'asset_type': 'commodities', 'country': 'all', 'sentiment_bearish': 40, 'sentiment_bullish': 60, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 24},
+            {'symbol': 'ETHUSD', 'full_name': 'Ethereum vs US Dollar', 'direction': 'BUY', 'pattern': 'DOUBLE_BOTTOM', 'timeframe': '4H', 'entry': '3450', 'target': '3650', 'stop': '3300', 'entry_price': 3450, 'take_profit': 3650, 'stop_loss': 3300, 'confidence': 69, 'ai_confidence': 69, 'asset_type': 'crypto', 'country': 'all', 'sentiment_bearish': 42, 'sentiment_bullish': 58, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 36},
+            {'symbol': 'GER40', 'full_name': 'DAX 40 Index', 'direction': 'SELL', 'pattern': 'DOUBLE_TOP', 'timeframe': '1H', 'entry': '18250', 'target': '17950', 'stop': '18450', 'entry_price': 18250, 'take_profit': 17950, 'stop_loss': 18450, 'confidence': 66, 'ai_confidence': 66, 'asset_type': 'indices', 'country': 'DE', 'sentiment_bearish': 58, 'sentiment_bullish': 42, 'status': 'active', 'is_published': True, 'is_pattern_idea': True, 'expires_hours': 48},
         ]
         
+        seeded = 0
         for signal in sample_signals:
             try:
-                columns = ', '.join(signal.keys())
-                placeholders = ', '.join([f":{key}" for key in signal.keys()])
+                # Extract expires_hours and remove from dict (not a DB column)
+                expires_hours = signal.pop('expires_hours', 24)
                 
-                insert_sql = f"""
-                INSERT INTO signals ({columns}, created_at)
-                VALUES ({placeholders}, NOW())
-                """
+                # Build raw SQL INSERT (avoids SQLAlchemy column validation issues)
+                insert_sql = """
+                INSERT INTO signals (
+                    symbol, full_name, direction, pattern, timeframe,
+                    entry, target, stop, entry_price, take_profit, stop_loss,
+                    confidence, ai_confidence, asset_type, country,
+                    sentiment_bearish, sentiment_bullish, status,
+                    is_published, is_pattern_idea, created_at, expires_at
+                ) VALUES (
+                    :symbol, :full_name, :direction, :pattern, :timeframe,
+                    :entry, :target, :stop, :entry_price, :take_profit, :stop_loss,
+                    :confidence, :ai_confidence, :asset_type, :country,
+                    :sentiment_bearish, :sentiment_bullish, :status,
+                    :is_published, :is_pattern_idea, NOW(), NOW() + INTERVAL '%s hours'
+                )
+                """ % expires_hours
                 
                 await database.execute(insert_sql, signal)
-                print(f"[ENHANCED SIGNALS] ✅ Added sample signal: {signal['symbol']} ({signal['pattern']})")
+                tag = "AnalysisIQ" if signal.get('is_pattern_idea') else "AI-Driven"
+                print(f"[ENHANCED SIGNALS] ✅ Seeded [{tag}]: {signal['symbol']} ({signal['pattern']})")
+                seeded += 1
             except Exception as e:
-                print(f"[ENHANCED SIGNALS] ⚠️  Error adding signal {signal['symbol']}: {e}")
+                print(f"[ENHANCED SIGNALS] ⚠️  Error seeding {signal.get('symbol', '?')}: {e}")
+        
+        print(f"[ENHANCED SIGNALS] 🎉 Seeded {seeded}/15 signals")
             
     except Exception as e:
-        print(f"[ENHANCED SIGNALS] ⚠️  Error adding sample signals: {e}")
+        print(f"[ENHANCED SIGNALS] ⚠️  Error in auto-seed: {e}")
 
 async def add_enhanced_signals_site_settings():
     """Add site settings for enhanced signals features"""

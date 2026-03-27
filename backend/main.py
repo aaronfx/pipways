@@ -35,6 +35,20 @@ from backend.database import database, init_database, run_migrations, run_unique
 BASE_DIR = Path(__file__).parent  # /app/backend
 FRONTEND_DIR = BASE_DIR.parent / "frontend"  # /app/frontend
 
+# Debug: Print paths at import time
+print(f"[PATH DEBUG] __file__ = {__file__}", flush=True)
+print(f"[PATH DEBUG] BASE_DIR = {BASE_DIR}", flush=True)
+print(f"[PATH DEBUG] BASE_DIR.parent = {BASE_DIR.parent}", flush=True)
+print(f"[PATH DEBUG] FRONTEND_DIR = {FRONTEND_DIR}", flush=True)
+print(f"[PATH DEBUG] FRONTEND_DIR exists = {FRONTEND_DIR.exists()}", flush=True)
+
+# List what's in the parent directory
+try:
+    parent_contents = list(BASE_DIR.parent.iterdir())
+    print(f"[PATH DEBUG] Contents of {BASE_DIR.parent}: {[p.name for p in parent_contents]}", flush=True)
+except Exception as e:
+    print(f"[PATH DEBUG] Could not list parent dir: {e}", flush=True)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database on startup
@@ -364,9 +378,25 @@ app.include_router(email_router, prefix="/email", tags=["Email Services"])
 app.include_router(learning_router, prefix="/learning", tags=["Learning Management"])
 app.include_router(risk_router, prefix="/risk", tags=["Risk Calculator"])
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
-app.mount("/js", StaticFiles(directory=FRONTEND_DIR / "js"), name="js")
+# Mount static files (with existence check to prevent crash)
+static_dir = FRONTEND_DIR / "static"
+js_dir = FRONTEND_DIR / "js"
+
+print(f"[STATIC] Looking for frontend at: {FRONTEND_DIR}", flush=True)
+print(f"[STATIC] static_dir exists: {static_dir.exists()}", flush=True)
+print(f"[STATIC] js_dir exists: {js_dir.exists()}", flush=True)
+
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    print(f"[STATIC] ✅ Mounted /static from {static_dir}", flush=True)
+else:
+    print(f"[STATIC] ⚠️ Static directory not found: {static_dir}", flush=True)
+
+if js_dir.exists():
+    app.mount("/js", StaticFiles(directory=js_dir), name="js")
+    print(f"[STATIC] ✅ Mounted /js from {js_dir}", flush=True)
+else:
+    print(f"[STATIC] ⚠️ JS directory not found: {js_dir}", flush=True)
 
 # Enhanced signals content endpoint
 @app.get("/static/enhanced_signals_content.html")
@@ -425,6 +455,12 @@ async def get_dashboard():
     except Exception as e:
         print(f"Error serving dashboard: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# Dashboard with .html extension (common request pattern)
+@app.get("/dashboard.html")
+async def get_dashboard_html():
+    """Serve the dashboard (with .html extension)"""
+    return await get_dashboard()
 
 # Academy endpoint
 @app.get("/academy")

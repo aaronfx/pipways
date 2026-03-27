@@ -1,12 +1,8 @@
 """
-Enhanced Signals API - Rewritten for databases library pattern
-Compatible with Pipways FastAPI + databases stack
-
-FIX 1: Changed signals.c.confidence → signals.c.ai_confidence
-FIX 2: Added /enhanced endpoint that was missing (causing 422 errors)
-       Route order fixed: /enhanced comes BEFORE /{signal_id}
-
-UPDATE: Added AnalysisIQ fields to SignalResponse for Pattern Trade Ideas.
+Enhanced Signals API for Pipways
+- Includes /enhanced endpoint
+- Auto-migrates missing columns on startup
+- AnalysisIQ support for Pattern Trade Ideas
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
@@ -14,10 +10,53 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 import random
 
-from .database import database, signals, users
+from .database import database, signals
 from .auth import get_current_user
 
 router = APIRouter()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTO-MIGRATION: Ensures all required columns exist
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def run_signals_migration():
+    """Add missing columns to signals table. Safe to run multiple times."""
+    migrations = [
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS pattern VARCHAR(50)",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS entry VARCHAR(50)",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS target VARCHAR(50)",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS stop VARCHAR(50)",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS entry_price FLOAT",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS take_profit FLOAT",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS stop_loss FLOAT",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS confidence INTEGER DEFAULT 75",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS ai_confidence INTEGER DEFAULT 75",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50) DEFAULT 'forex'",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS country VARCHAR(50) DEFAULT 'all'",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS sentiment_bearish INTEGER DEFAULT 50",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS sentiment_bullish INTEGER DEFAULT 50",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS is_pattern_idea BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS technical_summary TEXT",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS volatility_index INTEGER",
+        "ALTER TABLE signals ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP",
+    ]
+    
+    for sql in migrations:
+        try:
+            await database.execute(sql)
+        except Exception as e:
+            # Column might already exist or other non-fatal error
+            print(f"[SIGNALS] Migration note: {e}", flush=True)
+    
+    print("[SIGNALS] ✅ Migration complete", flush=True)
+
+
+# Run migration on module load (called from main.py startup)
+@router.on_event("startup")
+async def startup_migration():
+    await run_signals_migration()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -97,8 +136,6 @@ def get_full_name_from_symbol(symbol: str) -> str:
         "GBPUSD": "British Pound vs US Dollar",
         "USDJPY": "US Dollar vs Japanese Yen",
         "GBPJPY": "British Pound vs Japanese Yen",
-        "EURAUD": "Euro vs Australian Dollar",
-        "AUDNZD": "Australian Dollar vs New Zealand Dollar",
         "EURGBP": "Euro vs British Pound",
         "USDCAD": "US Dollar vs Canadian Dollar",
         "USDCHF": "US Dollar vs Swiss Franc",
@@ -108,7 +145,6 @@ def get_full_name_from_symbol(symbol: str) -> str:
         "EURSEEK": "Euro vs Swedish Krona",
         "CHINA50": "China A50 Index",
         "US30": "Dow Jones Industrial Average",
-        "US500": "S&P 500 Index",
         "US100": "Nasdaq 100 Index",
         "GER40": "DAX 40 Index",
         "XAUUSD": "Gold vs US Dollar",
@@ -251,7 +287,7 @@ def row_to_signal_response(row: dict, current_price_data: dict = None) -> Signal
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ENDPOINTS - IMPORTANT: Static routes MUST come BEFORE /{signal_id}
+# ENDPOINTS - Static routes MUST come BEFORE /{signal_id}
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/", response_model=List[SignalResponse])
@@ -300,10 +336,7 @@ async def get_enhanced_signals(
     view: Optional[str] = Query("all", description="View: 'all', 'standard', 'analysis_iq'"),
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Get enhanced signals - primary endpoint for frontend.
-    This MUST be defined BEFORE /{signal_id} to avoid route conflicts.
-    """
+    """Get enhanced signals - primary endpoint for frontend."""
     query = signals.select()
     
     if status and status != "all":
@@ -447,15 +480,19 @@ async def delete_signal(signal_id: int, current_user: dict = Depends(get_current
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SEED DATA
+# SEED DATA - Now runs migration first to ensure columns exist
 # ══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/seed")
 async def seed_sample_signals(current_user: dict = Depends(get_current_user)):
-    """Seed sample signals (admin only)."""
+    """Seed sample signals (admin only). Auto-migrates missing columns first."""
     if not current_user.get("is_admin", False) and current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
+    # Run migration first to ensure all columns exist
+    await run_signals_migration()
+
+    # Check if signals already exist
     count = await database.fetch_val("SELECT COUNT(*) FROM signals WHERE status = 'active'")
     if count and count > 0:
         return {"message": f"Signals already exist ({count} active)", "seeded": 0}
@@ -482,6 +519,7 @@ async def seed_sample_signals(current_user: dict = Depends(get_current_user)):
     ]
 
     seeded = 0
+    errors = []
     expiry_hours = [24, 36, 48, 72]
 
     for i, signal in enumerate(sample_signals):
@@ -493,6 +531,12 @@ async def seed_sample_signals(current_user: dict = Depends(get_current_user)):
             tag = "AnalysisIQ" if signal.get("is_pattern_idea") else "AI-Driven"
             print(f"[SIGNALS] ✅ Seeded [{tag}]: {signal['symbol']} ({signal['pattern']})", flush=True)
         except Exception as e:
-            print(f"[SIGNALS] ❌ Failed to seed {signal['symbol']}: {e}", flush=True)
+            error_msg = f"{signal['symbol']}: {str(e)}"
+            errors.append(error_msg)
+            print(f"[SIGNALS] ❌ Failed to seed {error_msg}", flush=True)
 
-    return {"message": f"Seeded {seeded} signals", "seeded": seeded}
+    result = {"message": f"Seeded {seeded} signals", "seeded": seeded}
+    if errors:
+        result["errors"] = errors[:5]  # Return first 5 errors for debugging
+    
+    return result

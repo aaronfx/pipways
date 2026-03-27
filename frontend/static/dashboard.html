@@ -404,8 +404,10 @@
                     }
                     
                     if (!this.user) {
-                        const token = localStorage.getItem('token');
+                        // FIXED: Use pipways_token instead of token
+                        const token = localStorage.getItem('pipways_token');
                         if (!token) {
+                            console.log('[Dashboard] No token found, redirecting to login');
                             window.location.href = '/';
                             return;
                         }
@@ -421,7 +423,9 @@
                                 window.Store.setUser(this.user);
                             }
                         } else {
-                            localStorage.removeItem('token');
+                            console.log('[Dashboard] Auth failed, clearing token');
+                            localStorage.removeItem('pipways_token');
+                            localStorage.removeItem('pipways_user');
                             window.location.href = '/';
                             return;
                         }
@@ -431,7 +435,27 @@
                     
                 } catch (error) {
                     console.error('Error loading user:', error);
-                    window.location.href = '/';
+                    // Don't redirect on network errors - show error state instead
+                    this.showAuthError();
+                }
+            }
+            
+            showAuthError() {
+                const content = document.getElementById('pageContent');
+                if (content) {
+                    content.innerHTML = `
+                        <div class="text-center py-12">
+                            <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                            <h2 class="text-xl font-semibold mb-2">Connection Error</h2>
+                            <p class="text-gray-400 mb-6">Unable to verify your session. Please try again.</p>
+                            <button onclick="location.reload()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg mr-2">
+                                Retry
+                            </button>
+                            <button onclick="dashboard.signOut()" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg">
+                                Sign Out
+                            </button>
+                        </div>
+                    `;
                 }
             }
             
@@ -908,7 +932,9 @@
             
             signOut() {
                 if (confirm('Are you sure you want to sign out?')) {
-                    localStorage.removeItem('token');
+                    // FIXED: Use pipways_token instead of token
+                    localStorage.removeItem('pipways_token');
+                    localStorage.removeItem('pipways_user');
                     if (window.Store && typeof window.Store.clearUser === 'function') {
                         window.Store.clearUser();
                     }

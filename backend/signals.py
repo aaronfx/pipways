@@ -132,7 +132,7 @@ async def create_signal(payload: SignalIn):
             "entry": payload.entry,
             "target": payload.target,
             "stop": payload.stop,
-            "confidence": payload.confidence,
+            "confidence": int(payload.confidence),  # Cast to int for PostgreSQL
             "asset_type": payload.asset_type,
             "country": payload.country,
             "pattern": payload.pattern,

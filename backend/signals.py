@@ -206,31 +206,40 @@ async def get_enhanced_signals(
 ) -> List[dict]:
     """Get all enhanced signals with pattern data"""
     
-    query = signals.select().where(signals.c.status == status)
-    rows = await database.fetch_all(query)
+    # Use raw SQL to avoid column mismatch with SQLAlchemy Table definition
+    # This handles cases where new columns haven't been added to the DB yet
+    query = """
+        SELECT * FROM signals WHERE status = :status
+        ORDER BY created_at DESC
+    """
+    rows = await database.fetch_all(query, {"status": status})
     
     result = []
     for row in rows:
         row_dict = dict(row._mapping)
         
-        # Parse JSON fields
+        # Parse JSON fields (if they exist)
         if row_dict.get("pattern_points"):
             try:
                 row_dict["pattern_points"] = json.loads(row_dict["pattern_points"])
             except:
                 row_dict["pattern_points"] = None
+        else:
+            row_dict["pattern_points"] = None
                 
         if row_dict.get("pattern_lines"):
             try:
                 row_dict["pattern_lines"] = json.loads(row_dict["pattern_lines"])
             except:
                 row_dict["pattern_lines"] = None
+        else:
+            row_dict["pattern_lines"] = None
         
-        # Add full name
+        # Add full name from SYMBOL_INFO
         symbol = row_dict.get("symbol", "")
         info = SYMBOL_INFO.get(symbol, {})
         row_dict["full_name"] = info.get("name", symbol)
-        row_dict["asset_type"] = info.get("type", "forex")
+        row_dict["asset_type"] = row_dict.get("asset_type") or info.get("type", "forex")
         row_dict["digits"] = info.get("digits", 5)
         
         result.append(row_dict)
@@ -245,8 +254,8 @@ async def get_signal(
 ) -> dict:
     """Get single signal with full details"""
     
-    query = signals.select().where(signals.c.id == signal_id)
-    row = await database.fetch_one(query)
+    query = "SELECT * FROM signals WHERE id = :signal_id"
+    row = await database.fetch_one(query, {"signal_id": signal_id})
     
     if not row:
         raise HTTPException(status_code=404, detail="Signal not found")

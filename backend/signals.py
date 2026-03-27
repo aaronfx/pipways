@@ -108,6 +108,9 @@ async def create_signal(payload: SignalIn):
         # Calculate expiry
         expires_at = datetime.now(timezone.utc) + timedelta(hours=payload.expires_in_hours)
 
+        # Cast confidence to int
+        conf_int = int(payload.confidence)
+
         # Insert into database
         query = """
             INSERT INTO signals (
@@ -118,7 +121,7 @@ async def create_signal(payload: SignalIn):
                 created_at, expires_at
             ) VALUES (
                 :symbol, :direction, :entry, :target, :stop,
-                :confidence, :confidence, :asset_type, :country,
+                :confidence, :ai_confidence, :asset_type, :country,
                 :pattern, :timeframe, :is_pattern_idea,
                 :pattern_points, 'active', TRUE,
                 :created_at, :expires_at
@@ -132,7 +135,8 @@ async def create_signal(payload: SignalIn):
             "entry": payload.entry,
             "target": payload.target,
             "stop": payload.stop,
-            "confidence": int(payload.confidence),  # Cast to int for PostgreSQL
+            "confidence": conf_int,
+            "ai_confidence": conf_int,  # Separate param to avoid type inference issue
             "asset_type": payload.asset_type,
             "country": payload.country,
             "pattern": payload.pattern,

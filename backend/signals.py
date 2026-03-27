@@ -110,17 +110,24 @@ async def create_signal(payload: SignalIn):
         
         # Expires hours
         expires_hours = int(payload.expires_in_hours)
+        
+        # Parse price values as floats
+        entry_price = float(payload.entry) if payload.entry else 0.0
+        take_profit = float(payload.target) if payload.target else 0.0
+        stop_loss = float(payload.stop) if payload.stop else 0.0
 
         # Insert into database - use PostgreSQL NOW() for timestamps
         query = f"""
             INSERT INTO signals (
                 symbol, direction, entry, target, stop,
+                entry_price, take_profit, stop_loss,
                 confidence, ai_confidence, asset_type, country,
                 pattern, timeframe, is_pattern_idea,
                 pattern_points, status, is_published,
                 created_at, expires_at
             ) VALUES (
                 :symbol, :direction, :entry, :target, :stop,
+                :entry_price, :take_profit, :stop_loss,
                 :confidence, :ai_confidence, :asset_type, :country,
                 :pattern, :timeframe, :is_pattern_idea,
                 :pattern_points, 'active', TRUE,
@@ -135,6 +142,9 @@ async def create_signal(payload: SignalIn):
             "entry": payload.entry,
             "target": payload.target,
             "stop": payload.stop,
+            "entry_price": entry_price,
+            "take_profit": take_profit,
+            "stop_loss": stop_loss,
             "confidence": conf_int,
             "ai_confidence": conf_int,
             "asset_type": payload.asset_type,

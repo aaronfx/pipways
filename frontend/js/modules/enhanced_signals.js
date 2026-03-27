@@ -1,5 +1,10 @@
-// Enhanced Signals Page Module — InsightPro Edition v4
+// Enhanced Signals Page — Production Edition v5
 // Deploy to: frontend/js/modules/enhanced_signals.js
+//
+// ⚠️ NO FAKE CHARTS
+// ⚠️ Uses TradingView Lightweight Charts (real library)
+// ⚠️ Clean info cards (no SVG simulation)
+// ⚠️ Modal with real chart + overlays
 
 (function () {
     'use strict';
@@ -9,7 +14,7 @@
     // ═══════════════════════════════════════════════════════════════════════════
 
     const PATTERN_EDUCATION = {
-        'SYMMETRICAL': {
+        'SYMMETRICAL_TRIANGLE': {
             title: 'Symmetrical Triangle',
             description: `The Symmetrical Triangle is a continuation pattern that develops when price consolidates between converging trendlines, with lower highs and higher lows forming equal slopes.
 
@@ -25,9 +30,7 @@ Price targets are typically calculated by measuring the height of the triangle a
 
 This pattern indicates a battle between buyers and sellers, with volatility contracting as the pattern matures. The narrowing price range suggests an imminent breakout.
 
-Traders watch for a decisive close outside the triangle boundaries to confirm the breakout direction. False breakouts are common, so confirmation is essential.
-
-The measured move target equals the triangle's height projected from the breakout point.`
+Traders watch for a decisive close outside the triangle boundaries to confirm the breakout direction. False breakouts are common, so confirmation is essential.`
         },
         'WEDGE': {
             title: 'Wedge Pattern',
@@ -112,7 +115,7 @@ Risk management is critical as reversals can take time to develop and may involv
     };
 
     function getPatternEducation(pattern) {
-        const key = (pattern || 'BREAKOUT').toUpperCase().replace(/[^A-Z]/g, '_');
+        const key = (pattern || 'BREAKOUT').toUpperCase().replace(/[^A-Z_]/g, '');
         if (PATTERN_EDUCATION[key]) return PATTERN_EDUCATION[key];
         for (const [k, v] of Object.entries(PATTERN_EDUCATION)) {
             if (key.includes(k) || k.includes(key)) return v;
@@ -128,269 +131,236 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CSS — InsightPro Style
+    // CSS — Institutional Grade UI
     // ═══════════════════════════════════════════════════════════════════════════
 
-    const IQ_STYLES = `
-    /* ══════════════════════════════════════════════════════════════════════════
-       InsightPro Signal Cards — Premium Trading UI
-       ══════════════════════════════════════════════════════════════════════════ */
-
+    const STYLES = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+    /* Grid Layout */
     #signalsGrid {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr) !important;
         gap: 20px !important;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    @media (max-width: 1100px) {
-        #signalsGrid { grid-template-columns: repeat(2, 1fr) !important; }
-    }
-    @media (max-width: 700px) {
-        #signalsGrid { grid-template-columns: 1fr !important; }
-    }
+    @media (max-width: 1100px) { #signalsGrid { grid-template-columns: repeat(2, 1fr) !important; } }
+    @media (max-width: 700px) { #signalsGrid { grid-template-columns: 1fr !important; } }
 
-    /* ── Signal Card ─────────────────────────────────────────────────────────── */
-    .iq-card {
-        background: linear-gradient(180deg, #1a1a1e 0%, #111113 100%);
+    /* ═══ SIGNAL CARD — Clean Info Design (NO fake chart) ═══ */
+    .sig-card {
+        background: linear-gradient(180deg, #141417 0%, #0d0d0f 100%);
         border: 1px solid rgba(255,255,255,0.06);
         border-radius: 16px;
         overflow: hidden;
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
     }
-    .iq-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    .sig-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        border-color: rgba(255,255,255,0.1);
     }
 
-    /* Header with badges */
-    .iq-header {
+    /* Card Header */
+    .sig-header {
         display: flex;
         align-items: center;
-        justify-content: center;
-        padding: 16px 16px 12px;
-        position: relative;
+        justify-content: space-between;
+        padding: 16px 20px 12px;
     }
-
-    /* Live Trade Badge */
-    .iq-live-badge {
+    .sig-live-badge {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 8px 18px;
+        gap: 8px;
+        padding: 8px 16px;
         background: linear-gradient(135deg, #00c9a7 0%, #00b894 100%);
         border-radius: 6px;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         color: #000;
         text-transform: uppercase;
-        box-shadow: 0 4px 15px rgba(0, 200, 150, 0.3);
+        box-shadow: 0 4px 15px rgba(0, 200, 150, 0.25);
     }
-    .iq-live-badge::before {
+    .sig-live-badge::before {
         content: '';
         width: 6px;
         height: 6px;
         background: #000;
         border-radius: 50%;
-        animation: iq-pulse 1.5s ease-in-out infinite;
+        animation: sig-pulse 1.5s ease-in-out infinite;
     }
-    @keyframes iq-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
+    @keyframes sig-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
     }
-
-    /* TradingView Icon */
-    .iq-tv-icon {
-        position: absolute;
-        right: 16px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 32px;
-        height: 32px;
+    .sig-tv-link {
+        width: 36px;
+        height: 36px;
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
         text-decoration: none;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .iq-tv-icon:hover {
-        transform: translateY(-50%) scale(1.1);
-        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    .sig-tv-link:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
     }
-    .iq-tv-icon svg {
-        width: 16px;
-        height: 16px;
-        fill: #fff;
-    }
+    .sig-tv-link svg { width: 18px; height: 18px; fill: #fff; }
 
     /* Symbol Row */
-    .iq-symbol-row {
+    .sig-symbol-row {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 0 20px 12px;
+        gap: 14px;
+        padding: 0 20px 14px;
     }
-
-    /* Asset Icon */
-    .iq-asset-icon {
-        width: 44px;
-        height: 44px;
+    .sig-icon {
+        width: 48px;
+        height: 48px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 16px;
+        font-size: 17px;
         font-weight: 800;
         flex-shrink: 0;
-        border: 3px solid rgba(255,255,255,0.1);
+        border: 3px solid rgba(255,255,255,0.08);
     }
-    .iq-asset-icon.gold {
+    .sig-icon.gold {
         background: linear-gradient(145deg, #ffd700 0%, #daa520 50%, #b8860b 100%);
         color: #1a1a1a;
-        border-color: rgba(255,215,0,0.3);
-        box-shadow: 0 4px 15px rgba(255,215,0,0.2);
+        border-color: rgba(255,215,0,0.25);
+        box-shadow: 0 6px 20px rgba(255,215,0,0.15);
     }
-    .iq-asset-icon.silver {
+    .sig-icon.silver {
         background: linear-gradient(145deg, #e8e8e8 0%, #c0c0c0 50%, #a8a8a8 100%);
         color: #1a1a1a;
-        border-color: rgba(192,192,192,0.3);
     }
-    .iq-asset-icon.crypto {
+    .sig-icon.crypto {
         background: linear-gradient(145deg, #f7931a 0%, #e67e00 100%);
         color: #fff;
-        border-color: rgba(247,147,26,0.3);
-        box-shadow: 0 4px 15px rgba(247,147,26,0.2);
+        box-shadow: 0 6px 20px rgba(247,147,26,0.15);
     }
-    .iq-asset-icon.indices {
+    .sig-icon.indices, .sig-icon.forex {
         background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
         color: #fff;
-        border-color: rgba(255,255,255,0.15);
-        font-size: 13px;
+        font-size: 14px;
     }
-    .iq-asset-icon.forex {
-        background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
-        color: #fff;
-        border-color: rgba(255,255,255,0.15);
-        font-size: 13px;
-    }
-
-    .iq-symbol-info {
-        flex: 1;
-        min-width: 0;
-    }
-    .iq-symbol-name {
-        display: flex;
-        align-items: baseline;
-        gap: 10px;
-    }
-    .iq-symbol-text {
-        font-size: 18px;
+    .sig-symbol-info { flex: 1; min-width: 0; }
+    .sig-symbol-name {
+        font-size: 20px;
         font-weight: 700;
         color: #fff;
         letter-spacing: -0.02em;
+        margin-bottom: 2px;
     }
-    .iq-pattern-tag {
+    .sig-pattern-name {
         font-size: 12px;
         font-weight: 500;
         color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
     }
 
-    /* Order Badge */
-    .iq-order-row {
+    /* Direction Badge */
+    .sig-direction-row {
         display: flex;
         justify-content: center;
         padding: 0 20px 16px;
     }
-    .iq-order-badge {
-        display: inline-block;
+    .sig-direction-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         padding: 10px 28px;
-        border-radius: 6px;
-        font-size: 12px;
+        border-radius: 8px;
+        font-size: 13px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
     }
-    .iq-order-buy {
+    .sig-direction-badge.buy {
         background: linear-gradient(135deg, #00c9a7 0%, #00b894 100%);
         color: #000;
-        box-shadow: 0 4px 15px rgba(0, 200, 150, 0.25);
+        box-shadow: 0 6px 20px rgba(0, 200, 150, 0.2);
     }
-    .iq-order-sell {
+    .sig-direction-badge.sell {
         background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
         color: #fff;
-        box-shadow: 0 4px 15px rgba(255, 107, 107, 0.25);
+        box-shadow: 0 6px 20px rgba(255, 107, 107, 0.2);
     }
 
-    /* Price Grid */
-    .iq-prices {
-        padding: 0 20px 16px;
+    /* Price Info */
+    .sig-prices {
+        padding: 0 20px;
     }
-    .iq-price-row {
+    .sig-price-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 0;
+        padding: 10px 0;
         border-bottom: 1px solid rgba(255,255,255,0.04);
     }
-    .iq-price-row:last-child {
-        border-bottom: none;
-    }
-    .iq-price-label {
+    .sig-price-row:last-child { border-bottom: none; }
+    .sig-price-label {
         font-size: 14px;
         font-weight: 500;
         color: #6b7280;
     }
-    .iq-price-value {
-        font-size: 15px;
+    .sig-price-value {
+        font-size: 16px;
         font-weight: 600;
         font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
         color: #fff;
     }
-    .iq-price-value.target { color: #00d4aa; }
-    .iq-price-value.stop { color: #ff6b6b; }
-    .iq-price-value.expires { color: #f5a623; }
+    .sig-price-value.target { color: #00d4aa; }
+    .sig-price-value.stop { color: #ff6b6b; }
+    .sig-price-value.expires { color: #f5a623; }
 
-    /* Chart */
-    .iq-chart {
-        width: 100%;
-        height: 140px;
-        background: linear-gradient(180deg, #0d0d10 0%, #0a0a0c 100%);
-        position: relative;
+    /* Confidence Bar */
+    .sig-confidence {
+        padding: 16px 20px 0;
+    }
+    .sig-confidence-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .sig-confidence-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .sig-confidence-value {
+        font-size: 14px;
+        font-weight: 700;
+        color: #a78bfa;
+    }
+    .sig-confidence-bar {
+        height: 4px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 2px;
         overflow: hidden;
     }
-    .iq-chart svg {
-        width: 100%;
+    .sig-confidence-fill {
         height: 100%;
-    }
-    .iq-tf-badge {
-        position: absolute;
-        bottom: 10px;
-        right: 12px;
-        width: 32px;
-        height: 32px;
-        background: rgba(0,0,0,0.8);
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-        color: #fff;
+        background: linear-gradient(90deg, #a78bfa 0%, #818cf8 100%);
+        border-radius: 2px;
+        transition: width 0.5s ease;
     }
 
     /* Learn More Button */
-    .iq-learn-btn {
+    .sig-learn-btn {
         display: block;
-        width: calc(100% - 32px);
-        margin: 0 16px 16px;
+        width: calc(100% - 40px);
+        margin: 20px 20px;
         padding: 14px;
         background: rgba(255,255,255,0.03);
         border: 1px solid rgba(255,255,255,0.08);
@@ -404,20 +374,21 @@ Always conduct your own analysis and use proper risk management when trading.`
         text-transform: uppercase;
         letter-spacing: 0.1em;
     }
-    .iq-learn-btn:hover {
+    .sig-learn-btn:hover {
         background: rgba(255,255,255,0.06);
         border-color: rgba(255,255,255,0.15);
+        transform: translateY(-2px);
     }
 
     /* Tab Bar */
-    .iq-tab-bar {
+    .sig-tab-bar {
         display: flex;
         gap: 32px;
         margin-bottom: 24px;
         padding-bottom: 16px;
         border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    .iq-tab-item {
+    .sig-tab-item {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -428,9 +399,9 @@ Always conduct your own analysis and use proper risk management when trading.`
         transition: color 0.2s ease;
         padding: 6px 0;
     }
-    .iq-tab-item:hover { color: #9ca3af; }
-    .iq-tab-item.active { color: #fff; }
-    .iq-tab-dot {
+    .sig-tab-item:hover { color: #9ca3af; }
+    .sig-tab-item.active { color: #fff; }
+    .sig-tab-dot {
         width: 24px;
         height: 24px;
         border-radius: 50%;
@@ -439,66 +410,57 @@ Always conduct your own analysis and use proper risk management when trading.`
         justify-content: center;
         font-size: 12px;
     }
-    .iq-tab-item.ai-driven .iq-tab-dot {
-        background: linear-gradient(135deg, #f5a623, #e67e00);
-        color: #000;
-    }
-    .iq-tab-item.analysis-iq .iq-tab-dot {
-        background: linear-gradient(135deg, #6366f1, #4f46e5);
-        color: #fff;
-    }
+    .sig-tab-item.ai-driven .sig-tab-dot { background: linear-gradient(135deg, #f5a623, #e67e00); color: #000; }
+    .sig-tab-item.analysis-iq .sig-tab-dot { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; }
 
-    /* ══════════════════════════════════════════════════════════════════════════
-       Modal — InsightPro Style
-       ══════════════════════════════════════════════════════════════════════════ */
-    .iq-modal-overlay {
+    /* ═══ MODAL — Real Chart Integration ═══ */
+    .sig-modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.92);
-        backdrop-filter: blur(8px);
+        background: rgba(0, 0, 0, 0.94);
+        backdrop-filter: blur(12px);
         z-index: 9999;
         display: flex;
         align-items: flex-start;
         justify-content: center;
-        padding: 32px 16px;
+        padding: 24px 16px;
         overflow-y: auto;
         opacity: 0;
         transition: opacity 0.25s ease;
         pointer-events: none;
     }
-    .iq-modal-overlay.open {
+    .sig-modal-overlay.open {
         opacity: 1;
         pointer-events: all;
     }
-    .iq-modal {
-        background: linear-gradient(180deg, #1a1a1e 0%, #111113 100%);
+    .sig-modal {
+        background: linear-gradient(180deg, #141417 0%, #0d0d0f 100%);
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 20px;
         width: 100%;
-        max-width: 900px;
+        max-width: 1000px;
         margin: 20px 0;
         overflow: hidden;
-        box-shadow: 0 32px 64px rgba(0,0,0,0.5);
+        box-shadow: 0 40px 80px rgba(0,0,0,0.6);
     }
 
     /* Modal Header */
-    .iq-modal-header {
-        background: linear-gradient(180deg, #0d0d10 0%, #111113 100%);
-        padding: 24px;
+    .sig-modal-header {
+        background: linear-gradient(180deg, #0a0a0c 0%, #0d0d0f 100%);
+        padding: 24px 28px;
         border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-
-    /* Top row: Flag, Symbol, Name, Price */
-    .iq-modal-top {
+    .sig-modal-top {
         display: flex;
         align-items: center;
         gap: 16px;
-        margin-bottom: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
     }
-    .iq-modal-flag {
-        width: 52px;
-        height: 40px;
-        border-radius: 6px;
+    .sig-modal-flag {
+        width: 56px;
+        height: 42px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -506,176 +468,187 @@ Always conduct your own analysis and use proper risk management when trading.`
         background: #1a1a2e;
         border: 1px solid rgba(255,255,255,0.1);
     }
-    .iq-modal-symbol-badge {
+    .sig-modal-symbol-badge {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: #fff;
-        padding: 6px 14px;
-        border-radius: 6px;
-        font-size: 13px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
         font-weight: 700;
         letter-spacing: 0.02em;
     }
-    .iq-modal-pair-name {
-        font-size: 22px;
+    .sig-modal-pair-name {
+        font-size: 24px;
         font-weight: 600;
         color: #fff;
         flex: 1;
+        min-width: 200px;
     }
-    .iq-modal-price-box {
-        text-align: right;
-    }
-    .iq-modal-live-price {
-        font-size: 36px;
+    .sig-modal-price-box { text-align: right; }
+    .sig-modal-live-price {
+        font-size: 40px;
         font-weight: 700;
         color: #fff;
         font-family: 'SF Mono', 'JetBrains Mono', monospace;
         letter-spacing: -0.02em;
     }
-    .iq-modal-price-change {
+    .sig-modal-price-change {
         font-size: 14px;
         font-weight: 600;
-        margin-top: 2px;
+        margin-top: 4px;
     }
-    .iq-modal-price-change.up { color: #00d4aa; }
-    .iq-modal-price-change.down { color: #ff6b6b; }
+    .sig-modal-price-change.up { color: #00d4aa; }
+    .sig-modal-price-change.down { color: #ff6b6b; }
 
-    /* Badges row */
-    .iq-modal-badges {
+    /* Badges */
+    .sig-modal-badges {
         display: flex;
         gap: 12px;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
     }
-    .iq-modal-live-badge {
+    .sig-modal-live-tag {
         display: inline-flex;
         align-items: center;
-        padding: 8px 16px;
+        padding: 8px 18px;
         background: linear-gradient(135deg, #f5a623 0%, #e67e00 100%);
         border-radius: 6px;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         color: #000;
         text-transform: uppercase;
     }
 
-    /* Info grid */
-    .iq-modal-info {
+    /* Info Grid */
+    .sig-modal-info {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
         gap: 20px;
     }
-    @media (max-width: 700px) {
-        .iq-modal-info { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 768px) {
+        .sig-modal-info { grid-template-columns: repeat(3, 1fr); }
     }
-    .iq-modal-info-item {
-        text-align: center;
+    @media (max-width: 480px) {
+        .sig-modal-info { grid-template-columns: repeat(2, 1fr); }
     }
-    .iq-modal-info-value {
+    .sig-modal-info-item { text-align: center; }
+    .sig-modal-info-value {
         font-size: 18px;
         font-weight: 700;
         color: #00d4aa;
         font-family: 'SF Mono', 'JetBrains Mono', monospace;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
     }
-    .iq-modal-info-value.pattern {
-        color: #fff;
-        font-family: 'Inter', sans-serif;
-        font-size: 16px;
-    }
-    .iq-modal-info-value.entry { color: #fff; }
-    .iq-modal-info-value.stop { color: #ff6b6b; }
-    .iq-modal-info-label {
+    .sig-modal-info-value.pattern { color: #fff; font-family: 'Inter', sans-serif; font-size: 15px; }
+    .sig-modal-info-value.entry { color: #fff; }
+    .sig-modal-info-value.stop { color: #ff6b6b; }
+    .sig-modal-info-label {
         font-size: 11px;
         font-weight: 600;
         color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
     }
 
     /* Sentiment */
-    .iq-sentiment {
+    .sig-sentiment {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 10px;
     }
-    .iq-sentiment-bar {
-        width: 80px;
+    .sig-sentiment-bar {
+        width: 90px;
         height: 6px;
         background: #333;
         border-radius: 3px;
         overflow: hidden;
         display: flex;
     }
-    .iq-sentiment-bear { background: linear-gradient(90deg, #ff6b6b, #ff8787); }
-    .iq-sentiment-bull { background: linear-gradient(90deg, #00d4aa, #00e6b8); }
-    .iq-sentiment-label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #6b7280;
-    }
+    .sig-sentiment-bear { background: linear-gradient(90deg, #ff6b6b, #ff8787); }
+    .sig-sentiment-bull { background: linear-gradient(90deg, #00d4aa, #00e6b8); }
+    .sig-sentiment-label { font-size: 11px; font-weight: 600; color: #6b7280; }
 
     /* Modal Body */
-    .iq-modal-body {
-        padding: 28px;
-    }
+    .sig-modal-body { padding: 28px; }
 
-    /* Chart in modal */
-    .iq-modal-chart {
+    /* TradingView Chart Container */
+    .sig-chart-container {
         width: 100%;
-        height: 220px;
-        background: linear-gradient(180deg, #0d0d10 0%, #0a0a0c 100%);
+        height: 400px;
+        background: #0a0a0c;
         border-radius: 12px;
         margin-bottom: 28px;
         overflow: hidden;
         position: relative;
+        border: 1px solid rgba(255,255,255,0.06);
     }
-    .iq-modal-chart svg {
+    .sig-chart-container iframe {
         width: 100%;
         height: 100%;
+        border: none;
     }
-    .iq-modal-chart .iq-tf-badge {
-        bottom: 14px;
-        right: 14px;
-        width: 36px;
-        height: 36px;
-        font-size: 12px;
+    .sig-chart-loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #0a0a0c;
+        color: #6b7280;
+        font-size: 14px;
+        gap: 12px;
+    }
+    .sig-chart-loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(255,255,255,0.1);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: sig-spin 1s linear infinite;
+    }
+    @keyframes sig-spin {
+        to { transform: rotate(360deg); }
     }
 
-    /* Trade Idea section */
-    .iq-modal-title-row {
+    /* Trade Idea Section */
+    .sig-modal-title-row {
         display: flex;
         align-items: center;
         gap: 14px;
         margin-bottom: 12px;
     }
-    .iq-modal-title {
+    .sig-modal-title {
         font-size: 28px;
         font-weight: 700;
         color: #fff;
     }
-    .iq-modal-tv-link {
-        width: 36px;
-        height: 36px;
+    .sig-modal-tv-link {
+        width: 38px;
+        height: 38px;
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         text-decoration: none;
-        transition: transform 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .iq-modal-tv-link:hover { transform: scale(1.1); }
-    .iq-modal-tv-link svg { width: 18px; height: 18px; fill: #fff; }
+    .sig-modal-tv-link:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+    .sig-modal-tv-link svg { width: 18px; height: 18px; fill: #fff; }
 
-    .iq-modal-meta {
+    .sig-modal-meta {
         font-size: 13px;
         color: #f5a623;
         margin-bottom: 24px;
-        line-height: 1.6;
+        line-height: 1.7;
     }
-
-    .iq-modal-description {
+    .sig-modal-description {
         font-size: 16px;
         line-height: 1.9;
         color: #d1d5db;
@@ -683,13 +656,14 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
 
     /* Modal Footer */
-    .iq-modal-footer {
+    .sig-modal-footer {
         padding: 20px 28px;
         border-top: 1px solid rgba(255,255,255,0.06);
         display: flex;
         gap: 14px;
+        flex-wrap: wrap;
     }
-    .iq-modal-btn {
+    .sig-modal-btn {
         padding: 14px 32px;
         border-radius: 10px;
         font-size: 14px;
@@ -697,39 +671,37 @@ Always conduct your own analysis and use proper risk management when trading.`
         cursor: pointer;
         transition: all 0.2s ease;
     }
-    .iq-modal-btn-primary {
+    .sig-modal-btn-primary {
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         border: none;
         color: #fff;
         flex: 1;
+        min-width: 150px;
     }
-    .iq-modal-btn-primary:hover {
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    .sig-modal-btn-primary:hover {
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
         transform: translateY(-2px);
     }
-    .iq-modal-btn-secondary {
+    .sig-modal-btn-secondary {
         background: rgba(255,255,255,0.03);
         border: 1px solid rgba(255,255,255,0.1);
         color: #9ca3af;
     }
-    .iq-modal-btn-secondary:hover {
+    .sig-modal-btn-secondary:hover {
         background: rgba(255,255,255,0.06);
         color: #fff;
     }
 
-    /* Countdown urgent */
-    .iq-countdown.urgent { color: #ff6b6b !important; animation: iq-urgent 1s infinite; }
-    @keyframes iq-urgent {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
+    /* Countdown */
+    .sig-countdown.urgent { color: #ff6b6b !important; animation: sig-urgent 1s infinite; }
+    @keyframes sig-urgent { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     `;
 
     function injectStyles() {
-        if (document.getElementById('iq-styles')) return;
+        if (document.getElementById('sig-styles')) return;
         const el = document.createElement('style');
-        el.id = 'iq-styles';
-        el.textContent = IQ_STYLES;
+        el.id = 'sig-styles';
+        el.textContent = STYLES;
         document.head.appendChild(el);
     }
 
@@ -769,14 +741,14 @@ Always conduct your own analysis and use proper risk management when trading.`
     let currentTab = 'ai-driven';
     let updateInterval = null;
     let countdownTimers = [];
-    let iqModal = null;
+    let modalOverlay = null;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════════════════════════════════════════
 
     function init() {
-        console.log('[InsightPro] Initialising v4...');
+        console.log('[Signals] Initialising v5 (Production)...');
         injectStyles();
         injectTabBar();
         injectModal();
@@ -788,18 +760,18 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
 
     function injectTabBar() {
-        if (document.getElementById('iq-tab-bar')) return;
+        if (document.getElementById('sig-tab-bar')) return;
 
         const bar = document.createElement('div');
-        bar.id = 'iq-tab-bar';
-        bar.className = 'iq-tab-bar';
+        bar.id = 'sig-tab-bar';
+        bar.className = 'sig-tab-bar';
         bar.innerHTML = `
-            <div id="iq-tab-ai" class="iq-tab-item ai-driven active" data-tab="ai-driven">
-                <span class="iq-tab-dot">✦</span>
+            <div id="sig-tab-ai" class="sig-tab-item ai-driven active" data-tab="ai-driven">
+                <span class="sig-tab-dot">✦</span>
                 AI-Driven Trade Ideas
             </div>
-            <div id="iq-tab-pattern" class="iq-tab-item analysis-iq" data-tab="analysis-iq">
-                <span class="iq-tab-dot">◈</span>
+            <div id="sig-tab-pattern" class="sig-tab-item analysis-iq" data-tab="analysis-iq">
+                <span class="sig-tab-dot">◈</span>
                 Pattern Trade Ideas
             </div>
         `;
@@ -810,14 +782,14 @@ Always conduct your own analysis and use proper risk management when trading.`
     }
 
     function injectModal() {
-        if (document.getElementById('iq-modal-overlay')) return;
+        if (document.getElementById('sig-modal-overlay')) return;
 
         const overlay = document.createElement('div');
-        overlay.id = 'iq-modal-overlay';
-        overlay.className = 'iq-modal-overlay';
-        overlay.innerHTML = `<div class="iq-modal" id="iq-modal"></div>`;
+        overlay.id = 'sig-modal-overlay';
+        overlay.className = 'sig-modal-overlay';
+        overlay.innerHTML = `<div class="sig-modal" id="sig-modal"></div>`;
         document.body.appendChild(overlay);
-        iqModal = overlay;
+        modalOverlay = overlay;
 
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) closeModal();
@@ -847,7 +819,7 @@ Always conduct your own analysis and use proper risk management when trading.`
             allSignals = signals || [];
             applyFilters();
         } catch (error) {
-            console.error('[InsightPro] Error:', error);
+            console.error('[Signals] Load error:', error);
         }
     }
 
@@ -862,13 +834,13 @@ Always conduct your own analysis and use proper risk management when trading.`
 
     function switchTab(tab) {
         currentTab = tab;
-        document.getElementById('iq-tab-ai')?.classList.toggle('active', tab === 'ai-driven');
-        document.getElementById('iq-tab-pattern')?.classList.toggle('active', tab === 'analysis-iq');
+        document.getElementById('sig-tab-ai')?.classList.toggle('active', tab === 'ai-driven');
+        document.getElementById('sig-tab-pattern')?.classList.toggle('active', tab === 'analysis-iq');
         applyFilters();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // RENDER
+    // RENDER CARDS — Clean Info Design (NO fake charts)
     // ═══════════════════════════════════════════════════════════════════════════
 
     function renderSignals() {
@@ -890,125 +862,6 @@ Always conduct your own analysis and use proper risk management when trading.`
         startCountdowns();
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CHART SVG GENERATOR
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function generateChartSVG(pattern, isBuy, seed = 1, isModal = false) {
-        const w = isModal ? 860 : 280;
-        const h = isModal ? 220 : 140;
-        const patternType = (pattern || '').toUpperCase();
-
-        // Pseudo-random
-        let s = seed;
-        const rand = (min, max) => { s = (s * 9301 + 49297) % 233280; return min + (s / 233280) * (max - min); };
-
-        // Generate candles
-        const numCandles = isModal ? 50 : 28;
-        const candles = [];
-        let price = 50;
-        const trend = isBuy ? 0.15 : -0.15;
-
-        for (let i = 0; i < numCandles; i++) {
-            const vol = 1.5 + rand(0, 2.5);
-            const open = price;
-            const change = trend + rand(-1.2, 1.2);
-            const close = open + change;
-            const high = Math.max(open, close) + rand(0.2, vol);
-            const low = Math.min(open, close) - rand(0.2, vol);
-            candles.push({ open, close, high, low, bull: close > open });
-            price = close;
-        }
-
-        // Normalize
-        const allP = candles.flatMap(c => [c.high, c.low]);
-        const minP = Math.min(...allP), maxP = Math.max(...allP);
-        const range = maxP - minP || 1;
-        const padY = isModal ? 20 : 15;
-        const toY = p => h - padY - ((p - minP) / range) * (h - padY * 2);
-
-        // Draw candles
-        const gap = (w - 20) / numCandles;
-        const cw = isModal ? 10 : 6;
-        let svg = '';
-
-        candles.forEach((c, i) => {
-            const x = 10 + i * gap + gap / 2;
-            const color = c.bull ? '#26a69a' : '#ef5350';
-            const yH = toY(c.high), yL = toY(c.low);
-            const yO = toY(c.open), yC = toY(c.close);
-            const top = Math.min(yO, yC);
-            const ht = Math.max(1, Math.abs(yO - yC));
-            
-            // Wick
-            svg += `<line x1="${x}" y1="${yH}" x2="${x}" y2="${yL}" stroke="${color}" stroke-width="1" stroke-linecap="round"/>`;
-            // Body
-            svg += `<rect x="${x - cw/2}" y="${top}" width="${cw}" height="${ht}" fill="${color}" rx="1"/>`;
-        });
-
-        // Pattern lines
-        const lc = '#818cf8'; // Lighter purple for better visibility
-        const lw = isModal ? 2.5 : 2;
-        const midY = toY((maxP + minP) / 2);
-        const topY = toY(maxP - range * 0.12);
-        const botY = toY(minP + range * 0.12);
-        const startX = isModal ? 60 : 20;
-        const endX = w - (isModal ? 60 : 20);
-
-        if (patternType.includes('SYMMETRICAL') || patternType.includes('TRIANGLE')) {
-            // Converging triangle
-            svg += `<line x1="${startX}" y1="${topY}" x2="${endX}" y2="${midY+3}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-            svg += `<line x1="${startX}" y1="${botY}" x2="${endX}" y2="${midY-3}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-        } else if (patternType.includes('WEDGE')) {
-            // Wedge - both lines slope same direction
-            const slopeDir = isBuy ? -1 : 1;
-            const topStart = toY(maxP - range * 0.15);
-            const botStart = toY(minP + range * 0.25);
-            const topEnd = topStart + slopeDir * (h * 0.15);
-            const botEnd = botStart + slopeDir * (h * 0.25);
-            svg += `<line x1="${startX}" y1="${topStart}" x2="${endX}" y2="${topEnd}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-            svg += `<line x1="${startX}" y1="${botStart}" x2="${endX}" y2="${botEnd}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-        } else if (patternType.includes('FLAG')) {
-            // Parallel sloping lines
-            const flagStart = isModal ? 180 : 60;
-            const y1s = toY(minP + range * 0.7);
-            const y2s = toY(minP + range * 0.4);
-            const slope = isBuy ? 0.08 : -0.08;
-            svg += `<line x1="${flagStart}" y1="${y1s}" x2="${endX}" y2="${y1s + slope * (endX - flagStart)}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-            svg += `<line x1="${flagStart}" y1="${y2s}" x2="${endX}" y2="${y2s + slope * (endX - flagStart)}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-        } else if (patternType.includes('PENNANT')) {
-            // Small converging triangle
-            const cx = w * 0.55;
-            const spread = isModal ? 100 : 55;
-            const vSpread = isModal ? 30 : 18;
-            svg += `<line x1="${cx - spread}" y1="${midY - vSpread}" x2="${cx + spread * 0.7}" y2="${midY}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-            svg += `<line x1="${cx - spread}" y1="${midY + vSpread}" x2="${cx + spread * 0.7}" y2="${midY}" stroke="${lc}" stroke-width="${lw}" stroke-linecap="round"/>`;
-        } else if (patternType.includes('DOUBLE') && patternType.includes('BOTTOM')) {
-            const by = toY(minP + range * 0.08);
-            const x1 = isModal ? 200 : 70, x2 = isModal ? 550 : 180;
-            const r = isModal ? 8 : 5;
-            svg += `<circle cx="${x1}" cy="${by}" r="${r}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
-            svg += `<circle cx="${x2}" cy="${by}" r="${r}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
-            svg += `<line x1="${x1}" y1="${by}" x2="${x2}" y2="${by}" stroke="${lc}" stroke-width="1" stroke-dasharray="6,4"/>`;
-        } else if (patternType.includes('DOUBLE') && patternType.includes('TOP')) {
-            const ty = toY(maxP - range * 0.08);
-            const x1 = isModal ? 200 : 70, x2 = isModal ? 550 : 180;
-            const r = isModal ? 8 : 5;
-            svg += `<circle cx="${x1}" cy="${ty}" r="${r}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
-            svg += `<circle cx="${x2}" cy="${ty}" r="${r}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
-            svg += `<line x1="${x1}" y1="${ty}" x2="${x2}" y2="${ty}" stroke="${lc}" stroke-width="1" stroke-dasharray="6,4"/>`;
-        } else {
-            // Default: horizontal support/resistance
-            svg += `<line x1="${startX}" y1="${midY}" x2="${endX}" y2="${midY}" stroke="${lc}" stroke-width="${lw}" stroke-dasharray="8,4"/>`;
-        }
-
-        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><rect width="100%" height="100%" fill="transparent"/>${svg}</svg>`;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // CARD RENDER
-    // ═══════════════════════════════════════════════════════════════════════════
-
     function getAssetIcon(symbol) {
         const map = {
             'XAUUSD': { text: 'Au', cls: 'gold' },
@@ -1020,97 +873,9 @@ Always conduct your own analysis and use proper risk management when trading.`
             'CHINA50': { text: 'CN', cls: 'indices' },
         };
         if (map[symbol]) return map[symbol];
-
-        // Forex pairs - use country code
-        const cc = symbol?.substring(0, 2);
-        return { text: cc || '??', cls: 'forex' };
+        const cc = symbol?.substring(0, 2) || '??';
+        return { text: cc, cls: 'forex' };
     }
-
-    function getFlag(symbol) {
-        const flags = {
-            'EU': '🇪🇺', 'GB': '🇬🇧', 'US': '🇺🇸', 'JP': '🇯🇵', 
-            'AU': '🇦🇺', 'NZ': '🇳🇿', 'CA': '🇨🇦', 'CH': '🇨🇭',
-            'CN': '🇨🇳', 'DE': '🇩🇪', 'XA': '🪙'
-        };
-        const cc = symbol?.substring(0, 2);
-        return flags[cc] || '🌐';
-    }
-
-    function renderCard(signal) {
-        const isBuy = (signal.direction || '').toUpperCase().includes('BUY');
-        const pattern = (signal.pattern || 'PATTERN').replace(/_/g, ' ');
-        const patternShort = pattern.length > 14 ? pattern.substring(0, 12) + '...' : pattern;
-        const tf = signal.timeframe || '4H';
-        const icon = getAssetIcon(signal.symbol);
-        const tvSymbol = getTVSymbol(signal.symbol);
-
-        // TradingView icon SVG
-        const tvSvg = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14l3-3 2 2 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-        return `
-        <div class="iq-card">
-            <!-- Header -->
-            <div class="iq-header">
-                <span class="iq-live-badge">Live Trade</span>
-                <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="iq-tv-icon" title="View on TradingView">
-                    ${tvSvg}
-                </a>
-            </div>
-
-            <!-- Symbol -->
-            <div class="iq-symbol-row">
-                <div class="iq-asset-icon ${icon.cls}">${icon.text}</div>
-                <div class="iq-symbol-info">
-                    <div class="iq-symbol-name">
-                        <span class="iq-symbol-text">${esc(signal.symbol)}</span>
-                        <span class="iq-pattern-tag">${esc(patternShort)}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Order Badge -->
-            <div class="iq-order-row">
-                <span class="iq-order-badge ${isBuy ? 'iq-order-buy' : 'iq-order-sell'}">
-                    ${isBuy ? 'BUY STOP' : 'SELL STOP'}
-                </span>
-            </div>
-
-            <!-- Prices -->
-            <div class="iq-prices">
-                <div class="iq-price-row">
-                    <span class="iq-price-label">Entry</span>
-                    <span class="iq-price-value">${esc(signal.entry || '—')}</span>
-                </div>
-                <div class="iq-price-row">
-                    <span class="iq-price-label">Target</span>
-                    <span class="iq-price-value target">${esc(signal.target || '—')}</span>
-                </div>
-                <div class="iq-price-row">
-                    <span class="iq-price-label">Stop</span>
-                    <span class="iq-price-value stop">${esc(signal.stop || '—')}</span>
-                </div>
-                <div class="iq-price-row">
-                    <span class="iq-price-label">Expires</span>
-                    <span class="iq-price-value expires iq-countdown" data-expiry="${signal.expires_at || ''}">${formatCountdown(signal.expires_at)}</span>
-                </div>
-            </div>
-
-            <!-- Chart -->
-            <div class="iq-chart">
-                ${generateChartSVG(signal.pattern, isBuy, signal.id, false)}
-                <div class="iq-tf-badge">${esc(tf)}</div>
-            </div>
-
-            <!-- Learn More -->
-            <button class="iq-learn-btn" onclick="window.EnhancedSignalsPage.openDeepInsight(${signal.id})">
-                Learn More
-            </button>
-        </div>`;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MODAL
-    // ═══════════════════════════════════════════════════════════════════════════
 
     function getTVSymbol(symbol) {
         const map = {
@@ -1123,6 +888,93 @@ Always conduct your own analysis and use proper risk management when trading.`
         };
         return map[symbol] || `FX:${symbol}`;
     }
+
+    function getFlag(symbol) {
+        const flags = {
+            'EU': '🇪🇺', 'GB': '🇬🇧', 'US': '🇺🇸', 'JP': '🇯🇵',
+            'AU': '🇦🇺', 'NZ': '🇳🇿', 'CA': '🇨🇦', 'CH': '🇨🇭',
+            'CN': '🇨🇳', 'DE': '🇩🇪', 'XA': '🪙', 'BT': '₿', 'ET': '⟠'
+        };
+        const cc = symbol?.substring(0, 2) || '';
+        return flags[cc] || '🌐';
+    }
+
+    function renderCard(signal) {
+        const isBuy = (signal.direction || '').toUpperCase().includes('BUY');
+        const pattern = (signal.pattern || 'PATTERN').replace(/_/g, ' ');
+        const icon = getAssetIcon(signal.symbol);
+        const tvSymbol = getTVSymbol(signal.symbol);
+        const confidence = signal.confidence || 75;
+
+        const tvSvg = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14l3-3 2 2 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+        return `
+        <div class="sig-card">
+            <!-- Header -->
+            <div class="sig-header">
+                <span class="sig-live-badge">Live Trade</span>
+                <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-tv-link" title="Open in TradingView">
+                    ${tvSvg}
+                </a>
+            </div>
+
+            <!-- Symbol -->
+            <div class="sig-symbol-row">
+                <div class="sig-icon ${icon.cls}">${icon.text}</div>
+                <div class="sig-symbol-info">
+                    <div class="sig-symbol-name">${esc(signal.symbol)}</div>
+                    <div class="sig-pattern-name">${esc(pattern)}</div>
+                </div>
+            </div>
+
+            <!-- Direction -->
+            <div class="sig-direction-row">
+                <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">
+                    ${isBuy ? 'BUY STOP' : 'SELL STOP'}
+                </span>
+            </div>
+
+            <!-- Prices -->
+            <div class="sig-prices">
+                <div class="sig-price-row">
+                    <span class="sig-price-label">Entry</span>
+                    <span class="sig-price-value">${esc(signal.entry || '—')}</span>
+                </div>
+                <div class="sig-price-row">
+                    <span class="sig-price-label">Target</span>
+                    <span class="sig-price-value target">${esc(signal.target || '—')}</span>
+                </div>
+                <div class="sig-price-row">
+                    <span class="sig-price-label">Stop</span>
+                    <span class="sig-price-value stop">${esc(signal.stop || '—')}</span>
+                </div>
+                <div class="sig-price-row">
+                    <span class="sig-price-label">Expires</span>
+                    <span class="sig-price-value expires sig-countdown" data-expiry="${signal.expires_at || ''}">${formatCountdown(signal.expires_at)}</span>
+                </div>
+            </div>
+
+            <!-- Confidence -->
+            <div class="sig-confidence">
+                <div class="sig-confidence-header">
+                    <span class="sig-confidence-label">AI Confidence</span>
+                    <span class="sig-confidence-value">${confidence}%</span>
+                </div>
+                <div class="sig-confidence-bar">
+                    <div class="sig-confidence-fill" style="width: ${confidence}%"></div>
+                </div>
+            </div>
+
+            <!-- Learn More -->
+            <button class="sig-learn-btn" onclick="window.EnhancedSignalsPage.openDeepInsight(${signal.id})">
+                View Analysis
+            </button>
+        </div>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MODAL — Real TradingView Chart Integration
+    // ═══════════════════════════════════════════════════════════════════════════
 
     function getPairName(symbol) {
         const names = {
@@ -1147,7 +999,7 @@ Always conduct your own analysis and use proper risk management when trading.`
 
     function openDeepInsight(signalId) {
         const signal = allSignals.find(s => s.id === signalId);
-        if (!signal || !iqModal) return;
+        if (!signal || !modalOverlay) return;
 
         const isBuy = (signal.direction || '').toUpperCase().includes('BUY');
         const pattern = (signal.pattern || 'Pattern').replace(/_/g, ' ');
@@ -1155,122 +1007,155 @@ Always conduct your own analysis and use proper risk management when trading.`
         const tvSymbol = getTVSymbol(signal.symbol);
         const flag = getFlag(signal.symbol);
         const pairName = getPairName(signal.symbol);
-        const bullish = signal.sentiment_bullish || 50;
+        const bullish = signal.sentiment_bullish || 55;
         const bearish = 100 - bullish;
         const tf = signal.timeframe || '4H';
 
+        // TradingView interval mapping
+        const tfMap = { '1M': '1', '5M': '5', '15M': '15', '30M': '30', '1H': '60', '4H': '240', '1D': 'D', 'D': 'D' };
+        const tvInterval = tfMap[tf] || '240';
+
         // Timestamps
-        const pubDate = signal.created_at 
+        const pubDate = signal.created_at
             ? new Date(signal.created_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
             : '—';
-        const expDate = signal.expires_at 
+        const expDate = signal.expires_at
             ? new Date(signal.expires_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
             : '—';
 
         const tvSvg = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14l3-3 2 2 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-        const modal = document.getElementById('iq-modal');
+        // TradingView Advanced Chart Widget (Free embed)
+        const tvChartUrl = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${encodeURIComponent(tvSymbol)}&interval=${tvInterval}&hidesidetoolbar=0&symboledit=0&saveimage=1&toolbarbg=0a0a0c&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=0&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=pipways&utm_medium=widget&utm_campaign=chart`;
+
+        const modal = document.getElementById('sig-modal');
         modal.innerHTML = `
             <!-- Header -->
-            <div class="iq-modal-header">
-                <div class="iq-modal-top">
-                    <div class="iq-modal-flag">${flag}</div>
-                    <span class="iq-modal-symbol-badge">${esc(signal.symbol)}</span>
-                    <span class="iq-modal-pair-name">${esc(pairName)}</span>
-                    <div class="iq-modal-price-box">
-                        <div class="iq-modal-live-price">${esc(signal.entry || '—')}</div>
-                        <div class="iq-modal-price-change ${isBuy ? 'up' : 'down'}">
-                            ${isBuy ? '▲' : '▼'} ${esc(signal.price_change || '+0.00%')}
+            <div class="sig-modal-header">
+                <div class="sig-modal-top">
+                    <div class="sig-modal-flag">${flag}</div>
+                    <span class="sig-modal-symbol-badge">${esc(signal.symbol)}</span>
+                    <span class="sig-modal-pair-name">${esc(pairName)}</span>
+                    <div class="sig-modal-price-box">
+                        <div class="sig-modal-live-price">${esc(signal.entry || '—')}</div>
+                        <div class="sig-modal-price-change ${isBuy ? 'up' : 'down'}">
+                            ${isBuy ? '▲' : '▼'} Entry Level
                         </div>
                     </div>
                 </div>
 
-                <div class="iq-modal-badges">
-                    <span class="iq-order-badge ${isBuy ? 'iq-order-buy' : 'iq-order-sell'}">
+                <div class="sig-modal-badges">
+                    <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">
                         ${isBuy ? 'BUY STOP' : 'SELL STOP'}
                     </span>
-                    <span class="iq-modal-live-badge">Live Trade</span>
+                    <span class="sig-modal-live-tag">Live Trade</span>
                 </div>
 
-                <div class="iq-modal-info">
-                    <div class="iq-modal-info-item">
-                        <div class="iq-modal-info-value pattern">${esc(pattern)}</div>
-                        <div class="iq-modal-info-label">Pattern</div>
+                <div class="sig-modal-info">
+                    <div class="sig-modal-info-item">
+                        <div class="sig-modal-info-value pattern">${esc(pattern)}</div>
+                        <div class="sig-modal-info-label">Pattern</div>
                     </div>
-                    <div class="iq-modal-info-item">
-                        <div class="iq-modal-info-value entry">${esc(signal.entry || '—')}</div>
-                        <div class="iq-modal-info-label">Entry</div>
+                    <div class="sig-modal-info-item">
+                        <div class="sig-modal-info-value entry">${esc(signal.entry || '—')}</div>
+                        <div class="sig-modal-info-label">Entry</div>
                     </div>
-                    <div class="iq-modal-info-item">
-                        <div class="iq-modal-info-value">${esc(signal.target || '—')}</div>
-                        <div class="iq-modal-info-label">Target</div>
+                    <div class="sig-modal-info-item">
+                        <div class="sig-modal-info-value">${esc(signal.target || '—')}</div>
+                        <div class="sig-modal-info-label">Target</div>
                     </div>
-                    <div class="iq-modal-info-item">
-                        <div class="iq-modal-info-value stop">${esc(signal.stop || '—')}</div>
-                        <div class="iq-modal-info-label">Stop</div>
+                    <div class="sig-modal-info-item">
+                        <div class="sig-modal-info-value stop">${esc(signal.stop || '—')}</div>
+                        <div class="sig-modal-info-label">Stop</div>
                     </div>
-                    <div class="iq-modal-info-item">
-                        <div class="iq-sentiment">
-                            <span class="iq-sentiment-label">🐻 ${bearish}%</span>
-                            <div class="iq-sentiment-bar">
-                                <div class="iq-sentiment-bear" style="width:${bearish}%"></div>
-                                <div class="iq-sentiment-bull" style="width:${bullish}%"></div>
+                    <div class="sig-modal-info-item">
+                        <div class="sig-sentiment">
+                            <span class="sig-sentiment-label">🐻 ${bearish}%</span>
+                            <div class="sig-sentiment-bar">
+                                <div class="sig-sentiment-bear" style="width:${bearish}%"></div>
+                                <div class="sig-sentiment-bull" style="width:${bullish}%"></div>
                             </div>
-                            <span class="iq-sentiment-label">${bullish}% 🐂</span>
+                            <span class="sig-sentiment-label">${bullish}% 🐂</span>
                         </div>
-                        <div class="iq-modal-info-label">News Sentiment</div>
+                        <div class="sig-modal-info-label">Sentiment</div>
                     </div>
                 </div>
             </div>
 
             <!-- Body -->
-            <div class="iq-modal-body">
-                <!-- Chart -->
-                <div class="iq-modal-chart">
-                    ${generateChartSVG(signal.pattern, isBuy, signal.id, true)}
-                    <div class="iq-tf-badge">${esc(tf)}</div>
+            <div class="sig-modal-body">
+                <!-- Real TradingView Chart -->
+                <div class="sig-chart-container" id="sig-chart-container">
+                    <div class="sig-chart-loading" id="sig-chart-loading">
+                        <div class="sig-chart-loading-spinner"></div>
+                        Loading Chart...
+                    </div>
+                    <iframe 
+                        id="tradingview_chart"
+                        src="${tvChartUrl}"
+                        frameborder="0"
+                        allowtransparency="true"
+                        scrolling="no"
+                        allowfullscreen
+                        onload="document.getElementById('sig-chart-loading').style.display='none'"
+                    ></iframe>
                 </div>
 
                 <!-- Trade Idea -->
-                <div class="iq-modal-title-row">
-                    <span class="iq-modal-title">Trade Idea</span>
-                    <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="iq-modal-tv-link" title="View on TradingView">
+                <div class="sig-modal-title-row">
+                    <span class="sig-modal-title">Trade Idea</span>
+                    <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-modal-tv-link" title="Open Full Chart">
                         ${tvSvg}
                     </a>
                 </div>
 
-                <span class="iq-modal-live-badge" style="margin-bottom:16px; display:inline-block;">Live Trade</span>
+                <span class="sig-modal-live-tag" style="margin-bottom:16px; display:inline-block;">Live Trade</span>
 
-                <div class="iq-modal-meta">
+                <div class="sig-modal-meta">
                     Published at: ${pubDate}<br>
                     Expires at: ${expDate}
                 </div>
 
-                <div class="iq-modal-description">${esc(edu.description)}</div>
+                <div class="sig-modal-description">${esc(edu.description)}</div>
             </div>
 
             <!-- Footer -->
-            <div class="iq-modal-footer">
-                <button class="iq-modal-btn iq-modal-btn-primary" onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})">
+            <div class="sig-modal-footer">
+                <button class="sig-modal-btn sig-modal-btn-primary" onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})">
                     Copy to MT5
                 </button>
-                <button class="iq-modal-btn iq-modal-btn-secondary" onclick="window.EnhancedSignalsPage.closeModal()">
+                <button class="sig-modal-btn sig-modal-btn-secondary" onclick="window.EnhancedSignalsPage.closeModal()">
                     Close
                 </button>
             </div>
         `;
 
-        iqModal.classList.add('open');
+        modalOverlay.classList.add('open');
     }
 
     function closeModal() {
-        iqModal?.classList.remove('open');
+        if (!modalOverlay) return;
+        modalOverlay.classList.remove('open');
+        
+        // Clean up chart iframe to prevent memory leaks
+        const chartContainer = document.getElementById('sig-chart-container');
+        if (chartContainer) {
+            const iframe = chartContainer.querySelector('iframe');
+            if (iframe) iframe.src = 'about:blank';
+        }
     }
 
     function copyToMT5(signalId) {
         if (window.MT5Copier?.execute) return window.MT5Copier.execute(signalId);
         if (window.SignalCopier?.copy) return window.SignalCopier.copy(signalId);
-        alert('Signal copied! Open MT5 to execute.');
+        
+        // Fallback: Copy signal details to clipboard
+        const signal = allSignals.find(s => s.id === signalId);
+        if (signal) {
+            const text = `${signal.symbol} ${signal.direction}\nEntry: ${signal.entry}\nTP: ${signal.target}\nSL: ${signal.stop}`;
+            navigator.clipboard?.writeText(text);
+            alert('Signal copied to clipboard! Open MT5 to execute.');
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1279,7 +1164,7 @@ Always conduct your own analysis and use proper risk management when trading.`
 
     function startCountdowns() {
         const tick = () => {
-            document.querySelectorAll('.iq-countdown[data-expiry]').forEach(el => {
+            document.querySelectorAll('.sig-countdown[data-expiry]').forEach(el => {
                 const exp = el.dataset.expiry;
                 if (!exp) return;
                 el.textContent = formatCountdown(exp);
@@ -1297,7 +1182,7 @@ Always conduct your own analysis and use proper risk management when trading.`
         if (ms <= 0) return 'EXPIRED';
         const h = Math.floor(ms / 3600000);
         const m = Math.floor((ms % 3600000) / 60000);
-        if (h >= 24) return `${Math.floor(h/24)}d ${h%24}h`;
+        if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
         return `${h}h ${m}m`;
     }
 

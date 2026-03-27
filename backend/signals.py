@@ -1,6 +1,9 @@
 """
 Enhanced Signals API - Rewritten for databases library pattern
 Compatible with Pipways FastAPI + databases stack
+
+FIX: Changed signals.c.confidence → signals.c.ai_confidence in get_active_signals()
+     The database table uses ai_confidence, not confidence.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
@@ -293,8 +296,9 @@ async def get_active_signals(
     user_tier = current_user.get("subscription_tier", "free")
     query = signals.select().where(signals.c.status == "active")
     
+    # FIX: Use ai_confidence instead of confidence (the DB column is ai_confidence)
     if confidence and confidence > 0:
-        query = query.where(signals.c.confidence >= confidence)
+        query = query.where(signals.c.ai_confidence >= confidence)
     if asset_type and asset_type != "all":
         query = query.where(signals.c.asset_type == asset_type)
     if pattern and pattern != "all":

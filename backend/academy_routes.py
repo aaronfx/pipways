@@ -3,7 +3,7 @@ Pipways Trading Academy — Standalone Router v1.0
 Responsibilities:
   1. GET  /academy.html     → serve academy.html (primary, mirrors dashboard.html)
   2. GET  /academy          → 301 redirect to /academy.html
-  3. All  /learning/*       → full LMS API (moved from learning.py / main.py)
+  3. All  /learning/*       → full LMS API (mounted with /learning prefix in main.py)
 
 Wire into main.py:
     from .academy_routes import router as academy_router
@@ -219,7 +219,7 @@ def extract_diagram_context(title: str, content: str) -> dict:
     text = content[:1200] if content else ""
 
     # Extract price values (e.g. 1.0850, 1.0800)
-    prices = re.findall(r'1\.\d{4}', text)
+    prices = re.findall(r'1\.\d{4}', text)
     if len(prices) >= 1:
         ctx["values"]["price_a"] = prices[0]
     if len(prices) >= 2:
@@ -1248,12 +1248,13 @@ async def academy_clean_url_redirect():
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LMS API — /learning/*
-# (These were previously mounted via main.py; they now live here exclusively)
+# These routes are mounted with prefix="/learning" in main.py, so we define
+# them WITHOUT the /learning prefix here to avoid double-prefixing.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── READ ──────────────────────────────────────────────────────────────────────
 
-@router.get("/learning/levels")
+@router.get("/levels")
 async def get_levels(current_user=Depends(get_current_user)):
     try:
         rows = await database.fetch_all(
@@ -1264,7 +1265,7 @@ async def get_levels(current_user=Depends(get_current_user)):
         print(f"[API ERROR] get_levels: {e}", flush=True)
         return []
 
-@router.get("/learning/modules/{level_id}")
+@router.get("/modules/{level_id}")
 async def get_modules(level_id: int, current_user=Depends(get_current_user)):
     try:
         level = await database.fetch_one(
@@ -1308,7 +1309,7 @@ async def get_modules(level_id: int, current_user=Depends(get_current_user)):
         print(f"[API ERROR] get_modules: {e}", flush=True)
         return []
 
-@router.get("/learning/lessons/{module_id}")
+@router.get("/lessons/{module_id}")
 async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
     try:
         module = await database.fetch_one(
@@ -1355,7 +1356,7 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
         print(f"[API ERROR] get_lessons: {e}", flush=True)
         return []
 
-@router.get("/learning/lesson/{lesson_id}")
+@router.get("/lesson/{lesson_id}")
 async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
     try:
         lesson = await database.fetch_one(
@@ -1397,7 +1398,7 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
         print(f"[API ERROR] get_lesson: {e}", flush=True)
         raise HTTPException(500, "Failed to load lesson data")
 
-@router.get("/learning/quiz/{lesson_id}")
+@router.get("/quiz/{lesson_id}")
 async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
     try:
         lesson = await database.fetch_one(
@@ -1428,7 +1429,7 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
         print(f"[API ERROR] get_quiz: {e}", flush=True)
         return {"lesson_id": lesson_id, "question_count": 0, "questions": []}
 
-@router.get("/learning/progress/{user_id}")
+@router.get("/progress/{user_id}")
 async def get_progress(user_id: int, current_user=Depends(get_current_user)):
     try:
         caller   = _user_get(current_user, "id", 0)
@@ -1493,7 +1494,7 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
         return {"user_id": user_id, "total_lessons": 0, "completed_lessons": 0,
                 "completion_rate": 0.0, "progress": [], "summary": [], "error": "Failed to load progress"}
 
-@router.get("/learning/badges/{user_id}")
+@router.get("/badges/{user_id}")
 async def get_badges(user_id: int, current_user=Depends(get_current_user)):
     try:
         caller   = _user_get(current_user, "id", 0)
@@ -1521,7 +1522,7 @@ async def get_badges(user_id: int, current_user=Depends(get_current_user)):
         print(f"[API ERROR] get_badges: {e}", flush=True)
         return {"user_id": user_id, "badges": [], "count": 0}
 
-@router.get("/learning/mentor/guide/{user_id}")
+@router.get("/mentor/guide/{user_id}")
 async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
     try:
         caller   = _user_get(current_user, "id", 0)
@@ -1574,7 +1575,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
 
 # ── WRITE ─────────────────────────────────────────────────────────────────────
 
-@router.post("/learning/badges/check")
+@router.post("/badges/check")
 async def check_badges(current_user=Depends(get_current_user)):
     try:
         user_id = _user_get(current_user, "id", 0)
@@ -1586,7 +1587,7 @@ async def check_badges(current_user=Depends(get_current_user)):
         print(f"[API ERROR] check_badges: {e}", flush=True)
         return {"newly_awarded": [], "count": 0}
 
-@router.post("/learning/quiz/submit")
+@router.post("/quiz/submit")
 async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_user)):
     try:
         user_id = _user_get(current_user, "id", 0)
@@ -1679,7 +1680,7 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
         print(f"[API ERROR] submit_quiz: {e}", flush=True)
         raise HTTPException(500, "Failed to submit quiz")
 
-@router.post("/learning/lesson/complete")
+@router.post("/lesson/complete")
 async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(get_current_user)):
     try:
         user_id = _user_get(current_user, "id", 0)
@@ -1721,7 +1722,7 @@ async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(g
         print(f"[API ERROR] complete_lesson: {e}", flush=True)
         raise HTTPException(500, "Failed to complete lesson")
 
-@router.post("/learning/profile/first-visit-complete")
+@router.post("/profile/first-visit-complete")
 async def mark_first_visit_complete(current_user=Depends(get_current_user)):
     try:
         user_id = _user_get(current_user, "id", 0)
@@ -1749,7 +1750,7 @@ async def mark_first_visit_complete(current_user=Depends(get_current_user)):
 
 # ── AI MENTOR endpoints ───────────────────────────────────────────────────────
 
-@router.post("/learning/mentor/teach")
+@router.post("/mentor/teach")
 async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
         lesson = await database.fetch_one(
@@ -1781,7 +1782,7 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
         print(f"[API ERROR] mentor_teach: {e}", flush=True)
         return {"lesson_title": "Lesson", "explanation": "Trading Coach is temporarily unavailable. Please review the lesson material and try again."}
 
-@router.post("/learning/mentor/practice")
+@router.post("/mentor/practice")
 async def mentor_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
         lesson = await database.fetch_one(
@@ -1820,7 +1821,7 @@ async def mentor_practice(lesson_id: int = Query(...), current_user=Depends(get_
             ),
         }
 
-@router.post("/learning/mentor/chart-practice")
+@router.post("/mentor/chart-practice")
 async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
     try:
         lesson = await database.fetch_one(
@@ -1894,7 +1895,7 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
 # RESUME LEARNING
 # ══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/learning/resume")
+@router.get("/resume")
 async def resume_learning(current_user=Depends(get_current_user)):
     """
     Returns the lesson the user should resume/start next.
@@ -1971,7 +1972,7 @@ async def resume_learning(current_user=Depends(get_current_user)):
 # AI DIAGRAM ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/learning/lesson/{lesson_id}/diagram")
+@router.get("/lesson/{lesson_id}/diagram")
 async def get_lesson_diagram(lesson_id: int, current_user=Depends(get_current_user)):
     """
     Returns an SVG diagram for a lesson.
@@ -2029,7 +2030,7 @@ async def get_lesson_diagram(lesson_id: int, current_user=Depends(get_current_us
         raise HTTPException(500, f"Diagram generation failed: {e}")
 
 
-@router.post("/learning/lesson/{lesson_id}/diagram/regenerate")
+@router.post("/lesson/{lesson_id}/diagram/regenerate")
 async def regenerate_lesson_diagram(lesson_id: int, current_user=Depends(get_current_user)):
     """Admin only: force-regenerate the AI diagram for a lesson."""
     is_admin = _user_get(current_user, "is_admin", False)
@@ -2068,7 +2069,7 @@ async def regenerate_lesson_diagram(lesson_id: int, current_user=Depends(get_cur
     except Exception as e:
         raise HTTPException(500, str(e))
 
-@router.post("/admin/academy/regenerate-all-diagrams")
+@router.post("/admin/regenerate-all-diagrams")
 async def admin_regenerate_all_diagrams(current_user=Depends(get_current_user)):
     """
     Admin only: strip and regenerate ALL lesson diagrams in the background.
@@ -2122,6 +2123,7 @@ async def admin_regenerate_all_diagrams(current_user=Depends(get_current_user)):
     return {"status": "started", "message": "Bulk diagram regeneration running in background. Check server logs for progress."}
 
 
+@router.post("/admin/reseed")
 async def admin_reseed(current_user=Depends(get_current_user)):
     """Admin only: wipe all curriculum data and reseed from academy_curriculum_seed.py."""
     if not _user_get(current_user, "is_admin", False):

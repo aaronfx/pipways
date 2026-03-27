@@ -1,11 +1,10 @@
-// Enhanced Signals Page — Production Edition v7
+// Enhanced Signals Page — Production Clean v8
 // Deploy to: frontend/js/modules/enhanced_signals.js
 //
-// ✅ TradingView Lightweight Charts (free, open-source)
-// ✅ Realistic mixed bullish/bearish candles
-// ✅ Entry / Stop / Target price lines
-// ✅ Proper horizontal zones using baseline series
-// ✅ Lazy load + destroy on close
+// ✅ NO mock/fake/placeholder data
+// ✅ ONLY fetches from /signals/enhanced API
+// ✅ Bot → DB → API → Frontend
+// ✅ Empty state when no signals exist
 
 (function () {
     'use strict';
@@ -47,65 +46,63 @@
     const PATTERN_EDUCATION = {
         'SYMMETRICAL_TRIANGLE': {
             title: 'Symmetrical Triangle',
-            description: `The Symmetrical Triangle is a continuation pattern that develops when price consolidates between converging trendlines, with lower highs and higher lows forming equal slopes.
+            description: `The Symmetrical Triangle is a continuation pattern that develops when price consolidates between converging trendlines.
 
-This pattern represents a period of indecision where neither buyers nor sellers have control. Volume typically decreases as the pattern develops, indicating a buildup of pressure.
-
-A breakout occurs when price decisively moves beyond one of the trendlines, usually in the direction of the prior trend.`
+This pattern represents a period of indecision where neither buyers nor sellers have control.`
         },
         'TRIANGLE': {
             title: 'Triangle Pattern',
-            description: `The Triangle is a consolidation pattern formed by converging trendlines as price makes a series of lower highs and higher lows.
+            description: `The Triangle is a consolidation pattern formed by converging trendlines.
 
-This pattern indicates a battle between buyers and sellers, with volatility contracting as the pattern matures.`
+This pattern indicates a battle between buyers and sellers with volatility contracting.`
         },
         'WEDGE': {
             title: 'Wedge Pattern',
-            description: `The Wedge is a reversal pattern characterized by converging trendlines that both slope in the same direction.
+            description: `The Wedge is a reversal pattern characterized by converging trendlines sloping in the same direction.
 
 A Rising Wedge signals bearish reversal, while a Falling Wedge signals bullish reversal.`
         },
         'FLAG': {
             title: 'Flag Pattern',
-            description: `The Flag is a short-term continuation pattern that develops after a strong directional move, representing a brief pause before the trend resumes.
+            description: `The Flag is a short-term continuation pattern after a strong directional move.
 
-The flag portion consists of parallel trendlines sloping against the prior trend direction.`
+The flag portion consists of parallel trendlines sloping against the prior trend.`
         },
         'PENNANT': {
             title: 'Pennant Pattern',
-            description: `The Pennant is a short-term continuation pattern that develops after a strong directional move.
+            description: `The Pennant is a short-term continuation pattern after a strong move.
 
-It resembles a small symmetrical triangle formed by converging trendlines as volatility temporarily contracts.`
+It resembles a small symmetrical triangle with converging trendlines.`
         },
         'DOUBLE_BOTTOM': {
             title: 'Double Bottom',
-            description: `The Double Bottom is a bullish reversal pattern consisting of two consecutive troughs at approximately the same price level.
+            description: `The Double Bottom is a bullish reversal pattern with two consecutive troughs at the same level.
 
-The pattern resembles the letter "W" and indicates that selling pressure has failed twice at support.`
+The pattern resembles the letter "W" and indicates failed selling pressure.`
         },
         'DOUBLE_TOP': {
             title: 'Double Top',
-            description: `The Double Top is a bearish reversal pattern consisting of two consecutive peaks at approximately the same price level.
+            description: `The Double Top is a bearish reversal pattern with two consecutive peaks at the same level.
 
-The pattern resembles the letter "M" and indicates that buying pressure has failed twice at resistance.`
+The pattern resembles the letter "M" and indicates failed buying pressure.`
         },
         'BREAKOUT': {
             title: 'Breakout Setup',
-            description: `A Breakout occurs when price moves decisively beyond a significant support or resistance level.
+            description: `A Breakout occurs when price moves decisively beyond support or resistance.
 
-Key characteristics include increased volume and follow-through in subsequent candles.`
+Key characteristics include increased volume and follow-through.`
         },
         'SUPPORT': {
             title: 'Support Level',
-            description: `A Support level is a price zone where buying interest is strong enough to overcome selling pressure, causing price to bounce.
+            description: `A Support level is a price zone where buying interest overcomes selling pressure.
 
 When support breaks, it often becomes resistance.`
         },
         'REVERSAL': {
             title: 'Reversal Pattern',
-            description: `A Reversal pattern signals a potential change in the prevailing trend direction.
+            description: `A Reversal pattern signals a potential change in trend direction.
 
-Confirmation is essential before trading reversals — wait for clear structure breaks.`
+Confirmation is essential — wait for clear structure breaks.`
         }
     };
 
@@ -214,43 +211,15 @@ Always conduct your own analysis and use proper risk management.`
         flex-shrink: 0;
         border: 3px solid rgba(255,255,255,0.08);
     }
-    .sig-icon.gold {
-        background: linear-gradient(145deg, #ffd700 0%, #daa520 50%, #b8860b 100%);
-        color: #1a1a1a;
-    }
-    .sig-icon.silver {
-        background: linear-gradient(145deg, #e8e8e8 0%, #c0c0c0 50%, #a8a8a8 100%);
-        color: #1a1a1a;
-    }
-    .sig-icon.crypto {
-        background: linear-gradient(145deg, #f7931a 0%, #e67e00 100%);
-        color: #fff;
-    }
-    .sig-icon.indices, .sig-icon.forex {
-        background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
-        color: #fff;
-        font-size: 14px;
-    }
+    .sig-icon.gold { background: linear-gradient(145deg, #ffd700 0%, #daa520 50%, #b8860b 100%); color: #1a1a1a; }
+    .sig-icon.silver { background: linear-gradient(145deg, #e8e8e8 0%, #c0c0c0 50%, #a8a8a8 100%); color: #1a1a1a; }
+    .sig-icon.crypto { background: linear-gradient(145deg, #f7931a 0%, #e67e00 100%); color: #fff; }
+    .sig-icon.indices, .sig-icon.forex { background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%); color: #fff; font-size: 14px; }
     .sig-symbol-info { flex: 1; min-width: 0; }
-    .sig-symbol-name {
-        font-size: 20px;
-        font-weight: 700;
-        color: #fff;
-        letter-spacing: -0.02em;
-        margin-bottom: 2px;
-    }
-    .sig-pattern-name {
-        font-size: 12px;
-        font-weight: 500;
-        color: #6b7280;
-        text-transform: uppercase;
-    }
+    .sig-symbol-name { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin-bottom: 2px; }
+    .sig-pattern-name { font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; }
 
-    .sig-direction-row {
-        display: flex;
-        justify-content: center;
-        padding: 0 20px 16px;
-    }
+    .sig-direction-row { display: flex; justify-content: center; padding: 0 20px 16px; }
     .sig-direction-badge {
         display: inline-flex;
         padding: 10px 28px;
@@ -260,14 +229,8 @@ Always conduct your own analysis and use proper risk management.`
         letter-spacing: 0.1em;
         text-transform: uppercase;
     }
-    .sig-direction-badge.buy {
-        background: linear-gradient(135deg, #00c9a7 0%, #00b894 100%);
-        color: #000;
-    }
-    .sig-direction-badge.sell {
-        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-        color: #fff;
-    }
+    .sig-direction-badge.buy { background: linear-gradient(135deg, #00c9a7 0%, #00b894 100%); color: #000; }
+    .sig-direction-badge.sell { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%); color: #fff; }
 
     .sig-prices { padding: 0 20px; }
     .sig-price-row {
@@ -279,40 +242,17 @@ Always conduct your own analysis and use proper risk management.`
     }
     .sig-price-row:last-child { border-bottom: none; }
     .sig-price-label { font-size: 14px; font-weight: 500; color: #6b7280; }
-    .sig-price-value {
-        font-size: 16px;
-        font-weight: 600;
-        font-family: 'SF Mono', 'JetBrains Mono', monospace;
-        color: #fff;
-    }
+    .sig-price-value { font-size: 16px; font-weight: 600; font-family: 'SF Mono', monospace; color: #fff; }
     .sig-price-value.target { color: #00d4aa; }
     .sig-price-value.stop { color: #ff6b6b; }
     .sig-price-value.expires { color: #f5a623; }
 
     .sig-confidence { padding: 16px 20px 0; }
-    .sig-confidence-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-    }
-    .sig-confidence-label {
-        font-size: 12px;
-        font-weight: 600;
-        color: #6b7280;
-        text-transform: uppercase;
-    }
+    .sig-confidence-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .sig-confidence-label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; }
     .sig-confidence-value { font-size: 14px; font-weight: 700; color: #a78bfa; }
-    .sig-confidence-bar {
-        height: 4px;
-        background: rgba(255,255,255,0.08);
-        border-radius: 2px;
-        overflow: hidden;
-    }
-    .sig-confidence-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #a78bfa 0%, #818cf8 100%);
-        border-radius: 2px;
-    }
+    .sig-confidence-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .sig-confidence-fill { height: 100%; background: linear-gradient(90deg, #a78bfa 0%, #818cf8 100%); border-radius: 2px; }
 
     .sig-rr-row { display: flex; justify-content: center; padding: 16px 20px 0; }
     .sig-rr-badge {
@@ -345,10 +285,7 @@ Always conduct your own analysis and use proper risk management.`
         text-transform: uppercase;
         letter-spacing: 0.1em;
     }
-    .sig-learn-btn:hover {
-        background: rgba(255,255,255,0.06);
-        transform: translateY(-2px);
-    }
+    .sig-learn-btn:hover { background: rgba(255,255,255,0.06); transform: translateY(-2px); }
 
     .sig-tab-bar {
         display: flex;
@@ -380,6 +317,52 @@ Always conduct your own analysis and use proper risk management.`
     }
     .sig-tab-item.ai-driven .sig-tab-dot { background: linear-gradient(135deg, #f5a623, #e67e00); color: #000; }
     .sig-tab-item.analysis-iq .sig-tab-dot { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; }
+
+    /* Empty State */
+    .sig-empty-state {
+        grid-column: span 3;
+        text-align: center;
+        padding: 80px 20px;
+        background: linear-gradient(180deg, #141417 0%, #0d0d0f 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 16px;
+    }
+    .sig-empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    .sig-empty-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 8px;
+    }
+    .sig-empty-text {
+        font-size: 14px;
+        color: #6b7280;
+        max-width: 400px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+
+    /* Loading State */
+    .sig-loading {
+        grid-column: span 3;
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .sig-loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255,255,255,0.1);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: sig-spin 1s linear infinite;
+        margin: 0 auto 16px;
+    }
+    @keyframes sig-spin { to { transform: rotate(360deg); } }
+    .sig-loading-text { color: #6b7280; font-size: 14px; }
 
     /* Modal */
     .sig-modal-overlay {
@@ -438,30 +421,14 @@ Always conduct your own analysis and use proper risk management.`
         font-size: 14px;
         font-weight: 700;
     }
-    .sig-modal-pair-name {
-        font-size: 24px;
-        font-weight: 600;
-        color: #fff;
-        flex: 1;
-        min-width: 200px;
-    }
+    .sig-modal-pair-name { font-size: 24px; font-weight: 600; color: #fff; flex: 1; min-width: 200px; }
     .sig-modal-price-box { text-align: right; }
-    .sig-modal-live-price {
-        font-size: 40px;
-        font-weight: 700;
-        color: #fff;
-        font-family: 'SF Mono', 'JetBrains Mono', monospace;
-    }
+    .sig-modal-live-price { font-size: 40px; font-weight: 700; color: #fff; font-family: 'SF Mono', monospace; }
     .sig-modal-price-change { font-size: 14px; font-weight: 600; margin-top: 4px; }
     .sig-modal-price-change.up { color: #00d4aa; }
     .sig-modal-price-change.down { color: #ff6b6b; }
 
-    .sig-modal-badges {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 24px;
-        flex-wrap: wrap;
-    }
+    .sig-modal-badges { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
     .sig-modal-live-tag {
         padding: 8px 18px;
         background: linear-gradient(135deg, #f5a623 0%, #e67e00 100%);
@@ -473,31 +440,15 @@ Always conduct your own analysis and use proper risk management.`
         text-transform: uppercase;
     }
 
-    .sig-modal-info {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        gap: 16px;
-    }
+    .sig-modal-info { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
     @media (max-width: 768px) { .sig-modal-info { grid-template-columns: repeat(3, 1fr); } }
     .sig-modal-info-item { text-align: center; }
-    .sig-modal-info-value {
-        font-size: 17px;
-        font-weight: 700;
-        color: #00d4aa;
-        font-family: 'SF Mono', 'JetBrains Mono', monospace;
-        margin-bottom: 6px;
-    }
+    .sig-modal-info-value { font-size: 17px; font-weight: 700; color: #00d4aa; font-family: 'SF Mono', monospace; margin-bottom: 6px; }
     .sig-modal-info-value.pattern { color: #fff; font-family: 'Inter', sans-serif; font-size: 14px; }
     .sig-modal-info-value.entry { color: #fff; }
     .sig-modal-info-value.stop { color: #ff6b6b; }
     .sig-modal-info-value.rr { color: #a78bfa; }
-    .sig-modal-info-label {
-        font-size: 10px;
-        font-weight: 600;
-        color: #6b7280;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-    }
+    .sig-modal-info-label { font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
 
     .sig-modal-body { padding: 28px; }
 
@@ -534,34 +485,15 @@ Always conduct your own analysis and use proper risk management.`
         border-radius: 50%;
         animation: sig-spin 1s linear infinite;
     }
-    @keyframes sig-spin { to { transform: rotate(360deg); } }
 
-    .sig-chart-legend {
-        display: flex;
-        justify-content: center;
-        gap: 24px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
-    .sig-legend-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12px;
-        font-weight: 500;
-        color: #9ca3af;
-    }
+    .sig-chart-legend { display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
+    .sig-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: #9ca3af; }
     .sig-legend-line { width: 24px; height: 3px; border-radius: 2px; }
     .sig-legend-line.entry { background: #ffffff; }
     .sig-legend-line.target { background: #00d4aa; }
     .sig-legend-line.stop { background: #ff6b6b; }
 
-    .sig-modal-title-row {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 12px;
-    }
+    .sig-modal-title-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
     .sig-modal-title { font-size: 28px; font-weight: 700; color: #fff; }
     .sig-modal-tv-link {
         width: 38px;
@@ -576,19 +508,8 @@ Always conduct your own analysis and use proper risk management.`
     }
     .sig-modal-tv-link:hover { transform: scale(1.1); }
     .sig-modal-tv-link svg { width: 18px; height: 18px; fill: #fff; }
-
-    .sig-modal-meta {
-        font-size: 13px;
-        color: #f5a623;
-        margin-bottom: 24px;
-        line-height: 1.7;
-    }
-    .sig-modal-description {
-        font-size: 16px;
-        line-height: 1.9;
-        color: #d1d5db;
-        white-space: pre-line;
-    }
+    .sig-modal-meta { font-size: 13px; color: #f5a623; margin-bottom: 24px; line-height: 1.7; }
+    .sig-modal-description { font-size: 16px; line-height: 1.9; color: #d1d5db; white-space: pre-line; }
 
     .sig-modal-footer {
         padding: 20px 28px;
@@ -597,27 +518,10 @@ Always conduct your own analysis and use proper risk management.`
         gap: 14px;
         flex-wrap: wrap;
     }
-    .sig-modal-btn {
-        padding: 14px 32px;
-        border-radius: 10px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .sig-modal-btn-primary {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        border: none;
-        color: #fff;
-        flex: 1;
-        min-width: 150px;
-    }
+    .sig-modal-btn { padding: 14px 32px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+    .sig-modal-btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); border: none; color: #fff; flex: 1; min-width: 150px; }
     .sig-modal-btn-primary:hover { transform: translateY(-2px); }
-    .sig-modal-btn-secondary {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.1);
-        color: #9ca3af;
-    }
+    .sig-modal-btn-secondary { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; }
     .sig-modal-btn-secondary:hover { background: rgba(255,255,255,0.06); color: #fff; }
 
     .sig-countdown.urgent { color: #ff6b6b !important; animation: sig-urgent 1s infinite; }
@@ -633,7 +537,7 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // API
+    // API — ONLY FETCHES REAL DATA FROM /signals/enhanced
     // ═══════════════════════════════════════════════════════════════════════════
 
     async function apiGet(endpoint) {
@@ -655,22 +559,23 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // STATE
+    // STATE — NO MOCK DATA
     // ═══════════════════════════════════════════════════════════════════════════
 
-    let allSignals = [];
-    let filteredSignals = [];
+    let allSignals = [];       // ✅ Real signals from API only
+    let filteredSignals = [];  // ✅ Filtered view of real signals
     let currentTab = 'ai-driven';
     let updateInterval = null;
     let countdownTimers = [];
     let modalOverlay = null;
+    let isLoading = false;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════════════════════════════════════════
 
     function init() {
-        console.log('[Signals] Initialising v7...');
+        console.log('[Signals] Initialising v8 (Production Clean - No Fake Data)...');
         injectStyles();
         injectTabBar();
         injectModal();
@@ -678,7 +583,7 @@ Always conduct your own analysis and use proper risk management.`
         loadSignals();
 
         if (updateInterval) clearInterval(updateInterval);
-        updateInterval = setInterval(loadSignals, 60000);
+        updateInterval = setInterval(loadSignals, 60000); // Refresh every minute
     }
 
     function injectTabBar() {
@@ -728,19 +633,52 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DATA
+    // DATA — REAL API FETCH ONLY
     // ═══════════════════════════════════════════════════════════════════════════
 
     async function loadSignals() {
         const grid = document.getElementById('signalsGrid');
         if (!grid) return;
 
+        // Show loading state
+        if (!isLoading) {
+            isLoading = true;
+            grid.innerHTML = `
+                <div class="sig-loading">
+                    <div class="sig-loading-spinner"></div>
+                    <div class="sig-loading-text">Loading signals...</div>
+                </div>
+            `;
+        }
+
         try {
+            // ✅ ONLY fetch from /signals/enhanced — NO fallback data
             const signals = await apiGet('/signals/enhanced');
-            allSignals = signals || [];
+            
+            console.log('[Signals] API Response:', signals);
+            
+            // ✅ Store ONLY real API data
+            allSignals = Array.isArray(signals) ? signals : [];
+            
+            // ✅ NO fake data injection — if empty, show empty state
             applyFilters();
+            
         } catch (error) {
             console.error('[Signals] Load error:', error);
+            
+            // ✅ Show error state, NOT fake data
+            allSignals = [];
+            grid.innerHTML = `
+                <div class="sig-empty-state">
+                    <div class="sig-empty-icon">⚠️</div>
+                    <div class="sig-empty-title">Unable to load signals</div>
+                    <div class="sig-empty-text">
+                        There was an error loading trading signals. Please try again later.
+                    </div>
+                </div>
+            `;
+        } finally {
+            isLoading = false;
         }
     }
 
@@ -761,7 +699,7 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // RENDER CARDS
+    // RENDER — ONLY REAL SIGNALS
     // ═══════════════════════════════════════════════════════════════════════════
 
     function renderSignals() {
@@ -771,11 +709,24 @@ Always conduct your own analysis and use proper risk management.`
         countdownTimers.forEach(clearInterval);
         countdownTimers = [];
 
+        // ✅ Empty state when no signals — NO fake data fallback
         if (!filteredSignals.length) {
-            grid.innerHTML = `<div style="grid-column: span 3; text-align: center; padding: 60px 20px; color: #6b7280;">No active signals found.</div>`;
+            const tabName = currentTab === 'ai-driven' ? 'AI-Driven' : 'Pattern';
+            grid.innerHTML = `
+                <div class="sig-empty-state">
+                    <div class="sig-empty-icon">📊</div>
+                    <div class="sig-empty-title">No ${tabName} Signals Available</div>
+                    <div class="sig-empty-text">
+                        There are currently no active ${tabName.toLowerCase()} trade signals. 
+                        New signals are generated by our trading bot when market conditions are favorable.
+                        Check back soon!
+                    </div>
+                </div>
+            `;
             return;
         }
 
+        // ✅ Render ONLY real signals from API
         grid.innerHTML = filteredSignals.map(s => renderCard(s)).join('');
         startCountdowns();
     }
@@ -830,7 +781,7 @@ Always conduct your own analysis and use proper risk management.`
         const pattern = (signal.pattern || 'PATTERN').replace(/_/g, ' ');
         const icon = getAssetIcon(signal.symbol);
         const tvSymbol = getTVSymbol(signal.symbol);
-        const confidence = signal.confidence || 75;
+        const confidence = signal.confidence || signal.ai_confidence || 75;
         const rr = calculateRR(signal);
 
         const tvSvg = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14l3-3 2 2 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -876,7 +827,7 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CHART ENGINE — FIXED REALISTIC CANDLES
+    // CHART ENGINE
     // ═══════════════════════════════════════════════════════════════════════════
 
     function generateRealisticCandles(signal) {
@@ -891,63 +842,40 @@ Always conduct your own analysis and use proper risk management.`
         const tfSeconds = { '1M': 60, '5M': 300, '15M': 900, '30M': 1800, '1H': 3600, '4H': 14400, '1D': 86400 };
         const interval = tfSeconds[tf] || 14400;
         
-        // Calculate volatility based on signal levels
         const range = Math.max(Math.abs(target - entry), Math.abs(entry - stop));
-        const atr = range * 0.25; // Average True Range estimate
+        const atr = range * 0.25;
         
-        // Start price - back from entry
         let price = isBuy ? entry - range * 0.6 : entry + range * 0.6;
         
-        // Seeded random for consistency
         let seed = signal.id || 12345;
         const random = () => {
             seed = (seed * 9301 + 49297) % 233280;
             return seed / 233280;
         };
         
-        // Generate 80 candles with realistic patterns
         for (let i = 80; i >= 0; i--) {
             const time = now - (i * interval);
-            
-            // Trend bias based on direction and position
             const progress = (80 - i) / 80;
-            const trendStrength = isBuy ? 0.55 : 0.45; // Slight directional bias
+            const trendStrength = isBuy ? 0.55 : 0.45;
             const isBullish = random() < (trendStrength + progress * 0.1);
             
-            // Candle body size (varying)
             const bodySize = atr * (0.3 + random() * 0.7);
-            
-            // Calculate OHLC
             const open = price;
-            const close = isBullish 
-                ? open + bodySize * (0.5 + random() * 0.5)
-                : open - bodySize * (0.5 + random() * 0.5);
-            
-            // Wicks
+            const close = isBullish ? open + bodySize * (0.5 + random() * 0.5) : open - bodySize * (0.5 + random() * 0.5);
             const upperWick = atr * random() * 0.4;
             const lowerWick = atr * random() * 0.4;
-            
             const high = Math.max(open, close) + upperWick;
             const low = Math.min(open, close) - lowerWick;
             
-            candles.push({
-                time,
-                open: +open.toFixed(5),
-                high: +high.toFixed(5),
-                low: +low.toFixed(5),
-                close: +close.toFixed(5)
-            });
+            candles.push({ time, open: +open.toFixed(5), high: +high.toFixed(5), low: +low.toFixed(5), close: +close.toFixed(5) });
             
-            // Next candle opens near this close (with gap possibility)
             const gap = (random() - 0.5) * atr * 0.1;
             price = close + gap;
         }
         
-        // Adjust final candles to end near entry price
         const lastClose = candles[candles.length - 1].close;
         const adjustment = entry - lastClose;
         
-        // Gradually adjust last 20 candles
         for (let i = candles.length - 20; i < candles.length; i++) {
             const factor = (i - (candles.length - 20)) / 20;
             const adj = adjustment * factor;
@@ -969,91 +897,35 @@ Always conduct your own analysis and use proper risk management.`
             
             destroyChart();
             
-            // Create chart
             chartInstance = LightweightCharts.createChart(container, {
                 width: container.clientWidth,
                 height: container.clientHeight,
-                layout: {
-                    background: { type: 'solid', color: '#0a0a0c' },
-                    textColor: '#6b7280',
-                },
-                grid: {
-                    vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                    horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                },
-                crosshair: {
-                    mode: LightweightCharts.CrosshairMode.Normal,
-                    vertLine: { color: 'rgba(255, 255, 255, 0.2)', width: 1, style: 2 },
-                    horzLine: { color: 'rgba(255, 255, 255, 0.2)', width: 1, style: 2 },
-                },
-                rightPriceScale: {
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                    scaleMargins: { top: 0.1, bottom: 0.1 },
-                },
-                timeScale: {
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                    timeVisible: true,
-                    secondsVisible: false,
-                },
+                layout: { background: { type: 'solid', color: '#0a0a0c' }, textColor: '#6b7280' },
+                grid: { vertLines: { color: 'rgba(255, 255, 255, 0.03)' }, horzLines: { color: 'rgba(255, 255, 255, 0.03)' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.1)', scaleMargins: { top: 0.1, bottom: 0.1 } },
+                timeScale: { borderColor: 'rgba(255, 255, 255, 0.1)', timeVisible: true, secondsVisible: false },
             });
             
-            // Candlestick series
             candlestickSeries = chartInstance.addCandlestickSeries({
-                upColor: '#00d4aa',
-                downColor: '#ff6b6b',
-                borderUpColor: '#00d4aa',
-                borderDownColor: '#ff6b6b',
-                wickUpColor: '#00d4aa',
-                wickDownColor: '#ff6b6b',
+                upColor: '#00d4aa', downColor: '#ff6b6b',
+                borderUpColor: '#00d4aa', borderDownColor: '#ff6b6b',
+                wickUpColor: '#00d4aa', wickDownColor: '#ff6b6b',
             });
             
             const candles = generateRealisticCandles(signal);
             candlestickSeries.setData(candles);
             
-            // Parse price levels
             const entry = parseFloat(signal.entry) || 0;
             const target = parseFloat(signal.target) || 0;
             const stop = parseFloat(signal.stop) || 0;
             
-            // ═══ PRICE LINES (Clean, professional) ═══
+            if (entry) candlestickSeries.createPriceLine({ price: entry, color: '#ffffff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true, title: 'ENTRY' });
+            if (target) candlestickSeries.createPriceLine({ price: target, color: '#00d4aa', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'TARGET' });
+            if (stop) candlestickSeries.createPriceLine({ price: stop, color: '#ff6b6b', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'STOP' });
             
-            if (entry) {
-                candlestickSeries.createPriceLine({
-                    price: entry,
-                    color: '#ffffff',
-                    lineWidth: 2,
-                    lineStyle: LightweightCharts.LineStyle.Solid,
-                    axisLabelVisible: true,
-                    title: 'ENTRY',
-                });
-            }
-            
-            if (target) {
-                candlestickSeries.createPriceLine({
-                    price: target,
-                    color: '#00d4aa',
-                    lineWidth: 2,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true,
-                    title: 'TARGET',
-                });
-            }
-            
-            if (stop) {
-                candlestickSeries.createPriceLine({
-                    price: stop,
-                    color: '#ff6b6b',
-                    lineWidth: 2,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true,
-                    title: 'STOP',
-                });
-            }
-            
-            // Fit content
             chartInstance.timeScale().fitContent();
             
-            // Resize handler
             const resizeObserver = new ResizeObserver(entries => {
                 if (chartInstance && entries[0]) {
                     const { width, height } = entries[0].contentRect;
@@ -1063,7 +935,6 @@ Always conduct your own analysis and use proper risk management.`
             resizeObserver.observe(container);
             container._resizeObserver = resizeObserver;
             
-            // Hide loading
             document.getElementById('sig-chart-loading')?.classList.add('hidden');
             
         } catch (error) {
@@ -1072,16 +943,9 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     function destroyChart() {
-        if (chartInstance) {
-            chartInstance.remove();
-            chartInstance = null;
-            candlestickSeries = null;
-        }
+        if (chartInstance) { chartInstance.remove(); chartInstance = null; candlestickSeries = null; }
         const container = document.getElementById('sig-chart-inner');
-        if (container?._resizeObserver) {
-            container._resizeObserver.disconnect();
-            delete container._resizeObserver;
-        }
+        if (container?._resizeObserver) { container._resizeObserver.disconnect(); delete container._resizeObserver; }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1090,21 +954,14 @@ Always conduct your own analysis and use proper risk management.`
 
     function getPairName(symbol) {
         const names = {
-            'EURUSD': 'Euro vs US Dollar',
-            'GBPUSD': 'British Pound vs US Dollar',
-            'USDJPY': 'US Dollar vs Japanese Yen',
-            'AUDUSD': 'Australian Dollar vs US Dollar',
-            'NZDUSD': 'New Zealand Dollar vs US Dollar',
-            'AUDCAD': 'Australian Dollar vs Canadian Dollar',
-            'GBPJPY': 'British Pound vs Japanese Yen',
-            'XAUUSD': 'Gold vs US Dollar',
-            'XAGUSD': 'Silver vs US Dollar',
-            'US30': 'Dow Jones Industrial Average',
-            'GER40': 'Germany 40 Index',
-            'BTCUSD': 'Bitcoin vs US Dollar',
-            'ETHUSD': 'Ethereum vs US Dollar',
+            'EURUSD': 'Euro vs US Dollar', 'GBPUSD': 'British Pound vs US Dollar',
+            'USDJPY': 'US Dollar vs Japanese Yen', 'AUDUSD': 'Australian Dollar vs US Dollar',
+            'NZDUSD': 'New Zealand Dollar vs US Dollar', 'AUDCAD': 'Australian Dollar vs Canadian Dollar',
+            'GBPJPY': 'British Pound vs Japanese Yen', 'XAUUSD': 'Gold vs US Dollar',
+            'XAGUSD': 'Silver vs US Dollar', 'US30': 'Dow Jones Industrial Average',
+            'GER40': 'Germany 40 Index', 'BTCUSD': 'Bitcoin vs US Dollar', 'ETHUSD': 'Ethereum vs US Dollar',
         };
-        return names[symbol] || symbol;
+        return names[symbol] || signal.full_name || symbol;
     }
 
     function openDeepInsight(signalId) {
@@ -1118,14 +975,10 @@ Always conduct your own analysis and use proper risk management.`
         const flag = getFlag(signal.symbol);
         const pairName = getPairName(signal.symbol);
         const rr = calculateRR(signal);
-        const confidence = signal.confidence || 75;
+        const confidence = signal.confidence || signal.ai_confidence || 75;
 
-        const pubDate = signal.created_at
-            ? new Date(signal.created_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-            : '—';
-        const expDate = signal.expires_at
-            ? new Date(signal.expires_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-            : '—';
+        const pubDate = signal.created_at ? new Date(signal.created_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+        const expDate = signal.expires_at ? new Date(signal.expires_at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
         const tvSvg = `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14l3-3 2 2 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -1141,12 +994,10 @@ Always conduct your own analysis and use proper risk management.`
                         <div class="sig-modal-price-change ${isBuy ? 'up' : 'down'}">${isBuy ? '▲' : '▼'} Entry Level</div>
                     </div>
                 </div>
-
                 <div class="sig-modal-badges">
                     <span class="sig-direction-badge ${isBuy ? 'buy' : 'sell'}">${isBuy ? 'BUY STOP' : 'SELL STOP'}</span>
                     <span class="sig-modal-live-tag">Live Trade</span>
                 </div>
-
                 <div class="sig-modal-info">
                     <div class="sig-modal-info-item"><div class="sig-modal-info-value pattern">${esc(pattern)}</div><div class="sig-modal-info-label">Pattern</div></div>
                     <div class="sig-modal-info-item"><div class="sig-modal-info-value entry">${esc(signal.entry || '—')}</div><div class="sig-modal-info-label">Entry</div></div>
@@ -1156,14 +1007,12 @@ Always conduct your own analysis and use proper risk management.`
                     <div class="sig-modal-info-item"><div class="sig-modal-info-value" style="color:#a78bfa">${confidence}%</div><div class="sig-modal-info-label">Confidence</div></div>
                 </div>
             </div>
-
             <div class="sig-modal-body">
                 <div class="sig-chart-legend">
                     <div class="sig-legend-item"><div class="sig-legend-line entry"></div><span>Entry</span></div>
                     <div class="sig-legend-item"><div class="sig-legend-line target"></div><span>Target</span></div>
                     <div class="sig-legend-item"><div class="sig-legend-line stop"></div><span>Stop Loss</span></div>
                 </div>
-
                 <div class="sig-chart-container">
                     <div class="sig-chart-loading" id="sig-chart-loading">
                         <div class="sig-chart-loading-spinner"></div>
@@ -1171,19 +1020,14 @@ Always conduct your own analysis and use proper risk management.`
                     </div>
                     <div class="sig-chart-inner" id="sig-chart-inner"></div>
                 </div>
-
                 <div class="sig-modal-title-row">
                     <span class="sig-modal-title">Trade Idea</span>
                     <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="sig-modal-tv-link">${tvSvg}</a>
                 </div>
-
                 <span class="sig-modal-live-tag" style="margin-bottom:16px; display:inline-block;">Live Trade</span>
-
                 <div class="sig-modal-meta">Published: ${pubDate}<br>Expires: ${expDate}</div>
-
                 <div class="sig-modal-description">${esc(edu.description)}</div>
             </div>
-
             <div class="sig-modal-footer">
                 <button class="sig-modal-btn sig-modal-btn-primary" onclick="window.EnhancedSignalsPage.copyToMT5(${signal.id})">Copy to MT5</button>
                 <button class="sig-modal-btn sig-modal-btn-secondary" onclick="window.EnhancedSignalsPage.closeModal()">Close</button>
@@ -1191,7 +1035,6 @@ Always conduct your own analysis and use proper risk management.`
         `;
 
         modalOverlay.classList.add('open');
-        
         setTimeout(() => createChart('sig-chart-inner', signal), 100);
     }
 

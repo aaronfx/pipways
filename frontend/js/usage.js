@@ -1,53 +1,185 @@
-// Enhanced Usage Tracking and Upgrade Modal System for Pipways
+// ══════════════════════════════════════════════════════════════════════════════
+// Pipways Usage Tracking & Upgrade Modal System
+// Handles feature limits, 402 interception, and usage badge rendering
+// ══════════════════════════════════════════════════════════════════════════════
+
 window.PipwaysUsage = (function() {
+    'use strict';
+
+    // ── State ─────────────────────────────────────────────────────────────────
     let userLimits = {};
-    let upgradeModal = null;
+    let currentTier = 'free';
     let initialized = false;
+    let isLoaded = false;
 
-    // Feature display names for user-facing text
-    const FEATURE_NAMES = {
-        'chart_analysis_daily': 'AI Chart Analysis',
-        'ai_mentor_daily': 'AI Trading Mentor',
-        'performance_analysis_monthly': 'Performance Analytics',
-        'stock_research_daily': 'AI Stock Research',
-        'signals_visible': 'Market Signals Access',
-        'signals_detailed_analysis': 'Detailed Signal Analysis',
-        'signals_chart_access': 'Full Chart Access',
-        'signals_pattern_filtering': 'Advanced Signal Filtering',
-        'signals_email_alerts': 'Signal Email Alerts',
-        'webinar_recordings': 'Webinar Recordings'
+    // ── Feature Configurations ────────────────────────────────────────────────
+    const FEATURE_CONFIG = {
+        'chart_analysis': {
+            displayName: 'AI Chart Analysis',
+            description: 'Upload chart images for AI-powered Smart Money analysis',
+            limits: { free: 2, basic: 50, pro: null },  // null = unlimited
+            period: 'daily'
+        },
+        'ai_mentor': {
+            displayName: 'AI Trading Mentor',
+            description: 'Chat with your personal AI trading coach',
+            limits: { free: 5, basic: 200, pro: null },
+            period: 'daily'
+        },
+        'performance_analysis': {
+            displayName: 'Performance Analytics',
+            description: 'Upload trading journal for AI analysis',
+            limits: { free: 1, basic: 10, pro: null },
+            period: 'monthly'
+        },
+        'stock_research': {
+            displayName: 'AI Stock Research',
+            description: 'Fundamental and sentiment analysis on stocks',
+            limits: { free: 3, basic: 100, pro: null },
+            period: 'daily'
+        },
+        'signals_visible': {
+            displayName: 'Market Signals',
+            description: 'Live trading signals from analysts',
+            limits: { free: 3, basic: null, pro: null },
+            period: 'active'
+        },
+        'signals_detailed': {
+            displayName: 'Signal Analysis',
+            description: 'In-depth pattern analysis for signals',
+            limits: { free: 1, basic: null, pro: null },
+            period: 'daily'
+        }
     };
 
-    // Feature descriptions for upgrade modal
-    const FEATURE_DESCRIPTIONS = {
-        'chart_analysis_daily': 'Upload chart images and get AI-powered Smart Money Concepts analysis',
-        'ai_mentor_daily': 'Chat with our AI trading coach for personalized guidance',
-        'performance_analysis_monthly': 'Upload your trading journal for detailed performance insights',
-        'stock_research_daily': 'Get fundamental and sentiment analysis on stocks',
-        'signals_visible': 'Access to all live trading signals with entry, target, and stop levels',
-        'signals_detailed_analysis': 'In-depth pattern analysis and risk/reward calculations',
-        'signals_chart_access': 'Interactive charts with TradingView integration',
-        'signals_pattern_filtering': 'Filter signals by pattern type, confidence level, and asset class',
-        'signals_email_alerts': 'Instant email notifications when new signals are published',
-        'webinar_recordings': 'Access to recorded trading webinars and educational content'
-    };
+    // ══════════════════════════════════════════════════════════════════════════
+    // INITIALIZATION
+    // ══════════════════════════════════════════════════════════════════════════
 
     function init() {
         if (initialized) return;
-        
-        console.log('PipwaysUsage: Initializing usage tracking system');
-        
-        setupUpgradeModal();
-        setupInterceptors();
-        loadUserLimits();
-        
         initialized = true;
+
+        console.log('PipwaysUsage: Initializing usage tracking system');
+
+        setupUpgradeModal();
+        setupFetchInterceptor();
+        loadUserLimits();
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // LOAD USER LIMITS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    async function loadUserLimits() {
+        try {
+            const token = localStorage.getItem('pipways_token');
+            if (!token) {
+                console.log('PipwaysUsage: No user found, skipping limits load');
+                isLoaded = true;
+                return;
+            }
+
+            // Try to get user from /auth/me
+            const response = await fetch('/auth/me', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                console.log('PipwaysUsage: Failed to fetch user, using defaults');
+                isLoaded = true;
+                return;
+            }
+
+            const data = await response.json();
+            const user = data.user || data;
+
+            currentTier = user.subscription_tier || user.tier || 'free';
+
+            // Build limits from user data or defaults
+            userLimits = {
+                tier: currentTier,
+                features: {}
+            };
+
+            // Populate feature limits based on tier
+            for (const [featureKey, config] of Object.entries(FEATURE_CONFIG)) {
+                const limit = config.limits[currentTier];
+                userLimits.features[featureKey] = {
+                    limit: limit,
+                    usage: user.usage?.[featureKey] || 0,
+                    remaining: limit === null ? 'unlimited' : Math.max(0, limit - (user.usage?.[featureKey] || 0)),
+                    has_access: limit !== 0
+                };
+            }
+
+            console.log('PipwaysUsage: User limits loaded for tier:', currentTier);
+            isLoaded = true;
+
+            // Dispatch event so dashboard can react
+            document.dispatchEvent(new CustomEvent('pipways:usage-updated'));
+
+        } catch (error) {
+            console.error('PipwaysUsage: Error loading user limits:', error);
+            isLoaded = true;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // FETCH INTERCEPTOR (402 HANDLING)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    function setupFetchInterceptor() {
+        const originalFetch = window.fetch;
+
+        window.fetch = async function(...args) {
+            try {
+                const response = await originalFetch.apply(this, args);
+
+                if (response.status === 402) {
+                    console.log('PipwaysUsage: 402 Payment Required intercepted');
+
+                    try {
+                        const errorData = await response.clone().json();
+                        const feature = extractFeatureFromError(errorData, args[0]);
+                        showUpgradeModal(feature, errorData);
+                    } catch (e) {
+                        console.error('Error parsing 402 response:', e);
+                        showUpgradeModal('general');
+                    }
+
+                    return response;
+                }
+
+                return response;
+            } catch (error) {
+                throw error;
+            }
+        };
+    }
+
+    function extractFeatureFromError(errorData, url) {
+        if (errorData && errorData.feature) return errorData.feature;
+
+        if (typeof url === 'string') {
+            if (url.includes('/ai/chart')) return 'chart_analysis';
+            if (url.includes('/ai/mentor')) return 'ai_mentor';
+            if (url.includes('/ai/performance')) return 'performance_analysis';
+            if (url.includes('/api/stock') || url.includes('/stocks')) return 'stock_research';
+            if (url.includes('/signals/enhanced')) return 'signals_visible';
+            if (url.includes('/signals/') && url.includes('/chart')) return 'signals_detailed';
+        }
+
+        return 'general';
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // UPGRADE MODAL
+    // ══════════════════════════════════════════════════════════════════════════
+
     function setupUpgradeModal() {
-        // Create upgrade modal HTML if it doesn't exist
         if (document.getElementById('upgradeModal')) return;
-        
+
         const modalHTML = `
             <div id="upgradeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="backdrop-filter: blur(4px);">
                 <div class="bg-gray-900 rounded-lg p-8 max-w-md w-full mx-4 border border-gray-700 shadow-2xl">
@@ -56,17 +188,15 @@ window.PipwaysUsage = (function() {
                             <i class="fas fa-crown text-white text-2xl"></i>
                         </div>
                         <h2 id="upgradeModalTitle" class="text-2xl font-bold text-white mb-2">Upgrade to Pro</h2>
-                        <p id="upgradeModalMessage" class="text-gray-400 mb-6">Unlock advanced trading features and tools</p>
+                        <p id="upgradeModalMessage" class="text-gray-400 mb-6">Unlock advanced trading features</p>
                         
                         <div id="upgradeModalFeatures" class="text-left bg-gray-800 rounded-lg p-4 mb-6">
                             <h3 class="font-semibold text-white mb-3">Pro Features Include:</h3>
-                            <ul id="upgradeFeaturesList" class="space-y-2 text-sm text-gray-300">
-                                <!-- Features will be populated dynamically -->
-                            </ul>
+                            <ul id="upgradeFeaturesList" class="space-y-2 text-sm text-gray-300"></ul>
                         </div>
                         
                         <div class="space-y-3">
-                            <button id="upgradeModalBtn" class="w-full bg-gradient-to-r from-purple-600 to-orange-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-orange-700 transition-all duration-200 transform hover:scale-105">
+                            <button id="upgradeModalBtn" class="w-full bg-gradient-to-r from-purple-600 to-orange-600 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-700 hover:to-orange-700 transition-all">
                                 Upgrade Now - ₦15,000/month
                             </button>
                             <button id="upgradeModalClose" class="w-full text-gray-400 hover:text-white transition-colors">
@@ -77,181 +207,17 @@ window.PipwaysUsage = (function() {
                 </div>
             </div>
         `;
-        
+
         document.body.insertAdjacentHTML('beforeend', modalHTML);
-        
-        // Setup event listeners
-        const closeBtn = document.getElementById('upgradeModalClose');
-        const upgradeBtn = document.getElementById('upgradeModalBtn');
-        const modal = document.getElementById('upgradeModal');
-        
-        if (closeBtn) {
-            closeBtn.addEventListener('click', hideUpgradeModal);
-        }
-        
-        if (upgradeBtn) {
-            upgradeBtn.addEventListener('click', () => {
-                hideUpgradeModal();
-                if (window.PaymentsPage && typeof window.PaymentsPage.showPlans === 'function') {
-                    window.PaymentsPage.showPlans();
-                } else {
-                    window.location.href = '/pricing';
-                }
-            });
-        }
-        
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    hideUpgradeModal();
-                }
-            });
-        }
-        
-        // ESC key to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
-                hideUpgradeModal();
-            }
+
+        document.getElementById('upgradeModalClose')?.addEventListener('click', hideUpgradeModal);
+        document.getElementById('upgradeModalBtn')?.addEventListener('click', () => {
+            hideUpgradeModal();
+            window.location.href = '/pricing';
         });
-    }
-
-    function setupInterceptors() {
-        // Intercept fetch requests to handle 402 responses
-        const originalFetch = window.fetch;
-        
-        window.fetch = async function(...args) {
-            try {
-                const response = await originalFetch.apply(this, args);
-                
-                if (response.status === 402) {
-                    console.log('PipwaysUsage: 402 Payment Required intercepted');
-                    
-                    try {
-                        const errorData = await response.clone().json();
-                        const feature = extractFeatureFromError(errorData, args[0]);
-                        showUpgradeModal(feature, errorData);
-                    } catch (e) {
-                        console.error('Error parsing 402 response:', e);
-                        showUpgradeModal('general');
-                    }
-                    
-                    return response;
-                }
-                
-                return response;
-            } catch (error) {
-                console.error('Fetch interceptor error:', error);
-                throw error;
-            }
-        };
-
-        // Also intercept API calls if using axios or similar
-        if (window.API && typeof window.API.interceptResponse === 'function') {
-            window.API.interceptResponse((error) => {
-                if (error.response?.status === 402) {
-                    const feature = extractFeatureFromError(error.response.data, error.config.url);
-                    showUpgradeModal(feature, error.response.data);
-                    return Promise.reject(error);
-                }
-                return Promise.reject(error);
-            });
-        }
-    }
-
-    function extractFeatureFromError(errorData, url) {
-        // Try to extract feature from error data or URL
-        if (errorData && errorData.feature) {
-            return errorData.feature;
-        }
-        
-        if (typeof url === 'string') {
-            if (url.includes('/signals/enhanced')) return 'signals_visible';
-            if (url.includes('/signals/') && url.includes('/chart-analysis')) return 'signals_detailed_analysis';
-            if (url.includes('/ai/chart')) return 'chart_analysis_daily';
-            if (url.includes('/ai/mentor')) return 'ai_mentor_daily';
-            if (url.includes('/ai/performance')) return 'performance_analysis_monthly';
-            if (url.includes('/api/stock')) return 'stock_research_daily';
-        }
-        
-        return 'general';
-    }
-
-    async function loadUserLimits() {
-        try {
-            const user = window.Store?.getUser();
-            if (!user) {
-                console.log('PipwaysUsage: No user found, skipping limits load');
-                return;
-            }
-            
-            // In a real implementation, load from API
-            // For now, use mock data based on user tier
-            const tier = user.subscription_tier || 'free';
-            
-            userLimits = {
-                tier: tier,
-                features: {
-                    'chart_analysis_daily': {
-                        limit: tier === 'free' ? 2 : 50,
-                        usage: 0,
-                        remaining: tier === 'free' ? 2 : 50,
-                        has_access: true
-                    },
-                    'ai_mentor_daily': {
-                        limit: tier === 'free' ? 5 : 200,
-                        usage: 0,
-                        remaining: tier === 'free' ? 5 : 200,
-                        has_access: true
-                    },
-                    'performance_analysis_monthly': {
-                        limit: tier === 'free' ? 1 : null,
-                        usage: 0,
-                        remaining: tier === 'free' ? 1 : 'unlimited',
-                        has_access: true
-                    },
-                    'stock_research_daily': {
-                        limit: tier === 'free' ? 3 : 100,
-                        usage: 0,
-                        remaining: tier === 'free' ? 3 : 100,
-                        has_access: true
-                    },
-                    'signals_visible': {
-                        limit: tier === 'free' ? 3 : null,
-                        usage: 0,
-                        remaining: tier === 'free' ? 3 : 'unlimited',
-                        has_access: true
-                    },
-                    'signals_detailed_analysis': {
-                        limit: tier === 'free' ? 1 : null,
-                        usage: 0,
-                        remaining: tier === 'free' ? 1 : 'unlimited',
-                        has_access: true
-                    },
-                    'signals_chart_access': {
-                        limit: tier === 'free' ? false : true,
-                        has_access: tier !== 'free'
-                    },
-                    'signals_pattern_filtering': {
-                        limit: tier === 'free' ? false : true,
-                        has_access: tier !== 'free'
-                    },
-                    'signals_email_alerts': {
-                        limit: tier === 'free' ? false : true,
-                        has_access: tier !== 'free'
-                    },
-                    'webinar_recordings': {
-                        limit: tier === 'free' ? false : true,
-                        has_access: tier !== 'free'
-                    }
-                }
-            };
-            
-            console.log('PipwaysUsage: User limits loaded:', userLimits);
-            
-        } catch (error) {
-            console.error('Error loading user limits:', error);
-        }
+        document.getElementById('upgradeModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'upgradeModal') hideUpgradeModal();
+        });
     }
 
     function showUpgradeModal(feature, options = {}) {
@@ -259,36 +225,21 @@ window.PipwaysUsage = (function() {
         const title = document.getElementById('upgradeModalTitle');
         const message = document.getElementById('upgradeModalMessage');
         const featuresList = document.getElementById('upgradeFeaturesList');
-        
-        if (!modal) {
-            console.error('PipwaysUsage: Upgrade modal not found');
-            return;
-        }
-        
-        // Get feature-specific content
-        const featureContent = getFeatureUpgradeContent(feature, options);
-        
-        // Update modal content
-        if (title) {
-            title.textContent = featureContent.title;
-        }
-        
-        if (message) {
-            message.textContent = featureContent.message;
-        }
-        
+
+        if (!modal) return;
+
+        const content = getFeatureUpgradeContent(feature);
+
+        if (title) title.textContent = content.title;
+        if (message) message.textContent = content.message;
         if (featuresList) {
-            featuresList.innerHTML = featureContent.features
-                .map(feat => `<li class="flex items-center"><i class="fas fa-check text-green-400 mr-2"></i>${feat}</li>`)
+            featuresList.innerHTML = content.features
+                .map(f => `<li class="flex items-center"><i class="fas fa-check text-green-400 mr-2"></i>${f}</li>`)
                 .join('');
         }
-        
-        // Show modal
+
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-        
-        // Track upgrade modal shown
-        trackUpgradeModalShown(feature);
     }
 
     function hideUpgradeModal() {
@@ -299,428 +250,283 @@ window.PipwaysUsage = (function() {
         }
     }
 
-    function getFeatureUpgradeContent(feature, options = {}) {
-        const defaultContent = {
-            title: 'Upgrade to Pro',
-            message: 'Unlock advanced trading features and tools to enhance your trading journey.',
-            features: [
-                'Unlimited AI chart analysis',
-                'Advanced AI mentor conversations', 
-                'Unlimited performance analytics',
-                'Full access to trading signals',
-                'Priority customer support'
-            ]
-        };
-
-        // Feature-specific content
-        const featureContent = {
-            'signals_visible': {
-                title: 'Access All Market Signals',
-                message: 'Upgrade to Pro to view all active trading signals with detailed analysis.',
-                features: [
-                    'View unlimited active signals',
-                    'Historical signal performance',
-                    'Real-time price updates',
-                    'Advanced filtering options',
-                    'Email signal alerts'
-                ]
-            },
-            'signals_detailed_analysis': {
-                title: 'Detailed Signal Analysis',
-                message: 'Get in-depth chart analysis and pattern insights for every signal.',
-                features: [
-                    'Unlimited detailed analysis',
-                    'AI pattern recognition',
-                    'Risk/reward calculations',
-                    'Market structure analysis',
-                    'Entry/exit recommendations'
-                ]
-            },
-            'signals_chart_access': {
-                title: 'Full Chart Access',
-                message: 'Access interactive charts with professional trading tools.',
-                features: [
-                    'TradingView integration',
-                    'Advanced technical indicators',
-                    'Pattern overlay tools',
-                    'Multiple timeframe analysis',
-                    'Screenshot and sharing tools'
-                ]
-            },
-            'signals_pattern_filtering': {
-                title: 'Advanced Signal Filtering',
-                message: 'Filter signals by pattern type, confidence level, and asset class.',
-                features: [
-                    'Pattern-based filtering',
-                    'Confidence level selection',
-                    'Multi-asset class filters',
-                    'Country-specific signals',
-                    'Custom filter combinations'
-                ]
-            },
-            'signals_email_alerts': {
-                title: 'Signal Email Alerts',
-                message: 'Never miss a trading opportunity with instant email notifications.',
-                features: [
-                    'Real-time signal alerts',
-                    'Custom notification settings',
-                    'Priority signal access',
-                    'Mobile-friendly emails',
-                    'Alert customization'
-                ]
-            },
-            'chart_analysis_daily': {
+    function getFeatureUpgradeContent(feature) {
+        const contents = {
+            'chart_analysis': {
                 title: 'Unlimited Chart Analysis',
-                message: 'Upload unlimited chart images for AI-powered analysis.',
-                features: [
-                    '50 daily chart analyses (vs 2 free)',
-                    'Smart Money Concepts analysis',
-                    'Institution order flow insights',
-                    'Entry and exit recommendations',
-                    'Confidence scoring'
-                ]
+                message: 'Upload unlimited charts for AI-powered analysis',
+                features: ['50 daily analyses (vs 2 free)', 'Smart Money Concepts', 'Entry & exit recommendations', 'Confidence scoring']
             },
-            'ai_mentor_daily': {
-                title: 'Unlimited AI Mentor Access',
-                message: 'Get unlimited access to your personal AI trading coach.',
-                features: [
-                    '200 daily mentor questions (vs 5 free)',
-                    'Personalized trading advice',
-                    'Strategy recommendations',
-                    'Psychology coaching',
-                    'Performance improvement tips'
-                ]
+            'ai_mentor': {
+                title: 'Unlimited AI Mentor',
+                message: 'Get unlimited access to your AI trading coach',
+                features: ['200 daily questions (vs 5 free)', 'Personalized advice', 'Strategy coaching', 'Performance tips']
             },
-            'performance_analysis_monthly': {
-                title: 'Unlimited Performance Analytics',
-                message: 'Upload unlimited trading journals for detailed performance insights.',
-                features: [
-                    'Unlimited journal uploads',
-                    'Advanced performance metrics',
-                    'Psychology profiling',
-                    'Risk consistency analysis',
-                    'Improvement recommendations'
-                ]
+            'signals_visible': {
+                title: 'Full Signal Access',
+                message: 'View all active trading signals',
+                features: ['Unlimited signal access', 'Real-time updates', 'Advanced filtering', 'Email alerts']
             },
-            'stock_research_daily': {
+            'stock_research': {
                 title: 'Unlimited Stock Research',
-                message: 'Research unlimited stocks with AI-powered fundamental analysis.',
-                features: [
-                    '100 daily stock analyses (vs 3 free)',
-                    'Nigerian and global stocks',
-                    'Fundamental analysis',
-                    'Sentiment scoring',
-                    'Investment recommendations'
-                ]
+                message: 'Research any stock with AI analysis',
+                features: ['100 daily analyses (vs 3 free)', 'NGX + global stocks', 'Fundamental analysis', 'Sentiment scoring']
+            },
+            'general': {
+                title: 'Upgrade to Pro',
+                message: 'Unlock all advanced trading features',
+                features: ['Unlimited AI features', 'Full signal access', 'Priority support', 'Advanced analytics']
             }
         };
 
-        // Use custom options if provided
-        if (options.title || options.message || options.features) {
-            return {
-                title: options.title || featureContent[feature]?.title || defaultContent.title,
-                message: options.message || featureContent[feature]?.message || defaultContent.message,
-                features: options.features || featureContent[feature]?.features || defaultContent.features
-            };
-        }
-
-        return featureContent[feature] || defaultContent;
+        return contents[feature] || contents['general'];
     }
 
-    function trackUpgradeModalShown(feature) {
-        try {
-            // Track that upgrade modal was shown
-            console.log(`PipwaysUsage: Upgrade modal shown for feature: ${feature}`);
-            
-            // In production, send analytics event
-            if (window.gtag) {
-                window.gtag('event', 'upgrade_modal_shown', {
-                    feature: feature,
-                    user_tier: userLimits.tier || 'free'
-                });
+    // ══════════════════════════════════════════════════════════════════════════
+    // BADGE RENDERING
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Render a usage badge for a specific feature
+     * @param {string} featureName - The feature key (e.g., 'chart_analysis')
+     * @param {HTMLElement|string} targetElement - DOM element or selector to render into
+     * @param {object} options - Optional display configuration
+     */
+    function renderBadge(featureName, targetElement, options = {}) {
+        // Handle element resolution
+        let element;
+        if (typeof targetElement === 'string') {
+            element = document.querySelector(targetElement);
+            if (!element) {
+                element = document.querySelector('#' + targetElement);
             }
-        } catch (error) {
-            console.error('Error tracking upgrade modal:', error);
+            if (!element) {
+                console.warn(`PipwaysUsage.renderBadge: Target element not found: ${targetElement}`);
+                return null;
+            }
+        } else if (targetElement instanceof HTMLElement) {
+            element = targetElement;
+        } else {
+            console.warn('PipwaysUsage.renderBadge: Invalid target element');
+            return null;
         }
+
+        // Get feature config and limits
+        const config = FEATURE_CONFIG[featureName];
+        const featureData = userLimits.features?.[featureName];
+
+        if (!config) {
+            console.warn(`PipwaysUsage.renderBadge: Unknown feature: ${featureName}`);
+            return null;
+        }
+
+        // Determine what to show based on tier
+        const tier = currentTier || 'free';
+        const limit = config.limits[tier];
+        const usage = featureData?.usage || 0;
+        const remaining = limit === null ? 'unlimited' : Math.max(0, limit - usage);
+
+        // Build badge HTML
+        let badgeHTML = '';
+
+        if (limit === null) {
+            // Unlimited - show Pro badge
+            badgeHTML = `
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full font-semibold"
+                          style="background:linear-gradient(90deg,rgba(124,58,237,.2),rgba(249,115,22,.2));color:#c4b5fd;border:1px solid rgba(124,58,237,.3);">
+                        <i class="fas fa-infinity mr-1" style="font-size:.6rem;"></i>Unlimited
+                    </span>
+                </div>
+            `;
+        } else if (limit === 0) {
+            // No access
+            badgeHTML = `
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full font-semibold"
+                          style="background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);">
+                        <i class="fas fa-lock mr-1" style="font-size:.6rem;"></i>Upgrade Required
+                    </span>
+                </div>
+            `;
+        } else {
+            // Show usage counter
+            const percentUsed = (usage / limit) * 100;
+            const isLow = remaining <= 1;
+            const color = isLow ? '#f87171' : remaining <= Math.ceil(limit / 3) ? '#fbbf24' : '#34d399';
+            const bgColor = isLow ? 'rgba(239,68,68,.1)' : remaining <= Math.ceil(limit / 3) ? 'rgba(251,191,36,.1)' : 'rgba(52,211,153,.1)';
+            const borderColor = isLow ? 'rgba(239,68,68,.25)' : remaining <= Math.ceil(limit / 3) ? 'rgba(251,191,36,.25)' : 'rgba(52,211,153,.25)';
+
+            badgeHTML = `
+                <div class="flex items-center gap-2">
+                    <div class="flex-1">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span style="color:#6b7280;">${config.period === 'daily' ? 'Today' : 'This month'}</span>
+                            <span style="color:${color};font-weight:600;">${remaining}/${limit} remaining</span>
+                        </div>
+                        <div class="w-full h-1.5 rounded-full" style="background:#1f2937;">
+                            <div class="h-full rounded-full transition-all duration-300" 
+                                 style="width:${Math.min(100, percentUsed)}%;background:${color};"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        element.innerHTML = badgeHTML;
+        return element;
     }
 
-    async function checkUsage(feature, amount = 1) {
-        try {
-            const user = window.Store?.getUser();
-            if (!user) {
-                return { allowed: false, reason: 'not_authenticated' };
-            }
-            
-            // Pro users have unlimited access
-            if (user.subscription_tier === 'pro' || user.subscription_tier === 'enterprise') {
-                return { allowed: true, tier: user.subscription_tier };
-            }
-            
-            // Check limits for free users
-            const featureLimit = userLimits.features?.[feature];
-            if (!featureLimit) {
-                return { allowed: false, reason: 'feature_not_found' };
-            }
-            
-            // Boolean features (access/no access)
-            if (typeof featureLimit.limit === 'boolean') {
-                return { 
-                    allowed: featureLimit.limit,
-                    reason: featureLimit.limit ? 'allowed' : 'upgrade_required'
-                };
-            }
-            
-            // Numeric limits
-            if (typeof featureLimit.limit === 'number') {
-                const allowed = (featureLimit.usage + amount) <= featureLimit.limit;
-                return {
-                    allowed: allowed,
-                    reason: allowed ? 'allowed' : 'limit_exceeded',
-                    usage: featureLimit.usage,
-                    limit: featureLimit.limit,
-                    remaining: Math.max(0, featureLimit.limit - featureLimit.usage)
-                };
-            }
-            
-            // Unlimited (null limit)
-            if (featureLimit.limit === null) {
-                return { allowed: true, reason: 'unlimited' };
-            }
-            
-            return { allowed: false, reason: 'unknown_limit_type' };
-            
-        } catch (error) {
-            console.error('Error checking usage:', error);
-            return { allowed: false, reason: 'error' };
+    /**
+     * Render a simple tier badge (Free/Basic/Pro)
+     * @param {HTMLElement|string} targetElement - DOM element or selector
+     * @param {object} options - Optional configuration
+     */
+    function renderTierBadge(targetElement, options = {}) {
+        let element;
+        if (typeof targetElement === 'string') {
+            element = document.querySelector(targetElement) || document.querySelector('#' + targetElement);
+        } else {
+            element = targetElement;
         }
+
+        if (!element) {
+            console.warn('PipwaysUsage.renderTierBadge: Target element not found');
+            return null;
+        }
+
+        const tier = options.tier || currentTier || 'free';
+
+        const badges = {
+            'free': { text: 'Free', bg: 'rgba(107,114,128,.2)', color: '#9ca3af', border: 'rgba(107,114,128,.3)' },
+            'basic': { text: 'Basic', bg: 'rgba(59,130,246,.2)', color: '#60a5fa', border: 'rgba(59,130,246,.3)' },
+            'pro': { text: 'Pro', bg: 'linear-gradient(90deg,rgba(124,58,237,.2),rgba(249,115,22,.2))', color: '#c4b5fd', border: 'rgba(124,58,237,.3)', icon: 'fa-crown' },
+            'enterprise': { text: 'Enterprise', bg: 'linear-gradient(90deg,rgba(251,191,36,.2),rgba(249,115,22,.2))', color: '#fbbf24', border: 'rgba(251,191,36,.3)', icon: 'fa-building' }
+        };
+
+        const config = badges[tier] || badges['free'];
+
+        element.innerHTML = `
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                  style="background:${config.bg};color:${config.color};border:1px solid ${config.border};">
+                ${config.icon ? `<i class="fas ${config.icon} mr-1" style="font-size:.6rem;"></i>` : ''}${config.text}
+            </span>
+        `;
+
+        return element;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // USAGE CHECKING
+    // ══════════════════════════════════════════════════════════════════════════
+
+    function checkUsage(feature, amount = 1) {
+        const tier = currentTier || 'free';
+        const config = FEATURE_CONFIG[feature];
+        const featureData = userLimits.features?.[feature];
+
+        if (!config) {
+            return { allowed: true, reason: 'unknown_feature' };
+        }
+
+        const limit = config.limits[tier];
+
+        // Unlimited
+        if (limit === null) {
+            return { allowed: true, tier: tier, remaining: 'unlimited' };
+        }
+
+        // No access
+        if (limit === 0) {
+            return { allowed: false, reason: 'upgrade_required', tier: tier };
+        }
+
+        // Check numeric limit
+        const usage = featureData?.usage || 0;
+        const remaining = limit - usage;
+        const allowed = remaining >= amount;
+
+        return {
+            allowed: allowed,
+            reason: allowed ? 'ok' : 'limit_exceeded',
+            usage: usage,
+            limit: limit,
+            remaining: Math.max(0, remaining),
+            tier: tier
+        };
     }
 
     function getFeatureLimit(feature) {
-        const featureLimit = userLimits.features?.[feature];
-        if (!featureLimit) return null;
-        
+        const config = FEATURE_CONFIG[feature];
+        const featureData = userLimits.features?.[feature];
+
+        if (!config) return null;
+
+        const tier = currentTier || 'free';
+        const limit = config.limits[tier];
+
         return {
-            limit: featureLimit.limit,
-            usage: featureLimit.usage || 0,
-            remaining: featureLimit.remaining,
-            has_access: featureLimit.has_access
+            limit: limit,
+            usage: featureData?.usage || 0,
+            remaining: limit === null ? 'unlimited' : Math.max(0, limit - (featureData?.usage || 0)),
+            period: config.period,
+            displayName: config.displayName
         };
     }
 
     function getUserTier() {
-        const user = window.Store?.getUser();
-        return user?.subscription_tier || 'free';
+        return currentTier || 'free';
     }
 
     function canAccessFeature(feature) {
-        const featureLimit = userLimits.features?.[feature];
-        return featureLimit?.has_access || false;
+        const config = FEATURE_CONFIG[feature];
+        if (!config) return true;
+
+        const tier = currentTier || 'free';
+        const limit = config.limits[tier];
+
+        return limit !== 0;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════════
-    // RENDER BADGE FUNCTION - This was missing and causing the error
-    // ══════════════════════════════════════════════════════════════════════════════
-    
-    /**
-     * Render a usage badge or subscription tier badge into a target element
-     * @param {string} targetSelector - CSS selector for the target element
-     * @param {object} options - Optional configuration
-     * @returns {HTMLElement|null} - The rendered badge element or null
-     */
-    function renderBadge(targetSelector, options = {}) {
-        try {
-            const target = typeof targetSelector === 'string' 
-                ? document.querySelector(targetSelector) 
-                : targetSelector;
-            
-            if (!target) {
-                console.warn('PipwaysUsage.renderBadge: Target element not found:', targetSelector);
-                return null;
-            }
-            
-            const user = window.Store?.getUser();
-            const tier = user?.subscription_tier || 'free';
-            
-            // Determine badge type based on options or tier
-            const badgeType = options.type || tier;
-            
-            // Badge configurations
-            const badgeConfigs = {
-                'free': {
-                    text: 'Free',
-                    classes: 'bg-gray-600 text-gray-200',
-                    icon: ''
-                },
-                'basic': {
-                    text: 'Basic',
-                    classes: 'bg-blue-600 text-white',
-                    icon: '<i class="fas fa-star mr-1"></i>'
-                },
-                'pro': {
-                    text: 'Pro',
-                    classes: 'bg-gradient-to-r from-purple-600 to-orange-600 text-white',
-                    icon: '<i class="fas fa-crown mr-1"></i>'
-                },
-                'enterprise': {
-                    text: 'Enterprise',
-                    classes: 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white',
-                    icon: '<i class="fas fa-building mr-1"></i>'
-                },
-                'usage': {
-                    text: options.text || 'Usage',
-                    classes: options.classes || 'bg-gray-700 text-gray-300',
-                    icon: options.icon || ''
-                }
-            };
-            
-            const config = badgeConfigs[badgeType] || badgeConfigs['free'];
-            
-            // Create badge HTML
-            const badgeHTML = `
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${config.classes}">
-                    ${config.icon}${options.text || config.text}
-                </span>
-            `;
-            
-            // Render based on mode
-            if (options.append) {
-                target.insertAdjacentHTML('beforeend', badgeHTML);
-            } else if (options.prepend) {
-                target.insertAdjacentHTML('afterbegin', badgeHTML);
-            } else {
-                target.innerHTML = badgeHTML;
-            }
-            
-            return target.querySelector('span');
-            
-        } catch (error) {
-            console.error('PipwaysUsage.renderBadge error:', error);
-            return null;
-        }
+    // ══════════════════════════════════════════════════════════════════════════
+    // AUTO-INIT
+    // ══════════════════════════════════════════════════════════════════════════
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('PipwaysUsage: DOM ready, initializing...');
+            init();
+        });
+    } else {
+        console.log('PipwaysUsage: DOM ready, initializing...');
+        init();
     }
 
-    /**
-     * Render a feature usage indicator (e.g., "2/5 remaining")
-     * @param {string} targetSelector - CSS selector for the target element
-     * @param {string} feature - Feature key
-     * @param {object} options - Optional configuration
-     */
-    function renderUsageIndicator(targetSelector, feature, options = {}) {
-        try {
-            const target = typeof targetSelector === 'string' 
-                ? document.querySelector(targetSelector) 
-                : targetSelector;
-            
-            if (!target) {
-                console.warn('PipwaysUsage.renderUsageIndicator: Target not found:', targetSelector);
-                return null;
-            }
-            
-            const featureLimit = getFeatureLimit(feature);
-            if (!featureLimit) {
-                target.innerHTML = '';
-                return null;
-            }
-            
-            let indicatorHTML = '';
-            
-            if (featureLimit.limit === null || featureLimit.remaining === 'unlimited') {
-                indicatorHTML = `
-                    <span class="text-xs text-green-400">
-                        <i class="fas fa-infinity mr-1"></i>Unlimited
-                    </span>
-                `;
-            } else if (typeof featureLimit.limit === 'number') {
-                const remaining = featureLimit.remaining;
-                const total = featureLimit.limit;
-                const percentage = (remaining / total) * 100;
-                
-                let colorClass = 'text-green-400';
-                if (percentage <= 20) colorClass = 'text-red-400';
-                else if (percentage <= 50) colorClass = 'text-yellow-400';
-                
-                indicatorHTML = `
-                    <span class="text-xs ${colorClass}">
-                        ${remaining}/${total} remaining
-                    </span>
-                `;
-            } else if (typeof featureLimit.limit === 'boolean') {
-                indicatorHTML = featureLimit.limit 
-                    ? `<span class="text-xs text-green-400"><i class="fas fa-check mr-1"></i>Available</span>`
-                    : `<span class="text-xs text-red-400"><i class="fas fa-lock mr-1"></i>Pro only</span>`;
-            }
-            
-            target.innerHTML = indicatorHTML;
-            return target;
-            
-        } catch (error) {
-            console.error('PipwaysUsage.renderUsageIndicator error:', error);
-            return null;
-        }
-    }
+    // ══════════════════════════════════════════════════════════════════════════
+    // PUBLIC API
+    // ══════════════════════════════════════════════════════════════════════════
 
-    // Enhanced signals-specific helper functions
-    function canViewAllSignals() {
-        return canAccessFeature('signals_visible') && userLimits.features?.['signals_visible']?.limit === null;
-    }
-
-    function canAccessDetailedAnalysis() {
-        return canAccessFeature('signals_detailed_analysis');
-    }
-
-    function canAccessFullCharts() {
-        return canAccessFeature('signals_chart_access');
-    }
-
-    function canUseAdvancedFilters() {
-        return canAccessFeature('signals_pattern_filtering');
-    }
-
-    function canReceiveSignalAlerts() {
-        return canAccessFeature('signals_email_alerts');
-    }
-
-    // Public API
     return {
-        init,
-        showUpgradeModal,
-        hideUpgradeModal,
-        checkUsage,
-        getFeatureLimit,
-        getUserTier,
-        canAccessFeature,
-        loadUserLimits,
-        
-        // Badge rendering functions - THESE WERE MISSING
-        renderBadge,
-        renderUsageIndicator,
-        
-        // Enhanced signals helpers
-        canViewAllSignals,
-        canAccessDetailedAnalysis,
-        canAccessFullCharts,
-        canUseAdvancedFilters,
-        canReceiveSignalAlerts
+        // State
+        get tier() { return currentTier; },
+        get isLoaded() { return isLoaded; },
+        get limits() { return userLimits; },
+
+        // Core methods
+        init: init,
+        loadUserLimits: loadUserLimits,
+        checkUsage: checkUsage,
+        getFeatureLimit: getFeatureLimit,
+        getUserTier: getUserTier,
+        canAccessFeature: canAccessFeature,
+
+        // Badge rendering
+        renderBadge: renderBadge,
+        renderTierBadge: renderTierBadge,
+
+        // Modal
+        showUpgradeModal: showUpgradeModal,
+        hideUpgradeModal: hideUpgradeModal
     };
+
 })();
-
-// Auto-initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('PipwaysUsage: DOM ready, initializing...');
-    PipwaysUsage.init();
-});
-
-// Also initialize immediately if DOM is already loaded
-if (document.readyState === 'loading') {
-    // DOM is still loading, wait for DOMContentLoaded
-} else {
-    // DOM is already loaded
-    console.log('PipwaysUsage: DOM already loaded, initializing...');
-    PipwaysUsage.init();
-}
-
-// Handle navigation events (for SPAs)
-window.addEventListener('popstate', function() {
-    console.log('PipwaysUsage: Navigation detected, reloading limits...');
-    PipwaysUsage.loadUserLimits();
-});

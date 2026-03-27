@@ -105,14 +105,14 @@ async def create_signal(payload: SignalIn):
         if payload.pattern_points:
             pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points])
 
-        # Calculate expiry
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=payload.expires_in_hours)
-
         # Cast confidence to int
         conf_int = int(payload.confidence)
+        
+        # Expires hours
+        expires_hours = int(payload.expires_in_hours)
 
-        # Insert into database
-        query = """
+        # Insert into database - use PostgreSQL NOW() for timestamps
+        query = f"""
             INSERT INTO signals (
                 symbol, direction, entry, target, stop,
                 confidence, ai_confidence, asset_type, country,
@@ -124,7 +124,7 @@ async def create_signal(payload: SignalIn):
                 :confidence, :ai_confidence, :asset_type, :country,
                 :pattern, :timeframe, :is_pattern_idea,
                 :pattern_points, 'active', TRUE,
-                :created_at, :expires_at
+                NOW(), NOW() + INTERVAL '{expires_hours} hours'
             )
             RETURNING id
         """
@@ -136,15 +136,13 @@ async def create_signal(payload: SignalIn):
             "target": payload.target,
             "stop": payload.stop,
             "confidence": conf_int,
-            "ai_confidence": conf_int,  # Separate param to avoid type inference issue
+            "ai_confidence": conf_int,
             "asset_type": payload.asset_type,
             "country": payload.country,
             "pattern": payload.pattern,
             "timeframe": payload.timeframe,
             "is_pattern_idea": payload.is_pattern_idea,
             "pattern_points": pattern_points_json,
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": expires_at,
         }
 
         result = await db.fetch_one(query, params)

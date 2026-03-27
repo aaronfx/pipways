@@ -253,6 +253,11 @@ Always conduct your own analysis and use proper risk management when trading. Pa
         overflow: hidden;
         text-overflow: ellipsis;
     }
+    .aiq-confidence {
+        font-size: 11px;
+        color: #a78bfa;
+        font-weight: 600;
+    }
 
     /* Order Badge */
     .aiq-order-badge-wrapper {
@@ -525,6 +530,24 @@ Always conduct your own analysis and use proper risk management when trading. Pa
     .aiq-modal-body {
         padding: 24px;
     }
+    .aiq-modal-chart {
+        width: 100%;
+        height: 200px;
+        background: #0a0a0a;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        overflow: hidden;
+        position: relative;
+    }
+    .aiq-modal-chart svg {
+        width: 100%;
+        height: 100%;
+    }
+    .aiq-modal-chart .aiq-tf-badge {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+    }
     .aiq-modal-title-row {
         display: flex;
         align-items: center;
@@ -772,8 +795,9 @@ Always conduct your own analysis and use proper risk management when trading. Pa
     // SVG CHART GENERATOR
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function generateChartSVG(pattern, isBuy, seed = 1) {
-        const w = 280, h = 120;
+    function generateChartSVG(pattern, isBuy, seed = 1, isModal = false) {
+        const w = isModal ? 760 : 280;
+        const h = isModal ? 200 : 120;
         const patternType = (pattern || '').toUpperCase();
 
         // Pseudo-random generator
@@ -802,53 +826,87 @@ Always conduct your own analysis and use proper risk management when trading. Pa
         const toY = p => h - 10 - ((p - minP) / range) * (h - 20);
 
         // Draw candles
-        const gap = (w - 20) / candles.length;
-        const cw = 6;
+        const numCandles = isModal ? 40 : 20;
+        const gap = (w - 20) / numCandles;
+        const cw = isModal ? 10 : 6;
         let svg = '';
 
-        candles.forEach((c, i) => {
-            const x = 10 + i * gap + gap / 2;
-            const color = c.bull ? '#26a69a' : '#ef5350';
-            svg += `<line x1="${x}" y1="${toY(c.high)}" x2="${x}" y2="${toY(c.low)}" stroke="${color}" stroke-width="1"/>`;
-            const top = Math.min(toY(c.open), toY(c.close));
-            const ht = Math.max(2, Math.abs(toY(c.open) - toY(c.close)));
-            svg += `<rect x="${x - cw/2}" y="${top}" width="${cw}" height="${ht}" fill="${color}"/>`;
-        });
+        // Generate more candles if modal
+        if (isModal && candles.length < numCandles) {
+            let p = candles[candles.length - 1]?.close || 50;
+            for (let i = candles.length; i < numCandles; i++) {
+                const vol = 2 + rand(0, 3);
+                const open = p;
+                const close = open + trend + rand(-1.5, 1.5);
+                const high = Math.max(open, close) + rand(0.3, vol);
+                const low = Math.min(open, close) - rand(0.3, vol);
+                candles.push({ open, close, high, low, bull: close > open });
+                p = close;
+            }
+            // Recalculate normalization
+            const allP2 = candles.flatMap(c => [c.high, c.low]);
+            const minP2 = Math.min(...allP2), maxP2 = Math.max(...allP2);
+            const range2 = maxP2 - minP2 || 1;
+            const toY2 = p => h - 10 - ((p - minP2) / range2) * (h - 20);
+            
+            candles.forEach((c, i) => {
+                const x = 10 + i * gap + gap / 2;
+                const color = c.bull ? '#26a69a' : '#ef5350';
+                svg += `<line x1="${x}" y1="${toY2(c.high)}" x2="${x}" y2="${toY2(c.low)}" stroke="${color}" stroke-width="1"/>`;
+                const top = Math.min(toY2(c.open), toY2(c.close));
+                const ht = Math.max(2, Math.abs(toY2(c.open) - toY2(c.close)));
+                svg += `<rect x="${x - cw/2}" y="${top}" width="${cw}" height="${ht}" fill="${color}"/>`;
+            });
+        } else {
+            candles.forEach((c, i) => {
+                const x = 10 + i * gap + gap / 2;
+                const color = c.bull ? '#26a69a' : '#ef5350';
+                svg += `<line x1="${x}" y1="${toY(c.high)}" x2="${x}" y2="${toY(c.low)}" stroke="${color}" stroke-width="1"/>`;
+                const top = Math.min(toY(c.open), toY(c.close));
+                const ht = Math.max(2, Math.abs(toY(c.open) - toY(c.close)));
+                svg += `<rect x="${x - cw/2}" y="${top}" width="${cw}" height="${ht}" fill="${color}"/>`;
+            });
+        }
 
         // Pattern lines
         const lc = '#6366f1';
+        const lw = isModal ? 3 : 2;
         const midY = toY((maxP + minP) / 2);
         const topY = toY(maxP - range * 0.1);
         const botY = toY(minP + range * 0.1);
 
         if (patternType.includes('SYMMETRICAL') || patternType.includes('TRIANGLE')) {
-            svg += `<line x1="15" y1="${topY}" x2="${w-25}" y2="${midY+5}" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<line x1="15" y1="${botY}" x2="${w-25}" y2="${midY-5}" stroke="${lc}" stroke-width="2"/>`;
+            svg += `<line x1="15" y1="${topY}" x2="${w-25}" y2="${midY+5}" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<line x1="15" y1="${botY}" x2="${w-25}" y2="${midY-5}" stroke="${lc}" stroke-width="${lw}"/>`;
         } else if (patternType.includes('WEDGE')) {
             const offset = isBuy ? 10 : -10;
-            svg += `<line x1="15" y1="${topY}" x2="${w-25}" y2="${midY+offset}" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<line x1="15" y1="${botY}" x2="${w-25}" y2="${midY+offset*0.5}" stroke="${lc}" stroke-width="2"/>`;
+            svg += `<line x1="15" y1="${topY}" x2="${w-25}" y2="${midY+offset}" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<line x1="15" y1="${botY}" x2="${w-25}" y2="${midY+offset*0.5}" stroke="${lc}" stroke-width="${lw}"/>`;
         } else if (patternType.includes('FLAG')) {
             const y1 = toY(minP + range * 0.65), y2 = toY(minP + range * 0.35);
-            svg += `<line x1="50" y1="${y1}" x2="${w-20}" y2="${y1-8}" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<line x1="50" y1="${y2}" x2="${w-20}" y2="${y2-8}" stroke="${lc}" stroke-width="2"/>`;
+            const startX = isModal ? 100 : 50;
+            svg += `<line x1="${startX}" y1="${y1}" x2="${w-20}" y2="${y1-8}" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<line x1="${startX}" y1="${y2}" x2="${w-20}" y2="${y2-8}" stroke="${lc}" stroke-width="${lw}"/>`;
         } else if (patternType.includes('PENNANT')) {
             const cx = w * 0.55;
-            svg += `<line x1="${cx-50}" y1="${midY-20}" x2="${cx+40}" y2="${midY}" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<line x1="${cx-50}" y1="${midY+20}" x2="${cx+40}" y2="${midY}" stroke="${lc}" stroke-width="2"/>`;
+            const spread = isModal ? 80 : 50;
+            svg += `<line x1="${cx-spread}" y1="${midY-20}" x2="${cx+spread*0.8}" y2="${midY}" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<line x1="${cx-spread}" y1="${midY+20}" x2="${cx+spread*0.8}" y2="${midY}" stroke="${lc}" stroke-width="${lw}"/>`;
         } else if (patternType.includes('DOUBLE') && patternType.includes('BOTTOM')) {
             const by = toY(minP + range * 0.05);
-            svg += `<circle cx="60" cy="${by}" r="5" fill="none" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<circle cx="160" cy="${by}" r="5" fill="none" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<line x1="60" y1="${by}" x2="160" y2="${by}" stroke="${lc}" stroke-width="1" stroke-dasharray="4,2"/>`;
+            const x1 = isModal ? 150 : 60, x2 = isModal ? 450 : 160;
+            svg += `<circle cx="${x1}" cy="${by}" r="${isModal ? 8 : 5}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<circle cx="${x2}" cy="${by}" r="${isModal ? 8 : 5}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<line x1="${x1}" y1="${by}" x2="${x2}" y2="${by}" stroke="${lc}" stroke-width="1" stroke-dasharray="4,2"/>`;
         } else if (patternType.includes('DOUBLE') && patternType.includes('TOP')) {
             const ty = toY(maxP - range * 0.05);
-            svg += `<circle cx="60" cy="${ty}" r="5" fill="none" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<circle cx="160" cy="${ty}" r="5" fill="none" stroke="${lc}" stroke-width="2"/>`;
-            svg += `<line x1="60" y1="${ty}" x2="160" y2="${ty}" stroke="${lc}" stroke-width="1" stroke-dasharray="4,2"/>`;
+            const x1 = isModal ? 150 : 60, x2 = isModal ? 450 : 160;
+            svg += `<circle cx="${x1}" cy="${ty}" r="${isModal ? 8 : 5}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<circle cx="${x2}" cy="${ty}" r="${isModal ? 8 : 5}" fill="none" stroke="${lc}" stroke-width="${lw}"/>`;
+            svg += `<line x1="${x1}" y1="${ty}" x2="${x2}" y2="${ty}" stroke="${lc}" stroke-width="1" stroke-dasharray="4,2"/>`;
         } else {
             // Default horizontal line
-            svg += `<line x1="10" y1="${midY}" x2="${w-10}" y2="${midY}" stroke="${lc}" stroke-width="2" stroke-dasharray="5,3"/>`;
+            svg += `<line x1="10" y1="${midY}" x2="${w-10}" y2="${midY}" stroke="${lc}" stroke-width="${lw}" stroke-dasharray="5,3"/>`;
         }
 
         return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><rect width="100%" height="100%" fill="#0a0a0a"/>${svg}</svg>`;
@@ -903,6 +961,7 @@ Always conduct your own analysis and use proper risk management when trading. Pa
                         ${esc(signal.symbol)}
                         <span class="aiq-pattern-tag">${esc(patternShort)}</span>
                     </div>
+                    <div class="aiq-confidence">${signal.confidence || 75}% Confidence</div>
                 </div>
             </div>
 
@@ -1022,6 +1081,10 @@ Always conduct your own analysis and use proper risk management when trading. Pa
                         <div class="aiq-modal-info-label">Stop</div>
                     </div>
                     <div class="aiq-modal-info-item">
+                        <div class="aiq-modal-info-value" style="color:#a78bfa;">${signal.confidence || 75}%</div>
+                        <div class="aiq-modal-info-label">Confidence</div>
+                    </div>
+                    <div class="aiq-modal-info-item" style="grid-column: span 2;">
                         <div class="aiq-sentiment">
                             <span class="aiq-sentiment-label">🐻 ${bearish}%</span>
                             <div class="aiq-sentiment-bar">
@@ -1035,8 +1098,14 @@ Always conduct your own analysis and use proper risk management when trading. Pa
                 </div>
             </div>
 
-            <!-- Body: Pattern Education -->
+            <!-- Body: Chart + Pattern Education -->
             <div class="aiq-modal-body">
+                <!-- Pattern Chart -->
+                <div class="aiq-modal-chart">
+                    ${generateChartSVG(signal.pattern, isBuy, signal.id, true)}
+                    <div class="aiq-tf-badge">${esc(signal.timeframe || '4H')}</div>
+                </div>
+
                 <div class="aiq-modal-title-row">
                     <span class="aiq-modal-title">Trade Idea</span>
                     <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" class="aiq-modal-tv-icon" title="Open in TradingView">

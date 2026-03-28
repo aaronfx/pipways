@@ -5,6 +5,11 @@ Deploy to: backend/routes/signals.py
 All routes at /api/signals/* (explicit full paths, no router prefix).
 Single clean import from backend.database — no fallbacks.
 Signal source: GreenXTrades bot only. No seed data.
+
+Migration:
+  Call `await run_signals_migration()` from main.py lifespan startup.
+  It is fully idempotent — ADD COLUMN IF NOT EXISTS per column, one at a time.
+  Also exposed as POST /api/signals/migrate for one-shot manual recovery.
 """
 
 import json
@@ -32,6 +37,91 @@ def get_db():
     if not database:
         raise HTTPException(status_code=500, detail="Database not initialized")
     return database
+
+
+# ── Schema migration ──────────────────────────────────────────────────────────
+
+# Every column the signals table must have.
+# Declared as (name, postgres_type_and_default) pairs.
+# ADD COLUMN IF NOT EXISTS is run individually so a pre-existing column never
+# causes the rest to be skipped — the bug that caused the HTTP 500 on pattern_name.
+_SIGNALS_COLUMNS: list = [
+    # Core price fields
+    ("entry_price",     "NUMERIC(20, 8)"),
+    ("take_profit",     "NUMERIC(20, 8)"),
+    ("stop_loss",       "NUMERIC(20, 8)"),
+    ("ai_confidence",   "INTEGER DEFAULT 50"),
+    # Classification
+    ("asset_type",      "TEXT DEFAULT 'forex'"),
+    ("country",         "TEXT DEFAULT 'all'"),
+    ("timeframe",       "TEXT DEFAULT 'M5'"),
+    ("status",          "TEXT DEFAULT 'active'"),
+    # SMC / pattern metadata
+    ("pattern",         "TEXT"),
+    ("pattern_name",    "TEXT"),          # v9.24 — was missing, caused HTTP 500
+    ("structure",       "TEXT"),
+    ("bias_d1",         "TEXT"),
+    ("bias_h4",         "TEXT"),
+    ("bos_m5",          "TEXT"),
+    # JSON columns
+    ("pattern_points",  "JSONB DEFAULT '[]'"),
+    ("pattern_lines",   "JSONB DEFAULT '[]'"),  # v9.24
+    ("breakout_point",  "JSONB"),
+    ("candles",         "JSONB DEFAULT '[]'"),
+    # Flags
+    ("is_pattern_idea", "BOOLEAN DEFAULT FALSE"),
+    ("is_published",    "BOOLEAN DEFAULT TRUE"),
+    # Timestamps
+    ("expires_at",      "TIMESTAMPTZ"),
+    ("updated_at",      "TIMESTAMPTZ"),
+]
+
+
+async def run_signals_migration() -> dict:
+    """
+    Idempotent schema migration for the signals table.
+
+    Runs one ALTER TABLE … ADD COLUMN IF NOT EXISTS per column so that:
+      - Adding a brand-new column never silently skips sibling columns.
+      - Safe to call on every Railway deploy / app startup.
+      - Returns a summary dict for logging / the /migrate endpoint.
+
+    Call from main.py lifespan:
+        from backend.routes.signals import run_signals_migration
+        async with lifespan(app):
+            await run_signals_migration()
+    """
+    db = database
+    if not db:
+        raise RuntimeError("Database not initialised — cannot run signals migration")
+
+    applied: list[str] = []
+    skipped: list[str] = []
+
+    for col_name, col_def in _SIGNALS_COLUMNS:
+        try:
+            await db.execute(
+                f"ALTER TABLE signals ADD COLUMN IF NOT EXISTS {col_name} {col_def};"
+            )
+            applied.append(col_name)
+        except Exception as exc:
+            # Log but continue — one bad column must not abort the rest
+            logger.error(f"[signals] migration failed for column '{col_name}': {exc}")
+            skipped.append(col_name)
+
+    summary = {
+        "total":   len(_SIGNALS_COLUMNS),
+        "applied": len(applied),
+        "skipped": len(skipped),
+        "columns": applied,
+        "errors":  skipped,
+    }
+    if skipped:
+        logger.warning(f"[signals] Migration completed with errors: {summary}")
+    else:
+        logger.info(f"[signals] Migration OK — {len(applied)} columns verified")
+
+    return summary
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -343,8 +433,30 @@ async def get_active_signals(
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
-# NOTE: Static-path routes (/enhanced, /active, /expire-old) are declared
-# BEFORE /{signal_id} so FastAPI never tries to cast those strings as int IDs.
+# NOTE: Static-path routes (/enhanced, /active, /migrate, /expire-old) are
+# declared BEFORE /{signal_id} so FastAPI never tries to cast those strings as int IDs.
+
+@router.post("/api/signals/migrate")
+async def migrate_signals_table():
+    """
+    One-shot admin endpoint — runs run_signals_migration() on demand.
+
+    Use this immediately after a deploy that adds new DB columns, or any time
+    a POST /api/signals returns HTTP 500 with "column X does not exist".
+
+    Not authenticated (internal Railway network only in production).
+    Safe to call repeatedly — fully idempotent.
+    """
+    try:
+        summary = await run_signals_migration()
+        status_code = 200 if not summary["errors"] else 207  # 207 = partial success
+        return JSONResponse(status_code=status_code, content={"ok": True, **summary})
+    except Exception as e:
+        logger.exception(f"[signals] /migrate endpoint error: {e}")
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+
+
+
 
 @router.get("/api/signals/{signal_id}")
 async def get_signal(signal_id: int):

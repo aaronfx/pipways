@@ -43,6 +43,13 @@ class BreakoutPoint(BaseModel):
     time: int
     price: float
 
+class CandleData(BaseModel):
+    time: int
+    open: float
+    high: float
+    low: float
+    close: float
+
 class SignalIn(BaseModel):
     # Core
     symbol: str
@@ -65,6 +72,9 @@ class SignalIn(BaseModel):
     # Chart overlay
     pattern_points: List[PatternPoint] = Field(default_factory=list)
     breakout_point: Optional[BreakoutPoint] = None
+    
+    # Real OHLC candles from MT5
+    candles: List[CandleData] = Field(default_factory=list)
 
     # Enhanced Signals routing — MUST be True for dashboard to show the signal
     is_pattern_idea: bool = False
@@ -104,6 +114,11 @@ async def create_signal(payload: SignalIn):
         pattern_points_json = None
         if payload.pattern_points:
             pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points])
+        
+        # Convert candles to JSON string
+        candles_json = None
+        if payload.candles:
+            candles_json = json.dumps([c.dict() for c in payload.candles])
 
         # Cast confidence to int
         conf_int = int(payload.confidence)
@@ -123,14 +138,14 @@ async def create_signal(payload: SignalIn):
                 entry_price, take_profit, stop_loss,
                 confidence, ai_confidence, asset_type, country,
                 pattern, timeframe, is_pattern_idea,
-                pattern_points, status, is_published,
+                pattern_points, candles, status, is_published,
                 created_at, expires_at
             ) VALUES (
                 :symbol, :direction, :entry, :target, :stop,
                 :entry_price, :take_profit, :stop_loss,
                 :confidence, :ai_confidence, :asset_type, :country,
                 :pattern, :timeframe, :is_pattern_idea,
-                :pattern_points, 'active', TRUE,
+                :pattern_points, :candles, 'active', TRUE,
                 NOW(), NOW() + INTERVAL '{expires_hours} hours'
             )
             RETURNING id
@@ -153,6 +168,7 @@ async def create_signal(payload: SignalIn):
             "timeframe": payload.timeframe,
             "is_pattern_idea": payload.is_pattern_idea,
             "pattern_points": pattern_points_json,
+            "candles": candles_json,
         }
 
         result = await db.fetch_one(query, params)
@@ -225,6 +241,13 @@ async def get_enhanced_signals(limit: int = 50):
                     signal['pattern_lines'] = json.loads(signal['pattern_lines'])
                 except:
                     signal['pattern_lines'] = None
+            
+            # Parse candles JSON
+            if signal.get('candles'):
+                try:
+                    signal['candles'] = json.loads(signal['candles'])
+                except:
+                    signal['candles'] = None
             
             # Convert datetime to ISO string for JSON
             for key in ['created_at', 'expires_at', 'updated_at']:

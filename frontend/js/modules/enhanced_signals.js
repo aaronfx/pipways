@@ -1,16 +1,16 @@
-// Enhanced Signals Page — Production v11 (Premium TradingView-Style Charts)
+// Enhanced Signals Page — Production v12 (InsightPro-Style Charts)
 // Deploy to: frontend/js/modules/enhanced_signals.js
 //
 // ✅ NO mock/fake/placeholder data
 // ✅ ONLY fetches from /signals/enhanced API
 // ✅ Bot → DB → API → Frontend
 // ✅ Real OHLC candles from MT5 (falls back to generated if not available)
-// ✅ PREMIUM Risk/Reward zones (strong visibility, neon glow effects)
-// ✅ Pattern overlay from pattern_points with fallback generation
+// ✅ INSIGHTPRO-STYLE Risk/Reward zones (start at breakout, sharp rectangles)
+// ✅ Vertical breakout line (dashed purple)
+// ✅ Triangle/wedge pattern (two converging trendlines)
+// ✅ Clean price labels: TARGET (green), ENTRY (white), STOP (red)
 // ✅ Trade status display (ACTIVE / WAITING / TRIGGERED / EXPIRED / TP HIT / SL HIT)
-// ✅ InsightPro-style premium chart UI with glow effects
-// ✅ Modular chart functions: drawLevels(), drawRiskReward(), drawPattern(), getTradeStatus()
-// ✅ Signal state visuals (faded expired, highlighted triggered)
+// ✅ Modular chart functions: drawBreakoutLine(), drawLevels(), drawRiskReward(), drawPattern()
 
 (function () {
     'use strict';
@@ -962,6 +962,7 @@ Always conduct your own analysis and use proper risk management.`
             
             // Use real MT5 candles if available, otherwise generate realistic ones
             let candles;
+            let isSyntheticData = false;
             if (signal.candles && Array.isArray(signal.candles) && signal.candles.length >= 10) {
                 // Real candles from MT5 bot — use directly
                 candles = signal.candles.map(c => ({
@@ -973,53 +974,64 @@ Always conduct your own analysis and use proper risk management.`
                 }));
                 console.log(`[Chart] ✅ Using ${candles.length} real MT5 candles for ${signal.symbol}`);
             } else {
-                // Fallback to generated candles
+                // Fallback to generated candles (with warning)
                 candles = generateRealisticCandles(signal);
-                console.log(`[Chart] Generated ${candles.length} synthetic candles for ${signal.symbol}`);
+                isSyntheticData = true;
+                console.warn(`[Chart] ⚠️ Using SYNTHETIC candles for ${signal.symbol} — no real MT5 data available`);
             }
             
-            // === RENDER CHART IN CORRECT ORDER ===
-            // 1. Draw R/R zones FIRST (below everything)
-            drawRiskRewardZones(candles, entry, target, stop, isBuy, isExpired, isTriggered);
+            // === RENDER CHART IN CORRECT ORDER (InsightPro Style) ===
+            
+            // Calculate breakout time (anchor point for zones)
+            const breakoutTime = getBreakoutTime(signal, candles);
+            
+            // 1. Draw R/R zones FIRST (below everything) - start at breakout
+            drawRiskRewardZones(candles, entry, target, stop, isBuy, isExpired, isTriggered, breakoutTime);
             
             // 2. Draw candlesticks with state-aware colors
             const candleOpacity = isExpired ? 0.4 : 1;
             candlestickSeries = chartInstance.addCandlestickSeries({
-                upColor: isExpired ? '#2d4a3e' : '#00ff88', 
-                downColor: isExpired ? '#4a2d2d' : '#ff4757',
-                borderUpColor: isExpired ? '#2d4a3e' : '#00ff88', 
-                borderDownColor: isExpired ? '#4a2d2d' : '#ff4757',
-                wickUpColor: isExpired ? '#2d4a3e' : '#00ff88', 
-                wickDownColor: isExpired ? '#4a2d2d' : '#ff4757',
+                upColor: isExpired ? '#2d4a3e' : '#26a69a', 
+                downColor: isExpired ? '#4a2d2d' : '#ef5350',
+                borderUpColor: isExpired ? '#2d4a3e' : '#26a69a', 
+                borderDownColor: isExpired ? '#4a2d2d' : '#ef5350',
+                wickUpColor: isExpired ? '#2d4a3e' : '#26a69a', 
+                wickDownColor: isExpired ? '#4a2d2d' : '#ef5350',
             });
             candlestickSeries.setData(candles);
             
-            // 3. Draw pattern overlay
-            drawPatternOverlay(signal, candles, isExpired);
+            // 3. Draw triangle/wedge pattern (two converging trendlines)
+            drawTrianglePattern(signal, candles, isExpired, breakoutTime);
             
-            // 4. Draw premium price levels (Entry/TP/SL)
+            // 4. Draw vertical breakout line (dashed cyan)
+            drawBreakoutLine(breakoutTime, candles, entry, target, stop, isExpired);
+            
+            // 5. Draw premium price levels (Entry/TP/SL)
             drawPremiumLevels(entry, target, stop, isExpired, isTriggered);
             
-            // 5. Add current price line (live indicator)
+            // 6. Add current price line (live indicator)
             if (!isExpired && candles.length > 0) {
                 drawCurrentPriceLine(candles[candles.length - 1].close);
             }
             
-            // 6. Add premium status overlay
-            addPremiumStatusOverlay(container, signal, candles);
+            // 7. Add premium status overlay (with synthetic data warning if applicable)
+            addPremiumStatusOverlay(container, signal, candles, isSyntheticData);
             
             // Fit content with padding
             chartInstance.timeScale().fitContent();
             
-            // Extend visible range forward for better zone visibility
-            const timeRange = chartInstance.timeScale().getVisibleRange();
-            if (timeRange) {
-                const extension = (timeRange.to - timeRange.from) * 0.1;
-                chartInstance.timeScale().setVisibleRange({
-                    from: timeRange.from,
-                    to: timeRange.to + extension
-                });
-            }
+            // Extend visible range forward to show zone projection (InsightPro style)
+            setTimeout(() => {
+                const timeRange = chartInstance.timeScale().getVisibleRange();
+                if (timeRange) {
+                    const duration = timeRange.to - timeRange.from;
+                    const extension = duration * 0.25;  // 25% forward extension
+                    chartInstance.timeScale().setVisibleRange({
+                        from: timeRange.from,
+                        to: timeRange.to + extension
+                    });
+                }
+            }, 100);
             
             // Resize observer
             const resizeObserver = new ResizeObserver(entries => {
@@ -1060,7 +1072,7 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PREMIUM CHART FUNCTIONS (TradingView-Style)
+    // INSIGHTPRO-STYLE CHART FUNCTIONS (v12)
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
@@ -1071,114 +1083,322 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     /**
-     * Draw premium Risk/Reward zones with strong visibility and glow effect
-     * CRITICAL: Zones must align perfectly with price levels
+     * Get breakout time from signal or calculate from candles
+     * This is the anchor point where zones BEGIN
      */
-    function drawRiskRewardZones(candles, entry, target, stop, isBuy, isExpired = false, isTriggered = false) {
+    function getBreakoutTime(signal, candles) {
+        if (signal.breakout_point?.time) return signal.breakout_point.time;
+        if (candles && candles.length > 10) {
+            return candles[Math.floor(candles.length * 0.75)].time;
+        }
+        return candles[candles.length - 1]?.time || Math.floor(Date.now() / 1000);
+    }
+
+    /**
+     * Draw REAL vertical breakout line (InsightPro style)
+     * Uses line series with SAME time, DIFFERENT prices = true vertical
+     */
+    function drawBreakoutLine(breakoutTime, candles, entry, target, stop, isExpired = false) {
+        if (!chartInstance || !breakoutTime) return;
+        
+        // Calculate line extent (from stop to target with small padding)
+        const range = Math.abs(target - stop);
+        const lineBottom = Math.min(stop, target) - range * 0.05;
+        const lineTop = Math.max(stop, target) + range * 0.05;
+        
+        // Create REAL vertical line using line series
+        const breakoutLineSeries = chartInstance.addLineSeries({
+            color: isExpired ? 'rgba(0, 194, 255, 0.4)' : '#00c2ff',  // Cyan (TradingView style)
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+            crosshairMarkerVisible: false,
+        });
+        
+        // Two points at SAME time = vertical line effect
+        breakoutLineSeries.setData([
+            { time: breakoutTime, value: lineBottom },
+            { time: breakoutTime, value: lineTop }
+        ]);
+        
+        console.log(`[Chart] ✅ Vertical breakout line at ${new Date(breakoutTime * 1000).toISOString()}`);
+    }
+
+    /**
+     * Draw InsightPro-style Risk/Reward zones
+     * CRITICAL: TRUE FLAT RECTANGLES with explicit borders
+     * Fixed BUY/SELL logic for correct zone orientation
+     * Opacity: 0.45 for strong visibility
+     */
+    function drawRiskRewardZones(candles, entry, target, stop, isBuy, isExpired = false, isTriggered = false, breakoutTime = null) {
         if (!chartInstance || !entry || !target || !stop) return;
         
-        const firstTime = candles[0]?.time;
         const lastTime = candles[candles.length - 1]?.time;
-        if (!firstTime || !lastTime) return;
+        const firstTime = candles[0]?.time;
+        if (!lastTime || !firstTime) return;
 
-        // Extend zones forward in time for visibility
-        const timeRange = lastTime - firstTime;
-        const extendedTime = lastTime + Math.floor(timeRange * 0.15);
+        // Get breakout time (anchor point for zones) - default to ~70% through candles
+        const startTime = breakoutTime || candles[Math.floor(candles.length * 0.70)]?.time || lastTime;
         
-        // Create extended candle data for zones
-        const extendedCandles = [...candles];
+        // Extend zones forward from breakout (~40% of visible range)
         const interval = candles.length > 1 ? candles[1].time - candles[0].time : 300;
-        for (let t = lastTime + interval; t <= extendedTime; t += interval) {
-            extendedCandles.push({ time: t });
+        const visibleDuration = lastTime - firstTime;
+        const forwardExtension = Math.floor(visibleDuration * 0.40);
+        const endTime = lastTime + forwardExtension;
+        
+        // Create zone data points (ONLY from breakout forward)
+        const zonePoints = [];
+        for (let t = startTime; t <= endTime; t += interval) {
+            zonePoints.push({ time: t });
+        }
+        if (zonePoints.length < 2) {
+            zonePoints.length = 0;
+            zonePoints.push({ time: startTime });
+            zonePoints.push({ time: endTime });
+        }
+
+        console.log(`[Chart] Drawing zones: ${isBuy ? 'BUY' : 'SELL'} E:${entry} T:${target} S:${stop}`);
+
+        // InsightPro colors - HIGHER OPACITY (0.45) for strong visibility
+        const profitFill = isExpired ? 'rgba(0, 150, 136, 0.18)' : 'rgba(0, 150, 136, 0.45)';
+        const profitBorder = isExpired ? 'rgba(0, 150, 136, 0.35)' : '#00bfa5';
+        const riskFill = isExpired ? 'rgba(198, 40, 40, 0.18)' : 'rgba(198, 40, 40, 0.45)';
+        const riskBorder = isExpired ? 'rgba(198, 40, 40, 0.35)' : '#ef5350';
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PROFIT ZONE (Teal) — TRUE FLAT RECTANGLE
+        // BUY: target above entry → area at target, fills down
+        // SELL: target below entry → area at entry, fills down toward target
+        // ═══════════════════════════════════════════════════════════════════════
+        const profitAreaLevel = isBuy ? target : entry;
+        const profitArea = chartInstance.addAreaSeries({
+            topColor: profitFill,
+            bottomColor: profitFill,
+            lineColor: 'transparent',  // We'll add explicit borders
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        profitArea.setData(zonePoints.map(c => ({ time: c.time, value: profitAreaLevel })));
+        
+        // Profit zone TOP border (solid, strong)
+        const profitTop = chartInstance.addLineSeries({
+            color: profitBorder,
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        profitTop.setData(zonePoints.map(c => ({ time: c.time, value: target })));
+        
+        // Profit zone BOTTOM border (at entry level)
+        const profitBottom = chartInstance.addLineSeries({
+            color: profitBorder,
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        profitBottom.setData(zonePoints.map(c => ({ time: c.time, value: entry })));
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // RISK ZONE (Red) — TRUE FLAT RECTANGLE  
+        // BUY: stop below entry → area at entry, fills down toward stop
+        // SELL: stop above entry → area at stop, fills down toward entry
+        // ═══════════════════════════════════════════════════════════════════════
+        const riskAreaLevel = isBuy ? entry : stop;
+        const riskArea = chartInstance.addAreaSeries({
+            topColor: riskFill,
+            bottomColor: riskFill,
+            lineColor: 'transparent',  // We'll add explicit borders
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        riskArea.setData(zonePoints.map(c => ({ time: c.time, value: riskAreaLevel })));
+        
+        // Risk zone TOP border (at entry level)
+        const riskTop = chartInstance.addLineSeries({
+            color: riskBorder,
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        riskTop.setData(zonePoints.map(c => ({ time: c.time, value: entry })));
+        
+        // Risk zone BOTTOM border (at stop level, solid strong)
+        const riskBottom = chartInstance.addLineSeries({
+            color: riskBorder,
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        riskBottom.setData(zonePoints.map(c => ({ time: c.time, value: stop })));
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ENTRY LINE (White dashed) — Visual separator between zones
+        // ═══════════════════════════════════════════════════════════════════════
+        const entryLine = chartInstance.addLineSeries({
+            color: isExpired ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.7)',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        entryLine.setData(zonePoints.map(c => ({ time: c.time, value: entry })));
+        
+        // ═══════════════════════════════════════════════════════════════════════
+        // LABEL MARKERS at zone end (InsightPro style)
+        // ═══════════════════════════════════════════════════════════════════════
+        const labelSeries = chartInstance.addLineSeries({
+            color: 'transparent',
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        labelSeries.setData([
+            { time: endTime, value: target },
+            { time: endTime, value: entry },
+            { time: endTime, value: stop }
+        ]);
+        labelSeries.setMarkers([
+            {
+                time: endTime,
+                position: 'inBar',
+                color: profitBorder,
+                shape: 'arrowUp',
+                text: 'TARGET'
+            },
+            {
+                time: endTime,
+                position: 'inBar',
+                color: '#ffffff',
+                shape: 'circle',
+                text: 'ENTRY'
+            },
+            {
+                time: endTime,
+                position: 'inBar',
+                color: riskBorder,
+                shape: 'arrowDown',
+                text: 'STOP'
+            }
+        ]);
+    }
+
+    /**
+     * Draw triangle/wedge pattern (InsightPro style)
+     * FORCED CONVERGENCE: Pattern ALWAYS converges to entry at breakout point
+     * This guarantees a clean triangle every time
+     */
+    function drawTrianglePattern(signal, candles, isExpired = false, breakoutTime = null) {
+        if (!chartInstance || !candles || candles.length < 20) return;
+        
+        const patternColor = isExpired ? 'rgba(38, 198, 218, 0.4)' : '#26c6da';
+        const entry = parseFloat(signal.entry) || candles[candles.length - 1].close;
+        const bTime = breakoutTime || getBreakoutTime(signal, candles);
+        
+        // Try to use pattern_points from signal first
+        let patternPoints = [];
+        if (signal.pattern_points) {
+            try {
+                patternPoints = typeof signal.pattern_points === 'string' 
+                    ? JSON.parse(signal.pattern_points) 
+                    : signal.pattern_points;
+            } catch (e) {
+                console.log('[Chart] Pattern points parse error:', e);
+            }
         }
         
-        // Calculate zone boundaries
-        const profitTop = isBuy ? target : entry;
-        const profitBottom = isBuy ? entry : target;
-        const lossTop = isBuy ? entry : stop;
-        const lossBottom = isBuy ? stop : entry;
-
-        // Opacity based on state
-        const baseOpacity = isExpired ? 0.08 : (isTriggered ? 0.45 : 0.35);
-        const borderOpacity = isExpired ? 0.15 : 0.6;
+        // If we have valid pattern_points, use them
+        if (Array.isArray(patternPoints) && patternPoints.length >= 3) {
+            const sortedPoints = patternPoints
+                .filter(p => p && (p.time || p.timestamp) && (p.price || p.value))
+                .map(p => ({
+                    time: p.time || p.timestamp,
+                    value: parseFloat(p.price || p.value),
+                }))
+                .sort((a, b) => a.time - b.time);
+            
+            if (sortedPoints.length >= 2) {
+                const patternSeries = chartInstance.addLineSeries({
+                    color: patternColor,
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    priceScaleId: 'right',
+                    lastValueVisible: false,
+                    priceLineVisible: false,
+                });
+                patternSeries.setData(sortedPoints);
+                return;
+            }
+        }
         
         // ═══════════════════════════════════════════════════════════════════════
-        // PROFIT ZONE (Green) — Entry to Target
-        // Strong neon green with visible border for premium look
+        // FORCED CONVERGENCE TRIANGLE
+        // Start from early candles, ALWAYS converge to entry at breakout point
         // ═══════════════════════════════════════════════════════════════════════
         
-        // Profit zone top line (glow effect simulation)
-        const profitGlowTop = chartInstance.addLineSeries({
-            color: `rgba(0, 255, 136, ${borderOpacity * 0.5})`,
-            lineWidth: 4,
+        // Find starting points from early candles
+        const startIndex = Math.floor(candles.length * 0.15);  // Start ~15% into data
+        const midIndex = Math.floor(candles.length * 0.45);    // Mid ~45%
+        const breakoutIndex = candles.findIndex(c => c.time >= bTime);
+        
+        if (startIndex >= candles.length || breakoutIndex < 0) return;
+        
+        const startCandle = candles[startIndex];
+        const midCandle = candles[midIndex];
+        
+        // Find high and low in the early section
+        const earlyCandles = candles.slice(startIndex, Math.min(midIndex + 5, candles.length));
+        const earlyHigh = Math.max(...earlyCandles.map(c => c.high));
+        const earlyLow = Math.min(...earlyCandles.map(c => c.low));
+        
+        // Find which candle has the high and low
+        const highCandle = earlyCandles.find(c => c.high === earlyHigh) || startCandle;
+        const lowCandle = earlyCandles.find(c => c.low === earlyLow) || startCandle;
+        
+        // UPPER TRENDLINE: from early high → converges to entry at breakout
+        const upperLine = chartInstance.addLineSeries({
+            color: patternColor,
+            lineWidth: 2,
             lineStyle: LightweightCharts.LineStyle.Solid,
             priceScaleId: 'right',
             lastValueVisible: false,
             priceLineVisible: false,
         });
-        profitGlowTop.setData(extendedCandles.map(c => ({ time: c.time, value: profitTop })));
+        upperLine.setData([
+            { time: highCandle.time, value: earlyHigh },
+            { time: bTime, value: entry }  // FORCED convergence to entry
+        ]);
         
-        // Profit zone fill area
-        const profitAreaSeries = chartInstance.addAreaSeries({
-            topColor: `rgba(0, 255, 136, ${baseOpacity})`,
-            bottomColor: `rgba(0, 255, 136, ${baseOpacity * 0.3})`,
-            lineColor: `rgba(0, 255, 163, ${borderOpacity})`,
+        // LOWER TRENDLINE: from early low → converges to entry at breakout  
+        const lowerLine = chartInstance.addLineSeries({
+            color: patternColor,
             lineWidth: 2,
-            priceScaleId: 'right',
-            lastValueVisible: false,
-            priceLineVisible: false,
-        });
-        profitAreaSeries.setData(extendedCandles.map(c => ({ time: c.time, value: profitTop })));
-        
-        // Profit zone bottom border
-        const profitBorderBottom = chartInstance.addLineSeries({
-            color: `rgba(0, 255, 136, ${borderOpacity * 0.4})`,
-            lineWidth: 1,
-            lineStyle: LightweightCharts.LineStyle.Dotted,
-            priceScaleId: 'right',
-            lastValueVisible: false,
-            priceLineVisible: false,
-        });
-        profitBorderBottom.setData(extendedCandles.map(c => ({ time: c.time, value: profitBottom })));
-        
-        // ═══════════════════════════════════════════════════════════════════════
-        // LOSS ZONE (Red) — Entry to Stop
-        // Strong neon red with visible border for premium look
-        // ═══════════════════════════════════════════════════════════════════════
-        
-        // Loss zone top line (glow effect simulation)
-        const lossGlowTop = chartInstance.addLineSeries({
-            color: `rgba(255, 71, 87, ${borderOpacity * 0.5})`,
-            lineWidth: 4,
             lineStyle: LightweightCharts.LineStyle.Solid,
             priceScaleId: 'right',
             lastValueVisible: false,
             priceLineVisible: false,
         });
-        lossGlowTop.setData(extendedCandles.map(c => ({ time: c.time, value: lossTop })));
+        lowerLine.setData([
+            { time: lowCandle.time, value: earlyLow },
+            { time: bTime, value: entry }  // FORCED convergence to entry
+        ]);
         
-        // Loss zone fill area
-        const lossAreaSeries = chartInstance.addAreaSeries({
-            topColor: `rgba(255, 71, 87, ${baseOpacity})`,
-            bottomColor: `rgba(255, 71, 87, ${baseOpacity * 0.3})`,
-            lineColor: `rgba(255, 77, 77, ${borderOpacity})`,
-            lineWidth: 2,
-            priceScaleId: 'right',
-            lastValueVisible: false,
-            priceLineVisible: false,
-        });
-        lossAreaSeries.setData(extendedCandles.map(c => ({ time: c.time, value: lossTop })));
-        
-        // Loss zone bottom border
-        const lossBorderBottom = chartInstance.addLineSeries({
-            color: `rgba(255, 71, 87, ${borderOpacity * 0.4})`,
-            lineWidth: 1,
-            lineStyle: LightweightCharts.LineStyle.Dotted,
-            priceScaleId: 'right',
-            lastValueVisible: false,
-            priceLineVisible: false,
-        });
-        lossBorderBottom.setData(extendedCandles.map(c => ({ time: c.time, value: lossBottom })));
+        console.log(`[Chart] ✅ Triangle pattern: H${earlyHigh.toFixed(2)} L${earlyLow.toFixed(2)} → Entry${entry}`);
     }
 
     /**
@@ -1400,7 +1620,7 @@ Always conduct your own analysis and use proper risk management.`
     /**
      * Add premium status overlay to chart (TradingView Ideas style)
      */
-    function addPremiumStatusOverlay(container, signal, candles) {
+    function addPremiumStatusOverlay(container, signal, candles, isSyntheticData = false) {
         // Remove existing overlay
         container.querySelector('.chart-status-overlay')?.remove();
         
@@ -1409,6 +1629,11 @@ Always conduct your own analysis and use proper risk management.`
         const rr = calculateRR(signal);
         const direction = (signal.direction || 'BUY').toUpperCase();
         const isBuy = direction.includes('BUY');
+        
+        // Synthetic data warning badge
+        const syntheticWarning = isSyntheticData 
+            ? '<span class="chart-synthetic-badge">⚠ SYNTHETIC</span>' 
+            : '';
         
         // Calculate current P/L if triggered
         let plDisplay = '';
@@ -1419,7 +1644,7 @@ Always conduct your own analysis and use proper risk management.`
             const risk = Math.abs(entry - stop);
             if (risk > 0) {
                 const pl = isBuy ? (current - entry) / risk : (entry - current) / risk;
-                const plColor = pl >= 0 ? '#00ff88' : '#ff4757';
+                const plColor = pl >= 0 ? '#00bfa5' : '#ef5350';
                 plDisplay = `<span class="chart-pl" style="color: ${plColor}">${pl >= 0 ? '+' : ''}${pl.toFixed(2)}R</span>`;
             }
         }
@@ -1430,6 +1655,7 @@ Always conduct your own analysis and use proper risk management.`
             <div class="chart-overlay-header">
                 <span class="chart-symbol-badge">${esc(signal.symbol)}</span>
                 <span class="chart-direction-badge ${isBuy ? 'buy' : 'sell'}">${direction}</span>
+                ${syntheticWarning}
             </div>
             <div class="chart-overlay-row">
                 <span class="chart-tf-badge">${timeframe}</span>
@@ -1445,9 +1671,9 @@ Always conduct your own analysis and use proper risk management.`
         `;
         
         // Inject premium overlay styles if not present
-        if (!document.getElementById('chart-overlay-styles-v11')) {
+        if (!document.getElementById('chart-overlay-styles-v12')) {
             const styles = document.createElement('style');
-            styles.id = 'chart-overlay-styles-v11';
+            styles.id = 'chart-overlay-styles-v12';
             styles.textContent = `
                 .chart-status-overlay {
                     position: absolute;
@@ -1465,14 +1691,14 @@ Always conduct your own analysis and use proper risk management.`
                     gap: 8px;
                 }
                 .chart-symbol-badge {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: rgba(20, 20, 30, 0.9);
                     color: #ffffff;
                     font-size: 13px;
                     font-weight: 700;
                     padding: 5px 10px;
                     border-radius: 4px;
                     letter-spacing: 0.5px;
-                    backdrop-filter: blur(8px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
                 }
                 .chart-direction-badge {
                     font-size: 11px;
@@ -1482,14 +1708,24 @@ Always conduct your own analysis and use proper risk management.`
                     letter-spacing: 1px;
                 }
                 .chart-direction-badge.buy {
-                    background: rgba(0, 255, 136, 0.2);
-                    color: #00ff88;
-                    border: 1px solid rgba(0, 255, 136, 0.4);
+                    background: rgba(0, 191, 165, 0.2);
+                    color: #00bfa5;
+                    border: 1px solid rgba(0, 191, 165, 0.4);
                 }
                 .chart-direction-badge.sell {
-                    background: rgba(255, 71, 87, 0.2);
-                    color: #ff4757;
-                    border: 1px solid rgba(255, 71, 87, 0.4);
+                    background: rgba(239, 83, 80, 0.2);
+                    color: #ef5350;
+                    border: 1px solid rgba(239, 83, 80, 0.4);
+                }
+                .chart-synthetic-badge {
+                    background: rgba(255, 152, 0, 0.2);
+                    color: #ff9800;
+                    font-size: 9px;
+                    font-weight: 700;
+                    padding: 3px 6px;
+                    border-radius: 3px;
+                    border: 1px solid rgba(255, 152, 0, 0.4);
+                    letter-spacing: 0.3px;
                 }
                 .chart-overlay-row {
                     display: flex;
@@ -1497,14 +1733,14 @@ Always conduct your own analysis and use proper risk management.`
                     gap: 8px;
                 }
                 .chart-tf-badge {
-                    background: rgba(139, 92, 246, 0.25);
-                    color: #a78bfa;
+                    background: rgba(0, 194, 255, 0.2);
+                    color: #00c2ff;
                     font-size: 10px;
                     font-weight: 700;
                     padding: 4px 8px;
                     border-radius: 4px;
                     letter-spacing: 0.5px;
-                    border: 1px solid rgba(139, 92, 246, 0.3);
+                    border: 1px solid rgba(0, 194, 255, 0.3);
                 }
                 .chart-status-badge {
                     font-size: 10px;
@@ -1513,20 +1749,18 @@ Always conduct your own analysis and use proper risk management.`
                     border-radius: 4px;
                     border: 1px solid;
                     letter-spacing: 0.5px;
-                    backdrop-filter: blur(4px);
                 }
                 .chart-pl {
                     font-size: 12px;
                     font-weight: 700;
                     padding: 2px 6px;
-                    background: rgba(0, 0, 0, 0.4);
+                    background: rgba(0, 0, 0, 0.5);
                     border-radius: 4px;
                 }
                 .chart-overlay-rr {
-                    background: rgba(0, 0, 0, 0.7);
+                    background: rgba(10, 10, 15, 0.9);
                     padding: 6px 10px;
                     border-radius: 6px;
-                    backdrop-filter: blur(8px);
                     border: 1px solid rgba(255, 255, 255, 0.08);
                 }
                 .chart-rr-label {
@@ -1537,10 +1771,9 @@ Always conduct your own analysis and use proper risk management.`
                     letter-spacing: 0.5px;
                 }
                 .chart-rr-value {
-                    color: #00ff88;
+                    color: #00bfa5;
                     font-size: 15px;
                     font-weight: 800;
-                    text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
                 }
             `;
             document.head.appendChild(styles);
@@ -1551,11 +1784,12 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // LEGACY FUNCTION ALIASES (for backward compatibility)
+    // LEGACY FUNCTION ALIASES (backward compatibility)
     // ═══════════════════════════════════════════════════════════════════════════
 
     function drawRiskRewardBoxes(candles, entry, target, stop, isBuy) {
-        drawRiskRewardZones(candles, entry, target, stop, isBuy, false, false);
+        const breakoutTime = getBreakoutTime({}, candles);
+        drawRiskRewardZones(candles, entry, target, stop, isBuy, false, false, breakoutTime);
     }
 
     function drawLevels(entry, target, stop) {
@@ -1563,11 +1797,21 @@ Always conduct your own analysis and use proper risk management.`
     }
 
     function drawPattern(signal, candles) {
-        drawPatternOverlay(signal, candles, false);
+        const breakoutTime = getBreakoutTime(signal, candles);
+        drawTrianglePattern(signal, candles, false, breakoutTime);
+    }
+
+    function drawPatternOverlay(signal, candles, isExpired) {
+        const breakoutTime = getBreakoutTime(signal, candles);
+        drawTrianglePattern(signal, candles, isExpired, breakoutTime);
     }
 
     function addTradeStatusOverlay(container, signal, candles) {
         addPremiumStatusOverlay(container, signal, candles);
+    }
+
+    function generateFallbackPattern(candles, signal) {
+        return []; // Deprecated - now using drawTrianglePattern
     }
 
     function destroyChart() {

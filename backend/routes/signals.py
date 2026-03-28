@@ -1,376 +1,208 @@
-# signals.py  —  Pipways backend route for GreenXTrades signal ingestion
-# Deploy to: routes/signals.py
-#
-# Mount in main.py:
-#
-#   from routes import signals
-#   app.include_router(signals.router)   # no prefix — route is /signals
-#
-# ⚠️  Do NOT add prefix="/signals" — that would make the route /signals/signals.
+"""
+Signals router — Pipways
+All routes served under /api/signals/* (explicit paths, no router prefix).
+Import source: backend.database (single, clean, no fallback).
+Signal source: GreenXTrades bot only. No seed data here.
+"""
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime, timezone, timedelta
-import logging
 import json
+import logging
+from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from backend.database import database
 
 logger = logging.getLogger(__name__)
 
-# redirect_slashes=False prevents FastAPI from creating the /signals/ redirect
-# that can silently convert POST → GET through a proxy.
-router = APIRouter(redirect_slashes=False)
+# ── Router ────────────────────────────────────────────────────────────────────
+# No prefix — full paths are declared on each route decorator.
+# This prevents the double-prefix bug (/api/api/signals/...) and
+# avoids the 302-redirect trap caused by the SPA catch-all 404 handler.
+router = APIRouter(tags=["signals"])
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DATABASE CONNECTION
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def get_database():
-    """Get database connection from main app"""
-    from backend.database import database
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def get_db():
+    if not database:
+        raise HTTPException(status_code=500, detail="Database not initialized")
     return database
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# REQUEST SCHEMAS
-# ═══════════════════════════════════════════════════════════════════════════════
+def _parse_json_field(value):
+    """Safely parse a JSON string field; return None on failure."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value          # already parsed (e.g. asyncpg returned a list)
+    try:
+        return json.loads(value)
+    except Exception:
+        return None
 
-class PatternPoint(BaseModel):
-    time: int
-    price: float
 
-class BreakoutPoint(BaseModel):
-    time: int
-    price: float
+def _hydrate(row: dict) -> dict:
+    """Parse JSON text columns so the frontend receives real arrays/objects."""
+    for field in ("pattern_points", "candles", "breakout_point", "pattern_lines"):
+        if field in row:
+            row[field] = _parse_json_field(row[field])
+    return row
 
-class SignalIn(BaseModel):
-    # Core
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
+class SignalCreate(BaseModel):
     symbol: str
-    direction: str                          # "BUY" | "SELL"
-    entry: str                              # sent as string from bot
-    target: str                             # TP
-    stop: str                               # SL
-
-    # Metadata
-    confidence: int = 50
-    asset_type: str = "forex"
-    country: str = "all"
-    expires_in_hours: int = 24
-
-    # Pattern / structure
-    pattern: str = "BREAKOUT"
-    structure: str = "BOS"
-    timeframe: str = "M5"
-
-    # Chart overlay
-    pattern_points: List[PatternPoint] = Field(default_factory=list)
-    breakout_point: Optional[BreakoutPoint] = None
-
-    # Enhanced Signals routing — MUST be True for dashboard to show the signal
-    is_pattern_idea: bool = False
-
-    # SMC context (informational)
-    bias_d1: Optional[str] = None
-    bias_h4: Optional[str] = None
-    bos_m5: Optional[str] = None
-
-    # Test signal marker
-    test_signal: Optional[bool] = False
-
-    class Config:
-        extra = "allow"     # ignore any extra fields the bot adds in future
+    direction: str
+    entry: str
+    target: str
+    stop: str
+    entry_price: Optional[float] = None
+    take_profit: Optional[float] = None
+    stop_loss: Optional[float] = None
+    confidence: Optional[int] = 70
+    ai_confidence: Optional[int] = 70
+    asset_type: Optional[str] = "forex"
+    country: Optional[str] = "all"
+    pattern: Optional[str] = "BREAKOUT"
+    pattern_name: Optional[str] = "Breakout"
+    timeframe: Optional[str] = "M5"
+    pattern_points: Optional[str] = None   # JSON string
+    pattern_lines: Optional[str] = None    # JSON string
+    candles: Optional[str] = None          # JSON string
+    breakout_point: Optional[str] = None   # JSON string
+    is_pattern_idea: Optional[bool] = True
+    is_published: Optional[bool] = True
+    expires_at: Optional[datetime] = None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# POST /signals — Create signal from bot
-# ═══════════════════════════════════════════════════════════════════════════════
+# ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.post("/signals")
-async def create_signal(payload: SignalIn):
+@router.get("/api/signals/enhanced")
+async def get_enhanced_signals(
+    limit: int = 50,
+    asset_type: Optional[str] = None,
+    direction: Optional[str] = None,
+):
     """
-    Receive a structured SMC signal from GreenXTrades bot and save to DB.
-    Returns 201 on success so the bot logs ✅.
+    Primary endpoint consumed by the Enhanced Signals dashboard panel.
+    Returns active, published, non-expired signals in descending creation order.
     """
-    db = get_database()
-    
     try:
-        logger.info(
-            f"[signals] ▶ Received {payload.symbol} {payload.direction} "
-            f"@ {payload.entry} | confidence={payload.confidence} "
-            f"test={payload.test_signal}"
-        )
+        db = get_db()
 
-        # Convert pattern_points to JSON string
-        pattern_points_json = None
-        if payload.pattern_points:
-            pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points])
+        # Build query — use raw SELECT * for schema-lag resilience
+        # (avoids missing-column errors when a new migration hasn't landed yet)
+        where_clauses = [
+            "status = 'active'",
+            "is_published = TRUE",
+            "(expires_at IS NULL OR expires_at > NOW())",
+        ]
 
-        # Calculate expiry
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=payload.expires_in_hours)
+        if asset_type:
+            # Simple equality; asset_type comes from our own query param, not user input
+            where_clauses.append(f"asset_type = '{asset_type.lower()}'")
 
-        # Insert into database
-        query = """
-            INSERT INTO signals (
-                symbol, direction, entry, target, stop,
-                confidence, ai_confidence, asset_type, country,
-                pattern, timeframe, is_pattern_idea,
-                pattern_points, status, is_published,
-                created_at, expires_at
-            ) VALUES (
-                :symbol, :direction, :entry, :target, :stop,
-                :confidence, :confidence, :asset_type, :country,
-                :pattern, :timeframe, :is_pattern_idea,
-                :pattern_points, 'active', TRUE,
-                :created_at, :expires_at
-            )
-            RETURNING id
-        """
+        if direction and direction.upper() in ("BUY", "SELL"):
+            where_clauses.append(f"direction = '{direction.upper()}'")
 
-        params = {
-            "symbol": payload.symbol,
-            "direction": payload.direction.upper(),
-            "entry": payload.entry,
-            "target": payload.target,
-            "stop": payload.stop,
-            "confidence": payload.confidence,
-            "asset_type": payload.asset_type,
-            "country": payload.country,
-            "pattern": payload.pattern,
-            "timeframe": payload.timeframe,
-            "is_pattern_idea": payload.is_pattern_idea,
-            "pattern_points": pattern_points_json,
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": expires_at,
-        }
+        where_sql = " AND ".join(where_clauses)
 
-        result = await db.fetch_one(query, params)
-        signal_id = result["id"] if result else None
-
-        logger.info(
-            f"[signals] ✅ {payload.symbol} {payload.direction} saved | id={signal_id}"
-        )
-
-        return JSONResponse(
-            status_code=201,
-            content={
-                "ok": True,
-                "signal_id": signal_id,
-                "symbol": payload.symbol,
-                "direction": payload.direction,
-                "message": "Signal received and saved.",
-            },
-        )
-
-    except Exception as e:
-        logger.exception(f"[signals] ❌ Failed to save signal: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"ok": False, "error": str(e)},
-        )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# GET /signals/enhanced — Read signals for frontend dashboard
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/signals/enhanced")
-async def get_enhanced_signals(limit: int = 50):
-    """
-    Return active, non-expired signals.
-    Called by dashboard to populate the Enhanced Signals panel.
-    """
-    db = get_database()
-    
-    try:
-        query = """
-            SELECT * FROM signals 
-            WHERE status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
+        # Use :limit so database.py's param replacement maps it to $1
+        query = f"""
+            SELECT * FROM signals
+            WHERE {where_sql}
             ORDER BY created_at DESC
             LIMIT :limit
         """
-        
+
         rows = await db.fetch_all(query, {"limit": limit})
-        
-        if not rows:
-            logger.info("[signals] GET /signals/enhanced — no active signals")
-            return []
-        
-        # Convert rows to dicts and parse JSON fields
-        signals = []
-        for row in rows:
-            signal = dict(row)
-            
-            # Parse JSON fields if present
-            if signal.get('pattern_points'):
-                try:
-                    signal['pattern_points'] = json.loads(signal['pattern_points'])
-                except:
-                    signal['pattern_points'] = None
-                    
-            if signal.get('pattern_lines'):
-                try:
-                    signal['pattern_lines'] = json.loads(signal['pattern_lines'])
-                except:
-                    signal['pattern_lines'] = None
-            
-            # Convert datetime to ISO string for JSON
-            for key in ['created_at', 'expires_at', 'updated_at']:
-                if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                    signal[key] = signal[key].isoformat()
-            
-            signals.append(signal)
-        
-        logger.info(f"[signals] GET /signals/enhanced — returning {len(signals)} signals")
-        return signals
+        return [_hydrate(dict(row)) for row in rows]
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception(f"[signals] GET /signals/enhanced error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"[signals] Error in /api/signals/enhanced: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch enhanced signals")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# GET /signals/active — Filtered signals (legacy compatibility)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/signals/active")
-async def get_active_signals(
-    country: str = "all",
-    asset_type: str = "forex",
-    limit: int = 50
-):
+@router.post("/api/signals")
+async def create_signal(payload: SignalCreate):
     """
-    Return filtered active signals. Has default params to avoid 422 errors.
+    Called by the GreenXTrades bot via the signal bridge.
+    Accepts a fully-formed signal and inserts it into the database.
     """
-    db = get_database()
-    
     try:
-        query = """
-            SELECT * FROM signals 
-            WHERE status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
-        """
-        params = {"limit": limit}
-        
-        if country and country != "all":
-            query += " AND country = :country"
-            params["country"] = country
-            
-        if asset_type and asset_type != "all":
-            query += " AND asset_type = :asset_type"
-            params["asset_type"] = asset_type
-        
-        query += " ORDER BY created_at DESC LIMIT :limit"
-        
-        rows = await db.fetch_all(query, params)
-        signals = [dict(row) for row in rows] if rows else []
-        
-        # Convert datetime fields
-        for signal in signals:
-            for key in ['created_at', 'expires_at', 'updated_at']:
-                if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                    signal[key] = signal[key].isoformat()
-        
-        logger.info(f"[signals] GET /signals/active — returning {len(signals)} signals")
-        return signals
+        db = get_db()
 
+        data = payload.dict()
+
+        # Default expiry: 4 hours from now
+        if data.get("expires_at") is None:
+            data["expires_at"] = datetime.utcnow() + timedelta(hours=4)
+
+        # Ensure JSON fields are stored as strings
+        for field in ("pattern_points", "pattern_lines", "candles", "breakout_point"):
+            val = data.get(field)
+            if val is not None and not isinstance(val, str):
+                data[field] = json.dumps(val)
+
+        created = await db.create_signal(data)
+        return {"success": True, "signal": dict(created)}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception(f"[signals] GET /signals/active error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"[signals] Error in POST /api/signals: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create signal")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# GET /signals/{id} — Single signal
-# ═══════════════════════════════════════════════════════════════════════════════
+@router.get("/api/signals/active")
+async def get_active_signals(limit: int = 50):
+    """Alias for active signals — identical result to /api/signals/enhanced."""
+    try:
+        db = get_db()
+        rows = await db.get_active_signals(limit=limit)
+        return [_hydrate(row) for row in rows]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[signals] Error in /api/signals/active: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch active signals")
 
-@router.get("/signals/{signal_id}")
+
+# NOTE: This route MUST be declared before /{signal_id} to avoid FastAPI
+# matching "active" or "enhanced" as an integer ID.
+@router.get("/api/signals/{signal_id}")
 async def get_signal(signal_id: int):
-    """Return a single signal by ID."""
-    db = get_database()
-    
+    """Return a single signal by primary key."""
     try:
-        query = "SELECT * FROM signals WHERE id = :signal_id"
-        row = await db.fetch_one(query, {"signal_id": signal_id})
-        
-        if not row:
-            return JSONResponse(status_code=404, content={"error": "Signal not found"})
-        
-        signal = dict(row)
-        
-        # Parse JSON fields
-        if signal.get('pattern_points'):
-            try:
-                signal['pattern_points'] = json.loads(signal['pattern_points'])
-            except:
-                pass
-                
-        if signal.get('pattern_lines'):
-            try:
-                signal['pattern_lines'] = json.loads(signal['pattern_lines'])
-            except:
-                pass
-        
-        # Convert datetime fields
-        for key in ['created_at', 'expires_at', 'updated_at']:
-            if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                signal[key] = signal[key].isoformat()
-        
-        return signal
-
+        db = get_db()
+        signal = await db.get_signal_by_id(signal_id)
+        if not signal:
+            raise HTTPException(status_code=404, detail=f"Signal {signal_id} not found")
+        return _hydrate(signal)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception(f"[signals] GET /signals/{signal_id} error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"[signals] Error fetching signal {signal_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch signal")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DELETE /signals/{id} — Soft delete (mark inactive)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.delete("/signals/{signal_id}")
-async def delete_signal(signal_id: int):
-    """Soft delete a signal (mark as inactive)."""
-    db = get_database()
-    
+@router.delete("/api/signals/{signal_id}")
+async def expire_signal(signal_id: int):
+    """Soft-delete a signal by setting its status to 'expired'."""
     try:
-        query = "UPDATE signals SET status = 'inactive' WHERE id = :signal_id RETURNING id"
-        result = await db.fetch_one(query, {"signal_id": signal_id})
-        
-        if not result:
-            return JSONResponse(status_code=404, content={"error": "Signal not found"})
-        
-        logger.info(f"[signals] ✅ Deleted signal #{signal_id}")
-        return {"id": signal_id, "status": "deleted"}
-
+        db = get_db()
+        # Use :id so database.py maps it to $1
+        await db.execute(
+            "UPDATE signals SET status = 'expired', updated_at = NOW() WHERE id = :id",
+            {"id": signal_id},
+        )
+        return {"success": True, "message": f"Signal {signal_id} expired"}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception(f"[signals] DELETE /signals/{signal_id} error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# POST /signals/expire-old — Cleanup expired signals
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.post("/signals/expire-old")
-async def expire_old_signals():
-    """Mark expired signals as inactive. Can be called by cron job."""
-    db = get_database()
-    
-    try:
-        query = """
-            UPDATE signals 
-            SET status = 'expired' 
-            WHERE status = 'active' 
-            AND expires_at < NOW()
-            RETURNING id
-        """
-        rows = await db.fetch_all(query)
-        count = len(rows) if rows else 0
-        
-        logger.info(f"[signals] ✅ Expired {count} old signals")
-        return {"expired_count": count}
-
-    except Exception as e:
-        logger.exception(f"[signals] expire-old error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"[signals] Error expiring signal {signal_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to expire signal")

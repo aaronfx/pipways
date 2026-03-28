@@ -174,82 +174,86 @@ class EnhancedSignalsPage {
     // ── Card Rendering ─────────────────────────────────────────────────────────
 
     renderSignalCard(signal) {
-        const pattern = signal.pattern_name || signal.pattern || 'Breakout';
-        const status  = this.calculateStatus(signal);
-        const rr      = this._calcRR(signal);
+        const pattern   = signal.pattern_name || signal.pattern || 'Breakout';
+        const status    = this.calculateStatus(signal);
+        const rr        = this._calcRR(signal);
+        const isBuy     = (signal.direction || '').toUpperCase().includes('BUY');
+        const conf      = signal.confidence || 70;
+
+        // Status badge — live-badge for ACTIVE, plain badge for others
+        const statusBadgeHtml = status.class === 'active'
+            ? `<span class="live-badge">LIVE</span>`
+            : `<span class="badge ${
+                status.class === 'pending' ? 'badge-warning' :
+                status.class === 'expired' ? 'badge-secondary' :
+                status.class === 'target_hit' ? 'badge-success' :
+                'badge-danger'
+              }">${status.icon} ${status.text}</span>`;
 
         return `
-            <div class="signal-card-pro" data-signal-id="${signal.id}"
-                 onclick="window.enhancedSignals.viewAnalysis(${signal.id})"
-                 style="background:linear-gradient(135deg,#1a1f2e 0%,#0d1117 100%);
-                        border:1px solid #30363d;border-radius:12px;overflow:hidden;
-                        box-shadow:0 4px 20px rgba(0,0,0,0.4);cursor:pointer;
-                        transition:border-color .2s,transform .2s;">
+            <div class="signal-card rounded-xl overflow-hidden cursor-pointer"
+                 data-signal-id="${signal.id}"
+                 onclick="window.enhancedSignals.viewAnalysis(${signal.id})">
 
-                <!-- Header -->
-                <div style="display:flex;justify-content:space-between;align-items:center;
-                            padding:14px 16px;border-bottom:1px solid #30363d;background:rgba(0,0,0,0.3);">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                        <div style="background:${signal.direction === 'BUY' ? 'rgba(0,208,132,0.2)' : 'rgba(255,71,87,0.2)'};
-                                    color:${signal.direction === 'BUY' ? '#00d084' : '#ff4757'};
-                                    padding:5px 11px;border-radius:6px;font-weight:700;font-size:15px;">
-                            ${signal.symbol}
-                        </div>
-                        <div style="background:rgba(255,255,255,0.07);color:#8b949e;
-                                    padding:3px 8px;border-radius:4px;font-size:11px;">
-                            ${signal.timeframe || 'M5'}
-                        </div>
-                        ${pattern !== 'Breakout' ? `
-                        <div style="background:rgba(88,166,255,0.15);color:#58a6ff;
-                                    padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;">
-                            ${pattern}
-                        </div>` : ''}
+                <!-- ── Header ── -->
+                <div class="flex items-center justify-between gap-2 p-3 border-b border-gray-800 flex-wrap">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-bold text-white text-base">${signal.symbol}</span>
+                        <span class="timeframe-badge">${signal.timeframe || 'M5'}</span>
+                        ${pattern !== 'Breakout' ? `<span class="pattern-badge">${pattern}</span>` : ''}
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                        <div style="background:${signal.direction === 'BUY' ? '#00d084' : '#ff4757'};
-                                    color:white;padding:5px 12px;border-radius:6px;font-weight:700;font-size:13px;">
-                            ${signal.direction === 'BUY' ? '▲ BUY' : '▼ SELL'}
-                        </div>
-                        <div style="background:${status.bg};color:${status.color};
-                                    padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">
-                            ${status.icon} ${status.text}
-                        </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span class="${isBuy ? 'buy-stop' : 'sell-stop'}">
+                            ${isBuy ? '▲ BUY' : '▼ SELL'}
+                        </span>
+                        ${statusBadgeHtml}
                     </div>
                 </div>
 
-                <!-- Price Levels -->
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#30363d;">
-                    <div style="background:#0d1117;padding:12px;text-align:center;">
-                        <div style="color:#8b949e;font-size:10px;margin-bottom:3px;text-transform:uppercase;">Entry</div>
-                        <div style="color:#fff;font-weight:700;font-size:15px;font-family:monospace;">${signal.entry}</div>
+                <!-- ── Price Levels ── -->
+                <div class="trade-levels px-3 pt-3">
+                    <div class="level-item">
+                        <span class="level-label">Entry</span>
+                        <span class="level-value level-entry">${signal.entry}</span>
                     </div>
-                    <div style="background:#0d1117;padding:12px;text-align:center;">
-                        <div style="color:#8b949e;font-size:10px;margin-bottom:3px;text-transform:uppercase;">Target</div>
-                        <div style="color:#00d084;font-weight:700;font-size:15px;font-family:monospace;">${signal.target}</div>
+                    <div class="level-item">
+                        <span class="level-label">Target</span>
+                        <span class="level-value level-target">${signal.target}</span>
                     </div>
-                    <div style="background:#0d1117;padding:12px;text-align:center;">
-                        <div style="color:#8b949e;font-size:10px;margin-bottom:3px;text-transform:uppercase;">Stop</div>
-                        <div style="color:#ff4757;font-weight:700;font-size:15px;font-family:monospace;">${signal.stop}</div>
+                    <div class="level-item">
+                        <span class="level-label">Stop</span>
+                        <span class="level-value level-stop">${signal.stop}</span>
                     </div>
                 </div>
 
-                <!-- Lightweight grid chart — always rendered (ProChart generates fallback candles) -->
-                <div style="position:relative;height:200px;background:#0a0a0f;">
+                <!-- ── Confidence Bar ── -->
+                <div class="px-3 pb-2">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-muted" style="font-size:10px;">Confidence</span>
+                        <span class="text-muted" style="font-size:10px;">${conf}%</span>
+                    </div>
+                    <div class="sentiment-bar">
+                        <div class="sentiment-fill ${isBuy ? 'sentiment-bullish' : 'sentiment-bearish'}"
+                             style="width:${conf}%"></div>
+                    </div>
+                </div>
+
+                <!-- ── Chart ── -->
+                <div class="relative mx-3 mb-3 rounded-lg overflow-hidden" style="height:180px;background:#0a0a0f;">
                     <div id="chart-${signal.id}" style="width:100%;height:100%;"></div>
                 </div>
 
-                <!-- Footer -->
-                <div style="padding:10px 16px;border-top:1px solid #30363d;
-                            display:flex;justify-content:space-between;align-items:center;
-                            background:rgba(0,0,0,0.2);">
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <span style="color:#6b7280;font-size:11px;">${signal.confidence || 70}% confidence</span>
-                        ${rr ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;
-                                           padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">
-                                    R:R ${rr.toFixed(1)}
-                                </span>` : ''}
+                <!-- ── Footer ── -->
+                <div class="flex items-center justify-between px-3 pb-3 gap-2">
+                    <div class="flex items-center gap-2">
+                        ${rr ? `<span class="badge badge-success">R:R ${rr.toFixed(1)}</span>` : ''}
+                        <span class="text-muted" style="font-size:11px;">
+                            ${new Date(signal.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                        </span>
                     </div>
-                    <div style="color:#58a6ff;font-size:12px;font-weight:600;">View Full Analysis →</div>
+                    <button class="learn-btn" onclick="event.stopPropagation(); window.enhancedSignals.viewAnalysis(${signal.id})">
+                        View Analysis
+                    </button>
                 </div>
             </div>`;
     }

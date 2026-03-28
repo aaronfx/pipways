@@ -23,18 +23,21 @@
 
 class EnhancedSignalsPage {
     constructor() {
-        this.charts           = new Map(); // signalId → LightweightCharts instance (grid)
+        this.charts           = new Map();
         this.signals          = [];
         this.activeTab        = 'ai';
         this._refreshInterval = null;
-        console.log('[EnhancedSignals] Instance created v21.0');
+        this._sectionVisible  = false;   // #9: pause interval when section hidden
+        this._initialized     = false;   // #17: reset flag lives here too
+        console.log('[EnhancedSignals] Instance created v21.1');
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     init() {
-        console.log('[EnhancedSignals] init() v21.0');
-        this.activeTab = 'ai';
+        console.log('[EnhancedSignals] init() v21.1');
+        this.activeTab       = 'ai';
+        this._sectionVisible = true;    // #9: mark visible
 
         // Tab buttons
         const aiTab  = document.getElementById('aiDrivenTab');
@@ -46,6 +49,7 @@ class EnhancedSignalsPage {
                 aiTab.classList.replace('text-gray-400', 'text-white');
                 patTab.classList.replace('bg-purple-600', 'bg-gray-700');
                 patTab.classList.replace('text-white', 'text-gray-400');
+                // #8: server-side filter — no is_pattern_idea param for AI tab
                 this.loadSignals();
             });
             patTab.addEventListener('click', () => {
@@ -54,6 +58,7 @@ class EnhancedSignalsPage {
                 patTab.classList.replace('text-gray-400', 'text-white');
                 aiTab.classList.replace('bg-purple-600', 'bg-gray-700');
                 aiTab.classList.replace('text-white', 'text-gray-400');
+                // #8: server-side filter — pass is_pattern_idea=true
                 this.loadSignals();
             });
         }
@@ -66,12 +71,24 @@ class EnhancedSignalsPage {
         if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) this.closeModal(); });
 
         this.loadSignals();
-        this._refreshInterval = setInterval(() => this.loadSignals(), 30000);
+        this._refreshInterval = setInterval(() => {
+            if (this._sectionVisible) this.loadSignals(); // #9: skip when hidden
+        }, 30000);
     }
+
+    // Called by dashboard when section becomes hidden (#9)
+    pause()  { this._sectionVisible = false; }
+    resume() { this._sectionVisible = true;  this.loadSignals(); }
 
     destroy() {
         if (this._refreshInterval) { clearInterval(this._refreshInterval); this._refreshInterval = null; }
-        this.charts.forEach(c => c.remove());
+        this._sectionVisible = false;
+        this._initialized    = false;  // #17: reset so init() fires again on next visit
+        // #7: disconnect observers before removing charts
+        this.charts.forEach(({ chart, observer }) => {
+            if (observer) observer.disconnect();
+            if (chart)    chart.remove();
+        });
         this.charts.clear();
         if (window.ProChart) window.ProChart.destroy();
     }
@@ -80,53 +97,21 @@ class EnhancedSignalsPage {
 
     async loadSignals() {
         const container = document.getElementById('enhanced-signals-container');
-        if (!container) {
-            console.warn('[EnhancedSignals] Container not found');
-            return;
-        }
+        if (!container) { console.warn('[EnhancedSignals] Container not found'); return; }
 
         try {
-            const response = await fetch('/api/signals/enhanced');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            // #8: server-side tab filter — pattern tab sends is_pattern_idea=true
+            const params = new URLSearchParams();
+            if (this.activeTab === 'pattern') params.set('is_pattern_idea', 'true');
+
+            const response = await fetch('/api/signals/enhanced?' + params.toString());
+            if (!response.ok) throw new Error('HTTP ' + response.status);
 
             const signals = await response.json();
             this.signals  = signals || [];
 
-            this._updateStats();
-
-            if (this.signals.length === 0) {
-                this.charts.forEach(c => c.remove());
-                this.charts.clear();
-                container.innerHTML = `
-                    <div class="col-span-full" style="text-align:center;padding:60px 20px;">
-                        <div style="font-size:48px;margin-bottom:16px;">📊</div>
-                        <h3 style="color:#9ca3af;font-size:1.1rem;font-weight:600;margin-bottom:8px;">No Active Signals</h3>
-                        <p style="color:#6b7280;font-size:.875rem;">Waiting for trading opportunities…</p>
-                    </div>`;
-                return;
-            }
-
-            const filtered = this.activeTab === 'pattern'
-                ? this.signals.filter(s => s.pattern_name || s.pattern)
-                : this.signals;
-
-            // Destroy old chart instances BEFORE wiping their DOM containers
-            this.charts.forEach(c => c.remove());
-            this.charts.clear();
-
-            container.innerHTML = filtered.length
-                ? filtered.map(s => this.renderSignalCard(s)).join('')
-                : `<div class="col-span-full" style="text-align:center;padding:40px;color:#6b7280;">
-                       No pattern-based signals available.
-                   </div>`;
-
-            // Render grid charts after DOM settles; ensure LightweightCharts is loaded first
-            setTimeout(async () => {
-                if (window.ProChart && window.ProChart.ensureLoaded) {
-                    await window.ProChart.ensureLoaded();
-                }
-                filtered.forEach(s => this.renderGridChart(s));
-            }, 100);
+            this._updateStats();   // #4: also fetches win rate async
+            this._renderGrid();
 
         } catch (err) {
             console.error('[EnhancedSignals] Load error:', err);
@@ -138,13 +123,49 @@ class EnhancedSignalsPage {
         }
     }
 
+    _renderGrid() {
+        const container = document.getElementById('enhanced-signals-container');
+        if (!container) return;
+
+        if (this.signals.length === 0) {
+            // #7: destroy before wiping DOM
+            this._destroyGridCharts();
+            container.innerHTML = `
+                <div class="col-span-full" style="text-align:center;padding:60px 20px;">
+                    <div style="font-size:48px;margin-bottom:16px;">📊</div>
+                    <h3 style="color:#9ca3af;font-size:1.1rem;font-weight:600;margin-bottom:8px;">No Active Signals</h3>
+                    <p style="color:#6b7280;font-size:.875rem;">Waiting for trading opportunities…</p>
+                </div>`;
+            return;
+        }
+
+        // #7: destroy old observers + charts BEFORE wiping DOM containers
+        this._destroyGridCharts();
+
+        container.innerHTML = this.signals.map(s => this.renderSignalCard(s)).join('');
+
+        setTimeout(async () => {
+            if (window.ProChart && window.ProChart.ensureLoaded) {
+                await window.ProChart.ensureLoaded();
+            }
+            this.signals.forEach(s => this.renderGridChart(s));
+        }, 100);
+    }
+
+    _destroyGridCharts() {
+        // #7: disconnect ResizeObserver for every card before chart.remove()
+        this.charts.forEach(({ chart, observer }) => {
+            if (observer) observer.disconnect();
+            if (chart)    chart.remove();
+        });
+        this.charts.clear();
+    }
+
     // ── Stats Row ──────────────────────────────────────────────────────────────
 
     _updateStats() {
-        const active = this.signals.filter(s => {
-            const mins = (Date.now() - new Date(s.created_at).getTime()) / 60000;
-            return mins < 60;
-        }).length;
+        // Active = signals with status 'active' (from DB, not time-based)
+        const active = this.signals.filter(s => (s.status || 'active') === 'active').length;
 
         const avgConf = this.signals.length
             ? Math.round(this.signals.reduce((sum, s) => sum + (s.confidence || 70), 0) / this.signals.length)
@@ -157,8 +178,18 @@ class EnhancedSignalsPage {
 
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
         set('enhanced-stat-active',     active);
-        set('enhanced-stat-confidence', avgConf != null ? (avgConf + '%') : '—');
-        set('enhanced-stat-rr',         avgRR   != null ? (avgRR + 'R')  : '—');
+        set('enhanced-stat-confidence', avgConf != null ? avgConf + '%' : '—');
+        set('enhanced-stat-rr',         avgRR   != null ? avgRR + 'R'  : '—');
+
+        // #4: Fetch win rate separately (async, non-blocking)
+        fetch('/api/signals/winrate?days=7')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data && data.win_rate_pct != null) {
+                    set('enhanced-stat-winrate', data.win_rate_pct + '%');
+                }
+            })
+            .catch(() => {});   // silent — winrate is a nice-to-have
     }
 
     _calcRR(signal) {
@@ -173,22 +204,20 @@ class EnhancedSignalsPage {
 
     // ── Status ─────────────────────────────────────────────────────────────────
 
+    // #2: calculateStatus reads DB status — bot updates via /close endpoints
     calculateStatus(signal) {
-        if (window.ProChart && window.ProChart.tradeState) {
-            const candles      = signal.candles;
-            const currentPrice = (candles && candles.length)
-                ? candles[candles.length - 1].close
-                : parseFloat(signal.entry);
-            const ts = window.ProChart.tradeState(signal, currentPrice);
-            return { text: ts.label, class: ts.state.toLowerCase(), icon: ts.icon, bg: ts.bg || 'rgba(107,114,128,0.2)', color: ts.color };
-        }
+        const dbStatus = (signal.status || 'active').toLowerCase();
+        if (dbStatus === 'closed_tp')     return { text: 'TARGET HIT',  class: 'target_hit', icon: '✓', bg: 'rgba(0,255,136,0.2)',   color: '#00ff88' };
+        if (dbStatus === 'closed_sl')     return { text: 'STOPPED OUT', class: 'stopped',    icon: '✗', bg: 'rgba(255,71,87,0.2)',   color: '#ff4757' };
+        if (dbStatus === 'closed_manual') return { text: 'CLOSED',      class: 'expired',    icon: '⚪', bg: 'rgba(139,148,158,0.2)', color: '#8b949e' };
+        if (dbStatus === 'expired')       return { text: 'EXPIRED',     class: 'expired',    icon: '⚪', bg: 'rgba(139,148,158,0.2)', color: '#8b949e' };
+        // Still active — time-based PENDING vs LIVE TRADE
         const mins = (Date.now() - new Date(signal.created_at)) / 60000;
-        if (mins <  5) return { text: 'PENDING', class: 'pending', icon: '⏳', bg: 'rgba(255,193,7,0.2)',   color: '#ffc107' };
-        if (mins < 60) return { text: 'ACTIVE',  class: 'active',  icon: '●',  bg: 'rgba(0,208,132,0.2)',  color: '#00d084' };
-        return              { text: 'EXPIRED', class: 'expired', icon: '⚪', bg: 'rgba(139,148,158,0.2)', color: '#8b949e' };
+        if (mins < 5) return { text: 'PENDING',    class: 'pending', icon: '⏳', bg: 'rgba(255,193,7,0.2)',  color: '#ffc107' };
+        return             { text: 'LIVE TRADE', class: 'active',  icon: '●',  bg: 'rgba(0,201,167,0.2)', color: '#00c9a7' };
     }
 
-    // ── Grid Chart (lightweight — one per card) ────────────────────────────────
+    // ── Grid Chart (#7 — {chart,observer} stored together so both can be cleaned up) ──
 
     renderGridChart(signal) {
         const container = document.getElementById('chart-' + signal.id);
@@ -199,41 +228,36 @@ class EnhancedSignalsPage {
                 container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:12px;">Chart lib not ready</div>';
                 return;
             }
+            // Grid cards have no candles (/enhanced excludes them) — always use validated fallback
             const candles = (window.ProChart && window.ProChart.validateCandles)
-                ? window.ProChart.validateCandles(signal)
-                : (signal.candles || []);
+                ? window.ProChart.validateCandles(signal) : [];
             if (!candles || candles.length < 5) {
                 container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:12px;">No chart data</div>';
                 return;
             }
-            const isExpired = signal.expires_at
-                ? new Date(signal.expires_at) < new Date()
-                : (Date.now() - new Date(signal.created_at)) / 60000 > 60;
-            const upColor   = isExpired ? '#1d4a38' : '#00d084';
-            const downColor = isExpired ? '#4a1d1d' : '#ff4757';
+            const isClosed  = ['closed_tp','closed_sl','closed_manual','expired'].includes(signal.status || '');
+            const upColor   = isClosed ? '#1d4a38' : '#00d084';
+            const downColor = isClosed ? '#4a1d1d' : '#ff4757';
             const chart = LC.createChart(container, {
                 width: container.clientWidth, height: container.clientHeight,
                 layout: { background: { type: 'solid', color: '#0a0a0f' }, textColor: '#6b7280', fontFamily: "'Inter',sans-serif" },
-                grid: { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
-                crosshair: { mode: LC.CrosshairMode.None },
+                grid:   { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
+                crosshair:       { mode: LC.CrosshairMode.None },
                 rightPriceScale: { borderColor: 'rgba(255,255,255,0.05)', scaleMargins: { top: 0.1, bottom: 0.1 } },
-                timeScale: { borderColor: 'rgba(255,255,255,0.05)', visible: false },
+                timeScale:       { borderColor: 'rgba(255,255,255,0.05)', visible: false },
                 handleScroll: false, handleScale: false,
             });
-            this.charts.set(signal.id, chart);
-            const cs = chart.addCandlestickSeries({
-                upColor, downColor, borderUpColor: upColor, borderDownColor: downColor, wickUpColor: upColor, wickDownColor: downColor,
-            });
+            const cs = chart.addCandlestickSeries({ upColor, downColor, borderUpColor: upColor, borderDownColor: downColor, wickUpColor: upColor, wickDownColor: downColor });
             cs.setData(candles);
             const entry = parseFloat(signal.entry), target = parseFloat(signal.target), stop = parseFloat(signal.stop);
             if (entry)  cs.createPriceLine({ price: entry,  color: '#ffffff', lineWidth: 1, lineStyle: LC.LineStyle.Solid,  axisLabelVisible: false });
             if (target) cs.createPriceLine({ price: target, color: '#00d084', lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
             if (stop)   cs.createPriceLine({ price: stop,   color: '#ff4757', lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
             chart.timeScale().fitContent();
-            const ro = new ResizeObserver(function(entries) {
-                if (chart && entries[0]) chart.resize(entries[0].contentRect.width, entries[0].contentRect.height);
-            });
+            // #7: store observer alongside chart so _destroyGridCharts() can disconnect it
+            const ro = new ResizeObserver((entries) => { if (chart && entries[0]) chart.resize(entries[0].contentRect.width, entries[0].contentRect.height); });
             ro.observe(container);
+            this.charts.set(signal.id, { chart, observer: ro });
         } catch (err) {
             console.error('[GridChart] ' + signal.symbol + ':', err);
             container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:12px;">Chart error</div>';
@@ -397,12 +421,46 @@ class EnhancedSignalsPage {
         return D[pattern] || ('The ' + pattern + ' pattern signals a potential trading opportunity. Monitor key price levels for confirmation of the expected directional move.');
     }
 
-    // ── Modal — competitor-grade layout ───────────────────────────────────────
+    // ── Modal — opens skeleton immediately, fetches full signal (with candles) async ──
 
     viewAnalysis(signalId) {
+        // Use cached signal for immediate render
         const signal = this.signals.find(s => s.id === signalId);
         if (!signal) return;
 
+        this._openModal(signal);
+
+        // #6: Fetch full signal row (includes candles) for PRO chart
+        fetch('/api/signals/' + signalId)
+            .then(r => r.ok ? r.json() : null)
+            .then(full => {
+                if (full && window.ProChart) {
+                    const chartDiv   = document.getElementById('modal-chart-container');
+                    const loadingDiv = document.getElementById('sig-chart-loading');
+                    if (chartDiv) chartDiv.style.display = 'block';
+                    window.ProChart.create('modal-chart-container', full)
+                        .then(() => { if (loadingDiv) loadingDiv.style.display = 'none'; })
+                        .catch(err => {
+                            console.error('[Modal] ProChart error:', err);
+                            if (loadingDiv) loadingDiv.style.display = 'none';
+                            if (chartDiv) chartDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:13px;">Chart error: ' + err.message + '</div>';
+                        });
+                }
+            })
+            .catch(() => {
+                // Fallback: try rendering with cached signal (no candles — uses fallback data)
+                if (window.ProChart) {
+                    const chartDiv   = document.getElementById('modal-chart-container');
+                    const loadingDiv = document.getElementById('sig-chart-loading');
+                    if (chartDiv) chartDiv.style.display = 'block';
+                    window.ProChart.create('modal-chart-container', signal)
+                        .then(() => { if (loadingDiv) loadingDiv.style.display = 'none'; })
+                        .catch(() => { if (loadingDiv) loadingDiv.style.display = 'none'; });
+                }
+            });
+    }
+
+    _openModal(signal) {
         const pattern      = signal.pattern_name || signal.pattern || 'Breakout';
         const rr           = this._calcRR(signal);
         const isBuy        = (signal.direction || '').toUpperCase().includes('BUY');
@@ -496,7 +554,7 @@ class EnhancedSignalsPage {
                 <div id="modal-chart-container" style="width:100%;height:400px;display:none;"></div>
             </div>
 
-            <!-- ── Trade Idea section (Image 4) ── -->
+            <!-- ── Trade Idea section ── -->
             <div class="sig-trade-idea">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
                     <span style="color:white;font-size:18px;font-weight:700;">Trade Idea</span>
@@ -514,28 +572,31 @@ class EnhancedSignalsPage {
                     <span class="pattern-badge">${pattern}</span>
                     <span class="timeframe-badge">${signal.timeframe || '1H'}</span>
                 </div>` : ''}
-            </div>`;
+            </div>
+
+            <!-- ── #12: SMC Confluence panel ── -->
+            ${(signal.bias_d1 || signal.bias_h4 || signal.bos_m5) ? `
+            <div style="background:#0f1117;border:1px solid #1f2937;border-radius:10px;padding:14px;margin-top:12px;">
+                <div style="color:#6b7280;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">SMC Confluence</div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                    <div style="text-align:center;padding:8px;background:rgba(31,41,55,0.5);border-radius:8px;">
+                        <div style="color:#6b7280;font-size:10px;margin-bottom:4px;">D1 Bias</div>
+                        <div style="font-size:13px;font-weight:700;color:${signal.bias_d1==='BULL'?'#22c55e':signal.bias_d1==='BEAR'?'#ef4444':'#9ca3af'};">${signal.bias_d1||'—'}</div>
+                    </div>
+                    <div style="text-align:center;padding:8px;background:rgba(31,41,55,0.5);border-radius:8px;">
+                        <div style="color:#6b7280;font-size:10px;margin-bottom:4px;">H4 Bias</div>
+                        <div style="font-size:13px;font-weight:700;color:${signal.bias_h4==='BULL'?'#22c55e':signal.bias_h4==='BEAR'?'#ef4444':'#9ca3af'};">${signal.bias_h4||'—'}</div>
+                    </div>
+                    <div style="text-align:center;padding:8px;background:rgba(31,41,55,0.5);border-radius:8px;">
+                        <div style="color:#6b7280;font-size:10px;margin-bottom:4px;">M5 BOS</div>
+                        <div style="font-size:13px;font-weight:700;color:${signal.bos_m5==='UP'?'#22c55e':signal.bos_m5==='DOWN'?'#ef4444':'#9ca3af'};">${signal.bos_m5||'—'}</div>
+                    </div>
+                </div>
+            </div>` : ''}`;
 
         // Show modal
         const modal = document.getElementById('signalModal');
         if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
-
-        // Fire PRO chart
-        if (window.ProChart) {
-            const chartDiv   = document.getElementById('modal-chart-container');
-            const loadingDiv = document.getElementById('sig-chart-loading');
-            if (chartDiv) chartDiv.style.display = 'block';
-
-            window.ProChart.create('modal-chart-container', signal)
-                .then(function() {
-                    if (loadingDiv) loadingDiv.style.display = 'none';
-                })
-                .catch(function(err) {
-                    console.error('[Modal] ProChart error:', err);
-                    if (loadingDiv) loadingDiv.style.display = 'none';
-                    if (chartDiv) chartDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:13px;">Chart error: ' + err.message + '</div>';
-                });
-        }
     }
 
     closeModal() {
@@ -560,7 +621,8 @@ console.log('[EnhancedSignals] Module loaded v21.0');
 (function () {
     'use strict';
 
-    var LIGHTWEIGHT_CHARTS_CDN = 'https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js';
+    // #18: jsdelivr CDN (more reliable than unpkg) — pin exact version
+    var LIGHTWEIGHT_CHARTS_CDN = 'https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js';
     var LightweightCharts = null;
     var chartInstance     = null;
     var candlestickSeries = null;
@@ -638,15 +700,47 @@ console.log('[EnhancedSignals] Module loaded v21.0');
 
     function drawPatternStructure(chart, candles, pattern, signal) {
         if (!chart || !candles || candles.length < 10) return;
+        var expired = isSignalExpired(signal);
+        var color   = expired ? 'rgba(148,163,184,0.5)' : '#00e5ff';
+        var width   = expired ? 1 : 3;
+        var LC      = LightweightCharts;
+
+        // ── #11 PATH A: Bot-provided explicit lines (authoritative — draw verbatim) ──
+        if (signal.pattern_lines && Array.isArray(signal.pattern_lines) && signal.pattern_lines.length > 0) {
+            var ROLE_COLORS = {
+                'resistance': expired ? 'rgba(239,68,68,0.4)'  : '#ef4444',
+                'support':    expired ? 'rgba(34,197,94,0.4)'  : '#22c55e',
+                'neckline':   expired ? 'rgba(251,191,36,0.4)' : '#fbbf24',
+                'projection': expired ? 'rgba(99,102,241,0.4)' : '#818cf8',
+                'default':    color
+            };
+            var STYLE_MAP = { 'solid': LC.LineStyle.Solid, 'dashed': LC.LineStyle.Dashed, 'dotted': LC.LineStyle.Dotted };
+            signal.pattern_lines.forEach(function(line) {
+                if (!line.p1 || !line.p2) return;
+                var lc = ROLE_COLORS[line.role] || ROLE_COLORS['default'];
+                var ls = STYLE_MAP[line.style]  || LC.LineStyle.Solid;
+                var lw = (line.role === 'projection') ? 1 : (expired ? 1 : 2);
+                addLine(chart, [{ time: line.p1.time, value: line.p1.price }, { time: line.p2.time, value: line.p2.price }], lc, lw, ls);
+            });
+            return;
+        }
+
+        // ── PATH B: Bot-provided pivot points — connect them directly (semi-real) ──
+        if (signal.pattern_points && Array.isArray(signal.pattern_points) && signal.pattern_points.length >= 2) {
+            var sorted = signal.pattern_points.slice().sort(function(a,b){ return a.time - b.time; });
+            for (var i = 0; i < sorted.length - 1; i++) {
+                addLine(chart, [{ time: sorted[i].time, value: sorted[i].price }, { time: sorted[i+1].time, value: sorted[i+1].price }], color, width, LC.LineStyle.Solid);
+            }
+            return;
+        }
+
+        // ── PATH C: Swing detection on real candles (fallback only) ──
+        // Only reaches here when both pattern_lines and pattern_points are absent.
         var sw      = findSwingPoints(candles);
         var highs   = sw.highs;
         var lows    = sw.lows;
         var key     = (pattern || '').toUpperCase().replace(/\s+/g, '_');
         var patDef  = PATTERNS[key] || PATTERNS['BREAKOUT'];
-        var expired = isSignalExpired(signal);
-        var color   = expired ? 'rgba(148,163,184,0.5)' : '#00e5ff';
-        var width   = expired ? 1 : 3;
-        var LC      = LightweightCharts;
 
         switch (patDef.structure) {
             case 'horizontal_top':
@@ -761,7 +855,10 @@ console.log('[EnhancedSignals] Module loaded v21.0');
         var isBuy  = (signal.direction || '').toUpperCase().indexOf('BUY') !== -1;
         if (!entry || !target || !stop) return;
         var lastTime   = candles[candles.length-1].time;
-        var startTime  = candles[Math.floor(candles.length * 0.6)].time;
+        // #10: Zone starts at signal creation time (real anchor), not a fake candle index
+        var startTime  = signal.created_at
+            ? Math.floor(new Date(signal.created_at).getTime() / 1000)
+            : candles[Math.floor(candles.length * 0.7)].time;
         var futureTime = lastTime + (lastTime - candles[0].time) * 0.4;
         var isExpired  = tradeState.state === 'STOPPED' || isSignalExpired(signal);
         var pB = isExpired ? 'rgba(0,255,136,0.15)' : 'rgba(0,255,136,0.25)';
@@ -890,18 +987,21 @@ console.log('[EnhancedSignals] Module loaded v21.0');
         return candles;
     }
 
+    // #13: Use same seeded LCG as generateRealisticCandles — chart stable across refreshes
     function generateCandlesFromPoints(signal) {
         var pts  = signal.pattern_points || [];
         var base = pts[0] ? pts[0].price : (parseFloat(signal.entry) || 100);
         var now  = Math.floor(Date.now() / 1000);
         var intv = 300;
+        var seed = (signal.id || 99999) + 1;
+        var rnd  = function() { seed = (seed*9301+49297)%233280; return seed/233280; };
         var candles = [];
         for (var i = 60; i >= 0; i--) {
             var time  = now - (i*intv);
             var v     = base * 0.002;
-            var open  = base  + (Math.random()-0.5)*v;
-            var close = open  + (Math.random()-0.5)*v;
-            candles.push({ time: time, open: +open.toFixed(5), high: +(Math.max(open,close)+Math.random()*v*0.5).toFixed(5), low: +(Math.min(open,close)-Math.random()*v*0.5).toFixed(5), close: +close.toFixed(5) });
+            var open  = base  + (rnd()-0.5)*v;
+            var close = open  + (rnd()-0.5)*v;
+            candles.push({ time: time, open: +open.toFixed(5), high: +(Math.max(open,close)+rnd()*v*0.5).toFixed(5), low: +(Math.min(open,close)-rnd()*v*0.5).toFixed(5), close: +close.toFixed(5) });
             base = close;
         }
         return candles;
@@ -941,11 +1041,8 @@ console.log('[EnhancedSignals] Module loaded v21.0');
 
             if (chartInstance) { chartInstance.remove(); chartInstance = null; candlestickSeries = null; }
 
-            var patternName = signal.pattern_name || signal.pattern;
-            if (!patternName) {
-                container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6b7280;">No pattern detected for this signal</div>';
-                return;
-            }
+            // #14: Always render chart — pattern gates only the structure drawing, not the chart itself
+            var patternName = signal.pattern_name || signal.pattern || 'Breakout';
 
             var candles = validateAndFixCandles(signal);
             if (!candles || candles.length < 10) {

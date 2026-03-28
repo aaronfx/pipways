@@ -248,6 +248,94 @@
             border: none; cursor: pointer; transition: all 0.2s;
         }
         .learn-btn:hover { background: #6d28d9; }
+
+        /* ── Competitor-grade signal card system ── */
+        .sig-live-trade {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 12px; border-radius: 9999px;
+            background: #ea580c; color: white;
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        }
+        .sig-live-trade::before {
+            content: ''; width: 5px; height: 5px; border-radius: 50%;
+            background: rgba(255,255,255,0.8); animation: pulse-dot 1.5s infinite;
+        }
+        .sig-target-hit-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 12px; border-radius: 9999px;
+            background: rgba(34,197,94,0.2); color: #22c55e;
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+        }
+        .sig-buystop-pill {
+            display: inline-block; padding: 5px 22px; border-radius: 9999px;
+            background: rgba(0,188,212,0.15); color: #00bcd4;
+            border: 1px solid rgba(0,188,212,0.35);
+            font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        }
+        .sig-sellstop-pill {
+            display: inline-block; padding: 5px 22px; border-radius: 9999px;
+            background: rgba(239,68,68,0.15); color: #ef4444;
+            border: 1px solid rgba(239,68,68,0.35);
+            font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+        }
+        .sig-price-list { width: 100%; }
+        .sig-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 13px;
+        }
+        .sig-row:last-child { border-bottom: none; }
+        .sig-label { color: #9ca3af; font-size: 13px; }
+        .sig-value { color: #f9fafb; font-weight: 600; font-family: monospace; }
+        .sig-learn-btn {
+            display: block; width: 100%; padding: 10px;
+            background: transparent; color: white;
+            border: 1px solid rgba(255,255,255,0.25); border-radius: 8px;
+            font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+            cursor: pointer; transition: all 0.2s; text-align: center;
+        }
+        .sig-learn-btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.5); }
+        .sig-flag {
+            width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+            border: 1.5px solid rgba(255,255,255,0.12); background: #1f2937;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .sig-flag img { width: 100%; height: 100%; object-fit: cover; }
+        .sig-tf-badge {
+            position: absolute; bottom: 8px; right: 8px;
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(0,0,0,0.75); border: 1px solid rgba(255,255,255,0.18);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 700; color: white;
+        }
+        .sig-brand-icon {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.3);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .sig-brand-icon i { color: #a78bfa; font-size: 10px; }
+        /* Modal hero row */
+        .sig-modal-hero {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .sig-modal-stats {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 1px; background: #374151; border-radius: 10px; overflow: hidden; margin-bottom: 16px;
+        }
+        .sig-modal-stat {
+            background: #111827; padding: 12px 8px; text-align: center;
+        }
+        .sig-modal-stat-label { display: block; font-size: 10px; color: #6b7280; margin-bottom: 5px; text-transform: uppercase; }
+        .sig-modal-stat-value { display: block; font-size: 14px; font-weight: 700; font-family: monospace; }
+        .sig-sentiment-row {
+            background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+        }
+        .sig-trade-idea {
+            background: #0f1117; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; margin-top: 16px;
+        }
+        .sig-trade-idea p { color: #d1d5db; font-size: 13px; line-height: 1.75; margin-bottom: 10px; }
+        .sig-trade-idea p:last-child { margin-bottom: 0; }
         .loading    { text-align:center; padding:2rem; }
         .spinner    { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
         @keyframes spin { to { transform:rotate(360deg); } }
@@ -1193,14 +1281,14 @@
             
             <!-- Signal Detail Modal -->
             <div id="signalModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-                <div class="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
-                        <h3 id="modalTitle" class="text-lg font-bold text-white">Signal Details</h3>
-                        <button id="closeModal" class="text-gray-400 hover:text-white text-xl">
-                            <i class="fas fa-times"></i>
+                <div class="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+                    <div class="sticky top-0 bg-gray-900 border-b border-gray-800 px-5 py-3 flex items-center justify-between z-10">
+                        <h3 id="modalTitle" class="text-sm font-semibold text-gray-400">Signal Analysis</h3>
+                        <button id="closeModal" class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-all">
+                            <i class="fas fa-times text-sm"></i>
                         </button>
                     </div>
-                    <div id="modalContent" class="p-6">
+                    <div id="modalContent" class="p-5">
                         <!-- Modal content loaded dynamically -->
                     </div>
                 </div>

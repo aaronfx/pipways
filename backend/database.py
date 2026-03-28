@@ -345,3 +345,13 @@ async def run_unique_index_migrations():
     Currently a no-op because all indexes are created in run_migrations().
     """
     pass  # indexes created inside Database.run_migrations()
+
+# ── Auth constants expected by security.py ────────────────────────────────────
+# security.py does:
+#   from .database import database, users, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+
+import os as _os
+
+SECRET_KEY = _os.environ.get("SECRET_KEY", "pipways-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(_os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))  # 7 days default

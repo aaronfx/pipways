@@ -1,10 +1,13 @@
-// Enhanced Signals Page — Production Clean v8
+// Enhanced Signals Page — Production v9 (Professional Charts)
 // Deploy to: frontend/js/modules/enhanced_signals.js
 //
 // ✅ NO mock/fake/placeholder data
 // ✅ ONLY fetches from /signals/enhanced API
 // ✅ Bot → DB → API → Frontend
-// ✅ Empty state when no signals exist
+// ✅ Risk/Reward boxes (green profit zone, red risk zone)
+// ✅ Pattern overlay from pattern_points
+// ✅ Trade status display (WAITING / TRIGGERED / EXPIRED / TP HIT / SL HIT)
+// ✅ Modular chart functions: drawLevels(), drawRiskReward(), drawPattern(), getTradeStatus()
 
 (function () {
     'use strict';
@@ -490,8 +493,11 @@ Always conduct your own analysis and use proper risk management.`
     .sig-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: #9ca3af; }
     .sig-legend-line { width: 24px; height: 3px; border-radius: 2px; }
     .sig-legend-line.entry { background: #ffffff; }
-    .sig-legend-line.target { background: #00d4aa; }
-    .sig-legend-line.stop { background: #ff6b6b; }
+    .sig-legend-line.target { background: #10b981; }
+    .sig-legend-line.stop { background: #ef4444; }
+    .sig-legend-box { width: 16px; height: 12px; border-radius: 3px; border: 1px solid; }
+    .sig-legend-box.profit { background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5); }
+    .sig-legend-box.loss { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.5); }
 
     .sig-modal-title-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
     .sig-modal-title { font-size: 28px; font-weight: 700; color: #fff; }
@@ -897,35 +903,75 @@ Always conduct your own analysis and use proper risk management.`
             
             destroyChart();
             
-            chartInstance = LightweightCharts.createChart(container, {
-                width: container.clientWidth,
-                height: container.clientHeight,
-                layout: { background: { type: 'solid', color: '#0a0a0c' }, textColor: '#6b7280' },
-                grid: { vertLines: { color: 'rgba(255, 255, 255, 0.03)' }, horzLines: { color: 'rgba(255, 255, 255, 0.03)' } },
-                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-                rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.1)', scaleMargins: { top: 0.1, bottom: 0.1 } },
-                timeScale: { borderColor: 'rgba(255, 255, 255, 0.1)', timeVisible: true, secondsVisible: false },
-            });
-            
-            candlestickSeries = chartInstance.addCandlestickSeries({
-                upColor: '#00d4aa', downColor: '#ff6b6b',
-                borderUpColor: '#00d4aa', borderDownColor: '#ff6b6b',
-                wickUpColor: '#00d4aa', wickDownColor: '#ff6b6b',
-            });
-            
-            const candles = generateRealisticCandles(signal);
-            candlestickSeries.setData(candles);
-            
+            // Parse key levels
             const entry = parseFloat(signal.entry) || 0;
             const target = parseFloat(signal.target) || 0;
             const stop = parseFloat(signal.stop) || 0;
+            const isBuy = (signal.direction || '').toUpperCase().includes('BUY');
             
-            if (entry) candlestickSeries.createPriceLine({ price: entry, color: '#ffffff', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid, axisLabelVisible: true, title: 'ENTRY' });
-            if (target) candlestickSeries.createPriceLine({ price: target, color: '#00d4aa', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'TARGET' });
-            if (stop) candlestickSeries.createPriceLine({ price: stop, color: '#ff6b6b', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'STOP' });
+            // Create chart with professional dark theme
+            chartInstance = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: container.clientHeight,
+                layout: { 
+                    background: { type: 'solid', color: '#0a0a0c' }, 
+                    textColor: '#9ca3af',
+                    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                },
+                grid: { 
+                    vertLines: { color: 'rgba(255, 255, 255, 0.02)' }, 
+                    horzLines: { color: 'rgba(255, 255, 255, 0.02)' } 
+                },
+                crosshair: { 
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                    vertLine: { color: 'rgba(255, 255, 255, 0.2)', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#1f2937' },
+                    horzLine: { color: 'rgba(255, 255, 255, 0.2)', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#1f2937' },
+                },
+                rightPriceScale: { 
+                    borderColor: 'rgba(255, 255, 255, 0.05)', 
+                    scaleMargins: { top: 0.15, bottom: 0.15 },
+                    textColor: '#6b7280',
+                },
+                timeScale: { 
+                    borderColor: 'rgba(255, 255, 255, 0.05)', 
+                    timeVisible: true, 
+                    secondsVisible: false,
+                    textColor: '#6b7280',
+                },
+                handleScroll: { mouseWheel: true, pressedMouseMove: true },
+                handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+            });
             
+            // Generate candles
+            const candles = generateRealisticCandles(signal);
+            
+            // === DRAW RISK/REWARD BOXES FIRST (below candles) ===
+            drawRiskRewardBoxes(candles, entry, target, stop, isBuy);
+            
+            // === DRAW CANDLESTICKS ===
+            candlestickSeries = chartInstance.addCandlestickSeries({
+                upColor: '#10b981', 
+                downColor: '#ef4444',
+                borderUpColor: '#10b981', 
+                borderDownColor: '#ef4444',
+                wickUpColor: '#10b981', 
+                wickDownColor: '#ef4444',
+            });
+            candlestickSeries.setData(candles);
+            
+            // === DRAW PATTERN OVERLAY ===
+            drawPattern(signal, candles);
+            
+            // === DRAW PRICE LEVELS ===
+            drawLevels(entry, target, stop);
+            
+            // === ADD TRADE STATUS OVERLAY ===
+            addTradeStatusOverlay(container, signal, candles);
+            
+            // Fit content
             chartInstance.timeScale().fitContent();
             
+            // Resize observer
             const resizeObserver = new ResizeObserver(entries => {
                 if (chartInstance && entries[0]) {
                     const { width, height } = entries[0].contentRect;
@@ -940,6 +986,305 @@ Always conduct your own analysis and use proper risk management.`
         } catch (error) {
             console.error('[Chart] Error:', error);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MODULAR CHART FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Draw Risk/Reward rectangles (green = profit zone, red = loss zone)
+     */
+    function drawRiskRewardBoxes(candles, entry, target, stop, isBuy) {
+        if (!chartInstance || !entry || !target || !stop) return;
+        
+        const firstTime = candles[0]?.time;
+        const lastTime = candles[candles.length - 1]?.time;
+        if (!firstTime || !lastTime) return;
+        
+        // Calculate box boundaries
+        const profitTop = isBuy ? target : entry;
+        const profitBottom = isBuy ? entry : target;
+        const lossTop = isBuy ? entry : stop;
+        const lossBottom = isBuy ? stop : entry;
+        
+        // Profit zone (green) - Entry to Target
+        const profitAreaSeries = chartInstance.addAreaSeries({
+            topColor: 'rgba(16, 185, 129, 0.15)',
+            bottomColor: 'rgba(16, 185, 129, 0.05)',
+            lineColor: 'rgba(16, 185, 129, 0.3)',
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        
+        // Create filled profit zone
+        const profitData = candles.map(c => ({
+            time: c.time,
+            value: profitTop,
+        }));
+        profitAreaSeries.setData(profitData);
+        
+        // Add baseline for profit zone
+        const profitBaseline = chartInstance.addLineSeries({
+            color: 'rgba(16, 185, 129, 0)',
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        profitBaseline.setData(candles.map(c => ({ time: c.time, value: profitBottom })));
+        
+        // Loss zone (red) - Entry to Stop
+        const lossAreaSeries = chartInstance.addAreaSeries({
+            topColor: 'rgba(239, 68, 68, 0.15)',
+            bottomColor: 'rgba(239, 68, 68, 0.05)',
+            lineColor: 'rgba(239, 68, 68, 0.3)',
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        
+        // Create filled loss zone
+        const lossData = candles.map(c => ({
+            time: c.time,
+            value: lossTop,
+        }));
+        lossAreaSeries.setData(lossData);
+        
+        // Add baseline for loss zone
+        const lossBaseline = chartInstance.addLineSeries({
+            color: 'rgba(239, 68, 68, 0)',
+            lineWidth: 0,
+            priceScaleId: 'right',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        lossBaseline.setData(candles.map(c => ({ time: c.time, value: lossBottom })));
+    }
+
+    /**
+     * Draw Entry, Target, Stop price lines with professional styling
+     */
+    function drawLevels(entry, target, stop) {
+        if (!candlestickSeries) return;
+        
+        // Entry line - solid white, prominent
+        if (entry) {
+            candlestickSeries.createPriceLine({ 
+                price: entry, 
+                color: '#ffffff', 
+                lineWidth: 2, 
+                lineStyle: LightweightCharts.LineStyle.Solid, 
+                axisLabelVisible: true, 
+                title: 'ENTRY',
+                axisLabelColor: '#ffffff',
+                axisLabelTextColor: '#000000',
+            });
+        }
+        
+        // Target line - green dashed
+        if (target) {
+            candlestickSeries.createPriceLine({ 
+                price: target, 
+                color: '#10b981', 
+                lineWidth: 2, 
+                lineStyle: LightweightCharts.LineStyle.Dashed, 
+                axisLabelVisible: true, 
+                title: 'TARGET',
+                axisLabelColor: '#10b981',
+                axisLabelTextColor: '#ffffff',
+            });
+        }
+        
+        // Stop line - red dashed
+        if (stop) {
+            candlestickSeries.createPriceLine({ 
+                price: stop, 
+                color: '#ef4444', 
+                lineWidth: 2, 
+                lineStyle: LightweightCharts.LineStyle.Dashed, 
+                axisLabelVisible: true, 
+                title: 'STOP',
+                axisLabelColor: '#ef4444',
+                axisLabelTextColor: '#ffffff',
+            });
+        }
+    }
+
+    /**
+     * Draw pattern using pattern_points from signal
+     */
+    function drawPattern(signal, candles) {
+        if (!chartInstance || !signal.pattern_points?.length) return;
+        
+        try {
+            const patternPoints = typeof signal.pattern_points === 'string' 
+                ? JSON.parse(signal.pattern_points) 
+                : signal.pattern_points;
+            
+            if (!Array.isArray(patternPoints) || patternPoints.length < 2) return;
+            
+            // Create pattern line series
+            const patternSeries = chartInstance.addLineSeries({
+                color: '#a78bfa', // Purple for pattern
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                priceScaleId: 'right',
+                lastValueVisible: false,
+                priceLineVisible: false,
+                crosshairMarkerVisible: false,
+            });
+            
+            // Convert pattern points to chart data
+            const patternData = patternPoints
+                .filter(p => p && (p.time || p.timestamp) && (p.price || p.value))
+                .map(p => ({
+                    time: p.time || p.timestamp,
+                    value: parseFloat(p.price || p.value),
+                }))
+                .sort((a, b) => a.time - b.time);
+            
+            if (patternData.length >= 2) {
+                patternSeries.setData(patternData);
+                
+                // Add markers at pattern points
+                const markers = patternData.map((point, idx) => ({
+                    time: point.time,
+                    position: idx % 2 === 0 ? 'aboveBar' : 'belowBar',
+                    color: '#a78bfa',
+                    shape: 'circle',
+                    size: 1,
+                }));
+                
+                patternSeries.setMarkers(markers);
+            }
+        } catch (e) {
+            console.log('[Chart] Pattern points parse error:', e);
+        }
+    }
+
+    /**
+     * Get trade status based on current price vs entry
+     */
+    function getTradeStatus(signal, candles) {
+        if (!candles || !candles.length) return { status: 'LOADING', color: '#6b7280' };
+        
+        const entry = parseFloat(signal.entry) || 0;
+        const target = parseFloat(signal.target) || 0;
+        const stop = parseFloat(signal.stop) || 0;
+        const isBuy = (signal.direction || '').toUpperCase().includes('BUY');
+        const currentPrice = candles[candles.length - 1]?.close || 0;
+        
+        // Check expiry
+        if (signal.expires_at) {
+            const expiresAt = new Date(signal.expires_at);
+            if (expiresAt < new Date()) {
+                return { status: 'EXPIRED', color: '#6b7280', icon: '⏱' };
+            }
+        }
+        
+        // Check if TP/SL hit
+        if (isBuy) {
+            if (currentPrice >= target) return { status: 'TP HIT', color: '#10b981', icon: '✓' };
+            if (currentPrice <= stop) return { status: 'SL HIT', color: '#ef4444', icon: '✗' };
+            if (currentPrice >= entry) return { status: 'TRIGGERED', color: '#f59e0b', icon: '▶' };
+        } else {
+            if (currentPrice <= target) return { status: 'TP HIT', color: '#10b981', icon: '✓' };
+            if (currentPrice >= stop) return { status: 'SL HIT', color: '#ef4444', icon: '✗' };
+            if (currentPrice <= entry) return { status: 'TRIGGERED', color: '#f59e0b', icon: '▶' };
+        }
+        
+        return { status: 'WAITING', color: '#3b82f6', icon: '◉' };
+    }
+
+    /**
+     * Add trade status overlay to chart
+     */
+    function addTradeStatusOverlay(container, signal, candles) {
+        // Remove existing overlay
+        container.querySelector('.chart-status-overlay')?.remove();
+        
+        const tradeStatus = getTradeStatus(signal, candles);
+        const timeframe = signal.timeframe || 'M5';
+        const rr = calculateRR(signal);
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'chart-status-overlay';
+        overlay.innerHTML = `
+            <div class="chart-overlay-row">
+                <span class="chart-tf-badge">${timeframe}</span>
+                <span class="chart-status-badge" style="background: ${tradeStatus.color}20; color: ${tradeStatus.color}; border-color: ${tradeStatus.color}">
+                    ${tradeStatus.icon || ''} ${tradeStatus.status}
+                </span>
+            </div>
+            <div class="chart-overlay-row chart-overlay-rr">
+                <span class="chart-rr-label">R:R</span>
+                <span class="chart-rr-value">${rr}</span>
+            </div>
+        `;
+        
+        // Inject overlay styles if not present
+        if (!document.getElementById('chart-overlay-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'chart-overlay-styles';
+            styles.textContent = `
+                .chart-status-overlay {
+                    position: absolute;
+                    top: 12px;
+                    left: 12px;
+                    z-index: 10;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    pointer-events: none;
+                }
+                .chart-overlay-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .chart-tf-badge {
+                    background: rgba(139, 92, 246, 0.2);
+                    color: #a78bfa;
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    letter-spacing: 0.5px;
+                }
+                .chart-status-badge {
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 4px 10px;
+                    border-radius: 4px;
+                    border: 1px solid;
+                    letter-spacing: 0.5px;
+                }
+                .chart-overlay-rr {
+                    background: rgba(0, 0, 0, 0.6);
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    backdrop-filter: blur(4px);
+                }
+                .chart-rr-label {
+                    color: #6b7280;
+                    font-size: 10px;
+                    font-weight: 500;
+                }
+                .chart-rr-value {
+                    color: #10b981;
+                    font-size: 13px;
+                    font-weight: 700;
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        container.style.position = 'relative';
+        container.appendChild(overlay);
     }
 
     function destroyChart() {
@@ -1012,6 +1357,8 @@ Always conduct your own analysis and use proper risk management.`
                     <div class="sig-legend-item"><div class="sig-legend-line entry"></div><span>Entry</span></div>
                     <div class="sig-legend-item"><div class="sig-legend-line target"></div><span>Target</span></div>
                     <div class="sig-legend-item"><div class="sig-legend-line stop"></div><span>Stop Loss</span></div>
+                    <div class="sig-legend-item"><div class="sig-legend-box profit"></div><span>Profit Zone</span></div>
+                    <div class="sig-legend-item"><div class="sig-legend-box loss"></div><span>Risk Zone</span></div>
                 </div>
                 <div class="sig-chart-container">
                     <div class="sig-chart-loading" id="sig-chart-loading">

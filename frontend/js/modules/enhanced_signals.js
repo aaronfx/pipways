@@ -12,55 +12,115 @@ class EnhancedSignalsPage {
 
     init() {
         console.log('[EnhancedSignals] PRO System initialized v20.1');
+        this.activeTab = 'ai';
+
+        // Wire tab buttons
+        const aiTab  = document.getElementById('aiDrivenTab');
+        const patTab = document.getElementById('patternTab');
+
+        if (aiTab && patTab) {
+            aiTab.addEventListener('click', () => {
+                this.activeTab = 'ai';
+                aiTab.classList.replace('bg-gray-700', 'bg-purple-600');
+                aiTab.classList.replace('text-gray-400', 'text-white');
+                patTab.classList.replace('bg-purple-600', 'bg-gray-700');
+                patTab.classList.replace('text-white', 'text-gray-400');
+                this.loadSignals();
+            });
+            patTab.addEventListener('click', () => {
+                this.activeTab = 'pattern';
+                patTab.classList.replace('bg-gray-700', 'bg-purple-600');
+                patTab.classList.replace('text-gray-400', 'text-white');
+                aiTab.classList.replace('bg-purple-600', 'bg-gray-700');
+                aiTab.classList.replace('text-white', 'text-gray-400');
+                this.loadSignals();
+            });
+        }
+
         this.loadSignals();
-        
-        // Auto refresh every 30 seconds
-        setInterval(() => this.loadSignals(), 30000);
+
+        // Auto-refresh every 30 seconds (stored so we can clear it later)
+        this._refreshInterval = setInterval(() => this.loadSignals(), 30000);
     }
 
     async loadSignals() {
+        const container = document.getElementById('enhanced-signals-container');
+        if (!container) {
+            console.warn('[EnhancedSignals] Container not found — section not visible yet');
+            return;
+        }
+
         try {
             const response = await fetch('/api/signals/enhanced');
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
             const signals = await response.json();
             this.signals = signals || [];
-            
-            const container = document.getElementById('enhanced-signals-container');
-            if (!container) {
-                console.warn('[EnhancedSignals] Container not found');
-                return;
-            }
-            
+
+            // ── Update stats row ────────────────────────────────────────────
+            const active = this.signals.filter(s => {
+                const mins = (Date.now() - new Date(s.created_at).getTime()) / 60000;
+                return mins < 60;
+            }).length;
+
+            const avgConf = this.signals.length
+                ? Math.round(this.signals.reduce((sum, s) => sum + (s.confidence || 70), 0) / this.signals.length)
+                : null;
+
+            const rrValues = this.signals
+                .map(s => {
+                    const entry = parseFloat(s.entry), target = parseFloat(s.target), stop = parseFloat(s.stop);
+                    if (!entry || !target || !stop) return null;
+                    const reward = Math.abs(target - entry);
+                    const risk   = Math.abs(entry - stop);
+                    return risk > 0 ? reward / risk : null;
+                })
+                .filter(Boolean);
+            const avgRR = rrValues.length
+                ? (rrValues.reduce((a, b) => a + b, 0) / rrValues.length).toFixed(1)
+                : null;
+
+            const statActive = document.getElementById('enhanced-stat-active');
+            const statConf   = document.getElementById('enhanced-stat-confidence');
+            const statRR     = document.getElementById('enhanced-stat-rr');
+            if (statActive) statActive.textContent = active;
+            if (statConf)   statConf.textContent   = avgConf != null ? `${avgConf}%` : '—';
+            if (statRR)     statRR.textContent      = avgRR != null ? `${avgRR}R` : '—';
+
+            // ── Render cards ────────────────────────────────────────────────
             if (this.signals.length === 0) {
                 container.innerHTML = `
-                    <div class="no-signals-state" style="text-align:center;padding:60px 20px;color:#666;">
+                    <div class="col-span-full" style="text-align:center;padding:60px 20px;color:#666;">
                         <div style="font-size:48px;margin-bottom:20px;">📊</div>
-                        <h3>No Active Signals</h3>
-                        <p>Waiting for trading opportunities...</p>
-                    </div>
-                `;
+                        <h3 style="color:#9ca3af;font-size:1.1rem;font-weight:600;margin-bottom:8px;">No Active Signals</h3>
+                        <p style="color:#6b7280;font-size:.875rem;">Waiting for trading opportunities…</p>
+                    </div>`;
                 return;
             }
-            
-            // Render signal cards
-            container.innerHTML = this.signals.map(signal => this.renderSignalCard(signal)).join('');
-            
+
+            // Respect active tab filter
+            const filtered = this.activeTab === 'pattern'
+                ? this.signals.filter(s => s.pattern_name || s.pattern)
+                : this.signals;
+
+            container.innerHTML = filtered.length
+                ? filtered.map(s => this.renderSignalCard(s)).join('')
+                : `<div class="col-span-full" style="text-align:center;padding:40px;color:#6b7280;">
+                       No pattern-based signals available.
+                   </div>`;
+
             // Initialize charts after DOM update
             setTimeout(() => {
-                this.signals.forEach(signal => {
-                    this.renderChart(signal);
-                });
+                filtered.forEach(s => this.renderChart(s));
             }, 100);
-            
+
         } catch (err) {
             console.error('[EnhancedSignals] Load error:', err);
-            const container = document.getElementById('enhanced-signals-container');
-            if (container) {
-                container.innerHTML = `<div class="error" style="padding:20px;color:red;">Error loading signals: ${err.message}</div>`;
-            }
+            container.innerHTML = `
+                <div class="col-span-full" style="padding:20px;color:#f87171;text-align:center;">
+                    <i class="fas fa-exclamation-triangle" style="font-size:2rem;margin-bottom:8px;display:block;"></i>
+                    Error loading signals: ${err.message}
+                </div>`;
         }
     }
 
@@ -414,29 +474,18 @@ class EnhancedSignalsPage {
     }
 
     destroy() {
+        if (this._refreshInterval) {
+            clearInterval(this._refreshInterval);
+            this._refreshInterval = null;
+        }
         this.charts.forEach(chart => chart.remove());
         this.charts.clear();
     }
 }
 
-// Create global instance
+// Create global instance (init is called by loadSectionData when the section is shown,
+// which also guarantees the DOM elements exist at that point)
 const enhancedSignals = new EnhancedSignalsPage();
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        if (document.getElementById('enhanced-signals-container')) {
-            enhancedSignals.init();
-        }
-    });
-} else {
-    // DOM already loaded
-    if (document.getElementById('enhanced-signals-container')) {
-        enhancedSignals.init();
-    }
-}
-
-// Export for global access
 window.enhancedSignals = enhancedSignals;
 
 console.log('[EnhancedSignals] Module loaded successfully v20.1');

@@ -1,22 +1,39 @@
-# signals.py  —  Pipways backend route for GreenXTrades signal ingestion
-# Deploy to: backend/signals.py
+"""
+Signals API routes for Pipways
+Handles signal ingestion from MT5 bot and retrieval for dashboard
+"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime, timezone, timedelta
+from typing import Optional, List, Dict
+from datetime import datetime, timedelta
 import logging
 import json
+import os
 
+# Setup logging
 logger = logging.getLogger(__name__)
-router = APIRouter(redirect_slashes=False, tags=["signals"])
 
-def get_database():
-    """Get database connection from main app"""
-    from backend.database import database
-    return database
+# Create router
+router = APIRouter(
+    prefix="/api",
+    tags=["signals"],
+    redirect_slashes=False
+)
 
+# Import database - try different import patterns
+try:
+    from backend.database import get_database, database
+except ImportError:
+    try:
+        from database import get_database, database
+    except ImportError:
+        logger.error("[signals] Cannot import database module")
+        get_database = None
+        database = None
+
+# Pydantic models
 class PatternPoint(BaseModel):
     time: int
     price: float
@@ -47,8 +64,9 @@ class SignalIn(BaseModel):
     timeframe: str = "M5"
     pattern_points: List[PatternPoint] = Field(default_factory=list)
     breakout_point: Optional[BreakoutPoint] = None
-    candles: List[CandleData] = Field(default_factory=list)  # 🔥 REAL CANDLES
-    is_pattern_idea: bool = False
+    candles: List[CandleData] = Field(default_factory=list)
+    is_pattern_idea: bool = True
+    pattern_name: Optional[str] = "Breakout"
     bias_d1: Optional[str] = None
     bias_h4: Optional[str] = None
     bos_m5: Optional[str] = None
@@ -57,72 +75,68 @@ class SignalIn(BaseModel):
     class Config:
         extra = "allow"
 
+async def get_db():
+    """Dependency to get database instance"""
+    if database:
+        return database
+    if get_database:
+        return get_database()
+    raise HTTPException(status_code=500, detail="Database not initialized")
+
 @router.post("/signals")
-async def create_signal(payload: SignalIn):
-    """Receive signal from bot and save to DB with candles"""
-    db = get_database()
-    
+async def create_signal(payload: SignalIn, db: Database = Depends(get_db)):
+    """
+    Receive signal from MT5 bot with candles and pattern data
+    """
     try:
-        logger.info(f"[signals] ▶ {payload.symbol} {payload.direction} @ {payload.entry} | candles={len(payload.candles)}")
-
-        # Convert to JSON strings
-        pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points]) if payload.pattern_points else None
-        candles_json = json.dumps([c.dict() for c in payload.candles]) if payload.candles else None
+        logger.info(f"[signals] ▶ {payload.symbol} {payload.direction} @ {payload.entry} | candles={len(payload.candles)} | pattern={payload.pattern_name}")
         
-        if candles_json:
-            logger.info(f"[signals] 📊 Storing {len(payload.candles)} candles")
+        # Parse complex fields
+        pattern_points_json = None
+        if payload.pattern_points and len(payload.pattern_points) > 0:
+            pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points])
+            
+        candles_json = None
+        if payload.candles and len(payload.candles) > 0:
+            candles_json = json.dumps([c.dict() for c in payload.candles])
+            
+        breakout_json = None
+        if payload.breakout_point:
+            breakout_json = json.dumps(payload.breakout_point.dict())
 
-        conf_int = int(payload.confidence)
-        expires_hours = int(payload.expires_in_hours)
+        # Calculate expiry
+        expires_at = datetime.utcnow() + timedelta(hours=payload.expires_in_hours)
         
-        entry_price = float(payload.entry) if payload.entry else 0.0
-        take_profit = float(payload.target) if payload.target else 0.0
-        stop_loss = float(payload.stop) if payload.stop else 0.0
-
-        query = """
-            INSERT INTO signals (
-                symbol, direction, entry, target, stop,
-                entry_price, take_profit, stop_loss,
-                confidence, ai_confidence, asset_type, country,
-                pattern, timeframe, is_pattern_idea,
-                pattern_points, candles, status, is_published,
-                created_at, expires_at
-            ) VALUES (
-                :symbol, :direction, :entry, :target, :stop,
-                :entry_price, :take_profit, :stop_loss,
-                :confidence, :ai_confidence, :asset_type, :country,
-                :pattern, :timeframe, :is_pattern_idea,
-                :pattern_points, :candles, 'active', TRUE,
-                NOW(), NOW() + INTERVAL '%s hours'
-            )
-            RETURNING id
-        """ % expires_hours
-
-        params = {
+        # Build signal data
+        signal_data = {
             "symbol": payload.symbol,
             "direction": payload.direction.upper(),
             "entry": payload.entry,
             "target": payload.target,
             "stop": payload.stop,
-            "entry_price": entry_price,
-            "take_profit": take_profit,
-            "stop_loss": stop_loss,
-            "confidence": conf_int,
-            "ai_confidence": conf_int,
+            "entry_price": float(payload.entry) if payload.entry else 0.0,
+            "take_profit": float(payload.target) if payload.target else 0.0,
+            "stop_loss": float(payload.stop) if payload.stop else 0.0,
+            "confidence": int(payload.confidence),
+            "ai_confidence": int(payload.confidence),
             "asset_type": payload.asset_type,
             "country": payload.country,
             "pattern": payload.pattern,
             "timeframe": payload.timeframe,
-            "is_pattern_idea": payload.is_pattern_idea,
             "pattern_points": pattern_points_json,
             "candles": candles_json,
+            "breakout_point": breakout_json,
+            "is_pattern_idea": payload.is_pattern_idea,
+            "pattern_name": payload.pattern_name or "Breakout",
+            "expires_at": expires_at
         }
-
-        result = await db.fetch_one(query, params)
-        signal_id = result["id"] if result else None
-
-        logger.info(f"[signals] ✅ {payload.symbol} saved | id={signal_id}")
-
+        
+        # Insert into database
+        result = await db.create_signal(signal_data)
+        signal_id = result.get("id") if result else None
+        
+        logger.info(f"[signals] ✅ {payload.symbol} saved | id={signal_id} | pattern={payload.pattern_name}")
+        
         return JSONResponse(
             status_code=201,
             content={
@@ -130,189 +144,148 @@ async def create_signal(payload: SignalIn):
                 "signal_id": signal_id,
                 "symbol": payload.symbol,
                 "candles_stored": len(payload.candles),
-            },
+                "pattern_detected": payload.pattern_name or "Breakout"
+            }
         )
-
+        
     except Exception as e:
         logger.exception(f"[signals] ❌ Failed to save: {e}")
-        return JSONResponse(status_code=500, content={"ok": False, "error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"ok": False, "error": str(e)}
+        )
 
 @router.get("/signals/enhanced")
-async def get_enhanced_signals(limit: int = 50):
-    """Return active signals WITH CANDLES for dashboard"""
-    db = get_database()
-    
+async def get_enhanced_signals(limit: int = 50, db: Database = Depends(get_db)):
+    """
+    Return active signals WITH CANDLES and PATTERNS for dashboard
+    """
     try:
-        query = """
-            SELECT * FROM signals 
-            WHERE status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY created_at DESC
-            LIMIT :limit
-        """
+        signals = await db.get_active_signals(limit)
         
-        rows = await db.fetch_all(query, {"limit": limit})
-        
-        if not rows:
+        if not signals:
+            logger.info("[signals] No active signals found")
             return []
         
-        signals = []
-        for row in rows:
-            signal = dict(row)
-            
-            # Parse pattern_points
-            if signal.get('pattern_points'):
-                try:
-                    signal['pattern_points'] = json.loads(signal['pattern_points'])
-                except:
-                    signal['pattern_points'] = None
-            
-            # 🔥 CRITICAL: Parse candles back to array
-            if signal.get('candles'):
-                try:
-                    parsed = json.loads(signal['candles'])
-                    if isinstance(parsed, list) and len(parsed) > 0:
-                        signal['candles'] = parsed
-                        logger.debug(f"[signals] 📊 Returning {len(parsed)} candles for {signal['symbol']}")
-                    else:
-                        signal['candles'] = None
-                except Exception as e:
-                    logger.warning(f"[signals] Failed to parse candles: {e}")
-                    signal['candles'] = None
-            else:
-                signal['candles'] = None
-            
-            # Convert datetime to ISO string
-            for key in ['created_at', 'expires_at', 'updated_at']:
-                if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                    signal[key] = signal[key].isoformat()
-            
-            signals.append(signal)
+        total_candles = sum(len(s.get("candles") or []) for s in signals)
+        total_patterns = sum(1 for s in signals if s.get("pattern_points"))
         
-        total = sum(len(s.get('candles') or []) for s in signals)
-        logger.info(f"[signals] GET /enhanced — {len(signals)} signals, {total} candles")
+        logger.info(f"[signals] GET /enhanced — {len(signals)} signals, {total_candles} candles, {total_patterns} patterns")
+        
+        # Convert datetime fields to ISO strings for JSON serialization
+        for signal in signals:
+            for key in ['created_at', 'expires_at', 'updated_at']:
+                if signal.get(key) and isinstance(signal[key], datetime):
+                    signal[key] = signal[key].isoformat()
+        
         return signals
-
+        
     except Exception as e:
         logger.exception(f"[signals] GET error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"error": str(e)}
+        )
 
 @router.get("/signals/active")
-async def get_active_signals(country: str = "all", asset_type: str = "forex", limit: int = 50):
-    """Legacy endpoint - also returns candles"""
-    db = get_database()
-    
+async def get_active_signals_api(
+    country: str = "all", 
+    asset_type: str = "forex", 
+    limit: int = 50,
+    db: Database = Depends(get_db)
+):
+    """
+    Legacy endpoint - also returns candles
+    """
     try:
-        query = """
-            SELECT * FROM signals 
-            WHERE status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
-        """
-        params = {"limit": limit}
+        signals = await db.get_active_signals(limit)
         
-        if country and country != "all":
-            query += " AND country = :country"
-            params["country"] = country
-            
-        if asset_type and asset_type != "all":
-            query += " AND asset_type = :asset_type"
-            params["asset_type"] = asset_type
+        # Filter by country/asset if specified
+        if country != "all":
+            signals = [s for s in signals if s.get("country") == country]
+        if asset_type != "all":
+            signals = [s for s in signals if s.get("asset_type") == asset_type]
         
-        query += " ORDER BY created_at DESC LIMIT :limit"
-        
-        rows = await db.fetch_all(query, params)
-        signals = []
-        
-        for row in rows:
-            signal = dict(row)
-            
-            # Parse candles
-            if signal.get('candles'):
-                try:
-                    signal['candles'] = json.loads(signal['candles'])
-                except:
-                    signal['candles'] = None
-                    
+        # Convert datetime fields
+        for signal in signals:
             for key in ['created_at', 'expires_at', 'updated_at']:
-                if signal.get(key) and hasattr(signal[key], 'isoformat'):
+                if signal.get(key) and isinstance(signal[key], datetime):
                     signal[key] = signal[key].isoformat()
-            
-            signals.append(signal)
         
         return signals
-
+        
     except Exception as e:
         logger.exception(f"[signals] error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"error": str(e)}
+        )
 
 @router.get("/signals/{signal_id}")
-async def get_signal(signal_id: int):
-    """Get single signal by ID"""
-    db = get_database()
-    
+async def get_signal(signal_id: int, db: Database = Depends(get_db)):
+    """
+    Get single signal by ID
+    """
     try:
-        row = await db.fetch_one("SELECT * FROM signals WHERE id = :id", {"id": signal_id})
+        signal = await db.get_signal_by_id(signal_id)
         
-        if not row:
-            return JSONResponse(status_code=404, content={"error": "Not found"})
+        if not signal:
+            return JSONResponse(
+                status_code=404, 
+                content={"error": "Signal not found"}
+            )
         
-        signal = dict(row)
-        
-        if signal.get('pattern_points'):
-            try:
-                signal['pattern_points'] = json.loads(signal['pattern_points'])
-            except:
-                pass
-        
-        if signal.get('candles'):
-            try:
-                signal['candles'] = json.loads(signal['candles'])
-            except:
-                signal['candles'] = None
-        
+        # Convert datetime fields
         for key in ['created_at', 'expires_at', 'updated_at']:
-            if signal.get(key) and hasattr(signal[key], 'isoformat'):
+            if signal.get(key) and isinstance(signal[key], datetime):
                 signal[key] = signal[key].isoformat()
         
         return signal
-
+        
     except Exception as e:
         logger.exception(f"[signals] error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"error": str(e)}
+        )
 
 @router.delete("/signals/{signal_id}")
-async def delete_signal(signal_id: int):
-    """Soft delete"""
-    db = get_database()
-    
+async def delete_signal(signal_id: int, db: Database = Depends(get_db)):
+    """
+    Soft delete signal
+    """
     try:
-        result = await db.fetch_one(
-            "UPDATE signals SET status = 'inactive' WHERE id = :id RETURNING id",
-            {"id": signal_id}
-        )
+        query = "UPDATE signals SET status = 'inactive' WHERE id = $1 RETURNING id"
+        result = await db.fetch_one(query, {"id": signal_id})
         
         if not result:
-            return JSONResponse(status_code=404, content={"error": "Not found"})
+            return JSONResponse(
+                status_code=404, 
+                content={"error": "Not found"}
+            )
         
         return {"id": signal_id, "status": "deleted"}
-
+        
     except Exception as e:
         logger.exception(f"[signals] error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"error": str(e)}
+        )
 
 @router.post("/signals/expire-old")
-async def expire_old_signals():
-    """Mark expired as inactive"""
-    db = get_database()
-    
+async def expire_old_signals(db: Database = Depends(get_db)):
+    """
+    Mark expired signals as inactive
+    """
     try:
-        rows = await db.fetch_all(
-            "UPDATE signals SET status = 'expired' WHERE status = 'active' AND expires_at < NOW() RETURNING id"
-        )
-        count = len(rows) if rows else 0
+        count = await db.expire_old_signals()
         logger.info(f"[signals] Expired {count} old signals")
         return {"expired_count": count}
-
+        
     except Exception as e:
         logger.exception(f"[signals] error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(
+            status_code=500, 
+            content={"error": str(e)}
+        )

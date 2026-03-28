@@ -1954,10 +1954,10 @@ const DashboardController = class {
                 case 'dashboard': this.loadDashboardStats(); break;
                 case 'signals':   await this.loadSignals();  break;
                 case 'enhanced-signals': 
-                    if (typeof window.EnhancedSignalsPage !== 'undefined') {
-                        window.EnhancedSignalsPage.init();
+                    if (typeof window.enhancedSignals !== 'undefined') {
+                        window.enhancedSignals.loadSignals();
                     } else {
-                        console.warn('[Dashboard] EnhancedSignalsPage module not loaded');
+                        console.warn('[Dashboard] enhancedSignals module not loaded');
                     }
                     break;
                 case 'webinars':  await this.loadWebinars(); break;
@@ -2180,7 +2180,7 @@ const DashboardController = class {
             safe(this.apiRequest('/courses/list')),
             safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
             safe(this.apiRequest('/blog/posts')),
-            safe(this.apiRequest('/signals/active')),
+            safe(this.apiRequest('/api/signals/active')),
             safe(this.apiRequest('/courses/enhanced/progress')),
             safe(this.apiRequest('/learning/resume')),
         ]);
@@ -3089,7 +3089,7 @@ const DashboardController = class {
         if (!container) return;
         container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading signals…</div>';
         try {
-            const data = await this.apiRequest('/signals/active');
+            const data = await this.apiRequest('/api/signals/active');
             const signals = Array.isArray(data) ? data : (data.signals || []);
             if (!signals.length) {
                 container.innerHTML = `<div class="col-span-full pw-empty">

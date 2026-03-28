@@ -1,424 +1,661 @@
-# signals.py  —  Pipways backend route for GreenXTrades signal ingestion
-# Deploy to: backend/signals.py
-#
-# Mount in main.py:
-#   from backend.signals import router as signals_router
-#   app.include_router(signals_router)   # no prefix — routes have /signals built-in
-#
-# ⚠️  Do NOT add prefix="/signals" — that would make the route /signals/signals.
+"""
+Database configuration - PRODUCTION READY
+Contains all table definitions for core + enhanced features
+"""
+import os
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, inspect, JSON
+from databases import Database
+from datetime import datetime
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime, timezone, timedelta
-import logging
-import json
+# Database URL
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/pipways")
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-logger = logging.getLogger(__name__)
+print(f"[DB] Connecting to: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'local'}", flush=True)
 
-# redirect_slashes=False prevents FastAPI from creating redirects
-router = APIRouter(redirect_slashes=False, tags=["signals"])
+database = Database(DATABASE_URL, min_size=5, max_size=20, command_timeout=60)
+metadata = MetaData()
 
+# ==========================================
+# CORE TABLES
+# ==========================================
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DATABASE CONNECTION
-# ═══════════════════════════════════════════════════════════════════════════════
+users = Table(
+    "users",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("email", String(255), unique=True, nullable=False),
+    Column("password_hash", String(255), nullable=False),
+    Column("full_name", String(255), default=""),
+    Column("is_active", Boolean, default=True),
+    Column("is_admin", Boolean, default=False),
+    Column("role", String(50), default="user"),
+    Column("created_at", DateTime, default=datetime.utcnow),
+    Column("subscription_tier", String(50), default="free")
+)
 
-def get_database():
-    """Get database connection from main app"""
-    from backend.database import database
-    return database
+courses_table = Table(
+    "courses",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("title", String(255), nullable=False),
+    Column("description", Text, default=""),
+    Column("level", String(50), default="beginner"),
+    Column("lesson_count", Integer, default=0),
+    Column("is_active", Boolean, default=True),
+    Column("created_at", DateTime, default=datetime.utcnow),
+    Column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
+    Column("instructor", String(255), default=""),
+    Column("thumbnail_url", String(500), default="")
+)
 
+webinars_table = Table(
+    "webinars",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("title", String(255), nullable=False),
+    Column("description", Text, default=""),
+    Column("scheduled_at", DateTime),
+    Column("status", String(50), default="scheduled"),
+    Column("duration_minutes", Integer, default=60),
+    Column("recording_url", String(500), default=""),
+    Column("presenter", String(255), default=""),
+    Column("created_at", DateTime, default=datetime.utcnow)
+)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# REQUEST SCHEMAS
-# ═══════════════════════════════════════════════════════════════════════════════
+blog_posts = Table(
+    "blog_posts",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("title", String(255), nullable=False),
+    Column("slug", String(255), unique=True, nullable=False),
+    Column("content", Text, default=""),
+    Column("excerpt", String(500), default=""),
+    Column("category", String(100), default="General"),
+    Column("featured", Boolean, default=False),
+    Column("status", String(50), default="published"),
+    Column("read_time", String(20), default="5 min"),
+    Column("created_at", DateTime, default=datetime.utcnow),
+    Column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
+    Column("author_id", Integer, ForeignKey("users.id"), nullable=True),
+    # SEO fields for enhanced blog
+    Column("seo_description", Text, default=""),
+    Column("seo_keywords", String(500), default=""),
+    Column("og_image_url", String(500), default="")
+)
 
-class PatternPoint(BaseModel):
-    time: int
-    price: float
+# ══════════════════════════════════════════════════════════════════════════════
+# SIGNALS TABLE - Complete with all Enhanced Signals + AnalysisIQ columns
+# ══════════════════════════════════════════════════════════════════════════════
+signals = Table(
+    "signals",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    # Core fields
+    Column("symbol", String(20), nullable=False),
+    Column("full_name", String(255), default=""),
+    Column("direction", String(10), nullable=False),
+    Column("timeframe", String(10), default="1H"),
+    Column("status", String(20), default="active"),
+    Column("created_at", DateTime, default=datetime.utcnow),
+    Column("closed_at", DateTime, nullable=True),
+    # Price levels (numeric for calculations)
+    Column("entry_price", Float, nullable=True),
+    Column("stop_loss", Float, nullable=True),
+    Column("take_profit", Float, nullable=True),
+    # Price levels (string for display)
+    Column("entry", String(50), default=""),
+    Column("target", String(50), default=""),
+    Column("stop", String(50), default=""),
+    # Pattern and analysis
+    Column("pattern", String(50), default=""),
+    Column("analysis", Text, default=""),
+    # Confidence scores
+    Column("confidence", Integer, default=75),
+    Column("ai_confidence", Float, default=None),
+    # Asset classification
+    Column("asset_type", String(50), default="forex"),
+    Column("country", String(50), default="all"),
+    # Sentiment
+    Column("sentiment_bearish", Integer, default=50),
+    Column("sentiment_bullish", Integer, default=50),
+    # Publishing and timing
+    Column("is_published", Boolean, default=True),
+    Column("expires_at", DateTime, nullable=True),
+    # AnalysisIQ / Pattern Ideas
+    Column("is_pattern_idea", Boolean, default=False),
+    Column("technical_summary", Text, default=""),
+    Column("volatility_index", Integer, nullable=True),
+    # Live price tracking
+    Column("current_price", String(20), default=""),
+    Column("price_change", String(20), default=""),
+    Column("price_change_percent", String(20), default=""),
+    # Chart data (JSON)
+    Column("chart_data", JSON, nullable=True),
+    # Pattern coordinates for charting overlays
+    Column("pattern_points", Text, nullable=True),  # JSON: [{time, price}, ...]
+    Column("pattern_lines", Text, nullable=True),   # JSON: [{start: {time, price}, end: {time, price}}, ...]
+    # Real OHLC candles from MT5 for chart rendering
+    Column("candles", Text, nullable=True),         # JSON: [{time, open, high, low, close}, ...]
+    # Result tracking
+    Column("result_pips", Float, nullable=True),
+    Column("outcome", String(20), default=""),
+    Column("created_by", Integer, nullable=True),
+)
 
-class BreakoutPoint(BaseModel):
-    time: int
-    price: float
+user_progress = Table(
+    "user_progress",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
+    Column("course_id", Integer, ForeignKey("courses.id"), nullable=False),
+    Column("progress_percent", Integer, default=0),
+    Column("completed_lessons", Integer, default=0),
+    Column("last_accessed", DateTime, default=datetime.utcnow),
+    Column("completed_at", DateTime, nullable=True)
+)
 
-class CandleData(BaseModel):
-    time: int
-    open: float
-    high: float
-    low: float
-    close: float
+# ==========================================
+# ENHANCED BLOG TABLES
+# ==========================================
 
-class SignalIn(BaseModel):
-    # Core
-    symbol: str
-    direction: str                          # "BUY" | "SELL"
-    entry: str                              # sent as string from bot
-    target: str                             # TP
-    stop: str                               # SL
+blog_comments = Table(
+    "blog_comments",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("post_id", Integer, ForeignKey("blog_posts.id", ondelete="CASCADE"), nullable=False),
+    Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
+    Column("content", Text, nullable=False),
+    Column("created_at", DateTime, default=datetime.utcnow),
+    Column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow),
+    Column("status", String(20), default="published")  # published, deleted, flagged
+)
 
-    # Metadata
-    confidence: int = 50
-    asset_type: str = "forex"
-    country: str = "all"
-    expires_in_hours: int = 24
+blog_tags = Table(
+    "blog_tags",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("name", String(50), unique=True, nullable=False),
+    Column("slug", String(50), unique=True, nullable=False),
+    Column("description", String(255), default="")
+)
 
-    # Pattern / structure
-    pattern: str = "BREAKOUT"
-    structure: str = "BOS"
-    timeframe: str = "M5"
+blog_post_tags = Table(
+    "blog_post_tags",
+    metadata,
+    Column("post_id", Integer, ForeignKey("blog_posts.id", ondelete="CASCADE"), nullable=False),
+    Column("tag_id", Integer, ForeignKey("blog_tags.id", ondelete="CASCADE"), nullable=False)
+)
 
-    # Chart overlay
-    pattern_points: List[PatternPoint] = Field(default_factory=list)
-    breakout_point: Optional[BreakoutPoint] = None
+# ==========================================
+# ENHANCED COURSES TABLES
+# ==========================================
 
-    # Real OHLC candles from MT5
-    candles: List[CandleData] = Field(default_factory=list)
+course_lessons = Table(
+    "course_lessons",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("course_id", Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False),
+    Column("title", String(255), nullable=False),
+    Column("content", Text, default=""),
+    Column("video_url", String(500), default=""),
+    Column("duration_minutes", Integer, default=0),
+    Column("sort_order", Integer, default=0),
+    Column("is_active", Boolean, default=True)
+)
 
-    # Enhanced Signals routing — MUST be True for dashboard to show the signal
-    is_pattern_idea: bool = False
+user_lesson_progress = Table(
+    "user_lesson_progress",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
+    Column("lesson_id", Integer, nullable=False),  # FIX: was FK to course_lessons (old table); plain Integer avoids FK ordering issues
+    Column("completed_at", DateTime, default=datetime.utcnow),
+    Column("time_spent_seconds", Integer, default=0)
+)
 
-    # SMC context (informational)
-    bias_d1: Optional[str] = None
-    bias_h4: Optional[str] = None
-    bos_m5: Optional[str] = None
+certificates = Table(
+    "certificates",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
+    Column("course_id", Integer, ForeignKey("courses.id"), nullable=False),
+    Column("certificate_number", String(100), unique=True, nullable=False),
+    Column("issued_at", DateTime, default=datetime.utcnow),
+    Column("pdf_url", String(500), default="")
+)
 
-    # Test signal marker
-    test_signal: Optional[bool] = False
+# ==========================================
+# SECURITY & UTILITIES
+# ==========================================
 
-    class Config:
-        extra = "allow"     # ignore any extra fields the bot adds in future
+SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
+_cached_columns = None
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# POST /signals — Create signal from bot
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.post("/signals")
-async def create_signal(payload: SignalIn):
-    """
-    Receive a structured SMC signal from GreenXTrades bot and save to DB.
-    Returns 201 on success so the bot logs ✅.
-    """
-    db = get_database()
-
+def get_available_columns(table_name='users'):
+    """Get list of actually available columns in the database table."""
+    global _cached_columns
+    
+    if _cached_columns is not None:
+        return _cached_columns
+    
     try:
-        logger.info(
-            f"[signals] ▶ Received {payload.symbol} {payload.direction} "
-            f"@ {payload.entry} | confidence={payload.confidence} "
-            f"candles={len(payload.candles)} "
-            f"test={payload.test_signal}"
+        sync_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+        engine = create_engine(sync_url, pool_pre_ping=True)
+        inspector = inspect(engine)
+        columns = inspector.get_columns(table_name)
+        _cached_columns = [col['name'] for col in columns]
+        print(f"[DB] Discovered columns: {_cached_columns}", flush=True)
+        return _cached_columns
+    except Exception as e:
+        print(f"[DB ERROR] Could not inspect columns: {e}", flush=True)
+        return [col.name for col in users.columns]
+
+async def init_database():
+    """Initialize database connection."""
+    try:
+        await database.connect()
+        print("[DB] Database initialized successfully", flush=True)
+    except Exception as e:
+        print(f"[DB FATAL] Could not connect: {e}", flush=True)
+        raise
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DATABASE MIGRATIONS  ─  added for CMS v2 + Enhanced Signals
+# Safe to call every startup: every statement is fully idempotent.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# (table, column, pg_type, default_clause)
+# Each row becomes:  ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <col> <type> <default>
+_COLUMN_MIGRATIONS = [
+    # ── blog_posts ────────────────────────────────────────────────────────────
+    # The live table was created with status/featured only; CMS v2 needs these:
+    ("blog_posts", "is_published",    "BOOLEAN",      "DEFAULT FALSE"),
+    ("blog_posts", "featured",        "BOOLEAN",      "DEFAULT FALSE"),  # was missing — caused all queries to fail
+    ("blog_posts", "read_time",       "VARCHAR(20)",  "DEFAULT '5 min'"),  # was missing
+    ("blog_posts", "tags",            "TEXT",         "DEFAULT '[]'"),
+    ("blog_posts", "featured_image",  "VARCHAR(500)", "DEFAULT ''"),
+    ("blog_posts", "views",           "INTEGER",      "DEFAULT 0"),
+    ("blog_posts", "focus_keyword",   "VARCHAR(255)", "DEFAULT ''"),
+    ("blog_posts", "seo_title",       "VARCHAR(255)", "DEFAULT ''"),
+    ("blog_posts", "seo_description", "TEXT",         "DEFAULT ''"),   # may already exist
+    ("blog_posts", "seo_keywords",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
+    ("blog_posts", "og_image_url",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
+
+    # ── signals (core + enhanced + AnalysisIQ) ─────────────────────────────────
+    # Core columns (may already exist from original schema)
+    ("signals", "symbol",             "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "direction",          "VARCHAR(10)",  "DEFAULT 'BUY'"),
+    ("signals", "entry_price",        "FLOAT",        "DEFAULT 0"),
+    ("signals", "stop_loss",          "FLOAT",        "DEFAULT 0"),
+    ("signals", "take_profit",        "FLOAT",        "DEFAULT 0"),
+    ("signals", "timeframe",          "VARCHAR(10)",  "DEFAULT '1H'"),
+    ("signals", "analysis",           "TEXT",         "DEFAULT ''"),
+    ("signals", "outcome",            "VARCHAR(20)",  ""),
+    ("signals", "ai_confidence",      "FLOAT",        ""),
+    ("signals", "is_published",       "BOOLEAN",      "DEFAULT TRUE"),
+    ("signals", "created_by",         "INTEGER",      ""),
+    ("signals", "result_pips",        "FLOAT",        ""),
+    ("signals", "closed_at",          "TIMESTAMP",    ""),
+    # Enhanced signals columns
+    ("signals", "full_name",          "VARCHAR(255)", "DEFAULT ''"),
+    ("signals", "pattern",            "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "entry",              "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "target",             "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "stop",               "VARCHAR(50)",  "DEFAULT ''"),
+    ("signals", "confidence",         "INTEGER",      "DEFAULT 75"),
+    ("signals", "asset_type",         "VARCHAR(50)",  "DEFAULT 'forex'"),
+    ("signals", "country",            "VARCHAR(50)",  "DEFAULT 'all'"),
+    ("signals", "sentiment_bearish",  "INTEGER",      "DEFAULT 50"),
+    ("signals", "sentiment_bullish",  "INTEGER",      "DEFAULT 50"),
+    ("signals", "expires_at",         "TIMESTAMP",    ""),
+    ("signals", "chart_data",         "JSONB",        ""),
+    ("signals", "current_price",      "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "price_change",       "VARCHAR(20)",  "DEFAULT ''"),
+    ("signals", "price_change_percent", "VARCHAR(20)", "DEFAULT ''"),
+    # AnalysisIQ columns (Pattern Trade Ideas)
+    ("signals", "is_pattern_idea",    "BOOLEAN",      "DEFAULT FALSE"),
+    ("signals", "technical_summary",  "TEXT",         "DEFAULT ''"),
+    ("signals", "volatility_index",   "INTEGER",      ""),
+
+    # ── webinars ──────────────────────────────────────────────────────────────
+    # presenter + recording_url are in the ORM but missing from some live DBs
+    ("webinars", "presenter",        "VARCHAR(255)", "DEFAULT ''"),
+    ("webinars", "meeting_link",     "VARCHAR(500)", "DEFAULT ''"),
+    ("webinars", "recording_url",    "VARCHAR(500)", "DEFAULT ''"),   # may already exist
+    ("webinars", "thumbnail",        "VARCHAR(500)", "DEFAULT ''"),
+    ("webinars", "max_attendees",    "INTEGER",      "DEFAULT 100"),
+    ("webinars", "is_published",     "BOOLEAN",      "DEFAULT FALSE"),
+    ("webinars", "speaker_bio",      "TEXT",         "DEFAULT ''"),
+    ("webinars", "tags",             "VARCHAR(500)", "DEFAULT ''"),
+    ("webinars", "status",           "VARCHAR(50)",  "DEFAULT 'scheduled'"),  # was missing → CMS INSERT failed
+
+    # ── courses ───────────────────────────────────────────────────────────────
+    ("courses", "price",               "FLOAT",        "DEFAULT 0"),
+    ("courses", "thumbnail",           "VARCHAR(500)", "DEFAULT ''"),
+    ("courses", "preview_video",       "VARCHAR(500)", "DEFAULT ''"),
+    ("courses", "is_active",           "BOOLEAN",      "DEFAULT TRUE"),   # was missing — caused INSERT 500
+    ("courses", "is_published",        "BOOLEAN",      "DEFAULT FALSE"),
+    ("courses", "certificate_enabled", "BOOLEAN",      "DEFAULT FALSE"),
+    ("courses", "pass_percentage",     "INTEGER",      "DEFAULT 70"),
+    # BUG FIX: instructor & thumbnail_url are in the ORM courses_table definition
+    # but were missing from _COLUMN_MIGRATIONS, so older live DBs that pre-date
+    # the ORM column addition would not have them added on startup.
+    ("courses", "instructor",          "VARCHAR(255)", "DEFAULT ''"),
+    ("courses", "thumbnail_url",       "VARCHAR(500)", "DEFAULT ''"),
+
+
+    # ── course_modules ────────────────────────────────────────────────────────
+    # BUG FIX: The live table may have been created by an older migration that
+    # lacked these columns.  CREATE TABLE IF NOT EXISTS never patches existing
+    # tables, so every column that can be missing needs its own ADD COLUMN.
+    ("course_modules", "description",  "TEXT",    "DEFAULT ''"),
+    ("course_modules", "order_index",  "INTEGER", "DEFAULT 0"),
+    ("course_modules", "is_published", "BOOLEAN", "DEFAULT TRUE"),
+    ("course_modules", "course_id",    "INTEGER", "REFERENCES courses(id) ON DELETE CASCADE"),
+    # ── lessons ───────────────────────────────────────────────────────────────
+    # Core FK columns — may be missing if table was created from old schema
+    ("lessons", "course_id",        "INTEGER",      "REFERENCES courses(id) ON DELETE CASCADE"),
+    ("lessons", "module_id",        "INTEGER",      ""),
+    ("lessons", "content",          "TEXT",         "DEFAULT ''"),
+    ("lessons", "video_url",        "VARCHAR(500)", "DEFAULT ''"),
+    ("lessons", "attachment_url",   "VARCHAR(500)", "DEFAULT ''"),
+    ("lessons", "duration_minutes", "INTEGER",      "DEFAULT 0"),
+    ("lessons", "order_index",      "INTEGER",      "DEFAULT 0"),
+    ("lessons", "is_free_preview",  "BOOLEAN",      "DEFAULT FALSE"),
+    ("lessons", "is_active",        "BOOLEAN",      "DEFAULT TRUE"),
+    ("lessons", "is_published",     "BOOLEAN",      "DEFAULT TRUE"),
+
+    # ── users ─────────────────────────────────────────────────────────────────
+    ("users", "last_login",        "TIMESTAMP",   ""),
+    # role / subscription_tier already exist in the ORM, guard anyway
+    ("users", "role",              "VARCHAR(50)", "DEFAULT 'user'"),
+    # ── ai_mentor_logs — add message/role columns for persistent history ──────
+    ("ai_mentor_logs", "role",    "VARCHAR(20)", "DEFAULT 'user'"),
+    ("ai_mentor_logs", "message", "TEXT",        "DEFAULT ''"),
+]
+
+# New tables required by CMS v2 — all CREATE … IF NOT EXISTS so safe to re-run.
+_TABLE_MIGRATIONS = [
+    """CREATE TABLE IF NOT EXISTS course_modules (
+        id          SERIAL PRIMARY KEY,
+        course_id   INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title       VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT '',
+        order_index INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS lessons (
+        id               SERIAL PRIMARY KEY,
+        course_id        INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        module_id        INTEGER,
+        title            VARCHAR(255) NOT NULL,
+        content          TEXT DEFAULT '',
+        video_url        VARCHAR(500) DEFAULT '',
+        attachment_url   VARCHAR(500) DEFAULT '',
+        duration_minutes INTEGER DEFAULT 0,
+        order_index      INTEGER DEFAULT 0,
+        is_free_preview  BOOLEAN DEFAULT FALSE,
+        is_active        BOOLEAN DEFAULT TRUE,
+        created_at       TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS quizzes (
+        id              SERIAL PRIMARY KEY,
+        module_id       INTEGER NOT NULL REFERENCES course_modules(id) ON DELETE CASCADE,
+        title           VARCHAR(255) NOT NULL,
+        pass_percentage INTEGER DEFAULT 70,
+        max_attempts    INTEGER DEFAULT 3,
+        created_at      TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS quiz_questions (
+        id             SERIAL PRIMARY KEY,
+        quiz_id        INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+        question       TEXT NOT NULL,
+        option_a       TEXT NOT NULL,
+        option_b       TEXT NOT NULL,
+        option_c       TEXT DEFAULT '',
+        option_d       TEXT DEFAULT '',
+        correct_option VARCHAR(1) NOT NULL,
+        explanation    TEXT DEFAULT '',
+        order_index    INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS media_library (
+        id            SERIAL PRIMARY KEY,
+        filename      VARCHAR(500) NOT NULL,
+        original_name VARCHAR(255) DEFAULT '',
+        url           VARCHAR(500) NOT NULL,
+        mime_type     VARCHAR(100) DEFAULT '',
+        size_bytes    BIGINT DEFAULT 0,
+        folder        VARCHAR(100) DEFAULT 'general',
+        created_at    TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS site_settings (
+        key        VARCHAR(120) PRIMARY KEY,
+        value      TEXT NOT NULL DEFAULT '',
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS announcements (
+        id         SERIAL PRIMARY KEY,
+        message    TEXT NOT NULL,
+        type       VARCHAR(20) DEFAULT 'info',
+        is_active  BOOLEAN DEFAULT TRUE,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS coupons (
+        id             SERIAL PRIMARY KEY,
+        code           VARCHAR(50) UNIQUE NOT NULL,
+        discount_type  VARCHAR(20) DEFAULT 'percent',
+        discount_value FLOAT NOT NULL,
+        max_uses       INTEGER DEFAULT 100,
+        uses           INTEGER DEFAULT 0,
+        expires_at     TIMESTAMP,
+        is_active      BOOLEAN DEFAULT TRUE,
+        created_at     TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS login_logs (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS ai_mentor_logs (
+        id             SERIAL PRIMARY KEY,
+        user_id        INTEGER,
+        question_topic VARCHAR(255) DEFAULT '',
+        role           VARCHAR(20)  DEFAULT 'user',
+        message        TEXT         DEFAULT '',
+        created_at     TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS chart_analysis_logs (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER,
+        symbol     VARCHAR(20) DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS journal_uploads (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
+]
+
+
+async def run_migrations():
+    """
+    Idempotent migration runner — call once from main.py lifespan startup.
+
+    Phase 1: CREATE new tables (IF NOT EXISTS).
+    Phase 2: ADD missing columns (IF NOT EXISTS).
+    Phase 3: Back-fill is_published from legacy status/is_active columns.
+    """
+    print("[DB MIGRATION] Starting schema migration…", flush=True)
+    ok = warn = 0
+
+    # ── Phase 1: new tables ──────────────────────────────────────────────────
+    for sql in _TABLE_MIGRATIONS:
+        try:
+            await database.execute(sql.strip())
+            ok += 1
+        except Exception as e:
+            print(f"[DB MIGRATION] table warn: {e}", flush=True)
+            warn += 1
+
+    # ── Phase 2: missing columns ─────────────────────────────────────────────
+    for table, col, col_type, default_clause in _COLUMN_MIGRATIONS:
+        try:
+            ddl = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}"
+            if default_clause:
+                ddl += f" {default_clause}"
+            await database.execute(ddl)
+            ok += 1
+        except Exception as e:
+            print(f"[DB MIGRATION] col {table}.{col} warn: {e}", flush=True)
+            warn += 1
+
+    # ── Phase 3: fix legacy NOT NULL constraints & sync dual-column data ─────
+
+    # The live signals table may have a "pair" column (older schema) that is NOT NULL.
+    # Make it nullable so CMS inserts (which use symbol/direction) don't fail.
+    for sql in [
+        "ALTER TABLE signals ALTER COLUMN pair DROP NOT NULL",
+        "ALTER TABLE signals ALTER COLUMN pair SET DEFAULT ''",
+    ]:
+        try: await database.execute(sql)
+        except Exception: pass  # column may not exist — safe to ignore
+
+    # Backfill pair = symbol for any rows where pair is null/empty
+    try:
+        await database.execute(
+            "UPDATE signals SET pair = symbol WHERE (pair IS NULL OR pair = '') AND symbol IS NOT NULL"
         )
+    except Exception: pass
 
-        # Convert pattern_points to JSON string
-        pattern_points_json = None
-        if payload.pattern_points:
-            pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points])
-
-        # Convert candles to JSON string
-        candles_json = None
-        if payload.candles:
-            candles_json = json.dumps([c.dict() for c in payload.candles])
-            logger.info(f"[signals] 📊 Storing {len(payload.candles)} candles for {payload.symbol}")
-
-        # Cast confidence to int
-        conf_int = int(payload.confidence)
-
-        # Expires hours
-        expires_hours = int(payload.expires_in_hours)
-
-        # Parse price values as floats
-        entry_price = float(payload.entry) if payload.entry else 0.0
-        take_profit = float(payload.target) if payload.target else 0.0
-        stop_loss = float(payload.stop) if payload.stop else 0.0
-
-        # Insert into database - use PostgreSQL NOW() for timestamps
-        query = f"""
-            INSERT INTO signals (
-                symbol, direction, entry, target, stop,
-                entry_price, take_profit, stop_loss,
-                confidence, ai_confidence, asset_type, country,
-                pattern, timeframe, is_pattern_idea,
-                pattern_points, candles, status, is_published,
-                created_at, expires_at
-            ) VALUES (
-                :symbol, :direction, :entry, :target, :stop,
-                :entry_price, :take_profit, :stop_loss,
-                :confidence, :ai_confidence, :asset_type, :country,
-                :pattern, :timeframe, :is_pattern_idea,
-                :pattern_points, :candles, 'active', TRUE,
-                NOW(), NOW() + INTERVAL '{expires_hours} hours'
-            )
-            RETURNING id
-        """
-
-        params = {
-            "symbol": payload.symbol,
-            "direction": payload.direction.upper(),
-            "entry": payload.entry,
-            "target": payload.target,
-            "stop": payload.stop,
-            "entry_price": entry_price,
-            "take_profit": take_profit,
-            "stop_loss": stop_loss,
-            "confidence": conf_int,
-            "ai_confidence": conf_int,
-            "asset_type": payload.asset_type,
-            "country": payload.country,
-            "pattern": payload.pattern,
-            "timeframe": payload.timeframe,
-            "is_pattern_idea": payload.is_pattern_idea,
-            "pattern_points": pattern_points_json,
-            "candles": candles_json,
-        }
-
-        result = await db.fetch_one(query, params)
-        signal_id = result["id"] if result else None
-
-        logger.info(
-            f"[signals] ✅ {payload.symbol} {payload.direction} saved | id={signal_id} | candles={len(payload.candles)}"
+    # Sync is_active with is_published for courses
+    # (public /courses/list filters by is_active, CMS sets is_published)
+    try:
+        await database.execute(
+            "UPDATE courses SET is_active = TRUE WHERE is_published = TRUE"
         )
+    except Exception: pass
 
-        return JSONResponse(
-            status_code=201,
-            content={
-                "ok": True,
-                "signal_id": signal_id,
-                "symbol": payload.symbol,
-                "direction": payload.direction,
-                "candles_stored": len(payload.candles),
-                "message": "Signal received and saved.",
-            },
+    # Sync is_published with is_active for courses (reverse direction for old data)
+    try:
+        await database.execute(
+            "UPDATE courses SET is_published = TRUE WHERE is_active = TRUE AND (is_published IS NULL OR is_published = FALSE)"
         )
+    except Exception: pass
 
-    except Exception as e:
-        logger.exception(f"[signals] ❌ Failed to save signal: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"ok": False, "error": str(e)},
+    # Sync webinar status = 'scheduled' for all published webinars
+    try:
+        await database.execute(
+            "UPDATE webinars SET status = 'scheduled' "
+            "WHERE is_published = TRUE AND (status IS NULL OR status = '' OR status = 'draft')"
         )
+    except Exception: pass
 
+    # Sync is_published from status for webinars (old data)
+    try:
+        await database.execute(
+            "UPDATE webinars SET is_published = TRUE "
+            "WHERE status NOT IN ('cancelled', 'draft', '') AND (is_published IS NULL OR is_published = FALSE)"
+        )
+    except Exception: pass
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# GET /signals/enhanced — Read signals for frontend dashboard
-# ═══════════════════════════════════════════════════════════════════════════════
+    # Sync blog status = 'published' for all posts with is_published = TRUE
+    try:
+        await database.execute(
+            "UPDATE blog_posts SET status = 'published' WHERE is_published = TRUE"
+        )
+    except Exception: pass
 
-@router.get("/signals/enhanced")
-async def get_enhanced_signals(limit: int = 50):
+    # Sync is_published from status for blog posts (old data)
+    try:
+        await database.execute(
+            "UPDATE blog_posts SET is_published = TRUE "
+            "WHERE status = 'published' AND (is_published IS NULL OR is_published = FALSE)"
+        )
+    except Exception: pass
+
+    # ── Phase 4: ensure site_settings has correct schema ────────────────────
+    # If the table exists with wrong column names, add the correct ones.
+    # The CREATE TABLE IF NOT EXISTS above never fixes an existing bad schema.
+    for fix_sql in [
+        # Ensure 'key' column exists (PRIMARY KEY)
+        """DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='site_settings' AND column_name='key'
+            ) THEN
+                -- Table exists but has wrong columns — drop and recreate
+                DROP TABLE IF EXISTS site_settings CASCADE;
+                CREATE TABLE site_settings (
+                    key        VARCHAR(120) PRIMARY KEY,
+                    value      TEXT NOT NULL DEFAULT '',
+                    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                );
+            END IF;
+        END $$""",
+        # Ensure 'value' column exists
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS value TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()",
+    ]:
+        try:
+            await database.execute(fix_sql)
+            ok += 1
+        except Exception as e:
+            print(f"[DB MIGRATION] site_settings fix warn: {e}", flush=True)
+            warn += 1
+
+    print(f"[DB MIGRATION] Complete — {ok} statements ok, {warn} warnings", flush=True)
+
+# ── Phase 4: Ensure UNIQUE constraints that ON CONFLICT clauses depend on ────
+# BUG: `user_progress` was created by metadata.create_all() WITHOUT a UNIQUE
+# constraint on (user_id, course_id). The ON CONFLICT upsert in complete_lesson
+# (courses.py) requires this constraint — without it PostgreSQL raises:
+#   "there is no unique or exclusion constraint matching the ON CONFLICT specification"
+# CREATE UNIQUE INDEX IF NOT EXISTS is idempotent and safe on existing tables.
+
+# Also: `user_lesson_progress` needs UNIQUE(user_id, lesson_id) for its
+# ON CONFLICT DO NOTHING clause.
+
+# Also: `certificates` needs UNIQUE(user_id, course_id) for its
+# ON CONFLICT DO NOTHING clause.
+
+_UNIQUE_INDEX_MIGRATIONS = [
+    (
+        "idx_user_progress_user_course",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_user_course "
+        "ON user_progress (user_id, course_id)"
+    ),
+    (
+        "idx_user_lesson_progress_user_lesson",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_lesson_progress_user_lesson "
+        "ON user_lesson_progress (user_id, lesson_id)"
+    ),
+    (
+        "idx_certificates_user_course",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_user_course "
+        "ON certificates (user_id, course_id)"
+    ),
+]
+
+async def run_unique_index_migrations():
     """
-    Return active, non-expired signals with CANDLES for dashboard charts.
-    Called by dashboard to populate the Enhanced Signals panel.
+    Add missing UNIQUE indexes that ON CONFLICT clauses depend on.
+    Called from main.py lifespan AFTER run_migrations().
+    Idempotent — safe to call on every deploy.
     """
-    db = get_database()
-
-    try:
-        query = """
-            SELECT * FROM signals 
-            WHERE status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY created_at DESC
-            LIMIT :limit
-        """
-
-        rows = await db.fetch_all(query, {"limit": limit})
-
-        if not rows:
-            logger.info("[signals] GET /signals/enhanced — no active signals")
-            return []
-
-        # Convert rows to dicts and parse JSON fields
-        signals = []
-        for row in rows:
-            signal = dict(row)
-
-            # Parse JSON fields if present
-            if signal.get('pattern_points'):
-                try:
-                    signal['pattern_points'] = json.loads(signal['pattern_points'])
-                except:
-                    signal['pattern_points'] = None
-
-            # ═══════════════════════════════════════════════════════════
-            # 🔥 CRITICAL: Parse candles JSON back to list for frontend
-            # ═══════════════════════════════════════════════════════════
-            if signal.get('candles'):
-                try:
-                    candles_parsed = json.loads(signal['candles'])
-                    if isinstance(candles_parsed, list) and len(candles_parsed) > 0:
-                        signal['candles'] = candles_parsed
-                        logger.debug(f"[signals] 📊 Returning {len(candles_parsed)} candles for {signal['symbol']}")
-                    else:
-                        signal['candles'] = None
-                except Exception as e:
-                    logger.warning(f"[signals] Failed to parse candles for {signal['symbol']}: {e}")
-                    signal['candles'] = None
-            else:
-                signal['candles'] = None
-
-            # Convert datetime to ISO string for JSON
-            for key in ['created_at', 'expires_at', 'updated_at']:
-                if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                    signal[key] = signal[key].isoformat()
-
-            signals.append(signal)
-
-        # Log summary
-        total_candles = sum(len(s.get('candles') or []) for s in signals)
-        logger.info(f"[signals] GET /signals/enhanced — returning {len(signals)} signals with {total_candles} total candles")
-        return signals
-
-    except Exception as e:
-        logger.exception(f"[signals] GET /signals/enhanced error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# GET /signals/active — Filtered signals (legacy compatibility)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/signals/active")
-async def get_active_signals(
-    country: str = "all",
-    asset_type: str = "forex",
-    limit: int = 50
-):
-    """
-    Return filtered active signals. Has default params to avoid 422 errors.
-    """
-    db = get_database()
-
-    try:
-        query = """
-            SELECT * FROM signals 
-            WHERE status = 'active'
-            AND (expires_at IS NULL OR expires_at > NOW())
-        """
-        params = {"limit": limit}
-
-        if country and country != "all":
-            query += " AND country = :country"
-            params["country"] = country
-
-        if asset_type and asset_type != "all":
-            query += " AND asset_type = :asset_type"
-            params["asset_type"] = asset_type
-
-        query += " ORDER BY created_at DESC LIMIT :limit"
-
-        rows = await db.fetch_all(query, params)
-        signals = [dict(row) for row in rows] if rows else []
-
-        # Parse candles and convert datetime fields
-        for signal in signals:
-            if signal.get('candles'):
-                try:
-                    signal['candles'] = json.loads(signal['candles'])
-                except:
-                    signal['candles'] = None
-
-            for key in ['created_at', 'expires_at', 'updated_at']:
-                if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                    signal[key] = signal[key].isoformat()
-
-        logger.info(f"[signals] GET /signals/active — returning {len(signals)} signals")
-        return signals
-
-    except Exception as e:
-        logger.exception(f"[signals] GET /signals/active error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# GET /signals/{id} — Single signal
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.get("/signals/{signal_id}")
-async def get_signal(signal_id: int):
-    """Return a single signal by ID."""
-    db = get_database()
-
-    try:
-        query = "SELECT * FROM signals WHERE id = :signal_id"
-        row = await db.fetch_one(query, {"signal_id": signal_id})
-
-        if not row:
-            return JSONResponse(status_code=404, content={"error": "Signal not found"})
-
-        signal = dict(row)
-
-        # Parse JSON fields
-        if signal.get('pattern_points'):
-            try:
-                signal['pattern_points'] = json.loads(signal['pattern_points'])
-            except:
-                pass
-
-        if signal.get('candles'):
-            try:
-                signal['candles'] = json.loads(signal['candles'])
-            except:
-                signal['candles'] = None
-
-        # Convert datetime fields
-        for key in ['created_at', 'expires_at', 'updated_at']:
-            if signal.get(key) and hasattr(signal[key], 'isoformat'):
-                signal[key] = signal[key].isoformat()
-
-        return signal
-
-    except Exception as e:
-        logger.exception(f"[signals] GET /signals/{signal_id} error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# DELETE /signals/{id} — Soft delete (mark inactive)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.delete("/signals/{signal_id}")
-async def delete_signal(signal_id: int):
-    """Soft delete a signal (mark as inactive)."""
-    db = get_database()
-
-    try:
-        query = "UPDATE signals SET status = 'inactive' WHERE id = :signal_id RETURNING id"
-        result = await db.fetch_one(query, {"signal_id": signal_id})
-
-        if not result:
-            return JSONResponse(status_code=404, content={"error": "Signal not found"})
-
-        logger.info(f"[signals] ✅ Deleted signal #{signal_id}")
-        return {"id": signal_id, "status": "deleted"}
-
-    except Exception as e:
-        logger.exception(f"[signals] DELETE /signals/{signal_id} error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# POST /signals/expire-old — Cleanup expired signals
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@router.post("/signals/expire-old")
-async def expire_old_signals():
-    """Mark expired signals as inactive. Can be called by cron job."""
-    db = get_database()
-
-    try:
-        query = """
-            UPDATE signals 
-            SET status = 'expired' 
-            WHERE status = 'active' 
-            AND expires_at < NOW()
-            RETURNING id
-        """
-        rows = await db.fetch_all(query)
-        count = len(rows) if rows else 0
-
-        logger.info(f"[signals] ✅ Expired {count} old signals")
-        return {"expired_count": count}
-
-    except Exception as e:
-        logger.exception(f"[signals] expire-old error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+    ok = warn = 0
+    for name, sql in _UNIQUE_INDEX_MIGRATIONS:
+        try:
+            await database.execute(sql)
+            ok += 1
+            print(f"[DB INDEX] {name}: ok", flush=True)
+        except Exception as e:
+            warn += 1
+            print(f"[DB INDEX] {name} warn: {e}", flush=True)
+    print(f"[DB INDEX] Done — {ok} ok, {warn} warnings", flush=True)

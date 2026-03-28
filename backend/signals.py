@@ -72,7 +72,7 @@ class SignalIn(BaseModel):
     # Chart overlay
     pattern_points: List[PatternPoint] = Field(default_factory=list)
     breakout_point: Optional[BreakoutPoint] = None
-    
+
     # Real OHLC candles from MT5
     candles: List[CandleData] = Field(default_factory=list)
 
@@ -102,11 +102,12 @@ async def create_signal(payload: SignalIn):
     Returns 201 on success so the bot logs ✅.
     """
     db = get_database()
-    
+
     try:
         logger.info(
             f"[signals] ▶ Received {payload.symbol} {payload.direction} "
             f"@ {payload.entry} | confidence={payload.confidence} "
+            f"candles={len(payload.candles)} "
             f"test={payload.test_signal}"
         )
 
@@ -114,18 +115,19 @@ async def create_signal(payload: SignalIn):
         pattern_points_json = None
         if payload.pattern_points:
             pattern_points_json = json.dumps([p.dict() for p in payload.pattern_points])
-        
+
         # Convert candles to JSON string
         candles_json = None
         if payload.candles:
             candles_json = json.dumps([c.dict() for c in payload.candles])
+            logger.info(f"[signals] 📊 Storing {len(payload.candles)} candles for {payload.symbol}")
 
         # Cast confidence to int
         conf_int = int(payload.confidence)
-        
+
         # Expires hours
         expires_hours = int(payload.expires_in_hours)
-        
+
         # Parse price values as floats
         entry_price = float(payload.entry) if payload.entry else 0.0
         take_profit = float(payload.target) if payload.target else 0.0
@@ -175,7 +177,7 @@ async def create_signal(payload: SignalIn):
         signal_id = result["id"] if result else None
 
         logger.info(
-            f"[signals] ✅ {payload.symbol} {payload.direction} saved | id={signal_id}"
+            f"[signals] ✅ {payload.symbol} {payload.direction} saved | id={signal_id} | candles={len(payload.candles)}"
         )
 
         return JSONResponse(
@@ -185,6 +187,7 @@ async def create_signal(payload: SignalIn):
                 "signal_id": signal_id,
                 "symbol": payload.symbol,
                 "direction": payload.direction,
+                "candles_stored": len(payload.candles),
                 "message": "Signal received and saved.",
             },
         )
@@ -204,11 +207,11 @@ async def create_signal(payload: SignalIn):
 @router.get("/signals/enhanced")
 async def get_enhanced_signals(limit: int = 50):
     """
-    Return active, non-expired signals.
+    Return active, non-expired signals with CANDLES for dashboard charts.
     Called by dashboard to populate the Enhanced Signals panel.
     """
     db = get_database()
-    
+
     try:
         query = """
             SELECT * FROM signals 
@@ -217,46 +220,52 @@ async def get_enhanced_signals(limit: int = 50):
             ORDER BY created_at DESC
             LIMIT :limit
         """
-        
+
         rows = await db.fetch_all(query, {"limit": limit})
-        
+
         if not rows:
             logger.info("[signals] GET /signals/enhanced — no active signals")
             return []
-        
+
         # Convert rows to dicts and parse JSON fields
         signals = []
         for row in rows:
             signal = dict(row)
-            
+
             # Parse JSON fields if present
             if signal.get('pattern_points'):
                 try:
                     signal['pattern_points'] = json.loads(signal['pattern_points'])
                 except:
                     signal['pattern_points'] = None
-                    
-            if signal.get('pattern_lines'):
-                try:
-                    signal['pattern_lines'] = json.loads(signal['pattern_lines'])
-                except:
-                    signal['pattern_lines'] = None
-            
-            # Parse candles JSON
+
+            # ═══════════════════════════════════════════════════════════
+            # 🔥 CRITICAL: Parse candles JSON back to list for frontend
+            # ═══════════════════════════════════════════════════════════
             if signal.get('candles'):
                 try:
-                    signal['candles'] = json.loads(signal['candles'])
-                except:
+                    candles_parsed = json.loads(signal['candles'])
+                    if isinstance(candles_parsed, list) and len(candles_parsed) > 0:
+                        signal['candles'] = candles_parsed
+                        logger.debug(f"[signals] 📊 Returning {len(candles_parsed)} candles for {signal['symbol']}")
+                    else:
+                        signal['candles'] = None
+                except Exception as e:
+                    logger.warning(f"[signals] Failed to parse candles for {signal['symbol']}: {e}")
                     signal['candles'] = None
-            
+            else:
+                signal['candles'] = None
+
             # Convert datetime to ISO string for JSON
             for key in ['created_at', 'expires_at', 'updated_at']:
                 if signal.get(key) and hasattr(signal[key], 'isoformat'):
                     signal[key] = signal[key].isoformat()
-            
+
             signals.append(signal)
-        
-        logger.info(f"[signals] GET /signals/enhanced — returning {len(signals)} signals")
+
+        # Log summary
+        total_candles = sum(len(s.get('candles') or []) for s in signals)
+        logger.info(f"[signals] GET /signals/enhanced — returning {len(signals)} signals with {total_candles} total candles")
         return signals
 
     except Exception as e:
@@ -278,7 +287,7 @@ async def get_active_signals(
     Return filtered active signals. Has default params to avoid 422 errors.
     """
     db = get_database()
-    
+
     try:
         query = """
             SELECT * FROM signals 
@@ -286,26 +295,32 @@ async def get_active_signals(
             AND (expires_at IS NULL OR expires_at > NOW())
         """
         params = {"limit": limit}
-        
+
         if country and country != "all":
             query += " AND country = :country"
             params["country"] = country
-            
+
         if asset_type and asset_type != "all":
             query += " AND asset_type = :asset_type"
             params["asset_type"] = asset_type
-        
+
         query += " ORDER BY created_at DESC LIMIT :limit"
-        
+
         rows = await db.fetch_all(query, params)
         signals = [dict(row) for row in rows] if rows else []
-        
-        # Convert datetime fields
+
+        # Parse candles and convert datetime fields
         for signal in signals:
+            if signal.get('candles'):
+                try:
+                    signal['candles'] = json.loads(signal['candles'])
+                except:
+                    signal['candles'] = None
+
             for key in ['created_at', 'expires_at', 'updated_at']:
                 if signal.get(key) and hasattr(signal[key], 'isoformat'):
                     signal[key] = signal[key].isoformat()
-        
+
         logger.info(f"[signals] GET /signals/active — returning {len(signals)} signals")
         return signals
 
@@ -322,34 +337,34 @@ async def get_active_signals(
 async def get_signal(signal_id: int):
     """Return a single signal by ID."""
     db = get_database()
-    
+
     try:
         query = "SELECT * FROM signals WHERE id = :signal_id"
         row = await db.fetch_one(query, {"signal_id": signal_id})
-        
+
         if not row:
             return JSONResponse(status_code=404, content={"error": "Signal not found"})
-        
+
         signal = dict(row)
-        
+
         # Parse JSON fields
         if signal.get('pattern_points'):
             try:
                 signal['pattern_points'] = json.loads(signal['pattern_points'])
             except:
                 pass
-                
-        if signal.get('pattern_lines'):
+
+        if signal.get('candles'):
             try:
-                signal['pattern_lines'] = json.loads(signal['pattern_lines'])
+                signal['candles'] = json.loads(signal['candles'])
             except:
-                pass
-        
+                signal['candles'] = None
+
         # Convert datetime fields
         for key in ['created_at', 'expires_at', 'updated_at']:
             if signal.get(key) and hasattr(signal[key], 'isoformat'):
                 signal[key] = signal[key].isoformat()
-        
+
         return signal
 
     except Exception as e:
@@ -365,14 +380,14 @@ async def get_signal(signal_id: int):
 async def delete_signal(signal_id: int):
     """Soft delete a signal (mark as inactive)."""
     db = get_database()
-    
+
     try:
         query = "UPDATE signals SET status = 'inactive' WHERE id = :signal_id RETURNING id"
         result = await db.fetch_one(query, {"signal_id": signal_id})
-        
+
         if not result:
             return JSONResponse(status_code=404, content={"error": "Signal not found"})
-        
+
         logger.info(f"[signals] ✅ Deleted signal #{signal_id}")
         return {"id": signal_id, "status": "deleted"}
 
@@ -389,7 +404,7 @@ async def delete_signal(signal_id: int):
 async def expire_old_signals():
     """Mark expired signals as inactive. Can be called by cron job."""
     db = get_database()
-    
+
     try:
         query = """
             UPDATE signals 
@@ -400,7 +415,7 @@ async def expire_old_signals():
         """
         rows = await db.fetch_all(query)
         count = len(rows) if rows else 0
-        
+
         logger.info(f"[signals] ✅ Expired {count} old signals")
         return {"expired_count": count}
 

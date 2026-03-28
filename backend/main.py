@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Import all route modules
 from backend.auth import router as auth_router, get_current_user
-from backend.signals import router as signals_router  # GreenXTrades signals
+from backend.routes.signals import router as signals_router  # GreenXTrades signals (routes/signals.py)
 from backend.courses import router as courses_router
 from backend.courses_enhanced import router as courses_enhanced_router
 from backend.webinars import router as webinars_router
@@ -183,7 +183,7 @@ app.add_middleware(
 
 # Include all routers with their prefixes
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
-app.include_router(signals_router)  # No prefix — routes are /signals, /signals/enhanced
+app.include_router(signals_router)  # No prefix — full paths declared in routes/signals.py as /api/signals/*
 app.include_router(courses_router, prefix="/courses", tags=["Courses"])
 app.include_router(courses_enhanced_router, prefix="/courses", tags=["Enhanced Courses"])
 app.include_router(webinars_router, prefix="/webinars", tags=["Webinars"])
@@ -240,11 +240,8 @@ async def get_enhanced_signals_content():
         print(f"Error serving enhanced signals content: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# Legacy signals route compatibility — redirects to /signals/enhanced
-@app.get("/signals/active")
-async def get_active_signals_legacy(current_user: dict = Depends(get_current_user)):
-    """Legacy endpoint - redirect to enhanced signals"""
-    return RedirectResponse(url="/signals/enhanced", status_code=301)
+# NOTE: /signals/active legacy route removed.
+# Use /api/signals/active or /api/signals/enhanced instead.
 
 # Root endpoint
 @app.get("/")
@@ -393,12 +390,12 @@ async def api_info():
         "signal_system": {
             "source": "trading_bot",
             "fake_data": False,
-            "endpoint": "/signals/enhanced"
+            "endpoint": "/api/signals/enhanced"
         },
         "features": {
             "authentication": "/auth",
-            "signals": "/signals",
-            "enhanced_signals": "/signals/enhanced",
+            "signals": "/api/signals",
+            "enhanced_signals": "/api/signals/enhanced",
             "courses": "/courses", 
             "webinars": "/webinars",
             "blog": "/blog",
@@ -430,11 +427,27 @@ async def get_favicon():
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc: HTTPException):
-    """Custom 404 handler"""
-    if request.url.path.startswith("/api/") or request.url.path.startswith("/auth/"):
-        return {"detail": "Endpoint not found"}
-    else:
-        return RedirectResponse(url="/", status_code=302)
+    """Custom 404 handler — API paths return JSON; everything else redirects to SPA root."""
+    from fastapi.responses import JSONResponse
+    path = request.url.path
+    is_api = (
+        path.startswith("/api/")
+        or path.startswith("/auth/")
+        or path.startswith("/signals/")
+        or path.startswith("/courses/")
+        or path.startswith("/webinars/")
+        or path.startswith("/blog/")
+        or path.startswith("/admin/")
+        or path.startswith("/ai/")
+        or path.startswith("/cms/")
+        or path.startswith("/payments/")
+        or path.startswith("/email/")
+        or path.startswith("/learning/")
+        or path.startswith("/risk/")
+    )
+    if is_api:
+        return JSONResponse(status_code=404, content={"detail": "Endpoint not found"})
+    return RedirectResponse(url="/", status_code=302)
 
 @app.exception_handler(500)
 async def internal_error_handler(request: Request, exc: Exception):

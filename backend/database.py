@@ -17,6 +17,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("RAILWAY_DATABAS
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 
+# Security constants for auth compatibility
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-here-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
 class Database:
     def __init__(self, database_url: str):
         self.database_url = database_url

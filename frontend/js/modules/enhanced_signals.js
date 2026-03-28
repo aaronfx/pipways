@@ -1,9 +1,10 @@
-// Enhanced Signals Page — Production v9 (Professional Charts)
+// Enhanced Signals Page — Production v10 (Real MT5 Candles)
 // Deploy to: frontend/js/modules/enhanced_signals.js
 //
 // ✅ NO mock/fake/placeholder data
 // ✅ ONLY fetches from /signals/enhanced API
 // ✅ Bot → DB → API → Frontend
+// ✅ Real OHLC candles from MT5 (falls back to generated if not available)
 // ✅ Risk/Reward boxes (green profit zone, red risk zone)
 // ✅ Pattern overlay from pattern_points
 // ✅ Trade status display (WAITING / TRIGGERED / EXPIRED / TP HIT / SL HIT)
@@ -942,8 +943,23 @@ Always conduct your own analysis and use proper risk management.`
                 handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
             });
             
-            // Generate candles
-            const candles = generateRealisticCandles(signal);
+            // Use real MT5 candles if available, otherwise generate realistic ones
+            let candles;
+            if (signal.candles && Array.isArray(signal.candles) && signal.candles.length >= 10) {
+                // Real candles from MT5 bot — use directly
+                candles = signal.candles.map(c => ({
+                    time: c.time,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close
+                }));
+                console.log(`[Chart] Using ${candles.length} real MT5 candles for ${signal.symbol}`);
+            } else {
+                // Fallback to generated candles
+                candles = generateRealisticCandles(signal);
+                console.log(`[Chart] Generated ${candles.length} candles for ${signal.symbol}`);
+            }
             
             // === DRAW RISK/REWARD BOXES FIRST (below candles) ===
             drawRiskRewardBoxes(candles, entry, target, stop, isBuy);

@@ -1,5 +1,6 @@
 """
 Database module for Pipways
+Compatible with existing auth.py imports
 """
 
 import os
@@ -49,11 +50,9 @@ class Database:
         
         async with self.pool.acquire() as conn:
             try:
-                # Convert dict params to tuple for asyncpg
                 if params:
                     keys = list(params.keys())
                     values = [params[k] for k in keys]
-                    # Replace :param with $1, $2, etc.
                     for i, key in enumerate(keys):
                         query = query.replace(f":{key}", f"${i+1}")
                     row = await conn.fetchrow(query, *values)
@@ -71,7 +70,6 @@ class Database:
         
         async with self.pool.acquire() as conn:
             try:
-                # Convert dict params to tuple for asyncpg
                 if params:
                     keys = list(params.keys())
                     values = [params[k] for k in keys]
@@ -107,7 +105,21 @@ class Database:
     async def run_migrations(self):
         """Run database migrations"""
         async with self.pool.acquire() as conn:
-            # Create signals table if not exists
+            # Users table for auth compatibility
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    name VARCHAR(100),
+                    role VARCHAR(20) DEFAULT 'user',
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            
+            # Signals table
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS signals (
                     id SERIAL PRIMARY KEY,
@@ -245,14 +257,63 @@ class Database:
         rows = await self.fetch_all(query)
         return len(rows) if rows else 0
 
+    # User methods for auth compatibility
+    async def create_user(self, email: str, password_hash: str, name: Optional[str] = None) -> Dict:
+        query = """
+            INSERT INTO users (email, password_hash, name)
+            VALUES ($1, $2, $3)
+            RETURNING id, email, name, role, is_active, created_at
+        """
+        return await self.fetch_one(query, {"email": email, "hash": password_hash, "name": name})
 
-# CRITICAL: Create singleton instance
+    async def get_user_by_email(self, email: str) -> Optional[Dict]:
+        query = "SELECT * FROM users WHERE email = $1 AND is_active = TRUE"
+        return await self.fetch_one(query, {"email": email})
+
+    async def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        query = "SELECT id, email, name, role, is_active, created_at FROM users WHERE id = $1"
+        return await self.fetch_one(query, {"id": user_id})
+
+
+# CRITICAL EXPORTS for auth.py compatibility
+
+# 1. Singleton instance
 database = Database(DATABASE_URL)
 
-# CRITICAL: Export get_database function
+# 2. get_database function
 def get_database():
     """Return database singleton instance"""
     return database
+
+# 3. LEGACY: users table reference (for auth.py compatibility)
+# This is a stub that provides the table interface auth.py expects
+class UsersTable:
+    """Stub for legacy auth.py compatibility"""
+    def __init__(self, db):
+        self.db = db
+    
+    async def select(self, *args, **kwargs):
+        """Legacy compatibility"""
+        return self
+    
+    async def where(self, **kwargs):
+        """Legacy compatibility"""
+        return []
+    
+    async def first(self):
+        """Legacy compatibility"""
+        return None
+
+users = UsersTable(database)
+
+# 4. LEGACY: get_available_columns function (for auth.py compatibility)
+def get_available_columns(table_name: str) -> List[str]:
+    """Return available columns for a table (legacy compatibility)"""
+    columns = {
+        'users': ['id', 'email', 'password_hash', 'name', 'role', 'is_active', 'created_at', 'updated_at'],
+        'signals': ['id', 'symbol', 'direction', 'entry', 'target', 'stop', 'pattern_name', 'candles', 'created_at']
+    }
+    return columns.get(table_name, [])
 
 # Legacy init functions
 async def init_db():

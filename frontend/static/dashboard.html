@@ -1976,6 +1976,10 @@ const DashboardController = class {
         if (activeLink) activeLink.classList.add('active');
 
         // ── Hide all sections, reveal target with fade ────────────────────
+        // #9: Pause enhanced signals interval when navigating away from it
+        if (typeof window.enhancedSignals !== 'undefined' && section !== 'enhanced-signals') {
+            window.enhancedSignals.pause();
+        }
         document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
         const target = document.getElementById(`section-${section}`);
         if (target) {
@@ -2043,12 +2047,13 @@ const DashboardController = class {
                 case 'signals':   await this.loadSignals();  break;
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
-                        // init() on first visit (registers tabs + interval), loadSignals() after that
                         if (!window.enhancedSignals._initialized) {
+                            // First visit — init() registers tabs, modal, interval
                             window.enhancedSignals._initialized = true;
                             window.enhancedSignals.init();
                         } else {
-                            window.enhancedSignals.loadSignals();
+                            // Returning — resume interval (#9) and refresh data
+                            window.enhancedSignals.resume();
                         }
                     } else {
                         console.warn('[Dashboard] enhancedSignals module not loaded');

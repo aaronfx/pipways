@@ -171,94 +171,7 @@ class EnhancedSignalsPage {
         return risk > 0 ? reward / risk : null;
     }
 
-    // ── Card Rendering ─────────────────────────────────────────────────────────
-
-    renderSignalCard(signal) {
-        const pattern   = signal.pattern_name || signal.pattern || 'Breakout';
-        const status    = this.calculateStatus(signal);
-        const rr        = this._calcRR(signal);
-        const isBuy     = (signal.direction || '').toUpperCase().includes('BUY');
-        const conf      = signal.confidence || 70;
-
-        // Status badge — live-badge for ACTIVE, plain badge for others
-        const statusBadgeHtml = status.class === 'active'
-            ? `<span class="live-badge">LIVE</span>`
-            : `<span class="badge ${
-                status.class === 'pending' ? 'badge-warning' :
-                status.class === 'expired' ? 'badge-secondary' :
-                status.class === 'target_hit' ? 'badge-success' :
-                'badge-danger'
-              }">${status.icon} ${status.text}</span>`;
-
-        return `
-            <div class="signal-card rounded-xl overflow-hidden cursor-pointer"
-                 data-signal-id="${signal.id}"
-                 onclick="window.enhancedSignals.viewAnalysis(${signal.id})">
-
-                <!-- ── Header ── -->
-                <div class="flex items-center justify-between gap-2 p-3 border-b border-gray-800 flex-wrap">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="font-bold text-white text-base">${signal.symbol}</span>
-                        <span class="timeframe-badge">${signal.timeframe || 'M5'}</span>
-                        ${pattern !== 'Breakout' ? `<span class="pattern-badge">${pattern}</span>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <span class="${isBuy ? 'buy-stop' : 'sell-stop'}">
-                            ${isBuy ? '▲ BUY' : '▼ SELL'}
-                        </span>
-                        ${statusBadgeHtml}
-                    </div>
-                </div>
-
-                <!-- ── Price Levels ── -->
-                <div class="trade-levels px-3 pt-3">
-                    <div class="level-item">
-                        <span class="level-label">Entry</span>
-                        <span class="level-value level-entry">${signal.entry}</span>
-                    </div>
-                    <div class="level-item">
-                        <span class="level-label">Target</span>
-                        <span class="level-value level-target">${signal.target}</span>
-                    </div>
-                    <div class="level-item">
-                        <span class="level-label">Stop</span>
-                        <span class="level-value level-stop">${signal.stop}</span>
-                    </div>
-                </div>
-
-                <!-- ── Confidence Bar ── -->
-                <div class="px-3 pb-2">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-muted" style="font-size:10px;">Confidence</span>
-                        <span class="text-muted" style="font-size:10px;">${conf}%</span>
-                    </div>
-                    <div class="sentiment-bar">
-                        <div class="sentiment-fill ${isBuy ? 'sentiment-bullish' : 'sentiment-bearish'}"
-                             style="width:${conf}%"></div>
-                    </div>
-                </div>
-
-                <!-- ── Chart ── -->
-                <div class="relative mx-3 mb-3 rounded-lg overflow-hidden" style="height:180px;background:#0a0a0f;">
-                    <div id="chart-${signal.id}" style="width:100%;height:100%;"></div>
-                </div>
-
-                <!-- ── Footer ── -->
-                <div class="flex items-center justify-between px-3 pb-3 gap-2">
-                    <div class="flex items-center gap-2">
-                        ${rr ? `<span class="badge badge-success">R:R ${rr.toFixed(1)}</span>` : ''}
-                        <span class="text-muted" style="font-size:11px;">
-                            ${new Date(signal.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                        </span>
-                    </div>
-                    <button class="learn-btn" onclick="event.stopPropagation(); window.enhancedSignals.viewAnalysis(${signal.id})">
-                        View Analysis
-                    </button>
-                </div>
-            </div>`;
-    }
-
-    // ── Status (delegates to ProChart.tradeState when ready) ──────────────────
+    // ── Status ─────────────────────────────────────────────────────────────────
 
     calculateStatus(signal) {
         if (window.ProChart && window.ProChart.tradeState) {
@@ -269,7 +182,6 @@ class EnhancedSignalsPage {
             const ts = window.ProChart.tradeState(signal, currentPrice);
             return { text: ts.label, class: ts.state.toLowerCase(), icon: ts.icon, bg: ts.bg || 'rgba(107,114,128,0.2)', color: ts.color };
         }
-        // Fallback: time-based (used before ProChart IIFE executes)
         const mins = (Date.now() - new Date(signal.created_at)) / 60000;
         if (mins <  5) return { text: 'PENDING', class: 'pending', icon: '⏳', bg: 'rgba(255,193,7,0.2)',   color: '#ffc107' };
         if (mins < 60) return { text: 'ACTIVE',  class: 'active',  icon: '●',  bg: 'rgba(0,208,132,0.2)',  color: '#00d084' };
@@ -281,132 +193,330 @@ class EnhancedSignalsPage {
     renderGridChart(signal) {
         const container = document.getElementById('chart-' + signal.id);
         if (!container) return;
-
         try {
             const LC = window.LightweightCharts;
             if (!LC) {
                 container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:12px;">Chart lib not ready</div>';
                 return;
             }
-
-            // ProChart provides validated/fallback candles
             const candles = (window.ProChart && window.ProChart.validateCandles)
                 ? window.ProChart.validateCandles(signal)
                 : (signal.candles || []);
-
             if (!candles || candles.length < 5) {
                 container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:12px;">No chart data</div>';
                 return;
             }
-
             const isExpired = signal.expires_at
                 ? new Date(signal.expires_at) < new Date()
                 : (Date.now() - new Date(signal.created_at)) / 60000 > 60;
-
             const upColor   = isExpired ? '#1d4a38' : '#00d084';
             const downColor = isExpired ? '#4a1d1d' : '#ff4757';
-
             const chart = LC.createChart(container, {
-                width:  container.clientWidth,
-                height: container.clientHeight,
-                layout: {
-                    background: { type: 'solid', color: '#0a0a0f' },
-                    textColor:  '#6b7280',
-                    fontFamily: "'Inter', sans-serif",
-                },
-                grid: {
-                    vertLines: { color: 'rgba(255,255,255,0.02)' },
-                    horzLines: { color: 'rgba(255,255,255,0.02)' }
-                },
-                crosshair:       { mode: LC.CrosshairMode.None },
+                width: container.clientWidth, height: container.clientHeight,
+                layout: { background: { type: 'solid', color: '#0a0a0f' }, textColor: '#6b7280', fontFamily: "'Inter',sans-serif" },
+                grid: { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
+                crosshair: { mode: LC.CrosshairMode.None },
                 rightPriceScale: { borderColor: 'rgba(255,255,255,0.05)', scaleMargins: { top: 0.1, bottom: 0.1 } },
-                timeScale:       { borderColor: 'rgba(255,255,255,0.05)', visible: false },
-                handleScroll:    false,
-                handleScale:     false,
+                timeScale: { borderColor: 'rgba(255,255,255,0.05)', visible: false },
+                handleScroll: false, handleScale: false,
             });
-
             this.charts.set(signal.id, chart);
-
             const cs = chart.addCandlestickSeries({
-                upColor, downColor,
-                borderUpColor: upColor, borderDownColor: downColor,
-                wickUpColor:   upColor, wickDownColor:   downColor,
+                upColor, downColor, borderUpColor: upColor, borderDownColor: downColor, wickUpColor: upColor, wickDownColor: downColor,
             });
             cs.setData(candles);
-
-            const entry  = parseFloat(signal.entry);
-            const target = parseFloat(signal.target);
-            const stop   = parseFloat(signal.stop);
+            const entry = parseFloat(signal.entry), target = parseFloat(signal.target), stop = parseFloat(signal.stop);
             if (entry)  cs.createPriceLine({ price: entry,  color: '#ffffff', lineWidth: 1, lineStyle: LC.LineStyle.Solid,  axisLabelVisible: false });
             if (target) cs.createPriceLine({ price: target, color: '#00d084', lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
             if (stop)   cs.createPriceLine({ price: stop,   color: '#ff4757', lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
-
             chart.timeScale().fitContent();
-
-            const ro = new ResizeObserver((entries) => {
+            const ro = new ResizeObserver(function(entries) {
                 if (chart && entries[0]) chart.resize(entries[0].contentRect.width, entries[0].contentRect.height);
             });
             ro.observe(container);
-
         } catch (err) {
             console.error('[GridChart] ' + signal.symbol + ':', err);
             container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ef4444;font-size:12px;">Chart error</div>';
         }
     }
 
-    // ── Modal — PRO Chart ──────────────────────────────────────────────────────
+    // ── Card Rendering ─────────────────────────────────────────────────────────
+
+    renderSignalCard(signal) {
+        const pattern  = signal.pattern_name || signal.pattern || 'Breakout';
+        const status   = this.calculateStatus(signal);
+        const isBuy    = (signal.direction || '').toUpperCase().includes('BUY');
+        const isActive = status.class === 'active';
+        const isExpired= status.class === 'expired' || status.class === 'stopped';
+        const expiry   = this._formatExpiry(signal);
+        const flagHtml = this._getFlag(signal.symbol || '');
+
+        const topBadge = isActive
+            ? '<span class="sig-live-trade">LIVE TRADE</span>'
+            : status.class === 'target_hit'
+                ? '<span class="sig-target-hit-badge">✓ TARGET HIT</span>'
+                : status.class === 'stopped'
+                    ? '<span class="badge badge-danger">✗ STOPPED</span>'
+                    : '<span style="height:22px;display:inline-block;"></span>';
+
+        return `
+            <div class="signal-card rounded-xl overflow-hidden cursor-pointer${isExpired ? ' opacity-60' : ''}"
+                 data-signal-id="${signal.id}"
+                 onclick="window.enhancedSignals.viewAnalysis(${signal.id})">
+
+                <!-- Top bar -->
+                <div class="flex items-center justify-between px-3 pt-3 pb-1">
+                    ${topBadge}
+                    <div class="sig-brand-icon"><i class="fas fa-chart-line"></i></div>
+                </div>
+
+                <!-- Symbol row: flag + symbol + pattern name -->
+                <div class="flex items-center justify-between px-3 pb-2 gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        ${flagHtml}
+                        <span class="text-white font-bold" style="font-size:15px;letter-spacing:.02em;">${signal.symbol}</span>
+                    </div>
+                    <span class="text-gray-400 text-xs font-semibold uppercase tracking-wide flex-shrink-0"
+                          style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                          title="${pattern}">${pattern}</span>
+                </div>
+
+                <!-- Direction pill — centered -->
+                <div class="flex justify-center pb-3">
+                    <span class="${isBuy ? 'sig-buystop-pill' : 'sig-sellstop-pill'}">
+                        ${isBuy ? 'BUY STOP' : 'SELL STOP'}
+                    </span>
+                </div>
+
+                <!-- Price list -->
+                <div class="sig-price-list px-3">
+                    <div class="sig-row">
+                        <span class="sig-label">Entry</span>
+                        <span class="sig-value level-entry">${signal.entry}</span>
+                    </div>
+                    <div class="sig-row">
+                        <span class="sig-label">Target</span>
+                        <span class="sig-value level-target">${signal.target}</span>
+                    </div>
+                    <div class="sig-row">
+                        <span class="sig-label">Stop</span>
+                        <span class="sig-value level-stop">${signal.stop}</span>
+                    </div>
+                    <div class="sig-row">
+                        <span class="sig-label">Expires</span>
+                        ${expiry}
+                    </div>
+                </div>
+
+                <!-- Chart with timeframe badge -->
+                <div class="relative mx-3 mt-3 rounded-lg overflow-hidden" style="height:180px;background:#0a0a0f;">
+                    <div id="chart-${signal.id}" style="width:100%;height:100%;"></div>
+                    <div class="sig-tf-badge">${(signal.timeframe || '1H').toUpperCase()}</div>
+                </div>
+
+                <!-- Footer -->
+                <div class="p-3">
+                    <button class="sig-learn-btn"
+                            onclick="event.stopPropagation(); window.enhancedSignals.viewAnalysis(${signal.id})">
+                        LEARN MORE
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    _getFlag(symbol) {
+        const FLAGS = {
+            USD:'us', EUR:'eu', GBP:'gb', JPY:'jp', CHF:'ch', CAD:'ca',
+            AUD:'au', NZD:'nz', SGD:'sg', HKD:'hk', SEK:'se', NOK:'no',
+            DKK:'dk', MXN:'mx', ZAR:'za', TRY:'tr', CNH:'cn', CNY:'cn',
+            BRL:'br', INR:'in', NGN:'ng', KWD:'kw', AED:'ae', SAR:'sa',
+        };
+        const SPECIALS = {
+            XAU:'🥇', XAG:'🥈', OIL:'🛢', WTI:'🛢', BTC:'₿', ETH:'Ξ',
+            US30:'🇺🇸', US500:'🇺🇸', SPX:'🇺🇸', NAS100:'🇺🇸', NDX:'🇺🇸',
+            UK100:'🇬🇧', GER40:'🇩🇪', DAX:'🇩🇪', CHINA50:'🇨🇳',
+            JPN225:'🇯🇵', AUS200:'🇦🇺', HK50:'🇭🇰',
+        };
+        const sym  = (symbol || '').toUpperCase();
+        const base = sym.slice(0, 3);
+        for (const [key, icon] of Object.entries(SPECIALS)) {
+            if (sym.startsWith(key) || sym === key) {
+                return `<div class="sig-flag"><span style="font-size:18px;line-height:1;">${icon}</span></div>`;
+            }
+        }
+        const code = FLAGS[base];
+        if (code) {
+            return `<div class="sig-flag"><img src="https://flagcdn.com/w40/${code}.png" alt="${base}" loading="lazy" onerror="this.parentNode.innerHTML='<span style=font-size:16px>💱</span>'"></div>`;
+        }
+        return `<div class="sig-flag"><span style="font-size:15px;">💱</span></div>`;
+    }
+
+    _formatExpiry(signal) {
+        if (!signal.expires_at) return '<span class="expiry-time">—</span>';
+        const diff = new Date(signal.expires_at) - new Date();
+        if (diff <= 0) return '<span style="color:#ef4444;font-weight:600;font-family:monospace;">Expired</span>';
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const label = d > 0 ? (d + 'd ' + h + 'h') : h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+        return '<span class="expiry-time" style="font-family:monospace;">' + label + '</span>';
+    }
+
+    _getCurrencyName(symbol) {
+        const NAMES = {
+            EURUSD:'Euro vs US Dollar', GBPUSD:'British Pound vs US Dollar',
+            USDJPY:'US Dollar vs Japanese Yen', USDCHF:'US Dollar vs Swiss Franc',
+            AUDUSD:'Australian Dollar vs USD', USDCAD:'US Dollar vs Canadian Dollar',
+            NZDUSD:'New Zealand Dollar vs USD', GBPJPY:'British Pound vs Yen',
+            EURJPY:'Euro vs Japanese Yen', EURGBP:'Euro vs British Pound',
+            XAUUSD:'Gold vs US Dollar', XAGUSD:'Silver vs US Dollar',
+            BTCUSD:'Bitcoin vs US Dollar', ETHUSD:'Ethereum vs US Dollar',
+            US30:'Dow Jones 30', US500:'S&P 500', NAS100:'NASDAQ 100',
+            UK100:'FTSE 100', GER40:'DAX 40', CHINA50:'China 50 Index',
+            JPN225:'Nikkei 225', AUS200:'ASX 200',
+        };
+        return NAMES[(symbol || '').toUpperCase()] || symbol;
+    }
+
+    _getPatternDescription(pattern) {
+        const D = {
+            'Pennant':'The Pennant is a short-term continuation pattern that develops after a strong directional move, symbolizing a pause in momentum. It resembles a small symmetrical triangle formed by converging trendlines as volatility temporarily contracts.\n\nThe pattern shows that both buyers and sellers are waiting for new direction following an impulsive move.\n\nA breakout in the direction of the prior trend validates the pattern and signals continuation.\n\nPrice objectives are often set by adding the length of the prior move (the flagpole) to the breakout level.',
+            'Ascending Triangle':'The Ascending Triangle is a bullish continuation pattern with a flat upper resistance and a rising lower support. Buyers are becoming increasingly aggressive while sellers hold a fixed ceiling.\n\nEach swing low is higher than the last, showing accumulating demand. A breakout above resistance typically triggers a sharp move upward.',
+            'Descending Triangle':'The Descending Triangle is a bearish continuation pattern with a flat support and descending resistance. Sellers grow more aggressive while buyers defend a fixed floor.\n\nA breakdown below support typically leads to a sharp move downward equal to the height of the triangle.',
+            'Symmetrical Triangle':'The Symmetrical Triangle is a consolidation pattern where both trendlines converge. Neither buyers nor sellers have a clear advantage as range narrows.\n\nA breakout in the direction of the prior trend signals the next significant move.',
+            'Rising Wedge':'The Rising Wedge is a bearish pattern where both support and resistance slope upward but converge. Price makes higher highs and higher lows but momentum is weakening.\n\nA breakdown below the lower trendline signals bearish continuation.',
+            'Falling Wedge':'The Falling Wedge is a bullish pattern where both lines slope downward but converge. Selling pressure is decreasing as the pattern matures.\n\nA breakout above the upper trendline signals bullish continuation.',
+            'Bull Flag':'The Bull Flag is a bullish continuation pattern: a sharp upward move (the flagpole) followed by a brief rectangular consolidation that slopes slightly downward.\n\nThe measured target is derived by adding the flagpole length to the breakout point.',
+            'Bear Flag':'The Bear Flag is a bearish continuation pattern: a sharp downward move followed by a brief consolidation sloping slightly upward.\n\nA breakdown below flag support confirms continuation.',
+            'Double Top':'The Double Top is a bearish reversal pattern where price tests a resistance level twice and fails to break through. A breakdown below the neckline confirms the reversal.',
+            'Double Bottom':'The Double Bottom is a bullish reversal pattern where price tests a support level twice and holds. A breakout above the neckline confirms the reversal.',
+            'Breakout':'A Breakout Setup occurs when price decisively breaks through a key support or resistance level with increased momentum, signalling the start of a new directional move.\n\nThe entry is placed just beyond the breakout level with a stop below the broken structure.',
+        };
+        return D[pattern] || ('The ' + pattern + ' pattern signals a potential trading opportunity. Monitor key price levels for confirmation of the expected directional move.');
+    }
+
+    // ── Modal — competitor-grade layout ───────────────────────────────────────
 
     viewAnalysis(signalId) {
         const signal = this.signals.find(s => s.id === signalId);
         if (!signal) return;
 
-        const pattern = signal.pattern_name || signal.pattern || 'Breakout';
-        const rr      = this._calcRR(signal);
+        const pattern      = signal.pattern_name || signal.pattern || 'Breakout';
+        const rr           = this._calcRR(signal);
+        const isBuy        = (signal.direction || '').toUpperCase().includes('BUY');
+        const status       = this.calculateStatus(signal);
+        const isActive     = status.class === 'active';
+        const flagHtml     = this._getFlag(signal.symbol || '');
+        const currName     = this._getCurrencyName(signal.symbol || '');
+        const conf         = signal.confidence || 70;
+        const description  = signal.rationale || this._getPatternDescription(pattern);
+        const publishedAt  = signal.created_at
+            ? new Date(signal.created_at).toLocaleString([], {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+            : '—';
+        const expiresAt    = signal.expires_at
+            ? new Date(signal.expires_at).toLocaleString([], {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+            : '—';
 
+        // News sentiment derived from confidence + direction
+        const bullPct = isBuy ? Math.round(conf * 0.6 + 20) : Math.round((100 - conf) * 0.6 + 15);
+        const bearPct = 100 - bullPct;
+
+        // Minimal modal title
         const titleEl = document.getElementById('modalTitle');
-        if (titleEl) titleEl.textContent = signal.symbol + ' — ' + signal.direction + ' Signal';
+        if (titleEl) titleEl.textContent = signal.symbol + ' · ' + pattern;
 
         const modalContent = document.getElementById('modalContent');
         if (!modalContent) return;
 
-        modalContent.innerHTML =
-            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
-                '<div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;text-align:center;">' +
-                    '<div style="color:#8b949e;font-size:10px;margin-bottom:4px;text-transform:uppercase;">Entry</div>' +
-                    '<div style="color:#fff;font-weight:700;font-size:17px;font-family:monospace;">' + signal.entry + '</div>' +
-                '</div>' +
-                '<div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;text-align:center;">' +
-                    '<div style="color:#8b949e;font-size:10px;margin-bottom:4px;text-transform:uppercase;">Target</div>' +
-                    '<div style="color:#00d084;font-weight:700;font-size:17px;font-family:monospace;">' + signal.target + '</div>' +
-                '</div>' +
-                '<div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;text-align:center;">' +
-                    '<div style="color:#8b949e;font-size:10px;margin-bottom:4px;text-transform:uppercase;">Stop</div>' +
-                    '<div style="color:#ff4757;font-weight:700;font-size:17px;font-family:monospace;">' + signal.stop + '</div>' +
-                '</div>' +
-            '</div>' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">' +
-                '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-                    '<span style="background:rgba(88,166,255,0.15);color:#58a6ff;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">' + pattern + '</span>' +
-                    (rr ? '<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">R:R ' + rr.toFixed(1) + '</span>' : '') +
-                    '<span style="background:rgba(255,255,255,0.07);color:#9ca3af;padding:4px 10px;border-radius:6px;font-size:12px;">' + (signal.timeframe || 'M5') + '</span>' +
-                '</div>' +
-                '<span style="color:#6b7280;font-size:12px;">' + (signal.confidence || 70) + '% confidence</span>' +
-            '</div>' +
-            '<div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid #30363d;margin-bottom:16px;">' +
-                '<div id="sig-chart-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:420px;background:#0a0a0f;color:#6b7280;">' +
-                    '<div style="font-size:28px;margin-bottom:10px;">⏳</div>' +
-                    '<div style="font-size:13px;">Loading PRO chart…</div>' +
-                '</div>' +
-                '<div id="modal-chart-container" style="width:100%;height:420px;display:none;"></div>' +
-            '</div>' +
-            (signal.rationale
-                ? '<div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:14px;">' +
-                      '<div style="color:#818cf8;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">AI Analysis</div>' +
-                      '<div style="color:#e0e7ff;font-size:13px;line-height:1.65;">' + signal.rationale + '</div>' +
-                  '</div>'
-                : '');
+        modalContent.innerHTML = `
+            <!-- ── Hero header (Image 2) ── -->
+            <div class="sig-modal-hero">
+                <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;flex:1;">
+                    ${flagHtml}
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+                            <span style="background:#1f2937;color:#9ca3af;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;">${signal.symbol}</span>
+                            <span style="color:white;font-size:17px;font-weight:700;">${currName}</span>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            <span class="${isBuy ? 'sig-buystop-pill' : 'sig-sellstop-pill'}" style="font-size:11px;padding:4px 14px;">
+                                ${isBuy ? 'BUY STOP' : 'SELL STOP'}
+                            </span>
+                            ${isActive ? '<span class="sig-live-trade" style="font-size:10px;">LIVE TRADE</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:28px;font-weight:700;color:white;font-family:monospace;line-height:1;">${signal.entry}</div>
+                    ${rr ? `<div style="color:#22c55e;font-size:13px;font-weight:600;margin-top:4px;">R:R ${rr.toFixed(1)} : 1</div>` : ''}
+                </div>
+            </div>
 
-        // Show modal (needs flex removed from hidden state)
+            <!-- ── Stats grid (Pattern | Entry | Target | Stop) ── -->
+            <div class="sig-modal-stats">
+                <div class="sig-modal-stat">
+                    <span class="sig-modal-stat-label">Pattern</span>
+                    <span class="sig-modal-stat-value" style="color:#a78bfa;font-size:12px;">${pattern}</span>
+                </div>
+                <div class="sig-modal-stat">
+                    <span class="sig-modal-stat-label">Entry</span>
+                    <span class="sig-modal-stat-value level-entry">${signal.entry}</span>
+                </div>
+                <div class="sig-modal-stat">
+                    <span class="sig-modal-stat-label">Target</span>
+                    <span class="sig-modal-stat-value level-target">${signal.target}</span>
+                </div>
+                <div class="sig-modal-stat">
+                    <span class="sig-modal-stat-label">Stop</span>
+                    <span class="sig-modal-stat-value level-stop">${signal.stop}</span>
+                </div>
+            </div>
+
+            <!-- ── News sentiment bar ── -->
+            <div class="sig-sentiment-row">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="color:#ef4444;font-size:12px;font-weight:600;">🐻 ${bearPct}%</span>
+                    <span style="color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">News Sentiment</span>
+                    <span style="color:#22c55e;font-size:12px;font-weight:600;">${bullPct}% 🐂</span>
+                </div>
+                <div style="display:flex;height:7px;background:#374151;border-radius:4px;overflow:hidden;">
+                    <div style="width:${bearPct}%;background:linear-gradient(90deg,#ef4444,#dc2626);"></div>
+                    <div style="width:${bullPct}%;background:linear-gradient(90deg,#22c55e,#16a34a);"></div>
+                </div>
+            </div>
+
+            <!-- ── PRO Chart (Image 3) ── -->
+            <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid #1f2937;margin-bottom:16px;">
+                <div id="sig-chart-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:400px;background:#0a0a0f;color:#6b7280;">
+                    <div class="spinner" style="margin-bottom:12px;"></div>
+                    <div style="font-size:13px;">Building Market Chart…</div>
+                </div>
+                <div id="modal-chart-container" style="width:100%;height:400px;display:none;"></div>
+            </div>
+
+            <!-- ── Trade Idea section (Image 4) ── -->
+            <div class="sig-trade-idea">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                    <span style="color:white;font-size:18px;font-weight:700;">Trade Idea</span>
+                    <div class="sig-brand-icon"><i class="fas fa-chart-line"></i></div>
+                    ${isActive ? '<span class="sig-live-trade">LIVE TRADE</span>' : ''}
+                </div>
+                <div style="color:#6b7280;font-size:12px;margin-bottom:14px;">
+                    Published: ${publishedAt}
+                    ${signal.expires_at ? ' &nbsp;·&nbsp; Expires: ' + expiresAt : ''}
+                    &nbsp;·&nbsp; ${signal.timeframe || '1H'} timeframe
+                </div>
+                ${description.split('\n\n').map(p => `<p>${p}</p>`).join('')}
+                ${rr ? `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <span class="badge badge-success">R:R ${rr.toFixed(1)}</span>
+                    <span class="pattern-badge">${pattern}</span>
+                    <span class="timeframe-badge">${signal.timeframe || '1H'}</span>
+                </div>` : ''}
+            </div>`;
+
+        // Show modal
         const modal = document.getElementById('signalModal');
         if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
 

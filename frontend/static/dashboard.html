@@ -1176,7 +1176,7 @@
                 </div>
                 
                 <!-- Signals Grid -->
-                <div id="signalsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div id="enhanced-signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div class="col-span-full text-center py-12">
                         <i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i>
                         <p class="text-gray-400">Loading enhanced signals...</p>
@@ -1955,7 +1955,13 @@ const DashboardController = class {
                 case 'signals':   await this.loadSignals();  break;
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
-                        window.enhancedSignals.loadSignals();
+                        // init() on first visit (registers tabs + interval), loadSignals() after that
+                        if (!window.enhancedSignals._initialized) {
+                            window.enhancedSignals._initialized = true;
+                            window.enhancedSignals.init();
+                        } else {
+                            window.enhancedSignals.loadSignals();
+                        }
                     } else {
                         console.warn('[Dashboard] enhancedSignals module not loaded');
                     }

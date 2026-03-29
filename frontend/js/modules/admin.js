@@ -9,7 +9,9 @@
 
 // ── Extend window.API with admin-specific methods ────────────────────────────
 API.getAdminStats = function() {
-    return dashboard.apiRequest('/admin/users');
+    // FIX: was /admin/users which returns a paginated user list, not platform stats.
+    // KPI cards (total_users, active_signals, new_today etc.) were all showing 0.
+    return dashboard.apiRequest('/admin/stats');
 };
 API.getAdminUsers = function(page = 1, perPage = 20, search = '') {
     const qs = new URLSearchParams({
@@ -61,9 +63,7 @@ const AdminPage = {
         })();
         const isAdmin = user.is_admin === true
             || user.role === 'admin'
-            || user.is_superuser === true
-            || (user.email||'').toLowerCase() === 'admin@pipways.com'
-            || (user.email||'').toLowerCase().startsWith('admin+');
+            || user.is_superuser === true;
 
         if (!isAdmin) {
             container.innerHTML = `
@@ -409,7 +409,7 @@ const AdminPage = {
             ? 'background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3);'
             : 'background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);';
         return `<tr>
-            <td class="font-medium text-white">${this._esc(u.username||'—')}</td>
+            <td class="font-medium text-white">${this._esc(u.full_name || u.username || '—')}</td>
             <td class="text-gray-400">${this._esc(u.email)}</td>
             <td class="text-gray-500">${this._date(u.created_at)}</td>
             <td><span style="color:${tc};font-size:.72rem;font-weight:700;">${tier.toUpperCase()}</span></td>

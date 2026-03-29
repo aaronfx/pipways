@@ -418,33 +418,54 @@ class DashboardController {
         const container = document.getElementById('admin-container');
         if (!container) return;
 
+        // Client-side guard before hitting the server
+        const isAdmin = this.user && (
+            this.user.is_admin === true
+            || this.user.role === 'admin'
+            || this.user.is_superuser === true
+        );
+        if (!isAdmin) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-20 text-center">
+                    <div class="w-16 h-16 rounded-full bg-red-900/30 flex items-center justify-center mb-4">
+                        <i class="fas fa-lock text-red-400 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Access Denied</h3>
+                    <p class="text-gray-400 text-sm">Administrator privileges required.</p>
+                </div>`;
+            return;
+        }
+
+        // FIX: delegate to the full AdminPage module (tabs, charts, paginated users, AI monitor).
+        // Previously rendered a static 3-card grid with non-functional Quick Action buttons.
+        if (typeof AdminPage !== 'undefined') {
+            await AdminPage.render(container);
+            return;
+        }
+
+        // Fallback: AdminPage module not loaded — show basic stats + warning
+        console.warn('[Dashboard] AdminPage module not loaded — showing basic view');
         try {
             const stats = await API.getAdminStats();
             container.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mb-4 text-sm text-yellow-400">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Admin module (admin.js) not loaded. Add it to the HTML before dashboard.js.
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                        <div class="text-3xl font-bold text-white mb-1">${stats.total_users || 0}</div>
+                        <div class="text-3xl font-bold text-white mb-1">${stats.total_users ?? 0}</div>
                         <div class="text-sm text-gray-400">Total Users</div>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                        <div class="text-3xl font-bold text-white mb-1">${stats.active_signals || 0}</div>
+                        <div class="text-3xl font-bold text-white mb-1">${stats.active_signals ?? 0}</div>
                         <div class="text-sm text-gray-400">Active Signals</div>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                        <div class="text-3xl font-bold text-white mb-1">${stats.new_today || 0}</div>
+                        <div class="text-3xl font-bold text-white mb-1">${stats.new_today ?? 0}</div>
                         <div class="text-sm text-gray-400">New Today</div>
                     </div>
-                </div>
-                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <h4 class="font-bold text-white mb-4">Quick Actions</h4>
-                    <div class="flex flex-wrap gap-3">
-                        <button class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Create Signal</button>
-                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Add Course</button>
-                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Schedule Webinar</button>
-                        <button class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">New Blog Post</button>
-                    </div>
-                </div>
-            `;
+                </div>`;
         } catch (error) {
             console.error('[Admin Error]', error);
             container.innerHTML = '<div class="text-red-400 p-4 bg-red-900/20 rounded-lg border border-red-800">Error loading admin data. Ensure you have admin privileges.</div>';
@@ -538,7 +559,7 @@ class DashboardController {
                     <i class="fas fa-user"></i>
                 </div>
                 <div class="bg-purple-600 p-3 rounded-2xl rounded-tr-none max-w-[85%] sm:max-w-[80%]">
-                    <p class="text-white">${message}</p>
+                    <p class="text-white">${message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
                 </div>
             </div>
         `;
@@ -660,7 +681,7 @@ class DashboardController {
         if (!file) return;
 
         if (file.size > 5 * 1024 * 1024) {
-            alert('File too large (max 5MB)');
+            window.dashboard._toast('File too large — max 5MB allowed', 'error');
             return;
         }
 
@@ -685,7 +706,7 @@ class DashboardController {
 
     async analyzeChart() {
         if (!this.currentChartBase64) {
-            alert('Please select a chart image first');
+            window.dashboard._toast('Please select a chart image first', 'warning');
             return;
         }
 
@@ -700,7 +721,7 @@ class DashboardController {
             const symbol = document.getElementById('chart-symbol')?.value || 'AUTO';
             const timeframe = document.getElementById('chart-timeframe')?.value || '';
 
-            const response = await fetch(`${API_BASE}/ai/chart/analyze`, {
+            const response = await fetch(`${window.location.origin}/ai/chart/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -766,7 +787,7 @@ class DashboardController {
 
         } catch (error) {
             console.error('[Chart Analysis] Error:', error);
-            alert('Failed to analyze chart. Please try again.');
+            window.dashboard._toast('Failed to analyze chart. Please try again.', 'error');
         } finally {
             if (loadingEl) loadingEl.classList.add('hidden');
             if (analyzeBtn) analyzeBtn.disabled = false;
@@ -794,12 +815,12 @@ class DashboardController {
         const symbol = document.getElementById('validator-symbol')?.value || 'EURUSD';
 
         if (!entry || !sl || !tp) {
-            alert('Please fill in Entry, SL, and TP values');
+            window.dashboard._toast('Please fill in Entry, SL, and TP values', 'warning');
             return;
         }
 
         try {
-            const response = await fetch(`${API_BASE}/ai/trade/validate`, {
+            const response = await fetch(`${window.location.origin}/ai/trade/validate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -844,18 +865,18 @@ class DashboardController {
 
         } catch (error) {
             console.error('[Trade Validator] Error:', error);
-            alert('Validation failed. Please try again.');
+            window.dashboard._toast('Validation failed. Please try again.', 'error');
         }
     }
 
     async saveCurrentSignal() {
         if (!this.currentAnalysis) {
-            alert('No analysis to save. Please analyze a chart first.');
+            window.dashboard._toast('No analysis to save — please analyze a chart first', 'warning');
             return;
         }
 
         try {
-            const response = await fetch(`${API_BASE}/ai/signal/save`, {
+            const response = await fetch(`${window.location.origin}/ai/signal/save`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -875,13 +896,13 @@ class DashboardController {
             });
 
             if (response.ok) {
-                alert('Signal saved successfully!');
+                window.dashboard._toast('Signal saved successfully!', 'success');
             } else {
                 throw new Error('Failed to save signal');
             }
         } catch (error) {
             console.error('[Save Signal] Error:', error);
-            alert('Failed to save signal. Please try again.');
+            window.dashboard._toast('Failed to save signal. Please try again.', 'error');
         }
     }
 
@@ -935,7 +956,7 @@ class DashboardController {
             formData.append('file', file);
             formData.append('format', this.currentJournalFormat || 'auto');
 
-            const response = await fetch(`${API_BASE}/ai/performance/upload-journal`, {
+            const response = await fetch(`${window.location.origin}/ai/performance/upload-journal`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
@@ -976,7 +997,7 @@ class DashboardController {
         const days = document.getElementById('performance-period')?.value || 30;
 
         try {
-            const response = await fetch(`${API_BASE}/ai/performance/dashboard?days=${days}`, {
+            const response = await fetch(`${window.location.origin}/ai/performance/dashboard?days=${days}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
                 }
@@ -1020,7 +1041,7 @@ class DashboardController {
 
     async loadEquityCurve() {
         try {
-            const response = await fetch(`${API_BASE}/ai/performance/equity-curve?days=30`, {
+            const response = await fetch(`${window.location.origin}/ai/performance/equity-curve?days=30`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
                 }
@@ -1073,7 +1094,7 @@ class DashboardController {
 
     async loadTradeDistribution() {
         try {
-            const response = await fetch(`${API_BASE}/ai/performance/trade-distribution`, {
+            const response = await fetch(`${window.location.origin}/ai/performance/trade-distribution`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('pipways_token')}`
                 }
@@ -1121,14 +1142,14 @@ class DashboardController {
     async analyzePerformance() {
         const input = document.getElementById('performance-journal-input');
         if (!input || !input.value.trim()) {
-            alert('Please enter trade data');
+            window.dashboard._toast('Please enter trade data', 'warning');
             return;
         }
 
         try {
             const trades = JSON.parse(input.value);
 
-            const response = await fetch(`${API_BASE}/ai/performance/analyze-journal`, {
+            const response = await fetch(`${window.location.origin}/ai/performance/analyze-journal`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1141,7 +1162,7 @@ class DashboardController {
             this.displayJournalAnalysis(result);
 
         } catch (e) {
-            alert('Invalid JSON format: ' + e.message);
+            window.dashboard._toast('Invalid JSON format: ' + e.message, 'error');
         }
     }
 
@@ -1305,7 +1326,7 @@ class DashboardController {
         const pnl = parseFloat(document.getElementById('manual-pnl').value);
 
         if (!symbol || isNaN(entry) || isNaN(pnl)) {
-            alert('Please fill in required fields');
+            window.dashboard._toast('Please fill in all required fields', 'warning');
             return;
         }
 
@@ -1323,7 +1344,7 @@ class DashboardController {
 
         this.manualTrades.push(trade);
 
-        fetch(`${API_BASE}/ai/performance/analyze-journal`, {
+        fetch(`${window.location.origin}/ai/performance/analyze-journal`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1348,13 +1369,13 @@ class DashboardController {
         if (!carousel) return;
 
         const slides = [
-            { icon: 'fa-satellite-dish', title: 'Trading Signals', desc: 'AI-powered signals with high accuracy', color: 'from-purple-600 to-blue-600', section: 'signals' },
-            { icon: 'fa-book', title: 'Trading Journal', desc: 'Track and analyze your trading performance', color: 'from-green-600 to-teal-600', section: 'journal' },
-            { icon: 'fa-chart-line', title: 'Chart Analysis', desc: 'Advanced technical analysis with AI Vision', color: 'from-orange-600 to-red-600', section: 'analysis' },
-            { icon: 'fa-robot', title: 'AI Mentor', desc: 'Personalized trading coaching 24/7', color: 'from-pink-600 to-purple-600', section: 'mentor' },
-            { icon: 'fa-graduation-cap', title: 'Courses', desc: 'Learn from beginner to advanced', color: 'from-blue-600 to-cyan-600', section: 'courses' },
-            { icon: 'fa-video', title: 'Webinars', desc: 'Live trading sessions and Q&A', color: 'from-indigo-600 to-purple-600', section: 'webinars' },
-            { icon: 'fa-newspaper', title: 'Trading Blog', desc: 'Latest market insights and strategies', color: 'from-yellow-600 to-orange-600', section: 'blog' }
+            { icon: 'fa-satellite-dish', title: 'Market Signals',  desc: 'AI-powered signals with high accuracy',         color: 'from-purple-600 to-blue-600',   section: 'enhanced-signals' },
+            { icon: 'fa-book',           title: 'Trading Journal',  desc: 'Track and analyze your trading performance',    color: 'from-green-600 to-teal-600',    section: 'journal' },
+            { icon: 'fa-chart-line',     title: 'Chart Analysis',   desc: 'Advanced technical analysis with AI Vision',    color: 'from-orange-600 to-red-600',    section: 'analysis' },
+            { icon: 'fa-robot',          title: 'AI Mentor',        desc: 'Personalized trading coaching 24/7',            color: 'from-pink-600 to-purple-600',   section: 'mentor' },
+            { icon: 'fa-graduation-cap', title: 'Trading Academy',  desc: 'Learn from beginner to advanced — always free', color: 'from-blue-600 to-cyan-600',     section: null, href: '/academy' },
+            { icon: 'fa-video',          title: 'Webinars',         desc: 'Live trading sessions and Q&A',                 color: 'from-indigo-600 to-purple-600', section: 'webinars' },
+            { icon: 'fa-newspaper',      title: 'Trading Blog',     desc: 'Latest market insights and strategies',         color: 'from-yellow-600 to-orange-600', section: 'blog' }
         ];
 
         let currentSlide = 0;
@@ -1362,7 +1383,7 @@ class DashboardController {
         const renderSlides = () => {
             const slide = slides[currentSlide];
             carousel.innerHTML = `
-                <div class="bg-gradient-to-r ${slide.color} rounded-xl p-6 md:p-8 text-white cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1" onclick="dashboard.navigate('${slide.section}')">
+                <div class="bg-gradient-to-r ${slide.color} rounded-xl p-6 md:p-8 text-white cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1" onclick="${slide.href ? `window.location.href='${slide.href}'` : `dashboard.navigate('${slide.section}')`}">
                     <div class="flex items-start justify-between">
                         <div>
                             <i class="fas ${slide.icon} text-3xl mb-3 opacity-80"></i>

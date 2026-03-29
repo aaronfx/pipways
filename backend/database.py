@@ -230,7 +230,15 @@ certificates = Table(
 # SECURITY & UTILITIES
 # ==========================================
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
+# FIX: removed insecure "change-this-in-production" fallback.
+# If SECRET_KEY is missing from env, fail at startup rather than signing JWTs
+# with a publicly known key that makes every token forgeable.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "[SECURITY] SECRET_KEY environment variable must be set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 

@@ -715,12 +715,19 @@ console.log('[EnhancedSignals] Module loaded v21.0');
                 'default':    color
             };
             var STYLE_MAP = { 'solid': LC.LineStyle.Solid, 'dashed': LC.LineStyle.Dashed, 'dotted': LC.LineStyle.Dotted };
+            // Clamp timestamps to candle range — LightweightCharts silently drops out-of-range points
+            var minT = candles[0].time;
+            var maxT = candles[candles.length-1].time + (candles[candles.length-1].time - candles[0].time) * 0.5;
+            var clamp = function(t) { return Math.min(Math.max(t, minT), maxT); };
             signal.pattern_lines.forEach(function(line) {
                 if (!line.p1 || !line.p2) return;
                 var lc = ROLE_COLORS[line.role] || ROLE_COLORS['default'];
                 var ls = STYLE_MAP[line.style]  || LC.LineStyle.Solid;
                 var lw = (line.role === 'projection') ? 1 : (expired ? 1 : 2);
-                addLine(chart, [{ time: line.p1.time, value: line.p1.price }, { time: line.p2.time, value: line.p2.price }], lc, lw, ls);
+                addLine(chart, [
+                    { time: clamp(line.p1.time), value: line.p1.price },
+                    { time: clamp(line.p2.time), value: line.p2.price }
+                ], lc, lw, ls);
             });
             return;
         }
@@ -876,21 +883,28 @@ console.log('[EnhancedSignals] Module loaded v21.0');
 
     function drawZone(chart, t0, t1, top, bottom, fillColor, borderColor) {
         var LC     = LightweightCharts;
-        var steps  = 10;
+        var steps  = 20;
         var dt     = (t1 - t0) / steps;
         var mkData = function(val) {
             var d = [];
             for (var i = 0; i <= steps; i++) d.push({ time: t0 + dt*i, value: val });
             return d;
         };
+
+        // Top border line
         addLine(chart, mkData(top),    borderColor, 2, LC.LineStyle.Solid);
+        // Bottom border line
         addLine(chart, mkData(bottom), borderColor, 2, LC.LineStyle.Solid);
-        var fillSteps = 5;
+
+        // Fill — use more fill lines at higher opacity for visible shading
+        var fillSteps = 12;
         var dp = (top - bottom) / fillSteps;
+        // Extract opacity from fillColor and boost it
+        var fillOpaque = fillColor
+            .replace('0.25', '0.12')
+            .replace('0.15', '0.08');
         for (var j = 1; j < fillSteps; j++) {
-            addLine(chart, mkData(bottom + dp*j),
-                fillColor.replace('0.25','0.08').replace('0.15','0.04'),
-                1, LC.LineStyle.Solid);
+            addLine(chart, mkData(bottom + dp*j), fillOpaque, 1, LC.LineStyle.Solid);
         }
     }
 
@@ -1072,7 +1086,7 @@ console.log('[EnhancedSignals] Module loaded v21.0');
                     vertLine: { color: 'rgba(99,102,241,0.5)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#1e1b4b' },
                     horzLine: { color: 'rgba(99,102,241,0.5)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#1e1b4b' }
                 },
-                rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', scaleMargins: { top: 0.15, bottom: 0.15 } },
+                rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', scaleMargins: { top: 0.12, bottom: 0.22 } },
                 timeScale:       { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: false }
             });
 
@@ -1096,7 +1110,13 @@ console.log('[EnhancedSignals] Module loaded v21.0');
             addStatusBadge(container, tradeState);
             addAIOverlay(container, signal, tradeState);
 
-            chartInstance.timeScale().fitContent();
+            // Zoom to last 60 candles so entry zone is prominent, not tiny
+            var totalBars = candles.length;
+            var showBars  = Math.min(60, totalBars);
+            chartInstance.timeScale().setVisibleLogicalRange({
+                from: totalBars - showBars,
+                to:   totalBars + 6   // 6 future bars for projection
+            });
 
             var ro = new ResizeObserver(function(entries) {
                 if (chartInstance && entries[0]) chartInstance.resize(entries[0].contentRect.width, entries[0].contentRect.height);

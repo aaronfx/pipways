@@ -804,16 +804,46 @@ class EnhancedSignalsPage {
                     <div class="sig-brand-icon"><i class="fas fa-chart-line"></i></div>
                     ${isActive ? '<span class="sig-live-trade">LIVE TRADE</span>' : ''}
                 </div>
-                <div style="color:#6b7280;font-size:12px;margin-bottom:14px;">
+                <div style="color:#6b7280;font-size:12px;margin-bottom:16px;">
                     Published: ${publishedAt}
                     ${signal.expires_at ? ' &nbsp;·&nbsp; Expires: ' + expiresAt : ''}
-                    &nbsp;·&nbsp; ${signal.timeframe || '1H'} timeframe
+                    &nbsp;·&nbsp; ${signal.timeframe || 'M5'} timeframe
                 </div>
-                ${description.split('\n\n').map(p => `<p>${p}</p>`).join('')}
+
+                ${(() => {
+                    const paras = description.split('\n\n').filter(p => p.trim());
+                    const body  = paras.slice(0, -1);
+                    const watch = paras[paras.length - 1] || '';
+                    // Render body paragraphs
+                    const bodyHtml = body.map(p =>
+                        `<p style="color:#d1d5db;font-size:14px;line-height:1.75;margin:0 0 12px 0;">${p}</p>`
+                    ).join('');
+                    // Render Watch section — split by newline and style each ✅ ⚠️ 💡 line
+                    const watchLines = watch.split('\n').filter(l => l.trim());
+                    const watchHtml = watchLines.length ? `
+                        <div style="margin-top:16px;background:#0f1117;border:1px solid #1f2937;border-radius:10px;padding:14px;">
+                            <div style="color:#6b7280;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">What To Watch</div>
+                            ${watchLines.map(line => {
+                                const isGood = line.startsWith('✅');
+                                const isWarn = line.startsWith('⚠');
+                                const isTip  = line.startsWith('💡');
+                                const icon   = isGood ? '✅' : isWarn ? '⚠️' : isTip ? '💡' : '•';
+                                const col    = isGood ? '#22c55e' : isWarn ? '#f59e0b' : isTip ? '#818cf8' : '#9ca3af';
+                                const bg     = isGood ? 'rgba(34,197,94,0.07)' : isWarn ? 'rgba(245,158,11,0.07)' : isTip ? 'rgba(129,140,248,0.07)' : 'transparent';
+                                const text   = line.replace(/^[✅⚠️💡•]\s*/, '').trim();
+                                return `<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 10px;background:${bg};border-radius:7px;margin-bottom:6px;">
+                                    <span style="font-size:14px;flex-shrink:0;line-height:1.5;">${icon}</span>
+                                    <span style="color:#d1d5db;font-size:13px;line-height:1.6;">${text}</span>
+                                </div>`;
+                            }).join('')}
+                        </div>` : '';
+                    return bodyHtml + watchHtml;
+                })()}
+
                 ${rr ? `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
                     <span class="badge badge-success">R:R ${rr.toFixed(1)}</span>
                     <span class="pattern-badge">${pattern}</span>
-                    <span class="timeframe-badge">${signal.timeframe || '1H'}</span>
+                    <span class="timeframe-badge">${signal.timeframe || 'M5'}</span>
                 </div>` : ''}
             </div>
 

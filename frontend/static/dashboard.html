@@ -556,13 +556,8 @@
             <a href="#" data-section="stocks" class="nav-link">
                 <i class="fas fa-chart-pie nav-icon" style="color:#34d399;"></i><span>AI Stock Research</span>
             </a>
-            <a href="#" data-section="signals" class="nav-link">
-                <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
-            </a>
             <a href="#" data-section="enhanced-signals" class="nav-link">
-                <i class="fas fa-chart-bar nav-icon" style="color:#a78bfa;"></i>
-                <span>Enhanced Signals</span>
-                <span class="ml-auto bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">New</span>
+                <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
             </a>
 
             <!-- DEVELOPMENT -->
@@ -765,7 +760,7 @@
                     </a>
                     <span class="text-gray-800 flex-shrink-0" style="font-size:.6rem;">·</span>
                     <!-- Signals -->
-                    <button onclick="dashboard.navigate('signals')"
+                    <button onclick="dashboard.navigate('enhanced-signals')"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all"
                             style="background:#111827;border:1px solid #1f2937;"
                             onmouseover="this.style.borderColor='#f472b6'" onmouseout="this.style.borderColor='#1f2937'">
@@ -1220,16 +1215,7 @@
             </section>
 
             <!-- SIGNALS -->
-            <section id="section-signals" class="section hidden">
-                <!-- Live indicator pill — subtle, no duplicate heading -->
-                <div class="flex items-center gap-2 mb-5">
-                    <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
-                    <span class="text-xs text-gray-400">Live signals — updated in real time</span>
-                </div>
-                <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            </section>
-
-            <!-- ENHANCED SIGNALS -->
+            <!-- ENHANCED SIGNALS — now the primary Market Signals view -->
             <section id="section-enhanced-signals" class="section hidden">
                 <!-- Enhanced Signals Header -->
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -2025,8 +2011,7 @@ const DashboardController = class {
             'blog':      { title: 'Research & Blog',       sub: 'Market analysis, trading insights and education' },
             'analysis':  { title: 'Validate Trade Setup',  sub: 'Upload a chart screenshot for AI-powered analysis' },
             'stocks':    { title: 'AI Stock Research',     sub: 'Fundamental and sentiment analysis on global markets' },
-            'signals':   { title: 'Market Signals',        sub: 'Live trading opportunities from our analysts' },
-            'enhanced-signals': { title: 'Enhanced Signals', sub: 'AI-powered professional trading insights' },
+            'enhanced-signals': { title: 'Market Signals',  sub: 'AI-powered professional trading insights' },
             'journal':   { title: 'Performance Analytics', sub: 'AI-powered coaching from your real trade data' },
             'mentor':    { title: 'AI Mentor',             sub: '24/7 personal trading coach' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
@@ -2071,15 +2056,21 @@ const DashboardController = class {
         try {
             switch(section) {
                 case 'dashboard': this.loadDashboardStats(); break;
-                case 'signals':   await this.loadSignals();  break;
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
-                        if (!window.enhancedSignals._initialized) {
-                            // First visit — init() registers tabs, modal, interval
+                        // FIX (disappear bug): After navigating away via href=/academy (full page
+                        // navigation), _initialized stays true but the container is empty because
+                        // the module's DOM state was lost. Always re-init when the container is
+                        // empty, regardless of the _initialized flag.
+                        const _esContainer = document.getElementById('enhanced-signals-container');
+                        const _esEmpty = !_esContainer || _esContainer.children.length === 0
+                            || (_esContainer.children.length === 1 && _esContainer.querySelector('.fa-spinner'));
+                        if (!window.enhancedSignals._initialized || _esEmpty) {
+                            // First visit OR returning after full page navigation away
                             window.enhancedSignals._initialized = true;
                             window.enhancedSignals.init();
                         } else {
-                            // Returning — resume interval (#9) and refresh data
+                            // Returning within the same page session — resume interval
                             window.enhancedSignals.resume();
                         }
                     } else {
@@ -2300,7 +2291,7 @@ const DashboardController = class {
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">'
                 + _premiumFeatureCard('fa-file-chart-pie','#a78bfa','rgba(124,58,237,.08)','rgba(124,58,237,.2)','Performance Analysis','Upload MT4/MT5 · find your weaknesses','journal',null,isPaid,isPaid?null:'1 free')
                 + _premiumFeatureCard('fa-chart-pie','#34d399','rgba(52,211,153,.08)','rgba(52,211,153,.2)','AI Stock Research','NGX + global stocks analysis','stocks',null,isPaid,isPaid?null:'2/day')
-                + _premiumFeatureCard('fa-satellite-dish','#f472b6','rgba(244,114,182,.08)','rgba(244,114,182,.2)','Market Signals','Live setups with validation','signals',null,isPaid,isPaid?null:'Preview')
+                + _premiumFeatureCard('fa-satellite-dish','#f472b6','rgba(244,114,182,.08)','rgba(244,114,182,.2)','Market Signals','Live setups with validation','enhanced-signals',null,isPaid,isPaid?null:'Preview')
                 + _premiumFeatureCard('fa-book-open','#fbbf24','rgba(251,191,36,.08)','rgba(251,191,36,.2)','Trading Academy','28 lessons · always free',null,'/academy',true,'Free')
                 + '</div>';
             return html;

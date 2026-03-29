@@ -816,8 +816,28 @@ console.log('[EnhancedSignals] Module loaded v21.0');
     }
 
     function drawAutoTrendlines(chart, candles, highs, lows, color, width, LC) {
-        if (highs.length >= 2) addLine(chart, [{ time: highs[highs.length-2].time, value: highs[highs.length-2].price }, { time: highs[highs.length-1].time, value: highs[highs.length-1].price }], color, width, LC.LineStyle.Solid);
-        if (lows.length  >= 2) addLine(chart, [{ time: lows[lows.length-2].time,   value: lows[lows.length-2].price   }, { time: lows[lows.length-1].time,   value: lows[lows.length-1].price   }], color, width, LC.LineStyle.Solid);
+        // For Breakout/default — draw a flat horizontal key level at the most recent swing high
+        // (the level price broke through). This is more meaningful than random diagonal lines.
+        if (!candles || candles.length < 5) return;
+        var lastTime = candles[candles.length-1].time;
+        var firstZoneTime = candles[Math.floor(candles.length * 0.5)].time;
+
+        if (highs.length >= 1) {
+            // Flat resistance — the level that was broken
+            var resistanceLevel = highs[highs.length-1].price;
+            addLine(chart, [
+                { time: firstZoneTime, value: resistanceLevel },
+                { time: lastTime,      value: resistanceLevel }
+            ], color, width, LC.LineStyle.Dashed);
+        }
+        if (lows.length >= 1) {
+            // Flat support — the floor holding price up
+            var supportLevel = lows[lows.length-1].price;
+            addLine(chart, [
+                { time: firstZoneTime, value: supportLevel },
+                { time: lastTime,      value: supportLevel }
+            ], color, width, LC.LineStyle.Dashed);
+        }
     }
 
     // ── Curved Projection ──────────────────────────────────────────────────────
@@ -875,83 +895,82 @@ console.log('[EnhancedSignals] Module loaded v21.0');
 
         var isExpired = tradeState.state === 'STOPPED' || isSignalExpired(signal);
 
-        // Zone timing — starts at signal creation, extends ~40% beyond last candle
-        var lastTime   = candles[candles.length-1].time;
-        var candleSpan = lastTime - candles[0].time;
-        var startTime  = signal.created_at
+        // Find which candles fall within the zone window (from signal creation onward)
+        var startTime = signal.created_at
             ? Math.floor(new Date(signal.created_at).getTime() / 1000)
             : candles[Math.floor(candles.length * 0.65)].time;
-        // Clamp startTime so it's within the candle range
         startTime = Math.max(startTime, candles[0].time);
-        var futureTime = lastTime + candleSpan * 0.45;
 
-        // Build dense time series across the zone — one point per candle interval
-        var candleInterval = candles.length > 1
-            ? (candles[candles.length-1].time - candles[0].time) / (candles.length - 1)
+        // Use ACTUAL candle timestamps so histogram bars exactly match candle width — no gaps
+        var zoneCandles = candles.filter(function(c) { return c.time >= startTime; });
+        if (zoneCandles.length < 2) {
+            // Fallback: use last 30% of candles
+            zoneCandles = candles.slice(Math.floor(candles.length * 0.7));
+        }
+
+        // Project forward — add ~12 future bars at the same interval
+        var interval = candles.length > 1
+            ? candles[candles.length-1].time - candles[candles.length-2].time
             : 300;
-        var timePoints = [];
-        for (var t = startTime; t <= futureTime; t += candleInterval) {
-            timePoints.push(Math.floor(t));
-        }
-        if (timePoints[timePoints.length-1] < futureTime) {
-            timePoints.push(Math.floor(futureTime));
+        var lastT = candles[candles.length-1].time;
+        var futureTimes = [];
+        for (var f = 1; f <= 12; f++) {
+            futureTimes.push(lastT + interval * f);
         }
 
-        // Colors — competitor style: dark solid fills, bright border lines
-        var profitFill   = isExpired ? 'rgba(0,140,100,0.18)' : 'rgba(0,170,120,0.22)';
-        var profitBorder = isExpired ? 'rgba(0,200,140,0.4)'  : '#00d084';
-        var riskFill     = isExpired ? 'rgba(160,30,30,0.18)' : 'rgba(200,40,40,0.22)';
-        var riskBorder   = isExpired ? 'rgba(220,60,60,0.4)'  : '#ff4757';
+        // All time points: real candles in zone + future projection bars
+        var allTimes = zoneCandles.map(function(c) { return c.time; }).concat(futureTimes);
+
+        // Strong colors matching reference images (dark filled rectangles)
+        var profitFill   = isExpired ? 'rgba(0,120,90,0.30)'  : 'rgba(0,150,110,0.38)';
+        var profitBorder = isExpired ? 'rgba(0,180,120,0.50)' : '#00d084';
+        var riskFill     = isExpired ? 'rgba(140,20,20,0.28)' : 'rgba(180,30,30,0.38)';
+        var riskBorder   = isExpired ? 'rgba(200,50,50,0.50)' : '#ff4757';
 
         if (isBuy) {
-            // Green zone: entry → target (profit)
-            drawSolidZone(chart, LC, timePoints, entry, target, profitFill, profitBorder);
-            // Red zone: stop → entry (risk)
-            drawSolidZone(chart, LC, timePoints, stop, entry, riskFill, riskBorder);
+            drawSolidZone(chart, LC, allTimes, entry, target, profitFill, profitBorder);
+            drawSolidZone(chart, LC, allTimes, stop,  entry,  riskFill,   riskBorder);
         } else {
-            // Green zone: target → entry (profit for sell)
-            drawSolidZone(chart, LC, timePoints, target, entry, profitFill, profitBorder);
-            // Red zone: entry → stop (risk for sell)
-            drawSolidZone(chart, LC, timePoints, entry, stop, riskFill, riskBorder);
+            drawSolidZone(chart, LC, allTimes, target, entry, profitFill, profitBorder);
+            drawSolidZone(chart, LC, allTimes, entry,  stop,  riskFill,   riskBorder);
         }
 
-        // Vertical dashed entry line — marks the signal bar (competitor standard)
-        var entryBarTime = signal.created_at
-            ? Math.floor(new Date(signal.created_at).getTime() / 1000)
-            : candles[candles.length - 3].time;
-        entryBarTime = Math.max(entryBarTime, candles[0].time);
-        addLine(chart,
-            [{ time: entryBarTime, value: isBuy ? stop - Math.abs(target-entry)*0.1 : target - Math.abs(target-entry)*0.1 },
-             { time: entryBarTime, value: isBuy ? target + Math.abs(target-entry)*0.1 : stop + Math.abs(target-entry)*0.1 }],
-            'rgba(200,200,200,0.35)', 1, LC.LineStyle.Dashed);
+        // Vertical dashed line at signal entry bar
+        var entryBarTime = Math.max(startTime, candles[0].time);
+        var priceRange   = Math.abs(target - stop);
+        addLine(chart, [
+            { time: entryBarTime, value: Math.min(entry, stop)   - priceRange * 0.05 },
+            { time: entryBarTime, value: Math.max(entry, target) + priceRange * 0.05 }
+        ], 'rgba(200,200,200,0.40)', 1, LC.LineStyle.Dashed);
     }
 
     function drawSolidZone(chart, LC, timePoints, bottomPrice, topPrice, fillColor, borderColor) {
-        // Histogram series: bars drawn from `base` (bottom) to `value` (top)
-        // This is the proper LightweightCharts API for solid filled price zones.
+        if (!timePoints || timePoints.length < 2) return;
+        if (topPrice <= bottomPrice) return;
+
+        // addHistogramSeries with base=bottomPrice draws solid bars from bottomPrice to value (topPrice)
+        // Using actual candle timestamps means bar width matches candle width — no gaps, solid fill
         var hist = chart.addHistogramSeries({
-            color:              fillColor,
-            base:               bottomPrice,
-            priceLineVisible:   false,
-            lastValueVisible:   false,
-            priceScaleId:       'right',
-            scaleMargins:       { top: 0, bottom: 0 },
+            color:            fillColor,
+            base:             bottomPrice,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            priceScaleId:     'right',
         });
         hist.setData(timePoints.map(function(t) {
             return { time: t, value: topPrice };
         }));
 
-        // Top border line
-        addLine(chart,
-            [{ time: timePoints[0], value: topPrice },
-             { time: timePoints[timePoints.length-1], value: topPrice }],
-            borderColor, 2, LC.LineStyle.Solid);
+        // Border lines — solid top, slightly thinner bottom
+        addLine(chart, [
+            { time: timePoints[0], value: topPrice },
+            { time: timePoints[timePoints.length-1], value: topPrice }
+        ], borderColor, 2, LC.LineStyle.Solid);
 
-        // Bottom border line
-        addLine(chart,
-            [{ time: timePoints[0], value: bottomPrice },
-             { time: timePoints[timePoints.length-1], value: bottomPrice }],
-            borderColor, 1, LC.LineStyle.Solid);
+        addLine(chart, [
+            { time: timePoints[0], value: bottomPrice },
+            { time: timePoints[timePoints.length-1], value: bottomPrice }
+        ], borderColor, 1, LC.LineStyle.Solid);
     }
 
     // ── Price Lines ────────────────────────────────────────────────────────────

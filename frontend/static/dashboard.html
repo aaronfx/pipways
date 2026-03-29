@@ -1820,8 +1820,13 @@ async function _parseApiError(response) {
 function _handleAuthError() {
     localStorage.removeItem('pipways_token');
     localStorage.removeItem('pipways_user');
-    alert('Your session has expired. Please log in again.');
-    window.location.href = '/';
+    // FIX: replaced blocking alert() with the existing toast system
+    if (typeof dashboard !== 'undefined' && typeof dashboard.showToast === 'function') {
+        dashboard.showToast('Session expired. Please log in again.', 'warning');
+        setTimeout(() => { window.location.href = '/'; }, 1500);
+    } else {
+        window.location.href = '/';
+    }
 }
 
 const DashboardController = class {
@@ -1842,6 +1847,12 @@ const DashboardController = class {
         // Pre-load cached performance so mentor has it immediately
         this._loadCachedPerformance();
         this.navigate('dashboard');
+        // FIX: Onboarding.init() was never called — wiring it in here so the
+        // post-registration skill quiz fires for new users. Self-dismisses if
+        // user has prior academy progress or has already completed onboarding.
+        if (typeof Onboarding !== 'undefined') {
+            Onboarding.init(this.user);
+        }
     }
 
     _loadCachedPerformance() {
@@ -1898,21 +1909,18 @@ const DashboardController = class {
     }
 
     // Centralised admin check used by renderAdminMenu, loadAdminData, and loadSectionData.
-    // Three tiers:
+    // Two tiers:
     //   1. Explicit flags from the JWT/user object (most reliable)
-    //   2. Email pattern fallback — catches cases where the stored user object
-    //      was created before is_admin was added to the JWT payload
-    //   3. /auth/me refresh — silently re-fetches the user and updates localStorage
+    //   2. /auth/me refresh — silently re-fetches the user and updates localStorage
     //      so the next page load has the correct flags without requiring a re-login
+    // FIX: removed email-pattern fallback (admin@pipways.com / admin+*) — any account
+    // registered with those addresses got the admin menu regardless of DB flags.
+    // _refreshUserFromServer() already corrects stale tokens on every load.
     _isAdminUser(user) {
         if (!user) return false;
         if (user.is_admin === true)     return true;
         if (user.role === 'admin')      return true;
         if (user.is_superuser === true) return true;
-        // Fallback: treat known admin email patterns as admin
-        // (handles cases where is_admin is missing from the stored token)
-        const email = (user.email || '').toLowerCase();
-        if (email === 'admin@pipways.com' || email.startsWith('admin+')) return true;
         return false;
     }
 
@@ -2075,7 +2083,14 @@ const DashboardController = class {
                             window.enhancedSignals.resume();
                         }
                     } else {
+                        // FIX: was only a console.warn — user saw a blank section with no explanation
                         console.warn('[Dashboard] enhancedSignals module not loaded');
+                        const esContainer = document.getElementById('enhanced-signals-container');
+                        if (esContainer) {
+                            esContainer.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">'
+                                + '<i class="fas fa-exclamation-circle mr-2"></i>'
+                                + 'Enhanced signals failed to load. Please refresh the page.</div>';
+                        }
                     }
                     break;
                 case 'webinars':  await this.loadWebinars(); break;
@@ -2294,14 +2309,23 @@ const DashboardController = class {
 
 
         // ── Fetch all data in parallel ────────────────────────────────────
-        const [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
-            safe(this.apiRequest('/courses/list')),
-            safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
-            safe(this.apiRequest('/blog/posts')),
-            safe(this.apiRequest('/api/signals/active')),
-            safe(this.apiRequest('/courses/enhanced/progress')),
-            safe(this.apiRequest('/learning/resume')),
-        ]);
+        // FIX: added 60s in-memory cache — previously all 6 requests re-fired
+        // on every navigate('dashboard') call (including tab switches back home).
+        const CACHE_TTL = 60_000;
+        let courses, webinars, blog, signals, progress, academyResume;
+        if (this._dashCache && Date.now() - this._dashCache.ts < CACHE_TTL) {
+            ({ courses, webinars, blog, signals, progress, academyResume } = this._dashCache.data);
+        } else {
+            [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
+                safe(this.apiRequest('/courses/list')),
+                safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
+                safe(this.apiRequest('/blog/posts')),
+                safe(this.apiRequest('/api/signals/active')),
+                safe(this.apiRequest('/courses/enhanced/progress')),
+                safe(this.apiRequest('/learning/resume')),
+            ]);
+            this._dashCache = { ts: Date.now(), data: { courses, webinars, blog, signals, progress, academyResume } };
+        }
 
         const count = d => Array.isArray(d) ? d.length
             : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
@@ -3541,9 +3565,17 @@ const DashboardController = class {
                 }
             });
 
-            // Keep last 20 messages for display history
-            const trimmed = messages.slice(-20);
-            localStorage.setItem('mentor_history', JSON.stringify(trimmed));
+            // FIX: capped at 50 messages — previously no ceiling, which would
+            // eventually throw QuotaExceededError and silently break history saves.
+            const MAX_HISTORY = 50;
+            const trimmed = messages.slice(-MAX_HISTORY);
+            try {
+                localStorage.setItem('mentor_history', JSON.stringify(trimmed));
+            } catch (qe) {
+                // Storage full — save a smaller emergency slice so we're not left with nothing
+                console.warn('[Mentor] localStorage quota exceeded, trimming to 10 messages');
+                localStorage.setItem('mentor_history', JSON.stringify(trimmed.slice(-10)));
+            }
 
             // Also save a compact summary of last 6 exchanges for cross-session context
             // This gives the AI context even after a refresh without loading full history
@@ -3551,10 +3583,14 @@ const DashboardController = class {
                 role: m.role,
                 content: m.content.slice(0, 300) // truncate long responses
             }));
-            localStorage.setItem('mentor_session_summary', JSON.stringify({
-                saved_at: new Date().toISOString(),
-                messages: summary
-            }));
+            try {
+                localStorage.setItem('mentor_session_summary', JSON.stringify({
+                    saved_at: new Date().toISOString(),
+                    messages: summary
+                }));
+            } catch (qe) {
+                console.warn('[Mentor] localStorage quota exceeded, skipping session summary');
+            }
         } catch (e) {
             console.error('Error saving mentor history:', e);
         }
@@ -4033,6 +4069,10 @@ window.API = API;
     <script src="/js/modules/courses.js"></script>
     <script src="/js/modules/quiz.js"></script>
     <script src="/js/modules/enhanced_signals.js"></script>
+    <!-- FIX: onboarding.js was never loaded — the post-registration skill quiz was
+         completely unreachable. Loaded after enhanced_signals.js so the API shim
+         defined earlier in this page is available when this script executes. -->
+    <script src="/js/onboarding.js"></script>
 
 </body>
 </html>

@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 # Import all route modules
-from backend.auth import router as auth_router, get_current_user
+from backend.auth import router as auth_router
 from backend.routes.signals import router as signals_router  # GreenXTrades signals (routes/signals.py)
 from backend.courses import router as courses_router
 from backend.courses_enhanced import router as courses_enhanced_router
@@ -90,7 +90,9 @@ async def run_enhanced_signals_migration():
             ('price_change_percent', 'VARCHAR(20)'),
             ('chart_data', 'TEXT'),
             ('expires_at', 'TIMESTAMPTZ'),
-            ('ai_confidence', 'INTEGER DEFAULT 50'),
+            # FIX: database.py migration declares ai_confidence as FLOAT (matches ORM). Using FLOAT here
+            # too to avoid type conflict on fresh deploys (whichever runs first used to win).
+            ('ai_confidence', 'FLOAT DEFAULT 0.5'),
             ('confidence', 'INTEGER DEFAULT 75'),
             ('entry', 'VARCHAR(50)'),
             ('target', 'VARCHAR(50)'),
@@ -185,18 +187,26 @@ app = FastAPI(
 )
 
 # CORS configuration
+# FIX: allow_origins=["*"] is illegal when allow_credentials=True (browsers reject it).
+# Explicit origin list is required for credentialed requests to work.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[
+        "https://gopipways.com",
+        "https://www.gopipways.com",
+        "http://localhost:8000",   # local dev
+        "http://127.0.0.1:8000",  # local dev
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Trusted host middleware for security
+# FIX: allowed_hosts=["*"] was a no-op — provides no protection.
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"]  # Configure appropriately for production
+    allowed_hosts=["gopipways.com", "www.gopipways.com", "localhost", "127.0.0.1"]
 )
 
 # Include all routers with their prefixes
@@ -473,7 +483,8 @@ async def internal_error_handler(request: Request, exc: Exception):
     print(f"Internal server error: {exc}")
     
     if request.url.path.startswith("/api/") or request.url.path.startswith("/auth/"):
-        return {"detail": "Internal server error"}
+        # FIX: returning a bare dict raises AssertionError in FastAPI — must return a Response
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
     else:
         return HTMLResponse(
             content="""

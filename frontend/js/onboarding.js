@@ -52,6 +52,12 @@ const Onboarding = {
     // ── Entry point ─────────────────────────────────────────────────────────
     async init(user) {
         if (!user) return;
+        // FIX: guard against the API shim not yet being available — onboarding.js
+        // loads after the shim in dashboard.html but guard defensively anyway.
+        if (typeof API === 'undefined') {
+            console.warn('[Onboarding] API shim not ready — skipping');
+            return;
+        }
         // Skip if user has been here before (flag in localStorage)
         const key = `pipways_onboarded_${user.id}`;
         if (localStorage.getItem(key)) return;
@@ -59,7 +65,12 @@ const Onboarding = {
         // Also skip if user already has academy progress
         try {
             const progress = await API.request(`/learning/progress/${user.id}`);
-            if (progress.completed_lessons > 0) {
+            // FIX: progress shape was assumed to be an object with completed_lessons.
+            // If the endpoint returns an array, the check would evaluate NaN > 0 = false
+            // and never skip onboarding for returning users. Handle both shapes.
+            const completedCount = progress?.completed_lessons
+                ?? (Array.isArray(progress) ? progress.length : 0);
+            if (completedCount > 0) {
                 localStorage.setItem(key, '1');
                 return;
             }

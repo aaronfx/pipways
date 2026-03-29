@@ -377,110 +377,133 @@ class EnhancedSignalsPage {
     _drawPatternSVG(signal) {
         const isBuy     = (signal.direction || '').toUpperCase().includes('BUY');
         const structure = (signal.structure || '').toLowerCase();
-        const pattern   = (signal.pattern_name || signal.pattern || '').toLowerCase();
         const upCol     = '#00d084';
         const downCol   = '#ff4757';
         const lineCol   = isBuy ? upCol : downCol;
-        const entryCol  = '#ffffff';
-        const zoneProfit= isBuy ? 'rgba(0,208,132,0.12)' : 'rgba(0,208,132,0.12)';
-        const zoneRisk  = 'rgba(255,71,87,0.12)';
         const w = 320, h = 150;
-        // Key horizontal levels (as % of height)
-        const stopY   = isBuy ? 85 : 22;
-        const entryY  = isBuy ? 68 : 40;
-        const targetY = isBuy ? 20 : 82;
 
-        // Candle stub — 8 small representative candles
-        const candleCount = 8;
-        const cw = 14, gap = 6;
-        const totalW = candleCount * (cw + gap);
-        const startX = 20;
-        // Heights oscillate around entry level with slight trend
-        const trendDir = isBuy ? -1 : 1;
-        const candleData = Array.from({length: candleCount}, (_, i) => {
-            const progress = i / (candleCount - 1);
-            const cy = entryY + trendDir * progress * 22 + (Math.sin(i * 1.8) * 6);
-            const bodyH = 6 + Math.abs(Math.sin(i * 2.3)) * 8;
-            const open  = cy - bodyH / 2;
-            const close = cy + bodyH / 2;
-            const bull  = isBuy ? i % 3 !== 0 : i % 3 === 0;
-            return { x: startX + i * (cw + gap), open, close, bull };
-        });
+        // Fixed vertical positions (px) — consistent regardless of direction
+        // For SELL: STOP is high, ENTRY is mid, TARGET is low
+        // For BUY:  STOP is low, ENTRY is mid, TARGET is high
+        const stopPx   = isBuy ? 118 : 22;
+        const entryPx  = isBuy ? 88  : 72;
+        const targetPx = isBuy ? 28  : 122;
 
-        // Pattern-specific lines
+        // Candles — 9 stubs filling the left 65% of the chart
+        const cw = 14, gap = 5, startX = 12;
+        const candleRows = [
+            {bull:false, bodyH:12, wickT:4,  wickB:8 },
+            {bull:true,  bodyH:8,  wickT:5,  wickB:6 },
+            {bull:false, bodyH:14, wickT:3,  wickB:7 },
+            {bull:false, bodyH:10, wickT:4,  wickB:5 },
+            {bull:true,  bodyH:6,  wickT:4,  wickB:4 },
+            {bull:false, bodyH:12, wickT:3,  wickB:6 },
+            {bull:true,  bodyH:7,  wickT:5,  wickB:5 },
+            {bull:false, bodyH:10, wickT:4,  wickB:5 },
+            {bull:false, bodyH:13, wickT:3,  wickB:7 },
+        ];
+        // Center candles around entry level
+        const candlesSVG = candleRows.map((c, i) => {
+            const x    = startX + i * (cw + gap);
+            const col  = isBuy ? (c.bull ? upCol : downCol) : (c.bull ? upCol : downCol);
+            const topY = entryPx - c.bodyH / 2;
+            const botY = entryPx + c.bodyH / 2;
+            return `<rect x="${x}" y="${topY}" width="${cw}" height="${c.bodyH}" rx="1" fill="${col}" opacity="0.85"/>
+                    <line x1="${x+cw/2}" y1="${topY - c.wickT}" x2="${x+cw/2}" y2="${botY + c.wickB}" stroke="${col}" stroke-width="1" opacity="0.5"/>`;
+        }).join('');
+
+        // Zone fill — right 33% of chart
+        const zoneX    = w * 0.67;
+        const zoneW    = w * 0.33;
+        const profitY  = Math.min(entryPx, targetPx);
+        const profitH  = Math.abs(targetPx - entryPx);
+        const riskY    = Math.min(entryPx, stopPx);
+        const riskH    = Math.abs(stopPx - entryPx);
+
+        // Pattern-specific lines drawn over the left 67% of chart
+        const lx0 = startX;
+        const lx1 = w * 0.66;
         let patternLines = '';
 
-        if (structure.includes('horizontal_bottom') || pattern.includes('descending')) {
-            // Descending triangle: flat support + falling resistance
+        if (structure.includes('horizontal_bottom') || structure.includes('descending')) {
+            // Descending triangle:
+            //   Flat support = dashed horizontal at entry level
+            //   Falling resistance = diagonal from STOP level (left) DOWN to just above entry (right)
+            const resistStart = stopPx + 4;          // starts at stop level on left
+            const resistEnd   = entryPx - 6;         // converges toward entry on right
             patternLines = `
-                <line x1="20" y1="${h*entryY/100+8}" x2="${w*0.7}" y2="${h*entryY/100+8}" stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
-                <line x1="20" y1="${h*0.28}" x2="${w*0.7}" y2="${h*entryY/100+2}" stroke="${downCol}" stroke-width="1.5" opacity="0.8"/>`;
-        } else if (structure.includes('horizontal_top') || pattern.includes('ascending')) {
-            // Ascending triangle: flat resistance + rising support
-            patternLines = `
-                <line x1="20" y1="${h*entryY/100-8}" x2="${w*0.7}" y2="${h*entryY/100-8}" stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
-                <line x1="20" y1="${h*0.72}" x2="${w*0.7}" y2="${h*entryY/100-2}" stroke="${upCol}" stroke-width="1.5" opacity="0.8"/>`;
-        } else if (structure.includes('converging')) {
-            // Symmetrical triangle / wedge
-            const midY = h * entryY / 100;
-            patternLines = `
-                <line x1="20" y1="${midY - 28}" x2="${w*0.68}" y2="${midY - 4}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
-                <line x1="20" y1="${midY + 28}" x2="${w*0.68}" y2="${midY + 4}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
-        } else if (structure.includes('parallel')) {
-            // Channel / flag
-            const midY = h * entryY / 100;
-            const slope = isBuy ? -0.06 : 0.06;
-            const rangeW = w * 0.55;
-            patternLines = `
-                <line x1="20" y1="${midY - 18}" x2="${20 + rangeW}" y2="${midY - 18 + slope * rangeW}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
-                <line x1="20" y1="${midY + 18}" x2="${20 + rangeW}" y2="${midY + 18 + slope * rangeW}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
-        } else {
-            // Breakout/Breakdown — horizontal key level with arrow
-            const lvlY = h * entryY / 100 + (isBuy ? 8 : -8);
-            const arrowDir = isBuy ? -1 : 1;
-            patternLines = `
-                <line x1="20" y1="${lvlY}" x2="${w*0.62}" y2="${lvlY}" stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
-                <line x1="${w*0.68}" y1="${lvlY}" x2="${w*0.68}" y2="${lvlY + arrowDir * 22}" stroke="${lineCol}" stroke-width="2" opacity="0.9"/>
-                <polygon points="${w*0.68},${lvlY + arrowDir * 28} ${w*0.68-5},${lvlY + arrowDir * 20} ${w*0.68+5},${lvlY + arrowDir * 20}" fill="${lineCol}" opacity="0.9"/>`;
-        }
+                <line x1="${lx0}" y1="${entryPx}" x2="${lx1}" y2="${entryPx}"
+                      stroke="${upCol}" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.75"/>
+                <line x1="${lx0}" y1="${resistStart}" x2="${lx1}" y2="${resistEnd}"
+                      stroke="${downCol}" stroke-width="2" opacity="0.85"/>`;
 
-        // Build candles SVG
-        const candlesSVG = candleData.map(c => {
-            const col  = c.bull ? upCol : downCol;
-            const topY = Math.min(c.open, c.close) * h / 100;
-            const bH   = Math.max(2, Math.abs(c.close - c.open) * h / 100);
-            const wickT= topY - 3;
-            const wickB= (Math.max(c.open, c.close) * h / 100) + 3;
-            return `<rect x="${c.x}" y="${topY}" width="${cw}" height="${bH}" rx="1" fill="${col}" opacity="0.85"/>
-                    <line x1="${c.x + cw/2}" y1="${wickT}" x2="${c.x + cw/2}" y2="${wickB}" stroke="${col}" stroke-width="1" opacity="0.6"/>`;
-        }).join('');
+        } else if (structure.includes('horizontal_top') || structure.includes('ascending')) {
+            // Ascending triangle:
+            //   Flat resistance = dashed horizontal at entry level
+            //   Rising support = diagonal from STOP level (left) UP to just below entry (right)
+            const supportStart = stopPx - 4;
+            const supportEnd   = entryPx + 6;
+            patternLines = `
+                <line x1="${lx0}" y1="${entryPx}" x2="${lx1}" y2="${entryPx}"
+                      stroke="${downCol}" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.75"/>
+                <line x1="${lx0}" y1="${supportStart}" x2="${lx1}" y2="${supportEnd}"
+                      stroke="${upCol}" stroke-width="2" opacity="0.85"/>`;
+
+        } else if (structure.includes('converging')) {
+            // Symmetrical triangle — both lines converge to entry
+            patternLines = `
+                <line x1="${lx0}" y1="${entryPx - 32}" x2="${lx1}" y2="${entryPx - 5}"
+                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
+                <line x1="${lx0}" y1="${entryPx + 32}" x2="${lx1}" y2="${entryPx + 5}"
+                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
+
+        } else if (structure.includes('parallel')) {
+            // Channel — parallel lines
+            const slope = isBuy ? -0.05 : 0.05;
+            const rangeW = lx1 - lx0;
+            patternLines = `
+                <line x1="${lx0}" y1="${entryPx - 22}" x2="${lx1}" y2="${entryPx - 22 + slope * rangeW}"
+                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
+                <line x1="${lx0}" y1="${entryPx + 22}" x2="${lx1}" y2="${entryPx + 22 + slope * rangeW}"
+                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
+
+        } else {
+            // Breakout/Breakdown — horizontal key level + arrow
+            const lvlY   = entryPx + (isBuy ? 10 : -10);
+            const arrDir = isBuy ? -1 : 1;
+            patternLines = `
+                <line x1="${lx0}" y1="${lvlY}" x2="${lx1 - 10}" y2="${lvlY}"
+                      stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.75"/>
+                <line x1="${lx1 - 10}" y1="${lvlY}" x2="${lx1 - 10}" y2="${lvlY + arrDir * 20}"
+                      stroke="${lineCol}" stroke-width="2" opacity="0.9"/>
+                <polygon points="${lx1-10},${lvlY + arrDir*26} ${lx1-15},${lvlY+arrDir*18} ${lx1-5},${lvlY+arrDir*18}"
+                         fill="${lineCol}" opacity="0.9"/>`;
+        }
 
         return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet"
                      xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
             <!-- Profit zone -->
-            <rect x="${w*0.68}" y="${h*Math.min(entryY,targetY)/100}" width="${w*0.30}"
-                  height="${h*Math.abs(targetY-entryY)/100}" fill="${zoneProfit}" rx="0"/>
+            <rect x="${zoneX}" y="${profitY}" width="${zoneW}" height="${profitH}"
+                  fill="${isBuy ? 'rgba(0,208,132,0.15)' : 'rgba(0,208,132,0.15)'}" rx="0"/>
             <!-- Risk zone -->
-            <rect x="${w*0.68}" y="${h*Math.min(entryY,stopY)/100}" width="${w*0.30}"
-                  height="${h*Math.abs(stopY-entryY)/100}" fill="${zoneRisk}" rx="0"/>
+            <rect x="${zoneX}" y="${riskY}" width="${zoneW}" height="${riskH}"
+                  fill="rgba(255,71,87,0.15)" rx="0"/>
             <!-- Pattern lines -->
             ${patternLines}
             <!-- Candles -->
             ${candlesSVG}
-            <!-- Entry line -->
-            <line x1="0" y1="${h*entryY/100}" x2="${w}" y2="${h*entryY/100}" stroke="${entryCol}" stroke-width="1.5" opacity="0.9"/>
-            <!-- Target line -->
-            <line x1="${w*0.65}" y1="${h*targetY/100}" x2="${w}" y2="${h*targetY/100}" stroke="${upCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.8"/>
-            <!-- Stop line -->
-            <line x1="${w*0.65}" y1="${h*stopY/100}" x2="${w}" y2="${h*stopY/100}" stroke="${downCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.8"/>
+            <!-- Horizontal level lines spanning full width -->
+            <line x1="0" y1="${entryPx}" x2="${w}" y2="${entryPx}" stroke="#ffffff" stroke-width="1.5" opacity="0.9"/>
+            <line x1="${zoneX}" y1="${targetPx}" x2="${w}" y2="${targetPx}" stroke="${upCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.85"/>
+            <line x1="${zoneX}" y1="${stopPx}" x2="${w}" y2="${stopPx}" stroke="${downCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.85"/>
             <!-- Labels -->
-            <text x="${w-4}" y="${h*targetY/100 - 3}" text-anchor="end" fill="${upCol}" font-size="9" font-family="monospace" font-weight="bold">TARGET</text>
-            <text x="${w-4}" y="${h*entryY/100 - 3}" text-anchor="end" fill="${entryCol}" font-size="9" font-family="monospace" font-weight="bold">ENTRY</text>
-            <text x="${w-4}" y="${h*stopY/100 - 3}" text-anchor="end" fill="${downCol}" font-size="9" font-family="monospace" font-weight="bold">STOP</text>
+            <text x="${w-4}" y="${targetPx - 3}" text-anchor="end" fill="${upCol}" font-size="9" font-family="monospace" font-weight="bold">TARGET</text>
+            <text x="${w-4}" y="${entryPx - 3}" text-anchor="end" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold">ENTRY</text>
+            <text x="${w-4}" y="${stopPx - 3}" text-anchor="end" fill="${downCol}" font-size="9" font-family="monospace" font-weight="bold">STOP</text>
         </svg>`;
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+        // ── Helpers ────────────────────────────────────────────────────────────────
 
     _getFlag(symbol) {
         const FLAGS = {
@@ -495,16 +518,32 @@ class EnhancedSignalsPage {
             UK100:'🇬🇧', GER40:'🇩🇪', DAX:'🇩🇪', CHINA50:'🇨🇳',
             JPN225:'🇯🇵', AUS200:'🇦🇺', HK50:'🇭🇰',
         };
-        const sym  = (symbol || '').toUpperCase();
-        const base = sym.slice(0, 3);
+        const sym   = (symbol || '').toUpperCase();
+        const base  = sym.slice(0, 3);
+        const quote = sym.slice(3, 6);
+
+        // Specials (commodities, indices) — single icon
         for (const [key, icon] of Object.entries(SPECIALS)) {
             if (sym.startsWith(key) || sym === key) {
                 return `<div class="sig-flag"><span style="font-size:18px;line-height:1;">${icon}</span></div>`;
             }
         }
-        const code = FLAGS[base];
-        if (code) {
-            return `<div class="sig-flag"><img src="https://flagcdn.com/w40/${code}.png" alt="${base}" loading="lazy" onerror="this.parentNode.innerHTML='<span style=font-size:16px>💱</span>'"></div>`;
+
+        // Forex pairs — show BOTH base and quote flags overlapping
+        const baseCode  = FLAGS[base];
+        const quoteCode = FLAGS[quote];
+        if (baseCode && quoteCode) {
+            return `<div class="sig-flag" style="position:relative;width:44px;height:32px;flex-shrink:0;">
+                <img src="https://flagcdn.com/w40/${baseCode}.png" alt="${base}" loading="lazy"
+                     style="position:absolute;left:0;top:4px;width:26px;height:20px;border-radius:3px;object-fit:cover;border:1px solid #374151;"
+                     onerror="this.style.display='none'">
+                <img src="https://flagcdn.com/w40/${quoteCode}.png" alt="${quote}" loading="lazy"
+                     style="position:absolute;left:16px;top:8px;width:26px;height:20px;border-radius:3px;object-fit:cover;border:1px solid #374151;"
+                     onerror="this.style.display='none'">
+            </div>`;
+        }
+        if (baseCode) {
+            return `<div class="sig-flag"><img src="https://flagcdn.com/w40/${baseCode}.png" alt="${base}" loading="lazy" onerror="this.parentNode.innerHTML='<span style=font-size:16px>💱</span>'"></div>`;
         }
         return `<div class="sig-flag"><span style="font-size:15px;">💱</span></div>`;
     }

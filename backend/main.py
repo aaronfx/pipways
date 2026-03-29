@@ -2,7 +2,6 @@ from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import os
 from pathlib import Path
@@ -202,12 +201,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Trusted host middleware for security
-# FIX: allowed_hosts=["*"] was a no-op — provides no protection.
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["gopipways.com", "www.gopipways.com", "localhost", "127.0.0.1"]
-)
+# NOTE: TrustedHostMiddleware removed — Railway's edge proxy enforces host
+# validation externally. Adding it here caused Railway's internal health
+# checker (100.64.0.2) to receive 400s on every GET /health because its
+# Host header doesn't match a user-facing domain, which flags the deployment
+# as unhealthy. The middleware provides no additional security value behind
+# Railway's proxy layer.
 
 # Include all routers with their prefixes
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])

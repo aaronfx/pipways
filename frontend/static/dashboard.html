@@ -565,7 +565,10 @@
             <a href="#" data-section="journal" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
                 <span>Performance Analytics</span>
-
+            </a>
+            <a href="#" data-section="risk" class="nav-link">
+                <i class="fas fa-calculator nav-icon" style="color:#38bdf8;"></i>
+                <span>Risk Calculator</span>
             </a>
 
             <!-- AI ASSISTANT -->
@@ -1559,6 +1562,11 @@
                 <div id="cms-container"></div>
             </section>
 
+            <!-- RISK CALCULATOR -->
+            <section id="section-risk" class="section hidden">
+                <div id="risk-calculator-container"></div>
+            </section>
+
             <!-- MENTOR -->
             <section id="section-mentor" class="section hidden">
                 <div class="max-w-7xl mx-auto h-[calc(100vh-140px)]">
@@ -2015,7 +2023,8 @@ const DashboardController = class {
             'journal':   { title: 'Performance Analytics', sub: 'AI-powered coaching from your real trade data' },
             'mentor':    { title: 'AI Mentor',             sub: '24/7 personal trading coach' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
-            'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
+            'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' },
+            'risk':      { title: 'Risk Calculator',    sub: 'Position sizing and risk management tools' }
         };
         const m = meta[section] || { title: 'Dashboard', sub: '' };
         const titleEl = document.getElementById('page-title');
@@ -2088,6 +2097,16 @@ const DashboardController = class {
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
+                case 'risk': {
+                    const rc = document.getElementById('risk-calculator-container');
+                    if (rc && typeof RiskCalculator !== 'undefined') {
+                        // Only render once — re-renders are handled internally by the module
+                        if (!rc._rcRendered) { rc._rcRendered = true; await RiskCalculator.render(rc); }
+                    } else if (rc) {
+                        rc.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl mb-4 block"></i><p class="text-sm">Loading Risk Calculator…</p></div>';
+                    }
+                    break;
+                }
                 case 'admin': {
                     const container = document.getElementById('admin-container');
                     if (!container) break;
@@ -2307,12 +2326,16 @@ const DashboardController = class {
         if (this._dashCache && Date.now() - this._dashCache.ts < CACHE_TTL) {
             ({ courses, webinars, blog, signals, progress, academyResume } = this._dashCache.data);
         } else {
+            const userId = this.user?.id;
             [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
                 safe(this.apiRequest('/courses/list')),
                 safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
                 safe(this.apiRequest('/blog/posts')),
                 safe(this.apiRequest('/api/signals/active')),
-                safe(this.apiRequest('/courses/enhanced/progress')),
+                // FIX: replaced /courses/enhanced/progress (never returned .levels breakdown)
+                // with /learning/progress/:user_id — same endpoint the academy page uses,
+                // returns { summary:[{level_id,level_name,percent,completed,total}], total_lessons, completed_lessons }
+                userId ? safe(this.apiRequest(`/learning/progress/${userId}`)) : Promise.resolve(null),
                 safe(this.apiRequest('/learning/resume')),
             ]);
             this._dashCache = { ts: Date.now(), data: { courses, webinars, blog, signals, progress, academyResume } };
@@ -2342,12 +2365,20 @@ const DashboardController = class {
         const webinarsSub = webinarArr.length > 0 ? 'This week' : '';
         const blogArr = Array.isArray(blog) ? blog : (blog?.posts || []);
         const signalArr = Array.isArray(signals) ? signals : (signals?.signals || []);
-        const activeSignals = signalArr.filter(s => s.status === 'active').length;
+        // FIX: filter by is_published and exclude expired signals (expires_at in the past)
+        // /api/signals/active returns status='active' for all, but some may be unpublished or expired.
+        const now = Date.now();
+        const activeSignals = signalArr.filter(s =>
+            s.status === 'active' &&
+            s.is_published !== false &&
+            (!s.expires_at || new Date(s.expires_at).getTime() > now)
+        ).length;
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
         // Academy lessons completed count for the stat chip
-        // FIX: old fallback used level_percent/100 * 12 (beginner-only hardcode, gave 0 when
-        // completed_count wasn't returned). overall_percent x 28 total lessons is correct.
+        // FIX: /learning/progress/:user_id returns { completed_lessons, total_lessons }
+        // at the top level — use that directly. Fall back to academyResume fields.
         const academyLessonsCount = (() => {
+            if (progress?.completed_lessons != null) return String(progress.completed_lessons);
             if (!academyResume) return '0';
             if (academyResume.type === 'complete') return '28';
             if (academyResume.completed_count != null) return String(academyResume.completed_count);
@@ -2494,24 +2525,37 @@ const DashboardController = class {
 
         // ── Card 3: Trading Academy Progress ────────────────────────────────
         const academyEl = document.getElementById('dash-academy-body');
-        // FIX: was reading progress.levels from /courses/enhanced/progress which never
-        // returns a .levels breakdown — all three bars always showed 0%.
-        // Now builds progressData from academyResume (/learning/resume) which has
-        // the current level's real percentage. Other levels stay 0% until started.
-        if (academyEl && academyResume) {
-            const currentLevel = (academyResume.level || 'beginner').toLowerCase();
-            const levelPct = academyResume.level_percent || 0;
-            const progressData = {
-                beginner:     { percentage: currentLevel === 'beginner'     ? levelPct : (academyResume.type === 'complete' || currentLevel === 'intermediate' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 12 },
-                intermediate: { percentage: currentLevel === 'intermediate' ? levelPct : (academyResume.type === 'complete' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 6  },
-                advanced:     { percentage: currentLevel === 'advanced'     ? levelPct : (academyResume.type === 'complete' ? 100 : 0), completed: 0, total: 10 },
-            };
-            // completed counts from completed_count and level
-            if (academyResume.completed_count != null) {
-                const cc = academyResume.completed_count;
-                if (currentLevel === 'beginner')     progressData.beginner.completed     = cc;
-                if (currentLevel === 'intermediate') { progressData.beginner.completed = 12; progressData.intermediate.completed = cc; }
-                if (currentLevel === 'advanced')     { progressData.beginner.completed = 12; progressData.intermediate.completed = 6; progressData.advanced.completed = cc; }
+        // FIX: now uses prog.summary from /learning/progress/:user_id — the same data
+        // source the academy page uses. summary is [{level_id,level_name,percent,completed,total}].
+        // Falls back to academyResume-derived data if /learning/progress returned null.
+        if (academyEl && (progress || academyResume)) {
+            // Build progressData from real summary array
+            const summary = progress?.summary || [];
+            const levelColors = { beginner: '#34d399', intermediate: '#60a5fa', advanced: '#f59e0b' };
+            const levelKeys   = ['beginner', 'intermediate', 'advanced'];
+            const levelTotals = { beginner: 12, intermediate: 6, advanced: 10 };
+
+            // If we have a summary, map it; otherwise fall back to resume-derived data
+            let progressData;
+            if (summary.length) {
+                progressData = {};
+                summary.forEach(s => {
+                    const key = (s.level_name || '').toLowerCase();
+                    progressData[key] = { percentage: s.percent || 0, completed: s.completed || 0, total: s.total || levelTotals[key] || 10 };
+                });
+                // Ensure all three keys exist
+                levelKeys.forEach(k => {
+                    if (!progressData[k]) progressData[k] = { percentage: 0, completed: 0, total: levelTotals[k] };
+                });
+            } else {
+                // Fallback: derive from academyResume
+                const currentLevel = (academyResume?.level || 'beginner').toLowerCase();
+                const levelPct = academyResume?.level_percent || 0;
+                progressData = {
+                    beginner:     { percentage: currentLevel === 'beginner' ? levelPct : (currentLevel === 'intermediate' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 12 },
+                    intermediate: { percentage: currentLevel === 'intermediate' ? levelPct : (currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 6  },
+                    advanced:     { percentage: currentLevel === 'advanced' ? levelPct : 0, completed: 0, total: 10 },
+                };
             }
 
             academyEl.innerHTML = `
@@ -4081,6 +4125,8 @@ window.API = API;
          completely unreachable. Loaded after enhanced_signals.js so the API shim
          defined earlier in this page is available when this script executes. -->
     <script src="/js/onboarding.js"></script>
+    <!-- Risk Calculator dashboard module — loaded last so window.dashboard is defined -->
+    <script src="/js/modules/risk_calculator.js"></script>
 
 </body>
 </html>

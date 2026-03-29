@@ -89,18 +89,32 @@ async def run_enhanced_signals_migration():
             ('price_change', 'VARCHAR(20)'),
             ('price_change_percent', 'VARCHAR(20)'),
             ('chart_data', 'TEXT'),
-            ('expires_at', 'TIMESTAMP'),
-            ('ai_confidence', 'INTEGER'),
+            ('expires_at', 'TIMESTAMPTZ'),
+            ('ai_confidence', 'INTEGER DEFAULT 50'),
             ('confidence', 'INTEGER DEFAULT 75'),
             ('entry', 'VARCHAR(50)'),
             ('target', 'VARCHAR(50)'),
             ('stop', 'VARCHAR(50)'),
-            ('pattern_points', 'TEXT'),  # JSON: [{time, price}, ...]
-            ('pattern_lines', 'TEXT'),   # JSON: [{start: {time, price}, end: {time, price}}, ...]
+            ('pattern_points', 'JSONB DEFAULT \'[]\''),
+            ('pattern_lines',  'JSONB DEFAULT \'[]\''),
             ('is_pattern_idea', 'BOOLEAN DEFAULT FALSE'),
             ('is_published', 'BOOLEAN DEFAULT TRUE'),
             ('technical_summary', 'TEXT'),
             ('volatility_index', 'FLOAT'),
+            # ── v9.24+ columns (GreenXTrades bot integration) ──────────────
+            ('pattern_name',   'TEXT'),
+            ('structure',      'TEXT'),
+            ('bias_d1',        'TEXT'),
+            ('bias_h4',        'TEXT'),
+            ('bos_m5',         'TEXT'),
+            ('breakout_point', 'JSONB'),
+            ('candles',        'JSONB DEFAULT \'[]\''),
+            ('timeframe',      "TEXT DEFAULT 'M5'"),
+            ('rationale',      'TEXT'),
+            ('entry_price',    'NUMERIC(20, 8)'),
+            ('take_profit',    'NUMERIC(20, 8)'),
+            ('stop_loss',      'NUMERIC(20, 8)'),
+            ('updated_at',     'TIMESTAMPTZ'),
         ]
         
         # Add missing columns
@@ -124,6 +138,10 @@ async def run_enhanced_signals_migration():
             'CREATE INDEX IF NOT EXISTS idx_signals_expires_at ON signals(expires_at)',
             'CREATE INDEX IF NOT EXISTS idx_signals_country ON signals(country)',
             'CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status)',
+            # Partial index for /api/signals/enhanced — turns full scan into index seek
+            '''CREATE INDEX IF NOT EXISTS idx_signals_enhanced
+               ON signals (status, is_published, expires_at, created_at DESC)
+               WHERE status = \'active\' AND is_published = TRUE''',
         ]
         
         for index_sql in indexes:

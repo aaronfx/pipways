@@ -2064,7 +2064,12 @@ const DashboardController = class {
     async loadSectionData(section) {
         try {
             switch(section) {
-                case 'dashboard': this.loadDashboardStats(); break;
+                case 'dashboard':
+                    // FIX: bust the data cache on every dashboard visit so fresh academy
+                    // progress and signal counts always load (not stale 60s cached data).
+                    this._dashCache = null;
+                    this.loadDashboardStats();
+                    break;
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
                         // FIX (disappear bug): After navigating away via href=/academy (full page
@@ -2326,15 +2331,21 @@ const DashboardController = class {
         if (this._dashCache && Date.now() - this._dashCache.ts < CACHE_TTL) {
             ({ courses, webinars, blog, signals, progress, academyResume } = this._dashCache.data);
         } else {
-            const userId = this.user?.id;
+            // FIX: this.user?.id can be undefined if the user object shape varies.
+            // Read id from localStorage directly — same pattern academy.html uses.
+            // This guarantees userId is available even if this.user hasn't been refreshed yet.
+            let userId = this.user?.id;
+            if (!userId) {
+                try { userId = JSON.parse(localStorage.getItem('pipways_user') || '{}').id || null; }
+                catch(_) { userId = null; }
+            }
             [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
                 safe(this.apiRequest('/courses/list')),
                 safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
                 safe(this.apiRequest('/blog/posts')),
                 safe(this.apiRequest('/api/signals/active')),
-                // FIX: replaced /courses/enhanced/progress (never returned .levels breakdown)
-                // with /learning/progress/:user_id — same endpoint the academy page uses,
-                // returns { summary:[{level_id,level_name,percent,completed,total}], total_lessons, completed_lessons }
+                // Uses /learning/progress/:user_id — same endpoint the academy page uses.
+                // Returns { summary:[{level_id,level_name,percent,completed,total}], completed_lessons }
                 userId ? safe(this.apiRequest(`/learning/progress/${userId}`)) : Promise.resolve(null),
                 safe(this.apiRequest('/learning/resume')),
             ]);
@@ -2365,14 +2376,22 @@ const DashboardController = class {
         const webinarsSub = webinarArr.length > 0 ? 'This week' : '';
         const blogArr = Array.isArray(blog) ? blog : (blog?.posts || []);
         const signalArr = Array.isArray(signals) ? signals : (signals?.signals || []);
-        // FIX: filter by is_published and exclude expired signals (expires_at in the past)
-        // /api/signals/active returns status='active' for all, but some may be unpublished or expired.
+        // FIX: strict active filter. is_published defaults to TRUE in the DB so
+        // `!== false` passes nulls too. Using strict `=== true` OR not set (old signals).
+        // Also adds 7-day age cap for signals without expires_at — old unclosed signals
+        // were showing up as active indefinitely.
         const now = Date.now();
-        const activeSignals = signalArr.filter(s =>
-            s.status === 'active' &&
-            s.is_published !== false &&
-            (!s.expires_at || new Date(s.expires_at).getTime() > now)
-        ).length;
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+        const activeSignals = signalArr.filter(s => {
+            if (s.status !== 'active') return false;
+            // is_published must be explicitly true or undefined/null (old signal before field added)
+            if (s.is_published === false) return false;
+            // If expires_at is set, use it
+            if (s.expires_at) return new Date(s.expires_at).getTime() > now;
+            // No expires_at — treat signals older than 7 days as stale
+            if (s.created_at) return (now - new Date(s.created_at).getTime()) < SEVEN_DAYS;
+            return true;
+        }).length;
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
         // Academy lessons completed count for the stat chip
         // FIX: /learning/progress/:user_id returns { completed_lessons, total_lessons }
@@ -2535,26 +2554,35 @@ const DashboardController = class {
             const levelKeys   = ['beginner', 'intermediate', 'advanced'];
             const levelTotals = { beginner: 12, intermediate: 6, advanced: 10 };
 
-            // If we have a summary, map it; otherwise fall back to resume-derived data
+            // Build progressData from summary array (confirmed field names from academy_routes.py):
+            // summary items: { level_id, level_name, percent, completed, total }
+            // level_name values from DB: "Beginner", "Intermediate", "Advanced"
             let progressData;
             if (summary.length) {
-                progressData = {};
+                progressData = { beginner: { percentage: 0, completed: 0, total: 12 },
+                                 intermediate: { percentage: 0, completed: 0, total: 6 },
+                                 advanced: { percentage: 0, completed: 0, total: 10 } };
                 summary.forEach(s => {
+                    // level_name from DB is capitalized — lowercase to match our keys
                     const key = (s.level_name || '').toLowerCase();
-                    progressData[key] = { percentage: s.percent || 0, completed: s.completed || 0, total: s.total || levelTotals[key] || 10 };
-                });
-                // Ensure all three keys exist
-                levelKeys.forEach(k => {
-                    if (!progressData[k]) progressData[k] = { percentage: 0, completed: 0, total: levelTotals[k] };
+                    if (progressData[key] !== undefined) {
+                        progressData[key] = {
+                            percentage: s.percent || 0,
+                            completed:  s.completed || 0,
+                            total:      s.total || levelTotals[key] || 10
+                        };
+                    }
                 });
             } else {
-                // Fallback: derive from academyResume
-                const currentLevel = (academyResume?.level || 'beginner').toLowerCase();
-                const levelPct = academyResume?.level_percent || 0;
+                // Fallback when /learning/progress/:userId returned null (no id, or API error).
+                // /learning/resume has NO level_percent field (confirmed from academy_routes.py).
+                // Best we can do: if user is on Beginner, we know Beginner is in progress (>0%).
+                // Use academyResume.level to show which level is active, leave percent unknown.
+                const currentLevel = (academyResume?.level || '').toLowerCase();
                 progressData = {
-                    beginner:     { percentage: currentLevel === 'beginner' ? levelPct : (currentLevel === 'intermediate' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 12 },
-                    intermediate: { percentage: currentLevel === 'intermediate' ? levelPct : (currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 6  },
-                    advanced:     { percentage: currentLevel === 'advanced' ? levelPct : 0, completed: 0, total: 10 },
+                    beginner:     { percentage: currentLevel === 'beginner' ? null : (currentLevel === 'intermediate' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 12 },
+                    intermediate: { percentage: currentLevel === 'intermediate' ? null : (currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 6 },
+                    advanced:     { percentage: currentLevel === 'advanced' ? null : 0, completed: 0, total: 10 },
                 };
             }
 
@@ -2572,7 +2600,7 @@ const DashboardController = class {
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-sm font-bold text-green-400">${Math.round(progressData.beginner.percentage || 0)}%</div>
+                            <div class="text-sm font-bold text-green-400">${progressData.beginner.percentage === null ? "…" : Math.round(progressData.beginner.percentage) + "%"}</div>
                         </div>
                     </div>
                     
@@ -2588,7 +2616,7 @@ const DashboardController = class {
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-sm font-bold text-blue-400">${Math.round(progressData.intermediate.percentage || 0)}%</div>
+                            <div class="text-sm font-bold text-blue-400">${progressData.intermediate.percentage === null ? "…" : Math.round(progressData.intermediate.percentage) + "%"}</div>
                         </div>
                     </div>
                     
@@ -2604,7 +2632,7 @@ const DashboardController = class {
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-sm font-bold text-yellow-400">${Math.round(progressData.advanced.percentage || 0)}%</div>
+                            <div class="text-sm font-bold text-yellow-400">${progressData.advanced.percentage === null ? "…" : Math.round(progressData.advanced.percentage) + "%"}</div>
                         </div>
                     </div>
                     

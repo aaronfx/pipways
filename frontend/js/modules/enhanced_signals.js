@@ -310,7 +310,7 @@ class EnhancedSignalsPage {
                         <span class="text-white font-bold" style="font-size:15px;letter-spacing:.02em;">${signal.symbol}</span>
                     </div>
                     <span class="text-gray-400 text-xs font-semibold uppercase tracking-wide flex-shrink-0"
-                          style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                          style="max-width:140px;font-size:11px;"
                           title="${pattern}">${pattern}</span>
                 </div>
 
@@ -422,7 +422,7 @@ class EnhancedSignalsPage {
                 [0.28,0.62,0.48,0.60,true],  [0.38,0.62,0.52,0.59,false],
                 [0.48,0.62,0.60,0.58,false], [0.56,0.62,0.68,0.59,true],
                 [0.64,0.62,0.74,0.60,false], [0.70,0.62,0.78,0.61,false],
-                [0.72,0.90,0.78,0.88,false], // breakdown candle — clamped to risk zone
+                [0.72,0.82,0.78,0.80,false], // breakdown candle — stays in risk zone above entry
             ];
             // Falling resistance: top-left to mid-right
             topPath = `M ${x0},${yN(0.05)} L ${x0+7*(cw+cGap)+cw},${yN(0.70)}`;

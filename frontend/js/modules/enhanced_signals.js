@@ -373,133 +373,195 @@ class EnhancedSignalsPage {
     }
 
     // ── Static Pattern SVG ─────────────────────────────────────────────────────
+    // Uses pattern_name (primary) and structure (fallback) to classify.
+    // Candles are crafted per-pattern to visually show the formation.
 
     _drawPatternSVG(signal) {
-        const isBuy     = (signal.direction || '').toUpperCase().includes('BUY');
-        const structure = (signal.structure || '').toLowerCase();
-        const upCol     = '#00d084';
-        const downCol   = '#ff4757';
-        const lineCol   = isBuy ? upCol : downCol;
-        const w = 320, h = 150;
+        const isBuy   = (signal.direction || '').toUpperCase().includes('BUY');
+        const pName   = (signal.pattern_name || signal.pattern || '').toLowerCase();
+        const pStruct = (signal.structure || '').toLowerCase();
 
-        // Fixed vertical positions (px) — consistent regardless of direction
-        // For SELL: STOP is high, ENTRY is mid, TARGET is low
-        // For BUY:  STOP is low, ENTRY is mid, TARGET is high
-        const stopPx   = isBuy ? 118 : 22;
-        const entryPx  = isBuy ? 88  : 72;
-        const targetPx = isBuy ? 28  : 122;
+        // Classify — pattern_name is authoritative
+        let pType = isBuy ? 'breakout' : 'breakdown';
+        if      (pName.includes('descending triangle') || pStruct === 'horizontal_bottom') pType = 'desc_triangle';
+        else if (pName.includes('ascending triangle')  || pStruct === 'horizontal_top')   pType = 'asc_triangle';
+        else if (pName.includes('symmetrical')         || pStruct === 'converging')        pType = 'sym_triangle';
+        else if (pName.includes('rising wedge')        || pStruct === 'converging_rising') pType = 'rising_wedge';
+        else if (pName.includes('falling wedge')       || pStruct === 'converging_falling')pType = 'falling_wedge';
+        else if (pName.includes('bear flag')           || pStruct === 'parallel_up')       pType = 'bear_flag';
+        else if (pName.includes('bull flag')           || pStruct === 'parallel_down')     pType = 'bull_flag';
+        else if (pName.includes('descending channel')  || pStruct === 'parallel_falling')  pType = 'desc_channel';
+        else if (pName.includes('ascending channel')   || pStruct === 'parallel_rising')   pType = 'asc_channel';
 
-        // Candles — 9 stubs filling the left 65% of the chart
-        const cw = 14, gap = 5, startX = 12;
-        const candleRows = [
-            {bull:false, bodyH:12, wickT:4,  wickB:8 },
-            {bull:true,  bodyH:8,  wickT:5,  wickB:6 },
-            {bull:false, bodyH:14, wickT:3,  wickB:7 },
-            {bull:false, bodyH:10, wickT:4,  wickB:5 },
-            {bull:true,  bodyH:6,  wickT:4,  wickB:4 },
-            {bull:false, bodyH:12, wickT:3,  wickB:6 },
-            {bull:true,  bodyH:7,  wickT:5,  wickB:5 },
-            {bull:false, bodyH:10, wickT:4,  wickB:5 },
-            {bull:false, bodyH:13, wickT:3,  wickB:7 },
-        ];
-        // Center candles around entry level
-        const candlesSVG = candleRows.map((c, i) => {
-            const x    = startX + i * (cw + gap);
-            const col  = isBuy ? (c.bull ? upCol : downCol) : (c.bull ? upCol : downCol);
-            const topY = entryPx - c.bodyH / 2;
-            const botY = entryPx + c.bodyH / 2;
-            return `<rect x="${x}" y="${topY}" width="${cw}" height="${c.bodyH}" rx="1" fill="${col}" opacity="0.85"/>
-                    <line x1="${x+cw/2}" y1="${topY - c.wickT}" x2="${x+cw/2}" y2="${botY + c.wickB}" stroke="${col}" stroke-width="1" opacity="0.5"/>`;
-        }).join('');
+        const w = 320, h = 148;
+        const G = '#00d084', R = '#ff4757', W = '#ffffff';
 
-        // Zone fill — right 33% of chart
-        const zoneX    = w * 0.67;
-        const zoneW    = w * 0.33;
-        const profitY  = Math.min(entryPx, targetPx);
-        const profitH  = Math.abs(targetPx - entryPx);
-        const riskY    = Math.min(entryPx, stopPx);
-        const riskH    = Math.abs(stopPx - entryPx);
+        // Fixed vertical levels (px) — SELL: stop=top, entry=mid, target=bottom
+        const stopPx   = isBuy ? 120 : 18;
+        const entryPx  = isBuy ? 82  : 66;
+        const targetPx = isBuy ? 22  : 124;
 
-        // Pattern-specific lines drawn over the left 67% of chart
-        const lx0 = startX;
-        const lx1 = w * 0.66;
-        let patternLines = '';
+        // Candle area: spans vertically from slightly above stop to slightly below entry
+        const aTop = Math.min(stopPx, entryPx) - 10;
+        const aBot = Math.max(stopPx, entryPx) + 10;
+        const aH   = aBot - aTop;
+        const nC   = 9, cw = 13, cGap = 5, x0 = 10;
+        // Normalize: n=0 → aTop, n=1 → aBot
+        const yN = n => aTop + n * aH;
 
-        if (structure.includes('horizontal_bottom') || structure.includes('descending')) {
-            // Descending triangle:
-            //   Flat support = dashed horizontal at entry level
-            //   Falling resistance = diagonal from STOP level (left) DOWN to just above entry (right)
-            const resistStart = stopPx + 4;          // starts at stop level on left
-            const resistEnd   = entryPx - 6;         // converges toward entry on right
-            patternLines = `
-                <line x1="${lx0}" y1="${entryPx}" x2="${lx1}" y2="${entryPx}"
-                      stroke="${upCol}" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.75"/>
-                <line x1="${lx0}" y1="${resistStart}" x2="${lx1}" y2="${resistEnd}"
-                      stroke="${downCol}" stroke-width="2" opacity="0.85"/>`;
+        // Zone (right 32%)
+        const zX = w * 0.68, zW = w * 0.32;
 
-        } else if (structure.includes('horizontal_top') || structure.includes('ascending')) {
-            // Ascending triangle:
-            //   Flat resistance = dashed horizontal at entry level
-            //   Rising support = diagonal from STOP level (left) UP to just below entry (right)
-            const supportStart = stopPx - 4;
-            const supportEnd   = entryPx + 6;
-            patternLines = `
-                <line x1="${lx0}" y1="${entryPx}" x2="${lx1}" y2="${entryPx}"
-                      stroke="${downCol}" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.75"/>
-                <line x1="${lx0}" y1="${supportStart}" x2="${lx1}" y2="${supportEnd}"
-                      stroke="${upCol}" stroke-width="2" opacity="0.85"/>`;
+        // Each candle def: [highN, lowN, openN, closeN, bull]  (all 0-1 normalized)
+        let defs, topPath, botPath;
 
-        } else if (structure.includes('converging')) {
-            // Symmetrical triangle — both lines converge to entry
-            patternLines = `
-                <line x1="${lx0}" y1="${entryPx - 32}" x2="${lx1}" y2="${entryPx - 5}"
-                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
-                <line x1="${lx0}" y1="${entryPx + 32}" x2="${lx1}" y2="${entryPx + 5}"
-                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
+        if (pType === 'desc_triangle') {
+            // Falling highs, flat lows → break DOWN
+            defs = [
+                [0.05,0.62,0.12,0.56,false], [0.18,0.62,0.32,0.57,false],
+                [0.28,0.62,0.48,0.60,true],  [0.38,0.62,0.52,0.59,false],
+                [0.48,0.62,0.60,0.58,false], [0.56,0.62,0.68,0.59,true],
+                [0.64,0.62,0.74,0.60,false], [0.70,0.62,0.78,0.61,false],
+                [0.72,0.98,0.78,0.95,false], // breakdown candle
+            ];
+            // Falling resistance: top-left to mid-right
+            topPath = `M ${x0},${yN(0.05)} L ${x0+7*(cw+cGap)+cw},${yN(0.70)}`;
+            // Flat support dashed
+            botPath = `M ${x0},${yN(0.63)} L ${zX},${yN(0.63)}`;
 
-        } else if (structure.includes('parallel')) {
-            // Channel — parallel lines
-            const slope = isBuy ? -0.05 : 0.05;
-            const rangeW = lx1 - lx0;
-            patternLines = `
-                <line x1="${lx0}" y1="${entryPx - 22}" x2="${lx1}" y2="${entryPx - 22 + slope * rangeW}"
-                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
-                <line x1="${lx0}" y1="${entryPx + 22}" x2="${lx1}" y2="${entryPx + 22 + slope * rangeW}"
-                      stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
+        } else if (pType === 'asc_triangle') {
+            defs = [
+                [0.05,0.92,0.88,0.10,true],  [0.05,0.80,0.76,0.10,true],
+                [0.05,0.68,0.64,0.10,false],  [0.05,0.58,0.54,0.10,true],
+                [0.05,0.50,0.46,0.10,false],  [0.05,0.42,0.38,0.10,true],
+                [0.05,0.36,0.32,0.10,false],  [0.05,0.30,0.26,0.10,true],
+                [0.03,0.08,0.26,0.05,true],  // breakout candle
+            ];
+            topPath = `M ${x0},${yN(0.05)} L ${zX},${yN(0.05)}`; // flat resistance
+            botPath = `M ${x0},${yN(0.92)} L ${x0+7*(cw+cGap)+cw},${yN(0.30)}`; // rising support
+
+        } else if (pType === 'sym_triangle') {
+            defs = [
+                [0.02,0.96,0.20,0.30,true],  [0.12,0.86,0.28,0.25,false],
+                [0.20,0.78,0.36,0.30,true],  [0.28,0.70,0.42,0.35,false],
+                [0.34,0.64,0.46,0.38,true],  [0.40,0.58,0.50,0.42,false],
+                [0.44,0.54,0.52,0.46,true],  [0.46,0.52,0.52,0.48,false],
+                isBuy ? [0.42,0.18,0.48,0.20,true] : [0.48,0.80,0.48,0.78,false],
+            ];
+            topPath = `M ${x0},${yN(0.02)} L ${x0+7*(cw+cGap)},${yN(0.46)}`;
+            botPath = `M ${x0},${yN(0.96)} L ${x0+7*(cw+cGap)},${yN(0.54)}`;
+
+        } else if (pType === 'rising_wedge') {
+            defs = [
+                [0.08,0.75,0.72,0.62,false],[0.04,0.65,0.62,0.52,true],
+                [0.06,0.58,0.55,0.48,false],[0.04,0.50,0.47,0.40,true],
+                [0.06,0.44,0.41,0.35,false],[0.04,0.38,0.35,0.30,true],
+                [0.06,0.33,0.30,0.27,false],[0.04,0.28,0.26,0.24,true],
+                [0.08,0.95,0.24,0.90,false],
+            ];
+            topPath = `M ${x0},${yN(0.08)} L ${x0+7*(cw+cGap)},${yN(0.06)}`;
+            botPath = `M ${x0},${yN(0.75)} L ${x0+7*(cw+cGap)},${yN(0.28)}`;
+
+        } else if (pType === 'falling_wedge') {
+            defs = [
+                [0.22,0.88,0.26,0.34,true],[0.30,0.80,0.34,0.42,false],
+                [0.36,0.74,0.40,0.48,true],[0.42,0.68,0.46,0.52,false],
+                [0.46,0.63,0.50,0.54,true],[0.50,0.58,0.54,0.56,false],
+                [0.52,0.55,0.56,0.53,true],[0.53,0.53,0.56,0.52,false],
+                [0.18,0.28,0.52,0.20,true],
+            ];
+            topPath = `M ${x0},${yN(0.22)} L ${x0+7*(cw+cGap)},${yN(0.52)}`;
+            botPath = `M ${x0},${yN(0.88)} L ${x0+7*(cw+cGap)},${yN(0.53)}`;
+
+        } else if (pType === 'bear_flag') {
+            defs = [
+                [0.02,0.38,0.34,0.05,false],[0.04,0.42,0.38,0.08,false],
+                [0.20,0.52,0.50,0.25,true], [0.22,0.56,0.53,0.28,false],
+                [0.28,0.60,0.57,0.33,true], [0.30,0.64,0.60,0.36,false],
+                [0.34,0.67,0.63,0.40,true], [0.36,0.70,0.65,0.42,false],
+                [0.38,0.95,0.65,0.92,false],
+            ];
+            topPath = `M ${x0+2*(cw+cGap)},${yN(0.22)} L ${x0+7*(cw+cGap)},${yN(0.36)}`;
+            botPath = `M ${x0+2*(cw+cGap)},${yN(0.54)} L ${x0+7*(cw+cGap)},${yN(0.68)}`;
+
+        } else if (pType === 'bull_flag') {
+            defs = [
+                [0.62,0.96,0.92,0.66,true], [0.58,0.88,0.84,0.62,true],
+                [0.50,0.78,0.76,0.54,false],[0.46,0.74,0.72,0.50,false],
+                [0.42,0.70,0.68,0.46,true], [0.40,0.68,0.65,0.44,false],
+                [0.36,0.65,0.62,0.40,true], [0.34,0.63,0.60,0.38,false],
+                [0.08,0.36,0.36,0.10,true],
+            ];
+            topPath = `M ${x0+2*(cw+cGap)},${yN(0.50)} L ${x0+7*(cw+cGap)},${yN(0.36)}`;
+            botPath = `M ${x0+2*(cw+cGap)},${yN(0.76)} L ${x0+7*(cw+cGap)},${yN(0.62)}`;
+
+        } else if (pType === 'desc_channel') {
+            defs = [
+                [0.05,0.32,0.08,0.28,false],[0.14,0.42,0.18,0.37,true],
+                [0.17,0.46,0.22,0.42,false],[0.26,0.56,0.32,0.51,true],
+                [0.30,0.60,0.36,0.56,false],[0.40,0.70,0.46,0.66,true],
+                [0.44,0.74,0.50,0.70,false],[0.54,0.84,0.60,0.80,true],
+                [0.58,0.92,0.62,0.89,false],
+            ];
+            topPath = `M ${x0},${yN(0.05)} L ${x0+8*(cw+cGap)},${yN(0.58)}`;
+            botPath = `M ${x0},${yN(0.32)} L ${x0+8*(cw+cGap)},${yN(0.88)}`;
+
+        } else if (pType === 'asc_channel') {
+            defs = [
+                [0.58,0.90,0.86,0.62,true], [0.52,0.83,0.80,0.56,false],
+                [0.46,0.76,0.74,0.50,true], [0.40,0.70,0.68,0.44,false],
+                [0.34,0.64,0.62,0.38,true], [0.28,0.58,0.56,0.32,false],
+                [0.22,0.52,0.50,0.26,true], [0.16,0.46,0.44,0.20,false],
+                [0.04,0.24,0.22,0.08,true],
+            ];
+            topPath = `M ${x0},${yN(0.58)} L ${x0+8*(cw+cGap)},${yN(0.04)}`;
+            botPath = `M ${x0},${yN(0.90)} L ${x0+8*(cw+cGap)},${yN(0.24)}`;
 
         } else {
-            // Breakout/Breakdown — horizontal key level + arrow
-            const lvlY   = entryPx + (isBuy ? 10 : -10);
-            const arrDir = isBuy ? -1 : 1;
-            patternLines = `
-                <line x1="${lx0}" y1="${lvlY}" x2="${lx1 - 10}" y2="${lvlY}"
-                      stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.75"/>
-                <line x1="${lx1 - 10}" y1="${lvlY}" x2="${lx1 - 10}" y2="${lvlY + arrDir * 20}"
-                      stroke="${lineCol}" stroke-width="2" opacity="0.9"/>
-                <polygon points="${lx1-10},${lvlY + arrDir*26} ${lx1-15},${lvlY+arrDir*18} ${lx1-5},${lvlY+arrDir*18}"
-                         fill="${lineCol}" opacity="0.9"/>`;
+            // Breakout/Breakdown — tight consolidation then decisive candle
+            const flat = 0.52;
+            defs = [
+                [flat-0.30,flat+0.08,flat-0.14,flat+0.04,false],
+                [flat-0.28,flat+0.08,flat-0.12,flat+0.04,true],
+                [flat-0.30,flat+0.09,flat-0.14,flat+0.05,false],
+                [flat-0.28,flat+0.08,flat-0.12,flat+0.04,true],
+                [flat-0.29,flat+0.09,flat-0.13,flat+0.05,false],
+                [flat-0.28,flat+0.08,flat-0.12,flat+0.04,true],
+                [flat-0.30,flat+0.09,flat-0.14,flat+0.05,false],
+                [flat-0.28,flat+0.08,flat-0.12,flat+0.04,true],
+                isBuy
+                    ? [flat-0.50,flat+0.02,flat-0.25,flat-0.42,true]
+                    : [flat-0.02,flat+0.50,flat+0.22,flat+0.44,false],
+            ];
+            topPath = `M ${x0},${yN(flat-0.28)} L ${x0+7*(cw+cGap)+cw},${yN(flat-0.28)}`;
+            botPath = null;
         }
 
-        return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet"
-                     xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
-            <!-- Profit zone -->
-            <rect x="${zoneX}" y="${profitY}" width="${zoneW}" height="${profitH}"
-                  fill="${isBuy ? 'rgba(0,208,132,0.15)' : 'rgba(0,208,132,0.15)'}" rx="0"/>
-            <!-- Risk zone -->
-            <rect x="${zoneX}" y="${riskY}" width="${zoneW}" height="${riskH}"
-                  fill="rgba(255,71,87,0.15)" rx="0"/>
-            <!-- Pattern lines -->
-            ${patternLines}
-            <!-- Candles -->
-            ${candlesSVG}
-            <!-- Horizontal level lines spanning full width -->
-            <line x1="0" y1="${entryPx}" x2="${w}" y2="${entryPx}" stroke="#ffffff" stroke-width="1.5" opacity="0.9"/>
-            <line x1="${zoneX}" y1="${targetPx}" x2="${w}" y2="${targetPx}" stroke="${upCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.85"/>
-            <line x1="${zoneX}" y1="${stopPx}" x2="${w}" y2="${stopPx}" stroke="${downCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.85"/>
-            <!-- Labels -->
-            <text x="${w-4}" y="${targetPx - 3}" text-anchor="end" fill="${upCol}" font-size="9" font-family="monospace" font-weight="bold">TARGET</text>
-            <text x="${w-4}" y="${entryPx - 3}" text-anchor="end" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold">ENTRY</text>
-            <text x="${w-4}" y="${stopPx - 3}" text-anchor="end" fill="${downCol}" font-size="9" font-family="monospace" font-weight="bold">STOP</text>
+        const svg_candles = defs.map((d, i) => {
+            const [hN,lN,oN,cN,bull] = d;
+            const px = x0 + i*(cw+cGap);
+            const hY = yN(hN), lY = yN(lN);
+            const oY = yN(Math.min(oN,cN)), cY = yN(Math.max(oN,cN));
+            const bH = Math.max(2, cY-oY);
+            const col = bull ? G : R;
+            return `<rect x="${px}" y="${oY}" width="${cw}" height="${bH}" rx="1" fill="${col}" opacity="0.88"/>
+                    <line x1="${px+cw/2}" y1="${hY}" x2="${px+cw/2}" y2="${lY}" stroke="${col}" stroke-width="1" opacity="0.5"/>`;
+        }).join('');
+
+        return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}"
+                     preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"
+                     style="position:absolute;top:0;left:0;">
+            <rect x="${zX}" y="${Math.min(entryPx,targetPx)}" width="${zW}" height="${Math.abs(targetPx-entryPx)}" fill="rgba(0,208,132,0.14)"/>
+            <rect x="${zX}" y="${Math.min(entryPx,stopPx)}"   width="${zW}" height="${Math.abs(stopPx-entryPx)}"   fill="rgba(255,71,87,0.14)"/>
+            ${svg_candles}
+            ${topPath ? `<path d="${topPath}" stroke="${R}" stroke-width="1.8" fill="none" opacity="0.85"/>` : ''}
+            ${botPath ? `<path d="${botPath}" stroke="${G}" stroke-width="1.8" fill="none" stroke-dasharray="5,3" opacity="0.80"/>` : ''}
+            <line x1="0"    y1="${entryPx}"  x2="${w}" y2="${entryPx}"  stroke="${W}" stroke-width="1.5" opacity="0.9"/>
+            <line x1="${zX}" y1="${targetPx}" x2="${w}" y2="${targetPx}" stroke="${G}" stroke-width="1"   stroke-dasharray="4,3" opacity="0.85"/>
+            <line x1="${zX}" y1="${stopPx}"   x2="${w}" y2="${stopPx}"   stroke="${R}" stroke-width="1"   stroke-dasharray="4,3" opacity="0.85"/>
+            <text x="${w-3}" y="${targetPx-3}" text-anchor="end" fill="${G}" font-size="9" font-family="monospace" font-weight="bold">TARGET</text>
+            <text x="${w-3}" y="${entryPx-3}"  text-anchor="end" fill="${W}" font-size="9" font-family="monospace" font-weight="bold">ENTRY</text>
+            <text x="${w-3}" y="${stopPx-3}"   text-anchor="end" fill="${R}" font-size="9" font-family="monospace" font-weight="bold">STOP</text>
         </svg>`;
     }
 

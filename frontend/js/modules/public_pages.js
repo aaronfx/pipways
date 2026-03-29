@@ -66,7 +66,7 @@ const PublicPages = (() => {
     async function signals(containerId = 'signals-container', ctrl = null) {
         spinner(containerId);
         try {
-            const data = await req('/signals/active', ctrl);
+            const data = await req('/api/signals/active', ctrl);
             const list = Array.isArray(data) ? data : (data.signals || []);
             const c = el(containerId); if (!c) return;
 
@@ -98,7 +98,7 @@ const PublicPages = (() => {
                         </div>
                         <div class="flex items-center gap-2">
                             ${s.timeframe ? `<span class="text-xs text-gray-500 bg-gray-700/60 px-2 py-0.5 rounded">${s.timeframe}</span>` : ''}
-                            ${s.ai_confidence ? `<span class="text-xs text-purple-400 font-semibold">AI ${Math.round(s.ai_confidence * 100)}%</span>` : ''}
+                            ${s.ai_confidence ? `<span class="text-xs text-purple-400 font-semibold">AI ${s.ai_confidence > 1 ? Math.round(s.ai_confidence) : Math.round(s.ai_confidence * 100)}%</span>` : ''}
                         </div>
                     </div>
                     <!-- body -->
@@ -152,8 +152,14 @@ const PublicPages = (() => {
             const list = Array.isArray(data) ? data : (data.webinars || []);
 
             // Split into upcoming and completed
-            const upcoming  = list.filter(w => !w.is_completed);
-            const completed = list.filter(w => w.is_completed);
+            // FIX: w.is_completed doesn't exist in the DB schema — field is always undefined,
+            // so the old filter put ALL webinars in 'upcoming' and NONE in 'completed'.
+            // Using the actual 'status' column and presence of recording_url instead.
+            const completed = list.filter(w =>
+                w.status === 'completed' || w.status === 'recorded' || !!w.recording_url
+            );
+            const completedIds = new Set(completed.map(w => w.id));
+            const upcoming  = list.filter(w => !completedIds.has(w.id));
 
             // Get user tier for gating recordings
             let userTier = 'free';
@@ -408,29 +414,6 @@ const PublicPages = (() => {
         } catch (e) {
             c.innerHTML = '<div style="text-align:center;padding:3rem;color:#6b7280;"><p style="color:#f87171;font-size:.9rem;">Could not load webinars: ' + e.message + '</p></div>';
         }
-    }
-
-
-
-    // Live countdown tick — updates every minute for cards within 48 hrs
-    function _startCountdownTickers(container) {
-        if (!container) return;
-        // Find all countdown spans and update them
-        var tick = function() {
-            container.querySelectorAll('[data-countdown]').forEach(function(el) {
-                var target = parseInt(el.getAttribute('data-countdown'), 10);
-                var diffMin = Math.floor((target - Date.now()) / 60000);
-                if (diffMin <= 0) {
-                    el.textContent = 'Starting now';
-                } else {
-                    var hrs = Math.floor(diffMin / 60);
-                    var mins = diffMin % 60;
-                    el.textContent = 'Starts in ' + (hrs > 0 ? hrs + 'h ' : '') + (mins > 0 ? mins + 'm' : '');
-                }
-            });
-        };
-        if (container._countdownTimer) clearInterval(container._countdownTimer);
-        container._countdownTimer = setInterval(tick, 60000);
     }
 
 

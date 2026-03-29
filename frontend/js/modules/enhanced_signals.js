@@ -108,7 +108,14 @@ class EnhancedSignalsPage {
             if (!response.ok) throw new Error('HTTP ' + response.status);
 
             const signals = await response.json();
-            this.signals  = signals || [];
+
+            // Keep only the most recent signal per symbol — prevents duplicate cards
+            const seen = new Set();
+            this.signals = (signals || []).filter(s => {
+                if (seen.has(s.symbol)) return false;
+                seen.add(s.symbol);
+                return true;
+            });
 
             this._updateStats();   // #4: also fetches win rate async
             this._renderGrid();
@@ -143,13 +150,6 @@ class EnhancedSignalsPage {
         this._destroyGridCharts();
 
         container.innerHTML = this.signals.map(s => this.renderSignalCard(s)).join('');
-
-        setTimeout(async () => {
-            if (window.ProChart && window.ProChart.ensureLoaded) {
-                await window.ProChart.ensureLoaded();
-            }
-            this.signals.forEach(s => this.renderGridChart(s));
-        }, 100);
     }
 
     _destroyGridCharts() {
@@ -274,6 +274,15 @@ class EnhancedSignalsPage {
         const isExpired= status.class === 'expired' || status.class === 'stopped';
         const expiry   = this._formatExpiry(signal);
         const flagHtml = this._getFlag(signal.symbol || '');
+        const conf     = signal.confidence || 70;
+
+        // Published time — "5 mins ago" / "2h ago"
+        const publishedAgo = signal.created_at ? this._timeAgo(signal.created_at) : '';
+
+        // Confidence bar — real SMC confluence score, not fake news sentiment
+        const confBarWidth = Math.min(100, Math.max(0, conf));
+        const confColor    = conf >= 80 ? '#00d084' : conf >= 60 ? '#f59e0b' : '#ef4444';
+        const confLabel    = conf >= 80 ? 'HIGH' : conf >= 60 ? 'MEDIUM' : 'LOW';
 
         const topBadge = isActive
             ? '<span class="sig-live-trade">LIVE TRADE</span>'
@@ -330,12 +339,27 @@ class EnhancedSignalsPage {
                         <span class="sig-label">Expires</span>
                         ${expiry}
                     </div>
+                    ${publishedAgo ? `<div class="sig-row">
+                        <span class="sig-label">Published</span>
+                        <span style="color:#6b7280;font-size:11px;font-family:monospace;">${publishedAgo}</span>
+                    </div>` : ''}
                 </div>
 
-                <!-- Chart with timeframe badge -->
-                <div class="relative mx-3 mt-3 rounded-lg overflow-hidden" style="height:180px;background:#0a0a0f;">
-                    <div id="chart-${signal.id}" style="width:100%;height:100%;"></div>
-                    <div class="sig-tf-badge">${(signal.timeframe || '1H').toUpperCase()}</div>
+                <!-- Confidence bar -->
+                <div style="padding:0 12px 10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="color:#6b7280;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Confidence</span>
+                        <span style="color:${confColor};font-size:11px;font-weight:700;">${conf}% <span style="opacity:.7;">${confLabel}</span></span>
+                    </div>
+                    <div style="height:5px;background:#1f2937;border-radius:3px;overflow:hidden;">
+                        <div style="width:${confBarWidth}%;height:100%;background:${confColor};border-radius:3px;transition:width .4s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Pattern SVG — static, instant, no chart library needed -->
+                <div class="relative mx-3 mt-3 rounded-lg overflow-hidden" style="height:150px;background:#0a0a0f;border:1px solid #1f2937;">
+                    ${this._drawPatternSVG(signal)}
+                    <div class="sig-tf-badge">${(signal.timeframe || 'M5').toUpperCase()}</div>
                 </div>
 
                 <!-- Footer -->
@@ -346,6 +370,114 @@ class EnhancedSignalsPage {
                     </button>
                 </div>
             </div>`;
+    }
+
+    // ── Static Pattern SVG ─────────────────────────────────────────────────────
+
+    _drawPatternSVG(signal) {
+        const isBuy     = (signal.direction || '').toUpperCase().includes('BUY');
+        const structure = (signal.structure || '').toLowerCase();
+        const pattern   = (signal.pattern_name || signal.pattern || '').toLowerCase();
+        const upCol     = '#00d084';
+        const downCol   = '#ff4757';
+        const lineCol   = isBuy ? upCol : downCol;
+        const entryCol  = '#ffffff';
+        const zoneProfit= isBuy ? 'rgba(0,208,132,0.12)' : 'rgba(0,208,132,0.12)';
+        const zoneRisk  = 'rgba(255,71,87,0.12)';
+        const w = 320, h = 150;
+        // Key horizontal levels (as % of height)
+        const stopY   = isBuy ? 85 : 22;
+        const entryY  = isBuy ? 68 : 40;
+        const targetY = isBuy ? 20 : 82;
+
+        // Candle stub — 8 small representative candles
+        const candleCount = 8;
+        const cw = 14, gap = 6;
+        const totalW = candleCount * (cw + gap);
+        const startX = 20;
+        // Heights oscillate around entry level with slight trend
+        const trendDir = isBuy ? -1 : 1;
+        const candleData = Array.from({length: candleCount}, (_, i) => {
+            const progress = i / (candleCount - 1);
+            const cy = entryY + trendDir * progress * 22 + (Math.sin(i * 1.8) * 6);
+            const bodyH = 6 + Math.abs(Math.sin(i * 2.3)) * 8;
+            const open  = cy - bodyH / 2;
+            const close = cy + bodyH / 2;
+            const bull  = isBuy ? i % 3 !== 0 : i % 3 === 0;
+            return { x: startX + i * (cw + gap), open, close, bull };
+        });
+
+        // Pattern-specific lines
+        let patternLines = '';
+
+        if (structure.includes('horizontal_bottom') || pattern.includes('descending')) {
+            // Descending triangle: flat support + falling resistance
+            patternLines = `
+                <line x1="20" y1="${h*entryY/100+8}" x2="${w*0.7}" y2="${h*entryY/100+8}" stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+                <line x1="20" y1="${h*0.28}" x2="${w*0.7}" y2="${h*entryY/100+2}" stroke="${downCol}" stroke-width="1.5" opacity="0.8"/>`;
+        } else if (structure.includes('horizontal_top') || pattern.includes('ascending')) {
+            // Ascending triangle: flat resistance + rising support
+            patternLines = `
+                <line x1="20" y1="${h*entryY/100-8}" x2="${w*0.7}" y2="${h*entryY/100-8}" stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+                <line x1="20" y1="${h*0.72}" x2="${w*0.7}" y2="${h*entryY/100-2}" stroke="${upCol}" stroke-width="1.5" opacity="0.8"/>`;
+        } else if (structure.includes('converging')) {
+            // Symmetrical triangle / wedge
+            const midY = h * entryY / 100;
+            patternLines = `
+                <line x1="20" y1="${midY - 28}" x2="${w*0.68}" y2="${midY - 4}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
+                <line x1="20" y1="${midY + 28}" x2="${w*0.68}" y2="${midY + 4}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
+        } else if (structure.includes('parallel')) {
+            // Channel / flag
+            const midY = h * entryY / 100;
+            const slope = isBuy ? -0.06 : 0.06;
+            const rangeW = w * 0.55;
+            patternLines = `
+                <line x1="20" y1="${midY - 18}" x2="${20 + rangeW}" y2="${midY - 18 + slope * rangeW}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>
+                <line x1="20" y1="${midY + 18}" x2="${20 + rangeW}" y2="${midY + 18 + slope * rangeW}" stroke="${lineCol}" stroke-width="1.5" opacity="0.8"/>`;
+        } else {
+            // Breakout/Breakdown — horizontal key level with arrow
+            const lvlY = h * entryY / 100 + (isBuy ? 8 : -8);
+            const arrowDir = isBuy ? -1 : 1;
+            patternLines = `
+                <line x1="20" y1="${lvlY}" x2="${w*0.62}" y2="${lvlY}" stroke="${lineCol}" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+                <line x1="${w*0.68}" y1="${lvlY}" x2="${w*0.68}" y2="${lvlY + arrowDir * 22}" stroke="${lineCol}" stroke-width="2" opacity="0.9"/>
+                <polygon points="${w*0.68},${lvlY + arrowDir * 28} ${w*0.68-5},${lvlY + arrowDir * 20} ${w*0.68+5},${lvlY + arrowDir * 20}" fill="${lineCol}" opacity="0.9"/>`;
+        }
+
+        // Build candles SVG
+        const candlesSVG = candleData.map(c => {
+            const col  = c.bull ? upCol : downCol;
+            const topY = Math.min(c.open, c.close) * h / 100;
+            const bH   = Math.max(2, Math.abs(c.close - c.open) * h / 100);
+            const wickT= topY - 3;
+            const wickB= (Math.max(c.open, c.close) * h / 100) + 3;
+            return `<rect x="${c.x}" y="${topY}" width="${cw}" height="${bH}" rx="1" fill="${col}" opacity="0.85"/>
+                    <line x1="${c.x + cw/2}" y1="${wickT}" x2="${c.x + cw/2}" y2="${wickB}" stroke="${col}" stroke-width="1" opacity="0.6"/>`;
+        }).join('');
+
+        return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet"
+                     xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
+            <!-- Profit zone -->
+            <rect x="${w*0.68}" y="${h*Math.min(entryY,targetY)/100}" width="${w*0.30}"
+                  height="${h*Math.abs(targetY-entryY)/100}" fill="${zoneProfit}" rx="0"/>
+            <!-- Risk zone -->
+            <rect x="${w*0.68}" y="${h*Math.min(entryY,stopY)/100}" width="${w*0.30}"
+                  height="${h*Math.abs(stopY-entryY)/100}" fill="${zoneRisk}" rx="0"/>
+            <!-- Pattern lines -->
+            ${patternLines}
+            <!-- Candles -->
+            ${candlesSVG}
+            <!-- Entry line -->
+            <line x1="0" y1="${h*entryY/100}" x2="${w}" y2="${h*entryY/100}" stroke="${entryCol}" stroke-width="1.5" opacity="0.9"/>
+            <!-- Target line -->
+            <line x1="${w*0.65}" y1="${h*targetY/100}" x2="${w}" y2="${h*targetY/100}" stroke="${upCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.8"/>
+            <!-- Stop line -->
+            <line x1="${w*0.65}" y1="${h*stopY/100}" x2="${w}" y2="${h*stopY/100}" stroke="${downCol}" stroke-width="1" stroke-dasharray="4,3" opacity="0.8"/>
+            <!-- Labels -->
+            <text x="${w-4}" y="${h*targetY/100 - 3}" text-anchor="end" fill="${upCol}" font-size="9" font-family="monospace" font-weight="bold">TARGET</text>
+            <text x="${w-4}" y="${h*entryY/100 - 3}" text-anchor="end" fill="${entryCol}" font-size="9" font-family="monospace" font-weight="bold">ENTRY</text>
+            <text x="${w-4}" y="${h*stopY/100 - 3}" text-anchor="end" fill="${downCol}" font-size="9" font-family="monospace" font-weight="bold">STOP</text>
+        </svg>`;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -375,6 +507,17 @@ class EnhancedSignalsPage {
             return `<div class="sig-flag"><img src="https://flagcdn.com/w40/${code}.png" alt="${base}" loading="lazy" onerror="this.parentNode.innerHTML='<span style=font-size:16px>💱</span>'"></div>`;
         }
         return `<div class="sig-flag"><span style="font-size:15px;">💱</span></div>`;
+    }
+
+    _timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1)  return 'just now';
+        if (mins < 60) return mins + ' min' + (mins === 1 ? '' : 's') + ' ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24)  return hrs + 'h ' + (mins % 60) + 'm ago';
+        return Math.floor(hrs / 24) + 'd ago';
     }
 
     _formatExpiry(signal) {
@@ -477,9 +620,10 @@ class EnhancedSignalsPage {
             ? new Date(signal.expires_at).toLocaleString([], {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
             : '—';
 
-        // News sentiment derived from confidence + direction
-        const bullPct = isBuy ? Math.round(conf * 0.6 + 20) : Math.round((100 - conf) * 0.6 + 15);
-        const bearPct = 100 - bullPct;
+        // Confidence — real SMC score (no fake sentiment calculation)
+        const confBarWidth = Math.min(100, Math.max(0, conf));
+        const confColor    = conf >= 80 ? '#00d084' : conf >= 60 ? '#f59e0b' : '#ef4444';
+        const confLabel    = conf >= 80 ? 'HIGH CONFIDENCE' : conf >= 60 ? 'MEDIUM CONFIDENCE' : 'LOW CONFIDENCE';
 
         // Minimal modal title
         const titleEl = document.getElementById('modalTitle');
@@ -532,16 +676,14 @@ class EnhancedSignalsPage {
                 </div>
             </div>
 
-            <!-- ── News sentiment bar ── -->
+            <!-- ── Confidence bar ── -->
             <div class="sig-sentiment-row">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="color:#ef4444;font-size:12px;font-weight:600;">🐻 ${bearPct}%</span>
-                    <span style="color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">News Sentiment</span>
-                    <span style="color:#22c55e;font-size:12px;font-weight:600;">${bullPct}% 🐂</span>
+                    <span style="color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">SMC Confidence</span>
+                    <span style="color:${confColor};font-size:13px;font-weight:700;">${conf}% — ${confLabel}</span>
                 </div>
-                <div style="display:flex;height:7px;background:#374151;border-radius:4px;overflow:hidden;">
-                    <div style="width:${bearPct}%;background:linear-gradient(90deg,#ef4444,#dc2626);"></div>
-                    <div style="width:${bullPct}%;background:linear-gradient(90deg,#22c55e,#16a34a);"></div>
+                <div style="height:7px;background:#1f2937;border-radius:4px;overflow:hidden;">
+                    <div style="width:${confBarWidth}%;height:100%;background:linear-gradient(90deg,${confColor}99,${confColor});border-radius:4px;"></div>
                 </div>
             </div>
 

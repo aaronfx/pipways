@@ -105,7 +105,7 @@
             </form>
 
             <div class="mt-6 pt-6 border-t border-gray-200 text-center">
-                <a href="#" onclick="alert('Contact admin@pipways.com for password reset')" class="text-sm text-blue-600 hover:underline">
+                <a href="#" onclick="showSuccess('To reset your password, email admin@pipways.com'); return false;" class="text-sm text-blue-600 hover:underline">
                     Forgot password?
                 </a>
             </div>
@@ -145,7 +145,16 @@
 
         function togglePassword(inputId) {
             const input = document.getElementById(inputId);
-            input.type = input.type === 'password' ? 'text' : 'password';
+            // FIX: previously only toggled input type — icon never changed, so
+            // the user had no visual confirmation that the password was visible.
+            const icon = input.parentElement.querySelector('button i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                if (icon) { icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+            } else {
+                input.type = 'password';
+                if (icon) { icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); }
+            }
         }
 
         function showError(message) {

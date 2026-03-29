@@ -37,6 +37,12 @@ const RiskCalculator = {
         const isAuth = !!localStorage.getItem('pipways_token');
 
         container.innerHTML = `
+        <style>
+            @media (max-width: 640px) {
+                .rc-grid-responsive { grid-template-columns: 1fr !important; }
+                #rc-d-main { font-size: 2.5rem !important; }
+            }
+        </style>
         <div style="max-width:900px;">
 
             <!-- Header -->
@@ -52,7 +58,8 @@ const RiskCalculator = {
 
             <!-- Main grid -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;"
-                 id="rc-dash-grid">
+                 id="rc-dash-grid"
+                 class="rc-grid-responsive">
 
                 <!-- Inputs -->
                 <div style="background:#111827;border-radius:12px;padding:24px;border:1px solid #1f2937;">
@@ -147,7 +154,7 @@ const RiskCalculator = {
             </div>
 
             <!-- Advanced tools row -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;" class="rc-grid-responsive">
 
                 <!-- Drawdown Simulator -->
                 <div style="background:#111827;border-radius:12px;padding:22px;border:1px solid #1f2937;">

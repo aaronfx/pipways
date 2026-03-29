@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipways — Trading Education & Research</title>
+    <title>Gopipways — Trading Education & Research</title>
     <!-- Silence Tailwind CDN development warning (safe in production) -->
     <script>
     (function() {
@@ -19,7 +19,7 @@
     <!-- Usage manager — loads before page scripts, intercepts 402s globally -->
     <script src="/js/usage.js"></script>
     <script>
-    // ── Pipways Markdown Renderer ─────────────────────────────────────────
+    // ── Gopipways Markdown Renderer ─────────────────────────────────────────
     // Self-contained — no external library dependency
     // Handles: **bold**, *italic*, `code`, bullet lists, numbered lists, line breaks
     (function() {
@@ -514,7 +514,7 @@
                         <i class="fas fa-graduation-cap text-white"></i>
                     </div>
                     <div>
-                        <h1 class="font-bold text-base tracking-tight">Pipways</h1>
+                        <h1 class="font-bold text-base tracking-tight">Gopipways</h1>
                         <p class="text-xs text-gray-500">Learn · Research · Grow</p>
                     </div>
                 </div>
@@ -1571,7 +1571,7 @@
                                             <i class="fas fa-robot text-white"></i>
                                         </div>
                                         <div>
-                                            <h3 class="font-bold text-white">Pipways AI Copilot</h3>
+                                            <h3 class="font-bold text-white">Gopipways AI Copilot</h3>
                                             <p class="text-xs text-gray-400">Platform Intelligence System</p>
                                         </div>
                                     </div>
@@ -1592,7 +1592,7 @@
                                         </div>
                                         <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
                                             <p class="text-gray-200 text-sm leading-relaxed">
-                                                👋 Welcome! I'm your <strong>Pipways Trading Copilot</strong>. I have access to your:
+                                                👋 Welcome! I'm your <strong>Gopipways Trading Copilot</strong>. I have access to your:
                                             </p>
                                             <ul class="mt-2 space-y-1 text-sm text-gray-300">
                                                 <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Performance Analytics</li>
@@ -2151,7 +2151,7 @@ const DashboardController = class {
     }
 
     _initSessionPill() {
-        // Pipways session clock — shows which session is live in WAT (UTC+1)
+        // Gopipways session clock — shows which session is live in WAT (UTC+1)
         const update = () => {
             const now = new Date();
             const utcH = now.getUTCHours();
@@ -2212,7 +2212,7 @@ const DashboardController = class {
         const n = counts[new Date().getDate() % counts.length];
         el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>'
             + '<span style="color:#9ca3af;font-size:.75rem;">'
-            + '<strong style="color:white;">' + n + '</strong> chart analyses run today by Pipways traders</span>';
+            + '<strong style="color:white;">' + n + '</strong> chart analyses run today by Gopipways traders</span>';
     }
 
     _initUsageBars() {
@@ -2345,21 +2345,25 @@ const DashboardController = class {
         const activeSignals = signalArr.filter(s => s.status === 'active').length;
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
         // Academy lessons completed count for the stat chip
+        // FIX: old fallback used level_percent/100 * 12 (beginner-only hardcode, gave 0 when
+        // completed_count wasn't returned). overall_percent x 28 total lessons is correct.
         const academyLessonsCount = (() => {
             if (!academyResume) return '0';
             if (academyResume.type === 'complete') return '28';
             if (academyResume.completed_count != null) return String(academyResume.completed_count);
-            // lesson_id is the DB id of the NEXT lesson — use level_percent as proxy
-            if (academyResume.level_percent > 0) {
-                const approx = Math.round((academyResume.level_percent / 100) * 12); // beginner has ~12 lessons
+            if (academyResume.overall_percent > 0) {
+                const approx = Math.round((academyResume.overall_percent / 100) * 28);
                 return approx > 0 ? String(approx) : '1';
             }
+            if (academyResume.level_percent > 0) return '1';
             return '0';
         })();
         setChip('stat-courses', academyLessonsCount, academyResume?.type === 'complete' ? 'All done! 🎉' : 'lessons done');
         setChip('stat-webinars', webinars ? count(webinars) : '—', webinarsSub);
         setChip('stat-blog',     blog     ? count(blog)     : '—', blogArr.length > 0 ? 'Latest articles' : '');
-        setChip('stat-signals',  signals  ? count(signals)  : '—', signalsSub);
+        // FIX: count(signals) returned total including closed signals.
+        // activeSignals is already computed above — use that for the chip.
+        setChip('stat-signals', signals ? (activeSignals > 0 ? String(activeSignals) : signalArr.length > 0 ? '0' : '—') : '—', signalsSub);
 
         // ── Card 1: Continue Learning (Academy-powered) ──────────────────
         const learningEl = document.getElementById('dash-learning-body');
@@ -2490,12 +2494,25 @@ const DashboardController = class {
 
         // ── Card 3: Trading Academy Progress ────────────────────────────────
         const academyEl = document.getElementById('dash-academy-body');
-        if (academyEl && progress) {
-            const progressData = progress.levels || {
-                beginner: { percentage: 0, completed: 0, total: 12 },
-                intermediate: { percentage: 0, completed: 0, total: 8 },
-                advanced: { percentage: 0, completed: 0, total: 8 }
+        // FIX: was reading progress.levels from /courses/enhanced/progress which never
+        // returns a .levels breakdown — all three bars always showed 0%.
+        // Now builds progressData from academyResume (/learning/resume) which has
+        // the current level's real percentage. Other levels stay 0% until started.
+        if (academyEl && academyResume) {
+            const currentLevel = (academyResume.level || 'beginner').toLowerCase();
+            const levelPct = academyResume.level_percent || 0;
+            const progressData = {
+                beginner:     { percentage: currentLevel === 'beginner'     ? levelPct : (academyResume.type === 'complete' || currentLevel === 'intermediate' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 12 },
+                intermediate: { percentage: currentLevel === 'intermediate' ? levelPct : (academyResume.type === 'complete' || currentLevel === 'advanced' ? 100 : 0), completed: 0, total: 6  },
+                advanced:     { percentage: currentLevel === 'advanced'     ? levelPct : (academyResume.type === 'complete' ? 100 : 0), completed: 0, total: 10 },
             };
+            // completed counts from completed_count and level
+            if (academyResume.completed_count != null) {
+                const cc = academyResume.completed_count;
+                if (currentLevel === 'beginner')     progressData.beginner.completed     = cc;
+                if (currentLevel === 'intermediate') { progressData.beginner.completed = 12; progressData.intermediate.completed = cc; }
+                if (currentLevel === 'advanced')     { progressData.beginner.completed = 12; progressData.intermediate.completed = 6; progressData.advanced.completed = cc; }
+            }
 
             academyEl.innerHTML = `
                 <div class="space-y-3">

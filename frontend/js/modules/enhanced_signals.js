@@ -357,7 +357,7 @@ class EnhancedSignalsPage {
                 </div>
 
                 <!-- Pattern SVG — static, instant, no chart library needed -->
-                <div class="relative mx-3 mt-3 rounded-lg overflow-hidden" style="height:150px;background:#0a0a0f;border:1px solid #1f2937;">
+                <div class="relative mx-3 mt-3 rounded-lg overflow-hidden" style="height:175px;background:#0a0a0f;border:1px solid #1f2937;">
                     ${this._drawPatternSVG(signal)}
                     <div class="sig-tf-badge">${(signal.timeframe || 'M5').toUpperCase()}</div>
                 </div>
@@ -393,13 +393,13 @@ class EnhancedSignalsPage {
         else if (pName.includes('descending channel')  || pStruct === 'parallel_falling')  pType = 'desc_channel';
         else if (pName.includes('ascending channel')   || pStruct === 'parallel_rising')   pType = 'asc_channel';
 
-        const w = 320, h = 148;
+        const w = 320, h = 175;
         const G = '#00d084', R = '#ff4757', W = '#ffffff';
 
         // Fixed vertical levels (px) — SELL: stop=top, entry=mid, target=bottom
-        const stopPx   = isBuy ? 120 : 18;
-        const entryPx  = isBuy ? 82  : 66;
-        const targetPx = isBuy ? 22  : 124;
+        const stopPx   = isBuy ? 138 : 18;
+        const entryPx  = isBuy ? 96  : 72;
+        const targetPx = isBuy ? 22  : 148;
 
         // Candle area: spans vertically from slightly above stop to slightly below entry
         const aTop = Math.min(stopPx, entryPx) - 10;
@@ -422,7 +422,7 @@ class EnhancedSignalsPage {
                 [0.28,0.62,0.48,0.60,true],  [0.38,0.62,0.52,0.59,false],
                 [0.48,0.62,0.60,0.58,false], [0.56,0.62,0.68,0.59,true],
                 [0.64,0.62,0.74,0.60,false], [0.70,0.62,0.78,0.61,false],
-                [0.72,0.98,0.78,0.95,false], // breakdown candle
+                [0.72,0.90,0.78,0.88,false], // breakdown candle — clamped to risk zone
             ];
             // Falling resistance: top-left to mid-right
             topPath = `M ${x0},${yN(0.05)} L ${x0+7*(cw+cGap)+cw},${yN(0.70)}`;

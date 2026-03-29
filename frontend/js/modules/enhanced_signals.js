@@ -25,10 +25,9 @@ class EnhancedSignalsPage {
     constructor() {
         this.charts           = new Map();
         this.signals          = [];
-        this.activeTab        = 'ai';
         this._refreshInterval = null;
-        this._sectionVisible  = false;   // #9: pause interval when section hidden
-        this._initialized     = false;   // #17: reset flag lives here too
+        this._sectionVisible  = false;
+        this._initialized     = false;
         console.log('[EnhancedSignals] Instance created v21.1');
     }
 
@@ -36,32 +35,7 @@ class EnhancedSignalsPage {
 
     init() {
         console.log('[EnhancedSignals] init() v21.1');
-        this.activeTab       = 'ai';
-        this._sectionVisible = true;    // #9: mark visible
-
-        // Tab buttons
-        const aiTab  = document.getElementById('aiDrivenTab');
-        const patTab = document.getElementById('patternTab');
-        if (aiTab && patTab) {
-            aiTab.addEventListener('click', () => {
-                this.activeTab = 'ai';
-                aiTab.classList.replace('bg-gray-700', 'bg-purple-600');
-                aiTab.classList.replace('text-gray-400', 'text-white');
-                patTab.classList.replace('bg-purple-600', 'bg-gray-700');
-                patTab.classList.replace('text-white', 'text-gray-400');
-                // #8: server-side filter — no is_pattern_idea param for AI tab
-                this.loadSignals();
-            });
-            patTab.addEventListener('click', () => {
-                this.activeTab = 'pattern';
-                patTab.classList.replace('bg-gray-700', 'bg-purple-600');
-                patTab.classList.replace('text-gray-400', 'text-white');
-                aiTab.classList.replace('bg-purple-600', 'bg-gray-700');
-                aiTab.classList.replace('text-white', 'text-gray-400');
-                // #8: server-side filter — pass is_pattern_idea=true
-                this.loadSignals();
-            });
-        }
+        this._sectionVisible = true;
 
         // Modal close — button, Escape key, backdrop click
         const closeBtn = document.getElementById('closeModal');
@@ -72,7 +46,7 @@ class EnhancedSignalsPage {
 
         this.loadSignals();
         this._refreshInterval = setInterval(() => {
-            if (this._sectionVisible) this.loadSignals(); // #9: skip when hidden
+            if (this._sectionVisible) this.loadSignals();
         }, 30000);
     }
 
@@ -100,11 +74,7 @@ class EnhancedSignalsPage {
         if (!container) { console.warn('[EnhancedSignals] Container not found'); return; }
 
         try {
-            // #8: server-side tab filter — pattern tab sends is_pattern_idea=true
-            const params = new URLSearchParams();
-            if (this.activeTab === 'pattern') params.set('is_pattern_idea', 'true');
-
-            const response = await fetch('/api/signals/enhanced?' + params.toString());
+            const response = await fetch('/api/signals/enhanced');
             if (!response.ok) throw new Error('HTTP ' + response.status);
 
             const signals = await response.json();

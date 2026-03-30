@@ -287,7 +287,7 @@ class EnhancedSignalsPage {
                 <!-- Direction pill — centered -->
                 <div class="flex justify-center pb-3">
                     <span class="${isBuy ? 'sig-buystop-pill' : 'sig-sellstop-pill'}">
-                        ${isBuy ? 'BUY STOP' : 'SELL STOP'}
+                        ${isBuy ? 'BUY LIMIT' : 'SELL LIMIT'}
                     </span>
                 </div>
 
@@ -715,7 +715,7 @@ class EnhancedSignalsPage {
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                             <span class="${isBuy ? 'sig-buystop-pill' : 'sig-sellstop-pill'}" style="font-size:11px;padding:4px 14px;">
-                                ${isBuy ? 'BUY STOP' : 'SELL STOP'}
+                                ${isBuy ? 'BUY LIMIT' : 'SELL LIMIT'}
                             </span>
                             ${isActive ? '<span class="sig-live-trade" style="font-size:10px;">LIVE TRADE</span>' : ''}
                         </div>
@@ -903,12 +903,12 @@ console.log('[EnhancedSignals] Module loaded v21.0');
             if (currentPrice >= target) return { state: 'TARGET_HIT', label: 'TARGET HIT',  color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)'  };
             if (currentPrice <= stop)   return { state: 'STOPPED',    label: 'STOPPED OUT', color: '#ff4757', icon: '✗', bg: 'rgba(255,71,87,0.2)'   };
             if (currentPrice >= entry)  return { state: 'ACTIVE',     label: 'LIVE TRADE',  color: '#00c9a7', icon: '●', bg: 'rgba(0,201,167,0.2)'   };
-            return                             { state: 'PENDING',    label: 'BUY STOP',    color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
+            return                             { state: 'PENDING',    label: 'BUY LIMIT',    color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
         } else {
             if (currentPrice <= target) return { state: 'TARGET_HIT', label: 'TARGET HIT',  color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)'  };
             if (currentPrice >= stop)   return { state: 'STOPPED',    label: 'STOPPED OUT', color: '#ff4757', icon: '✗', bg: 'rgba(255,71,87,0.2)'   };
             if (currentPrice <= entry)  return { state: 'ACTIVE',     label: 'LIVE TRADE',  color: '#00c9a7', icon: '●', bg: 'rgba(0,201,167,0.2)'   };
-            return                             { state: 'PENDING',    label: 'SELL STOP',   color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
+            return                             { state: 'PENDING',    label: 'SELL LIMIT',   color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
         }
     }
 

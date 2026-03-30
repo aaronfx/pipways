@@ -1,20 +1,19 @@
 """
-Email Service for Pipways
+Email Service for Gopipways
 Handles: welcome emails, lesson completion, signal alerts, weekly digest
 
-Provider: Mailgun (recommended for Nigeria — good deliverability, free tier = 1000 emails/month)
-Fallback: SMTP (any provider: Gmail, Zoho, etc.)
+Provider: SpaceMail SMTP (contact@gopipways.com)
+  Uses port 587 (STARTTLS) or port 465 (SSL) — auto-detected from SMTP_PORT.
 
 Environment variables:
-  EMAIL_PROVIDER        — "mailgun" | "smtp" (default: mailgun)
-  MAILGUN_API_KEY       — your Mailgun API key
-  MAILGUN_DOMAIN        — e.g. mg.pipways.com
-  SMTP_HOST             — e.g. smtp.gmail.com
-  SMTP_PORT             — e.g. 587
-  SMTP_USER             — sender email
-  SMTP_PASSWORD         — sender password
-  EMAIL_FROM_NAME       — "Pipways" (default)
-  EMAIL_FROM_ADDRESS    — noreply@pipways.com
+  EMAIL_PROVIDER        — "smtp" (SpaceMail uses SMTP)
+  SMTP_HOST             — smtp.spacemail.com
+  SMTP_PORT             — 587 (STARTTLS) or 465 (SSL)
+  SMTP_USER             — contact@gopipways.com
+  SMTP_PASSWORD         — your SpaceMail password
+  EMAIL_FROM_NAME       — "Gopipways" (default)
+  EMAIL_FROM_ADDRESS    — contact@gopipways.com
+  APP_BASE_URL          — https://www.gopipways.com
 """
 
 import os
@@ -34,16 +33,16 @@ from .security import get_current_user, get_user_id, is_admin_user
 
 router = APIRouter()
 
-EMAIL_PROVIDER  = os.getenv("EMAIL_PROVIDER", "mailgun")
+EMAIL_PROVIDER  = os.getenv("EMAIL_PROVIDER", "smtp")
 MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY", "")
 MAILGUN_DOMAIN  = os.getenv("MAILGUN_DOMAIN", "")
-SMTP_HOST       = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_HOST       = os.getenv("SMTP_HOST", "smtp.spacemail.com")
 SMTP_PORT       = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER       = os.getenv("SMTP_USER", "")
+SMTP_USER       = os.getenv("SMTP_USER", "contact@gopipways.com")
 SMTP_PASSWORD   = os.getenv("SMTP_PASSWORD", "")
-FROM_NAME       = os.getenv("EMAIL_FROM_NAME", "Pipways")
-FROM_ADDRESS    = os.getenv("EMAIL_FROM_ADDRESS", "noreply@pipways.com")
-APP_BASE_URL    = os.getenv("APP_BASE_URL", "https://pipways.com")
+FROM_NAME       = os.getenv("EMAIL_FROM_NAME", "Gopipways")
+FROM_ADDRESS    = os.getenv("EMAIL_FROM_ADDRESS", "contact@gopipways.com")
+APP_BASE_URL    = os.getenv("APP_BASE_URL", "https://www.gopipways.com")
 
 
 # ── Table initialisation ───────────────────────────────────────────────────────
@@ -126,10 +125,19 @@ async def _send_smtp(to, from_field, subject, html, text) -> bool:
         msg["To"]      = to
         msg.attach(MIMEText(text, "plain"))
         msg.attach(MIMEText(html,  "html"))
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-            s.starttls()
-            s.login(SMTP_USER, SMTP_PASSWORD)
-            s.sendmail(FROM_ADDRESS, [to], msg.as_string())
+        if SMTP_PORT == 465:
+            # SSL connection — SpaceMail port 465
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as s:
+                s.login(SMTP_USER, SMTP_PASSWORD)
+                s.sendmail(FROM_ADDRESS, [to], msg.as_string())
+        else:
+            # STARTTLS connection — SpaceMail port 587 (default)
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+                s.ehlo()
+                s.starttls()
+                s.ehlo()
+                s.login(SMTP_USER, SMTP_PASSWORD)
+                s.sendmail(FROM_ADDRESS, [to], msg.as_string())
         return True
     return await asyncio.get_event_loop().run_in_executor(None, _sync)
 
@@ -144,13 +152,13 @@ def _base(content: str, preview: str = "") -> str:
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
 <tr><td align="center"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;">
 <tr><td style="background:linear-gradient(135deg,#667eea,#764ba2);padding:32px 40px;border-radius:12px 12px 0 0;text-align:center;">
-  <h1 style="margin:0;color:white;font-size:24px;font-weight:800;">📈 Pipways</h1>
+  <h1 style="margin:0;color:white;font-size:24px;font-weight:800;">📈 Gopipways</h1>
   <p style="margin:4px 0 0;color:rgba(255,255,255,.8);font-size:13px;">Professional Trading Platform</p>
 </td></tr>
 <tr><td style="background:white;padding:36px 40px;">{content}</td></tr>
 <tr><td style="background:#f9fafb;padding:20px 40px;border-radius:0 0 12px 12px;text-align:center;border-top:1px solid #e5e7eb;">
   <p style="margin:0;font-size:12px;color:#9ca3af;">
-    You're receiving this because you signed up at Pipways.<br>
+    You're receiving this because you signed up at Gopipways.<br>
     <a href="{APP_BASE_URL}/settings" style="color:#6b7280;">Manage email preferences</a>
   </p>
 </td></tr>
@@ -162,7 +170,7 @@ def _base(content: str, preview: str = "") -> str:
 def welcome_email(full_name: str) -> tuple:
     first = (full_name or "Trader").split()[0]
     content = f"""
-<h2 style="margin:0 0 16px;font-size:22px;color:#111827;">Welcome to Pipways, {first}! 🎉</h2>
+<h2 style="margin:0 0 16px;font-size:22px;color:#111827;">Welcome to Gopipways, {first}! 🎉</h2>
 <p style="color:#374151;line-height:1.6;margin:0 0 20px;">Your account is ready. Here's what you have for free:</p>
 <table width="100%" cellpadding="10" cellspacing="0" style="margin-bottom:24px;">
   <tr style="border-bottom:1px solid #f3f4f6;"><td>📚 <strong>Trading Academy</strong> — Full curriculum, quizzes & certificates. 100% free.</td></tr>
@@ -175,7 +183,7 @@ def welcome_email(full_name: str) -> tuple:
    Start Learning Now →
 </a>
 <p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">Questions? Just reply to this email.</p>"""
-    return ("Welcome to Pipways — Your Trading Journey Starts Now",
+    return ("Welcome to Gopipways — Your Trading Journey Starts Now",
             _base(content, f"Welcome {first}! Your free account is ready."))
 
 
@@ -325,7 +333,7 @@ async def capture_email(body: EmailCaptureRequest):
     except Exception as e:
         print(f"[EMAIL CAPTURE] {e}", flush=True)
 
-    subject = "Welcome to Pipways — Your free trading resources"
+    subject = "Welcome to Gopipways — Your free trading resources"
     html = _base(f"""
 <h2 style="margin:0 0 16px;color:#111827;">Thanks for joining! 👋</h2>
 <p style="color:#374151;line-height:1.6;">
@@ -333,7 +341,7 @@ async def capture_email(body: EmailCaptureRequest):
   No credit card needed.
 </p>
 <a href="{APP_BASE_URL}" style="display:inline-block;margin-top:16px;background:#3b82f6;color:white;
-   text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Explore Pipways →</a>""",
+   text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Explore Gopipways →</a>""",
     "Your free trading resources are ready!")
     await send_email(body.email, subject, html)
     return {"success": True, "message": "Check your email!"}
@@ -397,7 +405,7 @@ async def broadcast_email(payload: dict, background_tasks: BackgroundTasks,
     """Admin only — email all users or a tier subset."""
     if not is_admin_user(current_user):
         raise HTTPException(403, "Admin only")
-    subject   = payload.get("subject", "Message from Pipways")
+    subject   = payload.get("subject", "Message from Gopipways")
     html_body = payload.get("html_body", "")
     tier      = payload.get("filter", "all")
     if not html_body:

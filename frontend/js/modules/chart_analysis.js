@@ -198,7 +198,6 @@ const ChartAnalysisPage = {
     },
 
     clearImage() {
-        // Bug 4 fix: cancel any in-progress retry countdown
         if (this._retryTimeout) { clearTimeout(this._retryTimeout); this._retryTimeout = null; }
         this.uploadedImage    = null;
         this.currentAnalysis  = null;
@@ -210,11 +209,19 @@ const ChartAnalysisPage = {
         if (previewDiv)  previewDiv.style.display = 'none';
         if (chartInput)  chartInput.value = '';
         if (valResults) { valResults.style.display = 'none'; valResults.innerHTML = ''; }
+        // Fix 3: also reset results panel so stale analysis doesn't show
         if (results) results.innerHTML = `
             <div class="card" style="text-align:center;padding:3rem;">
                 <p class="text-muted">Upload a chart to see AI analysis</p>
                 <small>Supports: PNG, JPG, JPEG, WEBP (max 10MB)</small>
             </div>`;
+        // Fix 2: clear validator inputs when image is cleared
+        ['validatorEntry','validatorSL','validatorTP'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const dirEl = document.getElementById('validatorDirection');
+        if (dirEl) dirEl.value = 'BUY';
     },
 
     async analyzeChart(file, _retryCount = 0) {
@@ -463,7 +470,7 @@ const ChartAnalysisPage = {
                     </button>
                 </div>`;
 
-            // Auto-fill validator
+            // Auto-fill validator with AI trade setup levels
             const eEl = document.getElementById('validatorEntry');
             const sEl = document.getElementById('validatorSL');
             const tEl = document.getElementById('validatorTP');
@@ -472,6 +479,12 @@ const ChartAnalysisPage = {
             if (sEl) sEl.value = setup.stop_loss || '';
             if (tEl) tEl.value = setup.take_profit || '';
             if (dEl) dEl.value = dir === 'BUY' ? 'BUY' : 'SELL';
+        } else {
+            // Fix 2: No trade setup — clear validator so stale values don't mislead
+            ['validatorEntry','validatorSL','validatorTP'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
         }
 
         const patternsHTML = (analysis.patterns_detected?.length)

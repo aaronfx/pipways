@@ -17,6 +17,7 @@ from backend.blog_enhanced import router as blog_enhanced_router
 from backend.admin import router as admin_router
 from backend.ai_services import router as ai_router
 from backend.chart_analysis import router as chart_analysis_router
+from backend.chart_analysis import init_chart_http_client, close_chart_http_client
 from backend.performance import router as performance_router
 from backend.ai_mentor import router as ai_mentor_router
 from backend.ai_insights import router as ai_insights_router
@@ -44,16 +45,22 @@ async def lifespan(app: FastAPI):
     # Initialize database on startup
     await init_database()
     print("✅ Database initialized")
-    
+
     # Run schema migrations (from database.py)
     await run_migrations()
     await run_unique_index_migrations()
-    
+
     # Enhanced Signals column migration (NO seed data)
     await run_enhanced_signals_migration()
-    
+
+    # Initialize chart analysis HTTP client (connection pooling for OpenRouter)
+    await init_chart_http_client()
+    print("✅ Chart analysis HTTP client initialized")
+
     yield
+
     # Cleanup on shutdown
+    await close_chart_http_client()
     await database.disconnect()
     print("🔄 Application shutting down")
 

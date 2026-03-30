@@ -250,19 +250,25 @@ _PASS2_PROMPT = """You are a professional SMC analyst performing top-down struct
 
 Chart context: {context}
 
-Analyze market structure ONLY — no entry signals at this stage:
+Analyze market structure AND identify key price levels:
 
 1. Identify swing highs and swing lows
 2. Determine structure: HH+HL = bullish | LH+LL = bearish | no clear pattern = ranging
 3. Identify the most recent BOS or CHOCH if clearly visible
 4. Identify premium and discount zones within the visible dealing range
 5. Note any liquidity pools (equal highs or equal lows)
+6. Identify key support levels (price areas where buyers have consistently stepped in)
+7. Identify key resistance levels (price areas where sellers have consistently appeared)
+
+NOTE: Support and resistance levels MUST be identified regardless of market direction.
+Even in a ranging market, there are clear horizontal levels — identify them from the chart.
 
 RULES:
 - Ranging with no clear BOS → trading_bias MUST be "neutral"
 - Fewer than 20 candles visible → trading_bias MUST be "neutral"
-- Conflicting signals (bullish BOS + bearish CHOCH) → trading_bias MUST be "neutral"
+- Conflicting signals → trading_bias MUST be "neutral"
 - NEVER force a direction — neutral is correct more often than traders admit
+- Always read price levels from the visible chart scale
 
 Return ONLY this JSON:
 {
@@ -277,6 +283,8 @@ Return ONLY this JSON:
   "dealing_range": {"high": "price", "low": "price", "equilibrium": "price"},
   "current_zone": "premium|discount|equilibrium",
   "in_correct_zone": true or false,
+  "support_levels": ["price1", "price2"],
+  "resistance_levels": ["price1", "price2"],
   "structure_notes": "one sentence plain English summary"
 }
 
@@ -479,11 +487,17 @@ async def analyze_chart_image(
         else:
             p3 = {
                 "entry_confluence_found": False,
-                "confluence_reason": f"Structure quality {p2.get('structure_quality','unknown')} or bias neutral.",
+                "confluence_reason": f"Structure quality {p2.get('structure_quality','unknown')} or bias neutral — no entry generated.",
                 "order_blocks": [], "fair_value_gaps": [], "liquidity_swept": False,
                 "suggested_entry": None, "suggested_stop": None, "suggested_target": None,
-                "bos_levels": [], "support_levels": [], "resistance_levels": [],
-                "key_insights": [p2.get("structure_notes", "Market is ranging or unclear.")],
+                "bos_levels": [],
+                "support_levels":    p2.get("support_levels", []),
+                "resistance_levels": p2.get("resistance_levels", []),
+                "key_insights": [
+                    p2.get("structure_notes", "Market is ranging or unclear."),
+                    f"Key levels identified: Support {p2.get('support_levels', [])} | Resistance {p2.get('resistance_levels', [])}".replace("[]", "none detected"),
+                    f"Price is currently in the {p2.get('current_zone','unknown')} zone of the dealing range.",
+                ],
                 "smc_signals": [],
             }
 
@@ -522,8 +536,8 @@ async def analyze_chart_image(
                 ],
             },
         },
-        "support_levels":    p3.get("support_levels", []),
-        "resistance_levels": p3.get("resistance_levels", []),
+        "support_levels":    p3.get("support_levels") or p2.get("support_levels", []),
+        "resistance_levels": p3.get("resistance_levels") or p2.get("resistance_levels", []),
         "suggested_entry":   p3.get("suggested_entry"),
         "suggested_stop":    p3.get("suggested_stop"),
         "suggested_target":  p3.get("suggested_target"),

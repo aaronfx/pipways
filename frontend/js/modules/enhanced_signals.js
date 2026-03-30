@@ -183,8 +183,8 @@ class EnhancedSignalsPage {
         if (dbStatus === 'expired')       return { text: 'EXPIRED',     class: 'expired',    icon: '⚪', bg: 'rgba(139,148,158,0.2)', color: '#8b949e' };
         // Still active — time-based PENDING vs LIVE TRADE
         const mins = (Date.now() - new Date(signal.created_at)) / 60000;
-        if (mins < 5) return { text: 'PENDING',    class: 'pending', icon: '⏳', bg: 'rgba(255,193,7,0.2)',  color: '#ffc107' };
-        return             { text: 'LIVE TRADE', class: 'active',  icon: '●',  bg: 'rgba(0,201,167,0.2)', color: '#00c9a7' };
+        if (mins < 5) return { text: 'PENDING',    class: 'pending',  icon: '⏳', bg: 'rgba(255,193,7,0.2)',  color: '#ffc107' };
+        return             { text: 'LIVE TRADE', class: 'active',   icon: '●',  bg: 'rgba(0,201,167,0.2)', color: '#00c9a7' };
     }
 
     // ── Grid Chart (#7 — {chart,observer} stored together so both can be cleaned up) ──
@@ -900,15 +900,47 @@ console.log('[EnhancedSignals] Module loaded v21.0');
         }
 
         if (isBuy) {
-            if (currentPrice >= target) return { state: 'TARGET_HIT', label: 'TARGET HIT',  color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)'  };
-            if (currentPrice <= stop)   return { state: 'STOPPED',    label: 'STOPPED OUT', color: '#ff4757', icon: '✗', bg: 'rgba(255,71,87,0.2)'   };
-            if (currentPrice >= entry)  return { state: 'ACTIVE',     label: 'LIVE TRADE',  color: '#00c9a7', icon: '●', bg: 'rgba(0,201,167,0.2)'   };
-            return                             { state: 'PENDING',    label: 'BUY LIMIT',    color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
+            // For BUY LIMIT: order only fills if price DROPPED to entry first.
+            // If current price is ABOVE entry and ABOVE target — price never
+            // came back down to fill. Show UNFILLED, not TARGET HIT.
+            if (currentPrice >= target) {
+                // Check if price ever reached entry — proxy: if current is far
+                // above entry, assume it ran away without filling
+                var priceDrop = entry - currentPrice;   // negative = above entry
+                if (priceDrop < 0) {
+                    // Price is above entry — order may not have filled
+                    // Only show TARGET HIT if DB status confirms it
+                    var dbStatus = (signal.status || '').toLowerCase();
+                    if (dbStatus === 'closed_tp') {
+                        return { state: 'TARGET_HIT', label: 'TARGET HIT',  color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)' };
+                    }
+                    return { state: 'UNFILLED', label: 'UNFILLED',  color: '#6366f1', icon: '⊘', bg: 'rgba(99,102,241,0.2)' };
+                }
+                return { state: 'TARGET_HIT', label: 'TARGET HIT', color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)' };
+            }
+            if (currentPrice <= stop)  return { state: 'STOPPED',  label: 'STOPPED OUT', color: '#ff4757', icon: '✗', bg: 'rgba(255,71,87,0.2)'   };
+            if (currentPrice >= entry) return { state: 'ACTIVE',   label: 'LIVE TRADE',  color: '#00c9a7', icon: '●', bg: 'rgba(0,201,167,0.2)'   };
+            // Price is below entry — waiting for limit fill
+            return                           { state: 'PENDING',   label: 'BUY LIMIT',   color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
         } else {
-            if (currentPrice <= target) return { state: 'TARGET_HIT', label: 'TARGET HIT',  color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)'  };
-            if (currentPrice >= stop)   return { state: 'STOPPED',    label: 'STOPPED OUT', color: '#ff4757', icon: '✗', bg: 'rgba(255,71,87,0.2)'   };
-            if (currentPrice <= entry)  return { state: 'ACTIVE',     label: 'LIVE TRADE',  color: '#00c9a7', icon: '●', bg: 'rgba(0,201,167,0.2)'   };
-            return                             { state: 'PENDING',    label: 'SELL LIMIT',   color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
+            // For SELL LIMIT: order only fills if price ROSE to entry first.
+            // If current price is BELOW entry and BELOW target — price never
+            // came back up to fill.
+            if (currentPrice <= target) {
+                var priceRise = currentPrice - entry;   // negative = below entry
+                if (priceRise < 0) {
+                    var dbStatus = (signal.status || '').toLowerCase();
+                    if (dbStatus === 'closed_tp') {
+                        return { state: 'TARGET_HIT', label: 'TARGET HIT',  color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)' };
+                    }
+                    return { state: 'UNFILLED', label: 'UNFILLED',  color: '#6366f1', icon: '⊘', bg: 'rgba(99,102,241,0.2)' };
+                }
+                return { state: 'TARGET_HIT', label: 'TARGET HIT', color: '#00ff88', icon: '✓', bg: 'rgba(0,255,136,0.2)' };
+            }
+            if (currentPrice >= stop)  return { state: 'STOPPED',  label: 'STOPPED OUT', color: '#ff4757', icon: '✗', bg: 'rgba(255,71,87,0.2)'   };
+            if (currentPrice <= entry) return { state: 'ACTIVE',   label: 'LIVE TRADE',  color: '#00c9a7', icon: '●', bg: 'rgba(0,201,167,0.2)'   };
+            // Price is above entry — waiting for limit fill
+            return                           { state: 'PENDING',   label: 'SELL LIMIT',  color: '#f5a623', icon: '◐', bg: 'rgba(245,166,35,0.2)'  };
         }
     }
 

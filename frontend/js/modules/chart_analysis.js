@@ -168,7 +168,7 @@ const ChartAnalysisPage = {
 
     handleFile(file) {
         if (!file) return;
-        if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+        if (file.size > 10 * 1024 * 1024) { this._toast('File too large (max 10MB)', 'error'); return; }
         this.uploadedImage = file;
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -178,24 +178,42 @@ const ChartAnalysisPage = {
             if (previewDiv) previewDiv.style.display = 'block';
         };
         reader.readAsDataURL(file);
-        this.analyzeChart(file);
+        // Rec 7: Show analyze button instead of auto-triggering
+        // User can set symbol/timeframe before clicking
+        const resultsDiv = document.getElementById('chartResults');
+        if (resultsDiv) resultsDiv.innerHTML = `
+            <div style="text-align:center;padding:3rem;background:#111827;border-radius:12px;border:1px solid #374151;">
+                <div style="font-size:2.5rem;margin-bottom:1rem;">📊</div>
+                <p style="color:white;font-weight:600;margin-bottom:.5rem;">Chart ready for analysis</p>
+                <p style="color:#9ca3af;font-size:.875rem;margin-bottom:1.5rem;">
+                    Optionally set the symbol and timeframe above, then click Analyze.
+                </p>
+                <button onclick="ChartAnalysisPage.analyzeChart(ChartAnalysisPage.uploadedImage)"
+                        style="padding:12px 32px;background:linear-gradient(90deg,#7c3aed,#3b82f6);
+                               color:white;border:none;border-radius:8px;font-weight:700;
+                               font-size:1rem;cursor:pointer;letter-spacing:.03em;">
+                    <i class="fas fa-robot" style="margin-right:8px;"></i>Analyze Chart
+                </button>
+            </div>`;
     },
 
     clearImage() {
+        // Bug 4 fix: cancel any in-progress retry countdown
+        if (this._retryTimeout) { clearTimeout(this._retryTimeout); this._retryTimeout = null; }
         this.uploadedImage    = null;
         this.currentAnalysis  = null;
         this.chartAnnotations = null;
-        const previewDiv    = document.getElementById('imagePreview');
-        const chartInput    = document.getElementById('chartInput');
-        const results       = document.getElementById('chartResults');
-        const valResults    = document.getElementById('validatorResults');
+        const previewDiv  = document.getElementById('imagePreview');
+        const chartInput  = document.getElementById('chartInput');
+        const results     = document.getElementById('chartResults');
+        const valResults  = document.getElementById('validatorResults');
         if (previewDiv)  previewDiv.style.display = 'none';
         if (chartInput)  chartInput.value = '';
         if (valResults) { valResults.style.display = 'none'; valResults.innerHTML = ''; }
         if (results) results.innerHTML = `
             <div class="card" style="text-align:center;padding:3rem;">
                 <p class="text-muted">Upload a chart to see AI analysis</p>
-                <small>Supports: PNG, JPG, JPEG (max 10MB)</small>
+                <small>Supports: PNG, JPG, JPEG, WEBP (max 10MB)</small>
             </div>`;
     },
 
@@ -262,7 +280,8 @@ const ChartAnalysisPage = {
                 const next = _retryCount + 1;
                 let secs   = 10;
                 const tick = () => {
-                    if (!document.getElementById('chartResults')) return;
+                    // Bug 4 fix: check if user cleared the image during countdown
+                    if (!this.uploadedImage || !document.getElementById('chartResults')) return;
                     results.innerHTML = `
                         <div style="text-align:center;padding:3rem;">
                             <div style="font-size:2.5rem;margin-bottom:1rem;">🌙</div>
@@ -283,7 +302,7 @@ const ChartAnalysisPage = {
                         </div>`;
                     if (secs <= 0) { this.analyzeChart(file, next); return; }
                     secs--;
-                    setTimeout(tick, 1000);
+                    this._retryTimeout = setTimeout(tick, 1000);
                 };
                 tick();
                 return;
@@ -291,8 +310,7 @@ const ChartAnalysisPage = {
 
             this.uploadedImage   = null;
             this.currentAnalysis = null;
-            const exhausted  = error.isColdStart && _retryCount >= MAX_RETRIES;
-            // Parse JSON error messages into human-readable text
+            const exhausted = error.isColdStart && _retryCount >= MAX_RETRIES;
             let userMsg;
             if (exhausted) {
                 userMsg = 'The server is taking too long to wake up. Please wait 30 seconds and try again.';
@@ -315,6 +333,28 @@ const ChartAnalysisPage = {
                                color:#f87171;border:1px solid rgba(239,68,68,.4);border-radius:.5rem;
                                cursor:pointer;font-size:.8rem;">Clear &amp; try again</button>` : ''}
                 </div>`;
+        }
+    },
+
+    // Bug 3 fix: HTML escape all AI-generated text before innerHTML insertion
+    _esc(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    // Rec 8: toast notification — uses existing dashboard toast if available
+    _toast(msg, type = 'success') {
+        if (window.dashboard && dashboard.showToast) {
+            dashboard.showToast(msg, type);
+        } else if (window.showToast) {
+            showToast(msg, type);
+        } else {
+            console.log(`[${type}] ${msg}`);
         }
     },
 
@@ -353,7 +393,7 @@ const ChartAnalysisPage = {
                         <li style="margin-bottom:.5rem;color:var(--gray-400);display:flex;align-items:flex-start;">
                             <i class="fas fa-check-circle mr-2 mt-1"
                                style="font-size:.75rem;color:var(--success);"></i>
-                            <span>${s}</span>
+                            <span>${this._esc(s)}</span>
                         </li>`).join('')}
                     </ul>
                 </div>`;
@@ -463,7 +503,7 @@ const ChartAnalysisPage = {
             <div class="card">
                 <div style="display:flex;justify-content:space-between;align-items:center;
                             margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--gray-700);">
-                    <h3 style="margin:0;">${analysis.symbol||'Unknown Symbol'}</h3>
+                    <h3 style="margin:0;">${this._esc(analysis.symbol||'Unknown Symbol')}</h3>
                     <div style="display:flex;gap:.5rem;">
                         <span class="badge badge-${(analysis.confidence||0)>.7?'success':'warning'}">
                             ${Math.round((analysis.confidence||0)*100)}% Confidence
@@ -522,7 +562,7 @@ const ChartAnalysisPage = {
                     <ul style="padding-left:1.5rem;margin:0;">
                         ${analysis.key_insights?.length
                             ? analysis.key_insights.map(i=>
-                                `<li style="margin-bottom:.5rem;color:var(--gray-400);">${i}</li>`).join('')
+                                `<li style="margin-bottom:.5rem;color:var(--gray-400);">${this._esc(i)}</li>`).join('')
                             : '<li class="text-muted">No specific insights</li>'}
                     </ul>
                 </div>
@@ -590,31 +630,46 @@ const ChartAnalysisPage = {
     },
 
     async saveSignal() {
-        if (!this.currentAnalysis?.trade_setup) { alert('No trade setup to save'); return; }
+        if (!this.currentAnalysis?.trade_setup) {
+            this._toast('No trade setup to save', 'error');
+            return;
+        }
         const setup = this.currentAnalysis.trade_setup;
-
-        // Re-apply direction inference
-        let dir = (setup.direction||'NEUTRAL').toUpperCase();
+        let dir = (setup.direction || 'NEUTRAL').toUpperCase();
         if (dir === 'NEUTRAL') {
-            const e = parseFloat(String(setup.entry).replace(',',''));
-            const t = parseFloat(String(setup.take_profit).replace(',',''));
+            const e = parseFloat(String(setup.entry).replace(',', ''));
+            const t = parseFloat(String(setup.take_profit).replace(',', ''));
             if (!isNaN(e) && !isNaN(t)) dir = t > e ? 'BUY' : 'SELL';
         }
 
         try {
-            const result = await API.saveSignal({
-                symbol:      this.currentAnalysis.symbol || 'Unknown',
-                direction:   dir,
-                entry_price: parseFloat(setup.entry),
-                stop_loss:   parseFloat(setup.stop_loss),
-                take_profit: parseFloat(setup.take_profit),
-                confidence:  setup.probability || .7,
-                analysis:    this.currentAnalysis.key_insights?.join('\n') || '',
+            // Rec 9: post to /api/signals so signal appears on Enhanced Signals grid
+            const token = localStorage.getItem('pipways_token');
+            const res = await fetch('/api/signals', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    symbol:      this.currentAnalysis.symbol || 'Unknown',
+                    direction:   dir,
+                    entry_price: parseFloat(setup.entry),
+                    stop_loss:   parseFloat(setup.stop_loss),
+                    take_profit: parseFloat(setup.take_profit),
+                    confidence:  Math.round((setup.probability || 0.7) * 100),
+                    rationale:   this.currentAnalysis.key_insights?.join('\n') || '',
+                    source:      'chart_analysis',
+                }),
             });
-            if (result.success) alert('Signal saved to AI Signal Engine!');
-            else throw new Error('Failed to save signal');
+            if (res.ok) {
+                this._toast('Signal saved to Enhanced Signals dashboard!', 'success');
+            } else {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.detail || 'Failed to save signal');
+            }
         } catch (error) {
-            alert('Error saving signal: ' + error.message);
+            this._toast('Error saving signal: ' + error.message, 'error');
         }
     },
 
@@ -627,20 +682,20 @@ const ChartAnalysisPage = {
                 ...(patterns.reversal||[]), ...(patterns.continuation||[]),
                 ...(patterns.candlestick||[]), ...(patterns.smc||[]),
             ];
-            container.innerHTML = all.slice(0, 6).map(p => `
+            container.innerHTML = all.map(p => `
                 <div class="card" style="transition:transform .2s;"
                      onmouseover="this.style.transform='translateY(-4px)'"
                      onmouseout="this.style.transform='translateY(0)'">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
-                        <h4 style="margin:0;font-size:1rem;color:var(--gray-200);">${p.name}</h4>
+                        <h4 style="margin:0;font-size:1rem;color:var(--gray-200);">${this._esc(p.name)}</h4>
                         <span class="badge badge-${p.type==='reversal'?'danger':p.type==='continuation'?'success':p.type==='smc'?'primary':'info'}"
-                              style="font-size:.75rem;">${p.type}</span>
+                              style="font-size:.75rem;">${this._esc(p.type)}</span>
                     </div>
-                    <p style="font-size:.875rem;color:var(--gray-500);margin-bottom:.75rem;">${p.description}</p>
+                    <p style="font-size:.875rem;color:var(--gray-500);margin-bottom:.75rem;">${this._esc(p.description)}</p>
                     <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <small style="color:var(--success);font-weight:600;">${p.success_rate} success rate</small>
+                        <small style="color:var(--success);font-weight:600;">${this._esc(p.success_rate)} success rate</small>
                         <span class="badge badge-${p.reliability==='high'?'success':p.reliability==='medium'?'warning':'secondary'}"
-                              style="font-size:.7rem;">${p.reliability}</span>
+                              style="font-size:.7rem;">${this._esc(p.reliability)}</span>
                     </div>
                 </div>`).join('');
         } catch (_) {

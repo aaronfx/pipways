@@ -97,13 +97,27 @@ SYMBOL_PRICE_RANGES: Dict[str, tuple] = {
 def normalize_symbol(symbol: str) -> str:
     if not symbol:
         return "Unknown"
-    s = symbol.upper().strip().replace("/", "").replace("-", "").replace(" ", "").replace(".", "")
+    s = symbol.upper().strip()
+
+    # Strip TradingView instrument name prefixes like "CFDs on Gold (US$ / OZ)"
+    # These appear in chart title bars and need cleaning before lookup
+    s = re.sub(r'\s*\(.*?\)', '', s)          # remove (US$ / OZ) etc
+    s = re.sub(r'CFDSON|CFDS ON|CFDON', '', s) # remove "CFDs on" prefix
+    s = s.replace("/", "").replace("-", "").replace(" ", "").replace(".", "").replace("$", "")
+
     mappings = {
-        "GOLD": "XAUUSD", "XAU": "XAUUSD", "SILVER": "XAGUSD", "XAG": "XAGUSD",
-        "BITCOIN": "BTCUSD", "BTC": "BTCUSD", "ETHEREUM": "ETHUSD", "ETH": "ETHUSD",
-        # Bug 13: NAS100 stays NAS100
+        "GOLD": "XAUUSD", "XAU": "XAUUSD", "XAUUSD": "XAUUSD",
+        "SILVER": "XAGUSD", "XAG": "XAGUSD", "XAGUSD": "XAGUSD",
+        "BITCOIN": "BTCUSD", "BTC": "BTCUSD",
+        "ETHEREUM": "ETHUSD", "ETH": "ETHUSD",
+        # TradingView gold variants
+        "GOLDUS": "XAUUSD", "GOLDOZ": "XAUUSD",
+        "CFDSONGOLD": "XAUUSD", "GOLDUSDOZ": "XAUUSD",
+        "XAUUSDT": "XAUUSD",
+        # NAS100
         "NAS100": "NAS100", "NASDAQ": "NAS100", "NAS": "NAS100",
         "US100": "NAS100", "NDX": "NAS100",
+        # Other indices
         "SP500": "US500", "SPX": "US500",
         "US30": "US30", "DOW": "US30",
         "DXY": "DXY", "DOLLARINDEX": "DXY", "USDX": "DXY",
@@ -112,6 +126,12 @@ def normalize_symbol(symbol: str) -> str:
     }
     if s in mappings:
         return mappings[s]
+
+    # Check known symbols list
+    for sym in COMMON_SYMBOLS:
+        if s == sym or s.startswith(sym):
+            return sym
+
     if len(s) == 6 and s.isalpha():
         return s
     return s
@@ -235,7 +255,7 @@ If ANY element is missing — photos, text screenshots, memes, artwork, etc — 
 If it IS a trading chart, return ONLY:
 {
   "is_chart": true,
-  "symbol_visible": "symbol text visible on chart or null",
+  "symbol_visible": "the trading symbol — for gold return XAUUSD, for silver XAGUSD, for bitcoin BTCUSD. If the chart says 'CFDs on Gold' or 'Gold' return XAUUSD. For forex pairs like EUR/USD return EURUSD. Return the clean symbol without slashes or spaces.",
   "timeframe_visible": "timeframe visible on chart or null",
   "price_scale_readable": true or false,
   "approximate_price_range": {"low": "lowest price or null", "high": "highest price or null"},
@@ -246,32 +266,44 @@ If it IS a trading chart, return ONLY:
 
 Return ONLY valid JSON. No markdown, no explanation."""
 
-_PASS2_PROMPT = """You are a professional SMC analyst performing top-down structure analysis.
+_PASS2_PROMPT = """You are a senior SMC prop firm trader. Analyze this chart decisively.
 
 Chart context: {context}
 
-Analyze market structure AND identify key price levels:
+STEP 1 — Read the overall price movement:
+Look at the FULL chart from left to right. Is price generally moving up, down, or sideways?
+- Mostly higher highs and higher lows overall = bullish
+- Mostly lower highs and lower lows overall = bearish
+- No clear overall direction, price bouncing between a range = ranging
 
-1. Identify swing highs and swing lows
-2. Determine structure: HH+HL = bullish | LH+LL = bearish | no clear pattern = ranging
-3. Identify the most recent BOS or CHOCH if clearly visible
-4. Identify premium and discount zones within the visible dealing range
-5. Note any liquidity pools (equal highs or equal lows)
-6. Identify key support levels (price areas where buyers have consistently stepped in)
-7. Identify key resistance levels (price areas where sellers have consistently appeared)
+STEP 2 — Identify the most recent significant swing high and swing low.
+These are the last clear turning points where price reversed.
 
-NOTE: Support and resistance levels MUST be identified regardless of market direction.
-Even in a ranging market, there are clear horizontal levels — identify them from the chart.
+STEP 3 — Has price broken above the last swing high (bullish BOS) or below the last swing low (bearish BOS)?
+A BOS is confirmed when a candle CLOSES beyond the level, not just wicks through it.
 
-RULES:
-- Ranging with no clear BOS → trading_bias MUST be "neutral"
-- Fewer than 20 candles visible → trading_bias MUST be "neutral"
-- Conflicting signals → trading_bias MUST be "neutral"
-- NEVER force a direction — neutral is correct more often than traders admit
-- Always read price levels from the visible chart scale
+STEP 4 — Identify the dealing range:
+- Range high = highest visible swing high on the chart
+- Range low = lowest visible swing low on the chart
+- Equilibrium = midpoint between high and low
+- Is current price above equilibrium (premium) or below (discount)?
+
+STEP 5 — Identify key support and resistance levels:
+Look for horizontal price levels where price has bounced or reversed multiple times.
+Always identify at least 2 support and 2 resistance levels if the chart has enough data.
+
+STEP 6 — Determine trading bias:
+- bullish: price making HH+HL pattern OR just broke above a swing high
+- bearish: price making LH+LL pattern OR just broke below a swing low
+- neutral: ONLY if price is clearly stuck in a tight range with no dominant direction for the ENTIRE visible chart
+
+IMPORTANT: Most charts have a discernible direction. Only use neutral if you genuinely cannot determine any directional bias after looking at the full chart. When in doubt between bullish/bearish, choose the direction of the most recent structure break.
+
+ALWAYS populate support_levels and resistance_levels — there are price levels on every chart.
+ALWAYS populate dealing_range — you can see the high and low of the visible price data.
 
 Return ONLY this JSON:
-{
+{{
   "market_structure": "bullish|bearish|ranging",
   "trading_bias": "bullish|bearish|neutral",
   "structure_quality": "strong|moderate|weak",
@@ -279,56 +311,60 @@ Return ONLY this JSON:
   "bos_direction": "up|down|null",
   "bos_level": "price or null",
   "choch_detected": true or false,
-  "liquidity_pools": [{"price": "level", "type": "equal_highs|equal_lows"}],
-  "dealing_range": {"high": "price", "low": "price", "equilibrium": "price"},
+  "liquidity_pools": [{{"price": "level", "type": "equal_highs|equal_lows"}}],
+  "dealing_range": {{"high": "price", "low": "price", "equilibrium": "price"}},
   "current_zone": "premium|discount|equilibrium",
   "in_correct_zone": true or false,
   "support_levels": ["price1", "price2"],
   "resistance_levels": ["price1", "price2"],
-  "structure_notes": "one sentence plain English summary"
-}
+  "structure_notes": "one decisive sentence: what is price doing and where is it likely to go"
+}}
 
 Return ONLY valid JSON. No markdown."""
 
-_PASS3_PROMPT = """You are a professional SMC entry analyst.
+_PASS3_PROMPT = """You are a senior SMC prop firm trader finding the best entry.
 
 Chart context: {context}
-Structure confirmed: {structure}
-Direction: {direction} only
-Current zone: {zone}
+Structure: {structure}
+Direction: {direction}
+Zone: {zone}
 
-Find entry confluence for {direction} ONLY:
+Find the BEST {direction} entry on this chart using SMC methodology.
 
-1. Order Blocks: last opposing candle before a strong {direction} impulse
-2. Fair Value Gaps: 3-candle imbalance zones in the {direction} direction
-3. Check if liquidity was swept before the potential entry zone
-4. Entry: at OB or FVG in correct zone | Stop: beyond nearest swing {sl_side} | Target: next opposing liquidity
+ORDER BLOCKS — find the last {ob_candle} candle before a strong {direction} move:
+The OB is the origin of institutional interest. Price often returns to this level.
 
-CRITICAL:
-- If price scale is unreadable → all levels must be null
-- If no OB or FVG confluence exists → set entry_confluence_found to false and entry to null
-- Stop MUST be on the {sl_side} side of entry
-- Target MUST be on the opposite side from stop
-- Minimum R:R 1.5 — reject setup if not achievable
-- Read prices from the chart — do NOT invent numbers
+FAIR VALUE GAPS — find 3-candle imbalances in the {direction} direction:
+Gap between candle 1 high and candle 3 low (for bullish FVG) where price has not returned.
+
+LIQUIDITY — was there a sweep of equal lows (BUY) or equal highs (SELL) before the setup?
+
+ENTRY RULES:
+- Entry at the OB or FVG level — whichever price has reached or is approaching
+- Stop beyond the nearest swing {sl_side} (invalidation level)
+- Target at next opposing liquidity or OB
+- Minimum R:R 1.5
+
+Read prices from the chart Y-axis. For gold prices are 4000-5000 range.
+Do NOT invent prices. If scale is unreadable, set prices to null.
 
 Return ONLY this JSON:
-{
+{{
   "entry_confluence_found": true or false,
-  "confluence_reason": "why valid or why rejected",
-  "order_blocks": [{"price": "level", "type": "bullish|bearish", "timeframe": "estimated"}],
-  "fair_value_gaps": [{"start": "price", "end": "price", "type": "bullish|bearish"}],
+  "confluence_reason": "specific: which OB or FVG at which exact price level",
+  "order_blocks": [{{"price": "level", "type": "bullish|bearish", "timeframe": "H1|H4|D1"}}],
+  "fair_value_gaps": [{{"start": "price", "end": "price", "type": "bullish|bearish"}}],
   "liquidity_swept": true or false,
   "liquidity_swept_level": "price or null",
   "suggested_entry": "price or null",
   "suggested_stop": "price or null",
   "suggested_target": "price or null",
   "bos_levels": ["price"],
-  "support_levels": ["price"],
-  "resistance_levels": ["price"],
-  "key_insights": ["insight 1", "insight 2", "insight 3"],
-  "smc_signals": ["signal 1", "signal 2"]
-}
+  "support_levels": ["price1", "price2"],
+  "resistance_levels": ["price1", "price2"],
+  "key_insights": ["what you see on this specific chart", "why this entry makes sense", "risk to watch"],
+  "smc_signals": ["specific signal 1", "specific signal 2"]
+}}
 
 Return ONLY valid JSON. No markdown."""
 
@@ -459,16 +495,19 @@ async def analyze_chart_image(
         bias = (p2.get("trading_bias") or "neutral").lower()
         print(f"[CHART] Pass 2 OK — bias={bias} sq={p2.get('structure_quality')}", flush=True)
 
-        # ── Pass 3: Entry confluence (temp 0.0, only if directional) ─────────
+        # Run Pass 3 for any directional bias — even weak structure can have valid entries
+        # Only skip if bias is genuinely neutral
         p3: Dict = {}
-        if bias in ("bullish", "bearish") and p2.get("structure_quality") not in ("weak",):
-            direction = "BUY"  if bias == "bullish" else "SELL"
-            sl_side   = "low"  if bias == "bullish" else "high"
-            zone      = p2.get("current_zone", "unknown")
+        if bias in ("bullish", "bearish"):
+            direction  = "BUY"  if bias == "bullish" else "SELL"
+            sl_side    = "low"  if bias == "bullish" else "high"
+            ob_candle  = "bearish" if bias == "bullish" else "bullish"
+            zone       = p2.get("current_zone", "unknown")
             struct_summary = json.dumps({
                 k: p2.get(k) for k in (
                     "market_structure", "trading_bias", "bos_confirmed",
-                    "bos_level", "dealing_range", "current_zone", "liquidity_pools"
+                    "bos_level", "dealing_range", "current_zone", "liquidity_pools",
+                    "support_levels", "resistance_levels",
                 )
             })
             print(f"[CHART] Pass 3: entry for {direction}", flush=True)
@@ -477,9 +516,10 @@ async def analyze_chart_image(
                     http,
                     _PASS3_PROMPT.format(
                         context=context, structure=struct_summary,
-                        direction=direction, zone=zone, sl_side=sl_side,
+                        direction=direction, zone=zone,
+                        sl_side=sl_side, ob_candle=ob_candle,
                     ),
-                    img_data_url, temperature=0.0, max_tokens=800,
+                    img_data_url, temperature=0.0, max_tokens=900,
                 ))
             except Exception:
                 p3 = {"entry_confluence_found": False, "confluence_reason": "Parse error"}

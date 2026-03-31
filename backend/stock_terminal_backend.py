@@ -31,9 +31,18 @@ from typing import Any
 
 import httpx
 from anthropic import AsyncAnthropic
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+# Auth + usage — relative imports (stock_terminal_backend lives inside backend/)
+try:
+    from .security import get_current_user
+    from .subscriptions import check_limit, log_usage
+    _AUTH_AVAILABLE = True
+except ImportError:
+    _AUTH_AVAILABLE = False
+    get_current_user = None  # type: ignore
 
 # ── Environment ───────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -469,8 +478,20 @@ async def overview(symbol: str) -> OkResponse:
     summary        = "Full AI stock analysis",
     description    = "Fetches live data via EODHD then runs Claude AI analysis. Cached 5 min.",
 )
-async def analyze(symbol: str) -> OkResponse:
+async def analyze(symbol: str, current_user: dict = Depends(get_current_user)) -> OkResponse:
     try:
+        user_id   = current_user.get("id")
+        user_tier = current_user.get("subscription_tier", "free")
+        if not await check_limit(user_id, user_tier, "stock_research"):
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "feature": "stock_research",
+                    "message": "Daily stock research limit reached. Upgrade to Pro for 100/day.",
+                    "upgrade": True,
+                }
+            )
+
         sym       = symbol.upper()
         cache_key = f"analysis:{sym}"
 
@@ -570,6 +591,7 @@ Return exactly this JSON structure:
             "ai_analysis": ai_data,
         }
         await cache_set(cache_key, result)
+        await log_usage(user_id, "stock_research", symbol=sym)
         return OkResponse(data=result)
 
     except HTTPException:
@@ -919,7 +941,19 @@ Return ONLY this JSON:
 
 
 @router.post("/ngx/analyze", response_model=OkResponse, summary="Analyze an NGX-listed stock")
-async def ngx_analyze(body: NgxAnalyzeRequest) -> OkResponse:
+async def ngx_analyze(body: NgxAnalyzeRequest, current_user: dict = Depends(get_current_user)) -> OkResponse:
+    user_id   = current_user.get("id")
+    user_tier = current_user.get("subscription_tier", "free")
+    if not await check_limit(user_id, user_tier, "stock_research"):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "feature": "stock_research",
+                "message": "Daily stock research limit reached. Upgrade to Pro for 100/day.",
+                "upgrade": True,
+            }
+        )
+
     ticker = body.ticker.strip().upper()
     cache_key = f"ngx:analyze:{ticker}:{body.analysis_type}"
     cached = await cache_get(cache_key)
@@ -998,6 +1032,7 @@ Using this data, provide a professional investment analysis. Return exactly this
         }
 
         await cache_set(cache_key, result)
+        await log_usage(user_id, "stock_research", symbol=ticker)
         return OkResponse(data=result)
 
     except HTTPException:
@@ -1007,7 +1042,19 @@ Using this data, provide a professional investment analysis. Return exactly this
 
 
 @router.post("/ngx/picks", response_model=OkResponse, summary="AI top picks for an NGX sector")
-async def ngx_picks(body: NgxPicksRequest) -> OkResponse:
+async def ngx_picks(body: NgxPicksRequest, current_user: dict = Depends(get_current_user)) -> OkResponse:
+    user_id   = current_user.get("id")
+    user_tier = current_user.get("subscription_tier", "free")
+    if not await check_limit(user_id, user_tier, "stock_research"):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "feature": "stock_research",
+                "message": "Daily stock research limit reached. Upgrade to Pro for 100/day.",
+                "upgrade": True,
+            }
+        )
+
     # Note: picks are AI-generated since we don't know which tickers to fetch upfront.
     # Prices are from Claude training knowledge — treat as indicative, not live.
     cache_key = f"ngx:picks:{body.sector}:{body.signal_filter}"
@@ -1043,6 +1090,7 @@ Use real NGX-listed companies. Prices are estimates — note this is indicative 
         for p in picks:
             p["data_source"] = "ai_estimate"
         await cache_set(cache_key, picks)
+        await log_usage(user_id, "stock_research", symbol=body.sector[:20])
         return OkResponse(data=picks)
 
     except HTTPException:

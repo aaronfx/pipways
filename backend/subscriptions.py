@@ -83,30 +83,43 @@ async def get_usage_state(user_id: int) -> Dict[str, int]:
     today       = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    async def _count(sql, params):
+    async def _count(table: str, sql: str, params: dict) -> int:
+        """
+        Run a COUNT query and return the result.
+        Logs failures explicitly — was previously silently returning 0 on any
+        error (table missing, bad params, connection issue), which caused the
+        usage badge to always show the full free limit regardless of actual use.
+        """
         try:
             row = await database.fetch_one(sql, params)
-            return int(row["cnt"]) if row else 0
-        except Exception:
+            count = int(row["cnt"]) if row else 0
+            print(f"[usage] {table} user={user_id} count={count}", flush=True)
+            return count
+        except Exception as exc:
+            print(f"[usage] ⚠️  {table} query failed for user={user_id}: {exc}", flush=True)
             return 0
 
     return {
         "chart_analysis": await _count(
+            "chart_analysis_logs",
             "SELECT COUNT(*) AS cnt FROM chart_analysis_logs "
             "WHERE user_id = :uid AND created_at >= :start",
             {"uid": user_id, "start": today}
         ),
         "ai_mentor": await _count(
+            "ai_mentor_logs",
             "SELECT COUNT(*) AS cnt FROM ai_mentor_logs "
             "WHERE user_id = :uid AND created_at >= :start",
             {"uid": user_id, "start": today}
         ),
         "performance_analysis": await _count(
+            "journal_uploads",
             "SELECT COUNT(*) AS cnt FROM journal_uploads "
             "WHERE user_id = :uid AND created_at >= :start",
             {"uid": user_id, "start": month_start}
         ),
         "stock_research": await _count(
+            "stock_analysis_logs",
             "SELECT COUNT(*) AS cnt FROM stock_analysis_logs "
             "WHERE user_id = :uid AND created_at >= :start",
             {"uid": user_id, "start": today}
@@ -120,9 +133,6 @@ async def get_usage_state(user_id: int) -> Dict[str, int]:
 
 _LIMIT_MAP = {
     # feature_key              log_table                free  basic  pro
-    #                                                         ↑ matches usage.js FEATURE_CONFIG
-    # pro=None means unlimited. basic tier was missing — free limits were
-    # applied to basic users, giving them 1 perf analysis instead of 10.
     "chart_analysis":        ("chart_analysis_logs",    2,    50,    None),
     "ai_mentor":             ("ai_mentor_logs",         5,    200,   None),
     "performance_analysis":  ("journal_uploads",        1,    10,    None),  # monthly
@@ -135,8 +145,8 @@ _MONTHLY_FEATURES = {"performance_analysis"}
 async def check_limit(user_id: int, user_tier: str, feature: str) -> bool:
     """
     Returns True if the user is under their usage limit.
-    Supports free / basic / pro tiers — each maps to its own daily/monthly cap.
-    Fails open on DB error so a table hiccup never blocks users.
+    Supports free / basic / pro tiers.
+    Fails open on DB error so a hiccup never blocks users.
     """
     if feature not in _LIMIT_MAP:
         return True
@@ -177,12 +187,15 @@ async def log_usage(user_id: int, feature: str, **kwargs):
     """
     Insert one row into the feature's log table after a SUCCESSFUL response.
     Extra kwargs forwarded as columns (symbol, timeframe, question_topic, filename).
-    Non-fatal on any error.
+
+    Self-heals: if the table is missing (init_subscription_tables() was never
+    called from main.py lifespan), it creates the tables automatically and
+    retries once — so usage logging works correctly from the very first deploy.
     """
     if feature not in _LIMIT_MAP:
         return
 
-    table = _LIMIT_MAP[feature][0]  # index 0 = table name (unchanged across 3-tuple → 4-tuple)
+    table = _LIMIT_MAP[feature][0]
 
     _allowed_cols = {
         "chart_analysis_logs":  {"symbol", "timeframe", "analysis_type"},
@@ -198,15 +211,31 @@ async def log_usage(user_id: int, feature: str, **kwargs):
 
     col_names  = ", ".join(cols.keys())
     col_values = ", ".join(f":{k}" for k in cols.keys())
+    sql = (
+        f"INSERT INTO {table} ({col_names}, created_at) "
+        f"VALUES ({col_values}, NOW())"
+    )
 
     try:
-        await database.execute(
-            f"INSERT INTO {table} ({col_names}, created_at) "
-            f"VALUES ({col_values}, NOW())",
-            cols
-        )
+        await database.execute(sql, cols)
+        print(f"[log_usage] ✅ {feature} logged for user={user_id}", flush=True)
     except Exception as e:
-        print(f"[log_usage] {feature}: {e}", flush=True)
+        err = str(e).lower()
+        # Table does not exist — auto-create all tables and retry once
+        if "does not exist" in err or "no such table" in err or "undefined table" in err:
+            print(
+                f"[log_usage] Table '{table}' missing — running init_subscription_tables() "
+                f"and retrying for {feature}",
+                flush=True,
+            )
+            try:
+                await init_subscription_tables()
+                await database.execute(sql, cols)
+                print(f"[log_usage] ✅ {feature} logged after self-heal for user={user_id}", flush=True)
+            except Exception as retry_e:
+                print(f"[log_usage] ❌ Retry failed for {feature} user={user_id}: {retry_e}", flush=True)
+        else:
+            print(f"[log_usage] ❌ {feature} failed for user={user_id}: {e}", flush=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

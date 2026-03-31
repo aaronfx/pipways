@@ -239,6 +239,30 @@ const ChartAnalysisPage = {
         const results = document.getElementById('chartResults');
         if (!results) return;
 
+        // ── Client-side usage gate ────────────────────────────────────────────
+        if (window.PipwaysUsage?.isLoaded) {
+            const check = window.PipwaysUsage.checkUsage('chart_analysis');
+            if (!check.allowed) {
+                results.innerHTML = `
+                    <div style="text-align:center;padding:3rem;background:#111827;border-radius:12px;border:1px solid #374151;">
+                        <div style="font-size:2.5rem;margin-bottom:1rem;">🔒</div>
+                        <p style="color:white;font-weight:700;font-size:1.1rem;margin-bottom:.5rem;">Free limit reached</p>
+                        <p style="color:#9ca3af;font-size:.875rem;margin-bottom:1.5rem;">
+                            You've used all ${check.limit} free chart analyses today.<br>Upgrade to Pro for 50/day.
+                        </p>
+                        <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;">
+                            <button onclick="window.PaymentsPage ? PaymentsPage.startPayment('pro_monthly') : window.location.href='/pricing.html'"
+                                style="padding:10px 24px;background:#7c3aed;color:white;border:none;
+                                       border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;">
+                                Upgrade to Pro →
+                            </button>
+                        </div>
+                    </div>`;
+                window.PipwaysUsage.showUpgradeModal('chart_analysis');
+                return;
+            }
+        }
+
         results.innerHTML = `<div class="loading" style="text-align:center;padding:3rem;">
             <div class="spinner" style="margin:0 auto 1rem;"></div>
             <p>Analyzing chart with AI Vision…</p>
@@ -253,6 +277,8 @@ const ChartAnalysisPage = {
             this.currentAnalysis = analysis;
             if (analysis.chart_annotations) this.chartAnnotations = analysis.chart_annotations;
             this.displayResults(analysis);
+            // Refresh usage badge so remaining count updates immediately
+            if (window.PipwaysUsage) window.PipwaysUsage.loadUserLimits();
 
         } catch (error) {
             // ── 402 limit reached — show upgrade modal instead of raw error ──

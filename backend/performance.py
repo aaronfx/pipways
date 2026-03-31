@@ -14,7 +14,7 @@ import re
 from collections import defaultdict
 
 from .database import database
-from .security import get_current_user
+from .auth import get_current_user
 from .subscriptions import check_limit, log_usage
 from .journal_parser import TradeJournalParser
 

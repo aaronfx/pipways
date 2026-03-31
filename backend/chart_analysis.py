@@ -29,6 +29,7 @@ import re
 
 from PIL import Image
 from .security import get_current_user
+from .subscriptions import check_limit, log_usage
 
 router = APIRouter()
 
@@ -540,6 +541,19 @@ async def analyze_chart_image(
     current_user = Depends(get_current_user)
 ):
     """Three-pass SMC chart analysis with full validation."""
+    user_id   = current_user.get("id")
+    user_tier = current_user.get("subscription_tier", "free")
+
+    if not await check_limit(user_id, user_tier, "chart_analysis"):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "feature": "chart_analysis",
+                "message": "Daily chart analysis limit reached. Upgrade to Pro for 50 analyses/day.",
+                "upgrade": True,
+            }
+        )
+
     print(f"[CHART] Upload: {file.filename} {file.content_type}", flush=True)
 
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -770,6 +784,7 @@ async def analyze_chart_image(
     )
 
     _cache_set(cache_key, result)
+    await log_usage(user_id, "chart_analysis", symbol=detected_symbol, timeframe=tf_hint)
     return result
 
 

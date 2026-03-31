@@ -199,7 +199,7 @@ def _calculate_confidence(result: Dict) -> float:
     if result.get("liquidity_swept"):    score += 0.10
     if result.get("in_correct_zone"):    score += 0.05
     if result.get("price_scale_readable") is False: score -= 0.20
-    return min(round(score, 2), 0.92)
+    return min(round(score, 2), 0.85)   # capped at 85% — 92% max was meaningless
 
 
 def _validate_trade_logic(result: Dict) -> List[str]:

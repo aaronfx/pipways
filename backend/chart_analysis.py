@@ -28,7 +28,7 @@ import json
 import re
 
 from PIL import Image
-from .security import get_current_user
+from .auth import get_current_user
 from .subscriptions import check_limit, log_usage
 
 router = APIRouter()

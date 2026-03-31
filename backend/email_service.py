@@ -116,6 +116,10 @@ async def _send_brevo(to_email: str, subject: str, html: str, text: str) -> bool
     Uses HTTPS — not blocked by Railway unlike SMTP ports 465/587.
     Docs: https://developers.brevo.com/reference/sendtransacemail
     """
+    if not BREVO_API_KEY:
+        print("[EMAIL/Brevo] ❌ BREVO_API_KEY is not set — check Railway variables", flush=True)
+        return False
+
     payload = {
         "sender":      {"name": FROM_NAME, "email": FROM_ADDRESS},
         "to":          [{"email": to_email}],
@@ -123,21 +127,45 @@ async def _send_brevo(to_email: str, subject: str, html: str, text: str) -> bool
         "htmlContent": html,
         "textContent": text,
     }
-    async with httpx.AsyncClient(timeout=30) as client:
-        res = await client.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "api-key":      BREVO_API_KEY,
-                "Content-Type": "application/json",
-                "Accept":       "application/json",
-            },
-            json=payload,
-        )
-    if res.status_code not in (200, 201):
-        print(f"[EMAIL/Brevo] {res.status_code}: {res.text}", flush=True)
+
+    print(f"[EMAIL/Brevo] Sending to={to_email} from={FROM_ADDRESS} subject={subject[:40]}", flush=True)
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await client.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key":      BREVO_API_KEY,
+                    "Content-Type": "application/json",
+                    "Accept":       "application/json",
+                },
+                json=payload,
+            )
+
+        if res.status_code in (200, 201):
+            print(f"[EMAIL/Brevo] ✅ Sent to {to_email}: {subject[:40]}", flush=True)
+            return True
+
+        # Log the full Brevo error response so we can diagnose
+        print(f"[EMAIL/Brevo] ❌ HTTP {res.status_code}: {res.text}", flush=True)
+
+        # Common Brevo error codes
+        if res.status_code == 401:
+            print("[EMAIL/Brevo] ❌ Invalid API key — check BREVO_API_KEY in Railway variables", flush=True)
+        elif res.status_code == 400:
+            print("[EMAIL/Brevo] ❌ Bad request — sender email may not be verified in Brevo", flush=True)
+            print("[EMAIL/Brevo]    → Go to brevo.com → Senders & Domains → verify contact@gopipways.com", flush=True)
+        elif res.status_code == 403:
+            print("[EMAIL/Brevo] ❌ Forbidden — account may be restricted or sender not approved", flush=True)
+
         return False
-    print(f"[EMAIL/Brevo] ✅ Sent to {to_email}: {subject[:40]}", flush=True)
-    return True
+
+    except httpx.TimeoutException:
+        print("[EMAIL/Brevo] ❌ Timeout connecting to Brevo API", flush=True)
+        return False
+    except Exception as e:
+        print(f"[EMAIL/Brevo] ❌ Exception: {type(e).__name__}: {e}", flush=True)
+        return False
 
 
 async def _send_mailgun(to, from_field, subject, html, text) -> bool:

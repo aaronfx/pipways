@@ -39,14 +39,19 @@ const ChartAnalysisPage = {
                 <p style="font-size:.8rem;color:var(--gray-500);margin:0;">Smart Money Concepts (SMC) Institutional Analysis</p>
             </div>
 
-            <!-- MAIN GRID — 1-col on mobile, 2-col on md+ using Tailwind -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-                <div>
+            <!-- Step 1: Upload + Analyze -->
+            <div class="card" style="margin-bottom:1.25rem;background:linear-gradient(135deg,var(--gray-800) 0%,var(--gray-900) 100%);">
+                <div class="card-body" style="padding:1.25rem;">
+                    <div style="font-size:.75rem;font-weight:700;color:var(--primary);text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:.75rem;">
+                        Step 1 — Upload Chart
+                    </div>
                     <div class="upload-area" id="dropZone"
-                         onclick="document.getElementById('chartInput').click()">
-                        <div style="font-size:3rem;margin-bottom:1rem;">📈</div>
-                        <h3>Drop chart image here</h3>
-                        <p style="color:var(--gray-500);margin-top:0.5rem;">or click to browse</p>
+                         onclick="document.getElementById('chartInput').click()"
+                         style="padding:1.5rem;">
+                        <div style="font-size:2.5rem;margin-bottom:.5rem;">📈</div>
+                        <h3 style="margin:0 0 .25rem;font-size:.95rem;">Drop chart image here</h3>
+                        <p style="color:var(--gray-500);margin:0;font-size:.8rem;">or click to browse · PNG, JPG, WEBP (max 10MB)</p>
                         <input type="file" id="chartInput" accept="image/*" style="display:none;"
                                onchange="ChartAnalysisPage.handleFile(this.files[0])">
                     </div>
@@ -65,15 +70,14 @@ const ChartAnalysisPage = {
                         </div>
                     </div>
 
-                    <!-- Symbol + Timeframe row — always 2 cols (inputs are compact) -->
-                    <div class="grid grid-cols-2 gap-3 mt-4">
+                    <!-- Symbol + Timeframe -->
+                    <div class="grid grid-cols-2 gap-3 mt-3">
                         <div class="form-group mb-0">
-                            <label>Symbol (optional)</label>
-                            <input type="text" id="chartSymbol" placeholder="Auto-detected"
-                                   class="form-control">
+                            <label style="font-size:.75rem;color:var(--gray-500);">Symbol (optional)</label>
+                            <input type="text" id="chartSymbol" placeholder="Auto-detected" class="form-control">
                         </div>
                         <div class="form-group mb-0">
-                            <label>Timeframe (optional)</label>
+                            <label style="font-size:.75rem;color:var(--gray-500);">Timeframe (optional)</label>
                             <select id="chartTimeframe" class="form-control">
                                 <option value="">Auto-detect</option>
                                 <option value="5M">5M</option>
@@ -84,55 +88,62 @@ const ChartAnalysisPage = {
                             </select>
                         </div>
                     </div>
-
-                    <!-- Trade Validator -->
-                    <div class="card" style="margin-top:1.25rem;background:linear-gradient(135deg,var(--gray-800) 0%,var(--gray-900) 100%);">
-                        <div class="card-header" style="border-bottom:1px solid var(--gray-700);">
-                            <h3 class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
-                                <i class="fas fa-shield-alt text-primary"></i> Trade Validator
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <!-- 4 inputs: 1-col on mobile, 2-col on sm+ -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                                <div class="form-group mb-0">
-                                    <label style="font-size:0.75rem;color:var(--gray-500);">Entry Price</label>
-                                    <input type="number" id="validatorEntry" step="0.00001"
-                                           class="form-control" placeholder="1.0850">
-                                </div>
-                                <div class="form-group mb-0">
-                                    <label style="font-size:0.75rem;color:var(--gray-500);">Direction</label>
-                                    <select id="validatorDirection" class="form-control">
-                                        <option value="BUY">BUY</option>
-                                        <option value="SELL">SELL</option>
-                                    </select>
-                                </div>
-                                <div class="form-group mb-0">
-                                    <label style="font-size:0.75rem;color:var(--gray-500);">Stop Loss</label>
-                                    <input type="number" id="validatorSL" step="0.00001"
-                                           class="form-control" placeholder="1.0800">
-                                </div>
-                                <div class="form-group mb-0">
-                                    <label style="font-size:0.75rem;color:var(--gray-500);">Take Profit</label>
-                                    <input type="number" id="validatorTP" step="0.00001"
-                                           class="form-control" placeholder="1.0900">
-                                </div>
-                            </div>
-                            <button onclick="ChartAnalysisPage.validateTrade()"
-                                    class="btn btn-primary btn-block"
-                                    style="background:linear-gradient(90deg,var(--primary) 0%,var(--info) 100%);">
-                                <i class="fas fa-check-circle"></i> Validate Setup
-                            </button>
-                            <div id="validatorResults" style="display:none;margin-top:1rem;"></div>
-                        </div>
-                    </div>
                 </div>
+            </div>
 
-                <div id="chartResults">
-                    <div class="card" style="text-align:center;padding:3rem;">
-                        <p class="text-muted">Upload a chart to see AI analysis</p>
-                        <small>Supports: PNG, JPG, JPEG (max 10MB)</small>
+            <!-- Step 2: Analysis Results -->
+            <div style="font-size:.75rem;font-weight:700;color:var(--primary);text-transform:uppercase;
+                        letter-spacing:.05em;margin-bottom:.75rem;">
+                Step 2 — AI Analysis
+            </div>
+            <div id="chartResults" style="margin-bottom:1.25rem;">
+                <div class="card" style="text-align:center;padding:3rem;">
+                    <p class="text-muted">Upload a chart above to see AI analysis</p>
+                    <small>The AI will identify structure, OBs, FVGs and generate a trade setup</small>
+                </div>
+            </div>
+
+            <!-- Step 3: Trade Validator -->
+            <div class="card" style="background:linear-gradient(135deg,var(--gray-800) 0%,var(--gray-900) 100%);">
+                <div class="card-header" style="border-bottom:1px solid var(--gray-700);">
+                    <h3 class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+                        <i class="fas fa-shield-alt text-primary"></i> Step 3 — Validate Your Setup
+                    </h3>
+                    <p style="margin:.25rem 0 0;font-size:.75rem;color:var(--gray-500);">
+                        Modify the AI levels or enter your own — then validate against the analysis.
+                    </p>
+                </div>
+                <div class="card-body">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                        <div class="form-group mb-0">
+                            <label style="font-size:0.75rem;color:var(--gray-500);">Entry Price</label>
+                            <input type="number" id="validatorEntry" step="0.00001"
+                                   class="form-control" placeholder="e.g. 4465">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label style="font-size:0.75rem;color:var(--gray-500);">Direction</label>
+                            <select id="validatorDirection" class="form-control">
+                                <option value="BUY">BUY</option>
+                                <option value="SELL">SELL</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label style="font-size:0.75rem;color:var(--gray-500);">Stop Loss</label>
+                            <input type="number" id="validatorSL" step="0.00001"
+                                   class="form-control" placeholder="e.g. 4400">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label style="font-size:0.75rem;color:var(--gray-500);">Take Profit</label>
+                            <input type="number" id="validatorTP" step="0.00001"
+                                   class="form-control" placeholder="e.g. 4580">
+                        </div>
                     </div>
+                    <button onclick="ChartAnalysisPage.validateTrade()"
+                            class="btn btn-primary btn-block"
+                            style="background:linear-gradient(90deg,var(--primary) 0%,var(--info) 100%);">
+                        <i class="fas fa-check-circle"></i> Validate Setup
+                    </button>
+                    <div id="validatorResults" style="display:none;margin-top:1rem;"></div>
                 </div>
             </div>
 
@@ -598,10 +609,10 @@ const ChartAnalysisPage = {
         const sl        = parseFloat(sEl.value);
         const tp        = parseFloat(tEl.value);
         const direction = dEl.value;
-        const symbol    = this.currentAnalysis?.symbol || 'Unknown';
+        const symbol    = (document.getElementById('chartSymbol')?.value || '').toUpperCase() || 'Unknown';
 
         if (!entry || !sl || !tp) {
-            this._toast('Please fill in all price levels', 'error');
+            this._toast('Please fill in Entry, Stop Loss and Take Profit', 'error');
             return;
         }
 
@@ -609,143 +620,239 @@ const ChartAnalysisPage = {
         if (!rd) return;
         rd.style.display = 'block';
 
-        // Rec 10: validate locally against existing analysis — no second API call
-        const result = this._validateLocally(entry, sl, tp, direction, symbol);
+        const result = this._validateSignal(entry, sl, tp, direction, symbol);
 
-        const sc = result.quality_score >= 80 ? 'var(--success)'
-                 : result.quality_score >= 60 ? 'var(--warning)'
-                 : 'var(--danger)';
+        const sc = result.score >= 80 ? '#00d084'
+                 : result.score >= 60 ? '#f59e0b'
+                 : '#ef4444';
+
+        const verdict = result.score >= 80 ? '✅ High Quality Signal — Tradeable'
+                      : result.score >= 60 ? '⚠️ Average Signal — Trade with caution'
+                      : '❌ Poor Signal — Do Not Trade';
 
         rd.innerHTML = `
             <div style="background:var(--gray-900);border-radius:var(--radius);padding:1rem;
                         border:1px solid var(--gray-700);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                    <span style="color:var(--gray-500);">Quality Score</span>
-                    <span style="font-size:1.5rem;font-weight:700;color:${sc};">${result.quality_score}/100</span>
+
+                <!-- Score header -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                    <span style="color:var(--gray-400);font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Signal Quality</span>
+                    <span style="font-size:2rem;font-weight:800;color:${sc};">${result.score}<span style="font-size:1rem;color:var(--gray-500);">/100</span></span>
                 </div>
-                <div style="width:100%;height:6px;background:var(--gray-700);border-radius:3px;
-                            margin-bottom:1rem;overflow:hidden;">
-                    <div style="width:${result.quality_score}%;height:100%;background:${sc};border-radius:3px;
-                                transition:width .5s ease;"></div>
+                <div style="width:100%;height:8px;background:var(--gray-700);border-radius:4px;margin-bottom:.75rem;overflow:hidden;">
+                    <div style="width:${result.score}%;height:100%;background:${sc};border-radius:4px;transition:width .6s ease;"></div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:.75rem;font-size:.875rem;">
-                    <div><span style="color:var(--gray-500);">R:R Ratio:</span>
-                         <span style="color:var(--gray-200);font-weight:600;margin-left:.5rem;">
-                             ${result.risk_reward_text}</span></div>
-                    <div><span style="color:var(--gray-500);">Probability:</span>
-                         <span style="color:var(--gray-200);font-weight:600;margin-left:.5rem;">
-                             ${result.probability}%</span></div>
+                <div style="padding:.6rem .75rem;border-radius:.5rem;margin-bottom:1rem;
+                            background:rgba(0,0,0,.3);border-left:3px solid ${sc};
+                            font-weight:700;font-size:.85rem;color:${sc};">${verdict}</div>
+
+                <!-- Key metrics -->
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem;">
+                    <div style="text-align:center;padding:.6rem;background:var(--gray-800);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:var(--gray-500);text-transform:uppercase;margin-bottom:2px;">R:R</div>
+                        <div style="font-size:1rem;font-weight:800;color:white;">${result.rr_text}</div>
+                    </div>
+                    <div style="text-align:center;padding:.6rem;background:var(--gray-800);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:var(--gray-500);text-transform:uppercase;margin-bottom:2px;">TP Hit %</div>
+                        <div style="font-size:1rem;font-weight:800;color:#00d084;">${result.tp_prob}%</div>
+                    </div>
+                    <div style="text-align:center;padding:.6rem;background:var(--gray-800);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:var(--gray-500);text-transform:uppercase;margin-bottom:2px;">SL Risk</div>
+                        <div style="font-size:1rem;font-weight:800;color:#ef4444;">${100 - result.tp_prob}%</div>
+                    </div>
                 </div>
+
+                <!-- Score breakdown -->
+                <div style="margin-bottom:.75rem;border:1px solid var(--gray-700);border-radius:.5rem;overflow:hidden;">
+                    <div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase;
+                                letter-spacing:.05em;padding:.4rem .75rem;background:var(--gray-800);
+                                border-bottom:1px solid var(--gray-700);">Score Breakdown</div>
+                    ${result.breakdown.map((b, i) => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;
+                                    padding:.45rem .75rem;font-size:.8rem;
+                                    ${i < result.breakdown.length-1 ? 'border-bottom:1px solid rgba(255,255,255,.04);' : ''}">
+                            <span style="color:var(--gray-400);">${this._esc(b.label)}</span>
+                            <div style="display:flex;align-items:center;gap:.5rem;">
+                                <div style="width:60px;height:4px;background:var(--gray-700);border-radius:2px;">
+                                    <div style="width:${Math.round((b.score/b.max)*100)}%;height:100%;
+                                                background:${b.score/b.max >= .7 ? '#00d084' : b.score/b.max >= .4 ? '#f59e0b' : '#ef4444'};
+                                                border-radius:2px;"></div>
+                                </div>
+                                <span style="font-weight:700;min-width:32px;text-align:right;
+                                             color:${b.score/b.max >= .7 ? '#00d084' : b.score/b.max >= .4 ? '#f59e0b' : '#ef4444'};">
+                                    ${b.score}/${b.max}
+                                </span>
+                            </div>
+                        </div>`).join('')}
+                </div>
+
                 ${result.warnings.length ? `
-                    <div style="margin-top:1rem;padding:.75rem;background:rgba(239,68,68,.1);
-                                border-radius:var(--radius);border-left:3px solid var(--danger);">
-                        <div style="font-size:.75rem;color:var(--danger);margin-bottom:.25rem;">Warnings:</div>
-                        ${result.warnings.map(w=>`<div style="font-size:.875rem;color:var(--gray-300);">• ${this._esc(w)}</div>`).join('')}
-                    </div>` : ''}
-                ${result.recommendations.length ? `
-                    <div style="margin-top:.75rem;padding:.75rem;background:rgba(16,185,129,.1);
-                                border-radius:var(--radius);border-left:3px solid var(--success);">
-                        <div style="font-size:.75rem;color:var(--success);margin-bottom:.25rem;">Recommendations:</div>
-                        ${result.recommendations.map(r=>`<div style="font-size:.875rem;color:var(--gray-300);">• ${this._esc(r)}</div>`).join('')}
-                    </div>` : ''}
+                <div style="padding:.75rem;background:rgba(239,68,68,.08);border-radius:.5rem;
+                            border-left:3px solid #ef4444;margin-bottom:.5rem;">
+                    <div style="font-size:.7rem;color:#ef4444;font-weight:700;margin-bottom:.35rem;">⚠ Issues</div>
+                    ${result.warnings.map(w=>`<div style="font-size:.8rem;color:var(--gray-300);margin-bottom:.2rem;">• ${this._esc(w)}</div>`).join('')}
+                </div>` : ''}
+
+                ${result.positives.length ? `
+                <div style="padding:.75rem;background:rgba(0,208,132,.06);border-radius:.5rem;
+                            border-left:3px solid #00d084;">
+                    <div style="font-size:.7rem;color:#00d084;font-weight:700;margin-bottom:.35rem;">✓ Strengths</div>
+                    ${result.positives.map(p=>`<div style="font-size:.8rem;color:var(--gray-300);margin-bottom:.2rem;">• ${this._esc(p)}</div>`).join('')}
+                </div>` : ''}
             </div>`;
     },
 
-    // ── Local trade validation — no API call needed ────────────────────────────
-    // Scores the user's entry/SL/TP against the existing chart analysis result.
-    // Returns quality_score (0-100), warnings, and recommendations.
-    _validateLocally(entry, sl, tp, direction, symbol) {
-        const warnings       = [];
-        const recommendations= [];
-        let score            = 50;
-        const analysis       = this.currentAnalysis;
-        const isBuy          = direction === 'BUY';
+    // ── Independent signal validator ──────────────────────────────────────────
+    // Works completely independently of the chart analysis.
+    // Evaluates any signal purely on its own merits — R:R, stop size,
+    // target realism, and probability estimation.
+    // Max score: 100 pts across 5 criteria.
+    _validateSignal(entry, sl, tp, direction, symbol) {
+        const warnings  = [];
+        const positives = [];
+        const breakdown = [];
+        const isBuy     = direction === 'BUY';
 
-        // ── Basic geometry checks ─────────────────────────────────────────────
-        const risk   = Math.abs(entry - sl);
-        const reward = Math.abs(tp - entry);
-        const rr     = risk > 0 ? reward / risk : 0;
+        // ── Basic geometry ────────────────────────────────────────────────────
+        const risk      = Math.abs(entry - sl);
+        const reward    = Math.abs(tp - entry);
+        const rr        = risk > 0 ? reward / risk : 0;
+        const rr_text   = rr > 0 ? `1:${rr.toFixed(2)}` : 'N/A';
 
-        // SL on correct side
-        if (isBuy  && sl >= entry) warnings.push('Stop loss must be BELOW entry for a BUY trade.');
-        if (!isBuy && sl <= entry) warnings.push('Stop loss must be ABOVE entry for a SELL trade.');
+        const slWrong = (isBuy && sl >= entry) || (!isBuy && sl <= entry);
+        const tpWrong = (isBuy && tp <= entry) || (!isBuy && tp >= entry);
+        if (slWrong) warnings.push(`Stop loss must be ${isBuy ? 'BELOW' : 'ABOVE'} entry for a ${direction}.`);
+        if (tpWrong) warnings.push(`Take profit must be ${isBuy ? 'ABOVE' : 'BELOW'} entry for a ${direction}.`);
 
-        // TP on correct side
-        if (isBuy  && tp <= entry) warnings.push('Take profit must be ABOVE entry for a BUY trade.');
-        if (!isBuy && tp >= entry) warnings.push('Take profit must be BELOW entry for a SELL trade.');
+        // ── 1. Risk:Reward (30 pts) ───────────────────────────────────────────
+        let rrScore = 0;
+        if      (rr >= 3.0) { rrScore = 30; positives.push(`Excellent R:R of ${rr_text} — strong edge over many trades.`); }
+        else if (rr >= 2.5) { rrScore = 26; positives.push(`Very good R:R of ${rr_text}.`); }
+        else if (rr >= 2.0) { rrScore = 22; positives.push(`Good R:R of ${rr_text}.`); }
+        else if (rr >= 1.5) { rrScore = 16; }
+        else if (rr >= 1.0) { rrScore =  8; warnings.push(`R:R of ${rr_text} is below 1.5 minimum. Reward barely covers risk.`); }
+        else if (rr >= 0.5) { rrScore =  2; warnings.push(`R:R of ${rr_text} — risk outweighs reward. Avoid this setup.`); }
+        else                { rrScore =  0; warnings.push(`R:R of ${rr_text} — this signal should not be traded.`); }
+        breakdown.push({ label: 'Risk:Reward Ratio', score: rrScore, max: 30 });
 
-        // R:R scoring
-        if (rr >= 3.0)       { score += 20; recommendations.push(`Excellent R:R of 1:${rr.toFixed(1)} — great setup.`); }
-        else if (rr >= 2.0)  { score += 15; }
-        else if (rr >= 1.5)  { score += 10; }
-        else if (rr >= 1.0)  { score +=  0; warnings.push(`R:R of 1:${rr.toFixed(1)} is below the recommended 1.5 minimum.`); }
-        else                 { score -= 15; warnings.push(`R:R of 1:${rr.toFixed(1)} is too low — risk outweighs reward.`); }
+        // ── 2. Stop Loss Sizing (25 pts) ──────────────────────────────────────
+        // Checks if the stop size is appropriate for the instrument.
+        // Too tight = will be stopped out by noise.
+        // Too wide = poor capital efficiency.
+        let slScore = 0;
+        const stopPct = (risk / entry) * 100;  // stop as % of price
 
-        // ── Cross-check against AI analysis ──────────────────────────────────
-        if (analysis) {
-            const bias = (analysis.trading_bias || '').toLowerCase();
+        // Instrument-based stop expectations
+        const isGold    = symbol.includes('XAU') || symbol.includes('GOLD');
+        const isIndex   = ['US30','US500','NAS100','UK100','DE30'].some(s => symbol.includes(s));
+        const isJPY     = symbol.includes('JPY');
+        const isCrypto  = ['BTC','ETH','XRP','LTC'].some(s => symbol.includes(s));
 
-            // Direction matches AI bias
-            if ((isBuy && bias === 'bullish') || (!isBuy && bias === 'bearish')) {
-                score += 15;
-                recommendations.push('Direction aligns with AI-detected market bias.');
-            } else if (bias !== 'neutral') {
-                score -= 10;
-                warnings.push(`Direction contradicts AI bias (${bias}). Trading against the structure.`);
-            }
+        let minPct, maxPct, idealLabel;
+        if      (isGold)   { minPct = 0.3;  maxPct = 2.0; idealLabel = '0.3–2% (30–200 pts on gold)'; }
+        else if (isIndex)  { minPct = 0.15; maxPct = 1.5; idealLabel = '0.15–1.5% of index price'; }
+        else if (isCrypto) { minPct = 1.0;  maxPct = 5.0; idealLabel = '1–5% for crypto'; }
+        else if (isJPY)    { minPct = 0.1;  maxPct = 0.8; idealLabel = '10–80 pips for JPY pairs'; }
+        else               { minPct = 0.1;  maxPct = 0.8; idealLabel = '10–80 pips for forex'; }
 
-            // Entry near AI suggested entry
-            const aiEntry = parseFloat(analysis.trade_setup?.entry);
-            if (aiEntry && !isNaN(aiEntry)) {
-                const diff = Math.abs(entry - aiEntry) / aiEntry;
-                if (diff < 0.005) {
-                    score += 10;
-                    recommendations.push('Entry is close to the AI-identified OB/FVG zone.');
-                } else if (diff > 0.02) {
-                    warnings.push(`Entry (${entry}) is far from the AI suggested level (${aiEntry}). Consider using the AI entry zone.`);
-                }
-            }
-
-            // SL check against AI stop
-            const aiSL = parseFloat(analysis.trade_setup?.stop_loss);
-            if (aiSL && !isNaN(aiSL)) {
-                const slDiff = Math.abs(sl - aiSL) / aiSL;
-                if (slDiff < 0.005) {
-                    score += 5;
-                } else if (
-                    (isBuy && sl > aiSL) ||   // tighter than AI
-                    (!isBuy && sl < aiSL)
-                ) {
-                    warnings.push('Your stop loss is tighter than the AI structural level — higher risk of early stop out.');
-                }
-            }
-
-            // Confidence bonus
-            const conf = analysis.confidence || 0;
-            if (conf >= 0.80) { score += 10; recommendations.push('High AI confidence (80%+) on this chart structure.'); }
-            else if (conf >= 0.65) { score += 5; }
-            else { warnings.push('Low AI confidence on this chart — structure may be unclear.'); }
-
-            // BOS confirmed
-            if (analysis.bos_confirmed) {
-                score += 5;
-                recommendations.push('Break of Structure confirmed — adds confluence to the setup.');
-            }
+        if (slWrong) {
+            slScore = 0;
+        } else if (stopPct >= minPct && stopPct <= maxPct) {
+            slScore = 25;
+            positives.push(`Stop size of ${stopPct.toFixed(2)}% is appropriate for ${symbol || 'this instrument'}.`);
+        } else if (stopPct < minPct) {
+            slScore = 8;
+            warnings.push(`Stop of ${stopPct.toFixed(2)}% is very tight for ${symbol}. Typical: ${idealLabel}. Risk of early stop out on normal volatility.`);
+        } else if (stopPct <= maxPct * 1.5) {
+            slScore = 15;
+            warnings.push(`Stop of ${stopPct.toFixed(2)}% is slightly wide — reducing position size is advised.`);
         } else {
-            recommendations.push('Upload and analyze a chart first for AI-assisted validation.');
+            slScore = 3;
+            warnings.push(`Stop of ${stopPct.toFixed(2)}% is excessively wide. This will require very small position size to manage risk.`);
         }
+        breakdown.push({ label: 'Stop Loss Sizing', score: slScore, max: 25 });
 
-        score = Math.max(0, Math.min(100, Math.round(score)));
-        const probability = Math.max(30, Math.min(90, Math.round(40 + score * 0.4)));
+        // ── 3. Target Realism (20 pts) ────────────────────────────────────────
+        // Is the TP a realistic distance? Not too far, not too close.
+        let tpScore = 0;
+        const tpPct = (reward / entry) * 100;
 
-        return {
-            quality_score:    score,
-            risk_reward_text: rr > 0 ? `1:${rr.toFixed(2)}` : 'N/A',
-            probability,
-            warnings,
-            recommendations,
-        };
+        let maxRealistic;
+        if      (isGold)   maxRealistic = 4.0;
+        else if (isIndex)  maxRealistic = 3.0;
+        else if (isCrypto) maxRealistic = 10.0;
+        else               maxRealistic = 1.5;  // forex
+
+        if (tpWrong) {
+            tpScore = 0;
+        } else if (tpPct <= maxRealistic && rr >= 1.5) {
+            tpScore = 20;
+            positives.push(`Target of ${tpPct.toFixed(2)}% is realistic and achievable for this instrument.`);
+        } else if (tpPct <= maxRealistic * 1.5 && rr >= 1.2) {
+            tpScore = 14;
+        } else if (tpPct > maxRealistic * 2) {
+            tpScore = 5;
+            warnings.push(`Target of ${tpPct.toFixed(2)}% from entry may be over-extended. Consider a closer partial target first.`);
+        } else {
+            tpScore = 10;
+        }
+        breakdown.push({ label: 'Target Realism', score: tpScore, max: 20 });
+
+        // ── 4. Probability Authenticity (15 pts) ──────────────────────────────
+        // Signal authenticity — does the math make sense as a real trade?
+        let authScore = 0;
+        const hasValidGeometry  = !slWrong && !tpWrong;
+        const hasReasonableStop = stopPct >= minPct * 0.5 && stopPct <= maxPct * 2;
+        const hasPositiveRR     = rr >= 1.0;
+
+        if (hasValidGeometry && hasReasonableStop && hasPositiveRR) {
+            authScore = 15;
+            positives.push('Signal geometry is valid — entry, stop and target are logically consistent.');
+        } else if (hasValidGeometry && hasPositiveRR) {
+            authScore = 10;
+        } else if (hasValidGeometry) {
+            authScore = 5;
+        } else {
+            authScore = 0;
+            warnings.push('Signal geometry has errors — check that SL and TP are on the correct sides of entry.');
+        }
+        breakdown.push({ label: 'Signal Authenticity', score: authScore, max: 15 });
+
+        // ── 5. Projected Win Rate / Edge (10 pts) ─────────────────────────────
+        // Based purely on R:R — higher R:R means you can be wrong more often and still profit.
+        // At 1:2 R:R you only need to win 34% of trades to break even.
+        // At 1:3 R:R you only need to win 25%.
+        let edgeScore = 0;
+        const breakevenWinRate = rr > 0 ? (1 / (1 + rr)) * 100 : 100;
+
+        if (breakevenWinRate <= 30) {
+            edgeScore = 10;
+            positives.push(`At ${rr_text} you only need a ${breakevenWinRate.toFixed(0)}% win rate to be profitable — strong statistical edge.`);
+        } else if (breakevenWinRate <= 40) {
+            edgeScore = 8;
+            positives.push(`Breakeven win rate is ${breakevenWinRate.toFixed(0)}% — achievable with a solid strategy.`);
+        } else if (breakevenWinRate <= 50) {
+            edgeScore = 5;
+        } else {
+            edgeScore = 0;
+            warnings.push(`You need to win more than ${breakevenWinRate.toFixed(0)}% of trades to profit at this R:R — very hard to sustain.`);
+        }
+        breakdown.push({ label: 'Statistical Edge', score: edgeScore, max: 10 });
+
+        // ── Final score ───────────────────────────────────────────────────────
+        const totalMax = breakdown.reduce((s, b) => s + b.max, 0);
+        const raw      = breakdown.reduce((s, b) => s + b.score, 0);
+        const score    = Math.round((raw / totalMax) * 100);
+
+        // TP probability — derived from R:R and score
+        // At 1:2 R:R with a good score, probability of TP hit ~55-65%
+        const baseProbability = Math.round(50 + (rr - 1) * 8);
+        const scoreBonus      = Math.round((score - 50) * 0.15);
+        const tp_prob         = Math.min(82, Math.max(25, baseProbability + scoreBonus));
+
+        return { score, rr_text, tp_prob, warnings, positives, breakdown };
     },
+
 
     // ── Admin check — mirrors dashboard._isAdminUser() ───────────────────────
     _isAdmin() {

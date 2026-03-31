@@ -2,18 +2,22 @@
 Email Service for Gopipways
 Handles: welcome emails, lesson completion, signal alerts, weekly digest
 
-Provider: SpaceMail SMTP (contact@gopipways.com)
-  Uses port 587 (STARTTLS) or port 465 (SSL) — auto-detected from SMTP_PORT.
+Provider: Brevo (formerly Sendinblue) — HTTPS API, works on Railway.
+  Railway blocks outbound SMTP ports 465/587. Brevo uses HTTPS so it
+  is never blocked.
 
 Environment variables:
-  EMAIL_PROVIDER        — "smtp" (SpaceMail uses SMTP)
-  SMTP_HOST             — smtp.spacemail.com
-  SMTP_PORT             — 587 (STARTTLS) or 465 (SSL)
-  SMTP_USER             — contact@gopipways.com
-  SMTP_PASSWORD         — your SpaceMail password
+  EMAIL_PROVIDER        — "brevo" (recommended) | "smtp" | "mailgun"
+  BREVO_API_KEY         — your Brevo API key (starts with xkeysib-)
   EMAIL_FROM_NAME       — "Gopipways" (default)
   EMAIL_FROM_ADDRESS    — contact@gopipways.com
   APP_BASE_URL          — https://www.gopipways.com
+
+  SMTP fallback (only if EMAIL_PROVIDER=smtp):
+  SMTP_HOST             — mail.spacemail.com
+  SMTP_PORT             — 587 or 465
+  SMTP_USER             — contact@gopipways.com
+  SMTP_PASSWORD         — your SpaceMail password
 """
 
 import os
@@ -33,10 +37,11 @@ from .security import get_current_user, get_user_id, is_admin_user
 
 router = APIRouter()
 
-EMAIL_PROVIDER  = os.getenv("EMAIL_PROVIDER", "smtp")
+EMAIL_PROVIDER  = os.getenv("EMAIL_PROVIDER", "brevo")
+BREVO_API_KEY   = os.getenv("BREVO_API_KEY", "")
 MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY", "")
 MAILGUN_DOMAIN  = os.getenv("MAILGUN_DOMAIN", "")
-SMTP_HOST       = os.getenv("SMTP_HOST", "smtp.spacemail.com")
+SMTP_HOST       = os.getenv("SMTP_HOST", "mail.spacemail.com")
 SMTP_PORT       = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER       = os.getenv("SMTP_USER", "contact@gopipways.com")
 SMTP_PASSWORD   = os.getenv("SMTP_PASSWORD", "")
@@ -91,7 +96,9 @@ async def send_email(to_email: str, subject: str, html_body: str,
     from_field = f"{FROM_NAME} <{FROM_ADDRESS}>"
     text_body  = text_body or re.sub(r"<[^>]+>", "", html_body).strip()
     try:
-        if EMAIL_PROVIDER == "mailgun" and MAILGUN_API_KEY and MAILGUN_DOMAIN:
+        if EMAIL_PROVIDER == "brevo" and BREVO_API_KEY:
+            return await _send_brevo(to_email, subject, html_body, text_body)
+        elif EMAIL_PROVIDER == "mailgun" and MAILGUN_API_KEY and MAILGUN_DOMAIN:
             return await _send_mailgun(to_email, from_field, subject, html_body, text_body)
         elif SMTP_USER and SMTP_PASSWORD:
             return await _send_smtp(to_email, from_field, subject, html_body, text_body)
@@ -101,6 +108,36 @@ async def send_email(to_email: str, subject: str, html_body: str,
     except Exception as e:
         print(f"[EMAIL] Send failed to {to_email}: {e}", flush=True)
         return False
+
+
+async def _send_brevo(to_email: str, subject: str, html: str, text: str) -> bool:
+    """
+    Send via Brevo (formerly Sendinblue) Transactional Email API.
+    Uses HTTPS — not blocked by Railway unlike SMTP ports 465/587.
+    Docs: https://developers.brevo.com/reference/sendtransacemail
+    """
+    payload = {
+        "sender":      {"name": FROM_NAME, "email": FROM_ADDRESS},
+        "to":          [{"email": to_email}],
+        "subject":     subject,
+        "htmlContent": html,
+        "textContent": text,
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        res = await client.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key":      BREVO_API_KEY,
+                "Content-Type": "application/json",
+                "Accept":       "application/json",
+            },
+            json=payload,
+        )
+    if res.status_code not in (200, 201):
+        print(f"[EMAIL/Brevo] {res.status_code}: {res.text}", flush=True)
+        return False
+    print(f"[EMAIL/Brevo] ✅ Sent to {to_email}: {subject[:40]}", flush=True)
+    return True
 
 
 async def _send_mailgun(to, from_field, subject, html, text) -> bool:
@@ -125,21 +162,38 @@ async def _send_smtp(to, from_field, subject, html, text) -> bool:
         msg["To"]      = to
         msg.attach(MIMEText(text, "plain"))
         msg.attach(MIMEText(html,  "html"))
+        # Timeout of 15s prevents hanging forever on blocked ports
         if SMTP_PORT == 465:
-            # SSL connection — SpaceMail port 465
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as s:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as s:
                 s.login(SMTP_USER, SMTP_PASSWORD)
                 s.sendmail(FROM_ADDRESS, [to], msg.as_string())
         else:
-            # STARTTLS connection — SpaceMail port 587 (default)
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
                 s.ehlo()
                 s.starttls()
                 s.ehlo()
                 s.login(SMTP_USER, SMTP_PASSWORD)
                 s.sendmail(FROM_ADDRESS, [to], msg.as_string())
         return True
-    return await asyncio.get_event_loop().run_in_executor(None, _sync)
+
+    try:
+        return await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, _sync),
+            timeout=20.0   # hard 20s ceiling — prevents request hanging forever
+        )
+    except asyncio.TimeoutError:
+        print(f"[EMAIL/SMTP] Timeout connecting to {SMTP_HOST}:{SMTP_PORT} — "
+              f"port may be blocked by Railway. Try port 465 or use a relay service.", flush=True)
+        return False
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[EMAIL/SMTP] Authentication failed — check SMTP_USER and SMTP_PASSWORD: {e}", flush=True)
+        return False
+    except smtplib.SMTPConnectError as e:
+        print(f"[EMAIL/SMTP] Cannot connect to {SMTP_HOST}:{SMTP_PORT}: {e}", flush=True)
+        return False
+    except Exception as e:
+        print(f"[EMAIL/SMTP] Error: {type(e).__name__}: {e}", flush=True)
+        return False
 
 
 # ── Base template ─────────────────────────────────────────────────────────────

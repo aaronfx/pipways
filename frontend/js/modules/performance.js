@@ -146,8 +146,8 @@ const PerformancePage = {
                 });
             }
             this.displayAnalysis(results);
-            // Refresh usage badge
-            if (window.PipwaysUsage) window.PipwaysUsage.loadUserLimits();
+            // Refresh usage badge immediately after successful analysis
+            if (window.PipwaysUsage) window.PipwaysUsage.refreshUsageCounts();
         } catch (e) {
             const msg = e.message || 'Analysis failed';
             if (typeof UI !== 'undefined') UI.showToast('Error: ' + msg, 'error');

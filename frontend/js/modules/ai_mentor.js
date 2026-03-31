@@ -106,8 +106,8 @@ class AIMentor {
                 this.updateProgressSidebar(data.academy_progress);
             }
 
-            // Refresh usage counters so badge decrements immediately after this use
-            if (window.PipwaysUsage) window.PipwaysUsage.loadUserLimits();
+            // Refresh usage badge immediately after successful message
+            if (window.PipwaysUsage) window.PipwaysUsage.refreshUsageCounts();
 
         } catch (error) {
             this.hideTyping();

@@ -1812,6 +1812,7 @@ async function _parseApiError(response) {
 }
 
 function _handleAuthError() {
+    localStorage.removeItem('token');
     localStorage.removeItem('pipways_token');
     localStorage.removeItem('pipways_user');
     // FIX: replaced blocking alert() with the existing toast system
@@ -1862,7 +1863,7 @@ const DashboardController = class {
     }
 
     checkAuth() {
-        const token = localStorage.getItem('pipways_token');
+        const token = localStorage.getItem('token') || localStorage.getItem('pipways_token');
         const userStr = localStorage.getItem('pipways_user');
         if (!token || !userStr) {
             window.location.href = '/';
@@ -2871,7 +2872,7 @@ const DashboardController = class {
 
 
     async apiRequest(endpoint, options = {}) {
-        const token = localStorage.getItem('pipways_token');
+        const token = localStorage.getItem('token') || localStorage.getItem('pipways_token');
         const headers = {
             'Content-Type': 'application/json',
             ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -2970,16 +2971,27 @@ const DashboardController = class {
             formData.append('file', file);
             formData.append('format', this.currentJournalFormat);
 
-            const token = localStorage.getItem('pipways_token');
+            // Fix: use canonical token key ('token') with legacy fallback
+            const token = localStorage.getItem('token') || localStorage.getItem('pipways_token');
             const response = await fetch(`${API_BASE}/ai/performance/upload-journal`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
 
+            // Note: usage.js intercepts 402 before this, shows upgrade modal,
+            // and throws a proper Error — so response.json() is only reached on success.
             const result = await response.json();
 
-            if (!response.ok) throw new Error(result.detail || 'Upload failed');
+            if (!response.ok) {
+                // Extract message safely — result.detail can be an object (402 payload)
+                // or a plain string (other errors). Both cases handled without [object Object].
+                const detail = result?.detail;
+                const msg = (typeof detail === 'string')
+                    ? detail
+                    : detail?.message || result?.message || 'Upload failed';
+                throw new Error(msg);
+            }
 
             if (result.trades && result.trades.length > 0) {
                 this.lastAnalysisResults = result;
@@ -3001,11 +3013,19 @@ const DashboardController = class {
                 this.displayJournalAnalysis(result);
                 statusEl.innerHTML = `<span class="text-green-400"><i class="fas fa-check mr-2"></i>Analyzed ${result.trades_parsed} trades</span>`;
                 this._toast(`Trade data imported successfully — ${result.trades_parsed} trades analysed`, 'success', 4000);
+                // Refresh usage badge so counter decrements immediately
+                if (window.PipwaysUsage) window.PipwaysUsage.refreshUsageCounts();
             } else {
                 throw new Error('No trades detected');
             }
         } catch (error) {
-            statusEl.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
+            // 402 errors already handled by usage.js interceptor (modal shown, proper message set).
+            // For limit errors just show a clean warning, not a red "Error:" prefix.
+            if (error.status === 402 || error.upgrade === true) {
+                statusEl.innerHTML = `<span class="text-yellow-400"><i class="fas fa-lock mr-2"></i>${error.message}</span>`;
+            } else {
+                statusEl.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
+            }
         } finally {
             loadingEl.classList.add('hidden');
         }
@@ -4118,6 +4138,7 @@ const DashboardController = class {
 
 
     logout() {
+        localStorage.removeItem('token');
         localStorage.removeItem('pipways_token');
         localStorage.removeItem('pipways_user');
         window.location.href = '/';

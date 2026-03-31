@@ -189,16 +189,30 @@ window.PipwaysUsage = (function() {
                 if (response.status === 402) {
                     console.log('PipwaysUsage: 402 Payment Required intercepted');
 
+                    let errorData = {};
                     try {
-                        const errorData = await response.clone().json();
-                        const feature = extractFeatureFromError(errorData, args[0]);
-                        showUpgradeModal(feature, errorData);
+                        errorData = await response.clone().json();
                     } catch (e) {
-                        console.error('Error parsing 402 response:', e);
-                        showUpgradeModal('general');
+                        console.error('PipwaysUsage: Error parsing 402 body:', e);
                     }
 
-                    return response;
+                    const feature = extractFeatureFromError(errorData, args[0]);
+                    showUpgradeModal(feature, errorData);
+
+                    // Attach parsed data to the response so calling code can read it
+                    // without calling .json() again (body can only be read once).
+                    // Also throw a proper Error so catch blocks get a real message
+                    // instead of "[object Object]".
+                    const limitMsg = errorData?.message
+                        || errorData?.detail
+                        || 'Usage limit reached. Upgrade to Pro to continue.';
+
+                    const limitError = new Error(limitMsg);
+                    limitError.status  = 402;
+                    limitError.feature = feature;
+                    limitError.detail  = errorData;
+                    limitError.upgrade = true;
+                    throw limitError;
                 }
 
                 return response;

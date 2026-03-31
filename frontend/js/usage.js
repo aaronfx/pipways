@@ -115,7 +115,7 @@ window.PipwaysUsage = (function() {
                 };
             }
 
-            console.log('PipwaysUsage: User limits loaded for tier:', currentTier);
+            console.log('PipwaysUsage: User limits loaded for tier:', currentTier, '| usage:', user.usage);
             isLoaded = true;
 
             // Dispatch event so dashboard can react
@@ -128,6 +128,54 @@ window.PipwaysUsage = (function() {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // REFRESH USAGE COUNTS  (lightweight — called after every feature use)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Hits the dedicated GET /auth/usage endpoint and patches only the
+     * usage/remaining fields in userLimits — no full user reload.
+     * Called by chart_analysis.js, ai_mentor.js, performance.js after a
+     * successful API call so the badge decrements immediately.
+     */
+    async function refreshUsageCounts() {
+        try {
+            const token = localStorage.getItem('token') || localStorage.getItem('pipways_token');
+            if (!token || !isLoaded) return;
+
+            const response = await fetch('/auth/usage', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                console.warn('PipwaysUsage: refreshUsageCounts HTTP', response.status, '— badge may be stale');
+                return;
+            }
+
+            const data = await response.json();
+            const usage = data.usage;
+
+            if (!usage) {
+                console.warn('PipwaysUsage: /auth/usage returned null — check Railway logs for [usage] errors');
+                return;
+            }
+
+            // Patch usage + remaining for each feature; keep tier and limit intact
+            for (const [featureKey, config] of Object.entries(FEATURE_CONFIG)) {
+                if (!userLimits.features?.[featureKey]) continue;
+                const limit = config.limits[currentTier];
+                const newUsage = usage[featureKey] ?? 0;
+                userLimits.features[featureKey].usage     = newUsage;
+                userLimits.features[featureKey].remaining =
+                    limit === null ? 'unlimited' : Math.max(0, limit - newUsage);
+            }
+
+            console.log('PipwaysUsage: Counts refreshed —', usage);
+            document.dispatchEvent(new CustomEvent('pipways:usage-updated'));
+
+        } catch (err) {
+            console.warn('PipwaysUsage: refreshUsageCounts error (non-fatal):', err);
+        }
+    }
     // FETCH INTERCEPTOR (402 HANDLING)
     // ══════════════════════════════════════════════════════════════════════════
 
@@ -517,6 +565,7 @@ window.PipwaysUsage = (function() {
         // Core methods
         init: init,
         loadUserLimits: loadUserLimits,
+        refreshUsageCounts: refreshUsageCounts,   // lightweight post-action refresh
         checkUsage: checkUsage,
         getFeatureLimit: getFeatureLimit,
         getUserTier: getUserTier,
@@ -530,9 +579,7 @@ window.PipwaysUsage = (function() {
         showUpgradeModal: showUpgradeModal,
         hideUpgradeModal: hideUpgradeModal,
 
-        // Convenience accessors — used by ai_mentor.js 402 handler and any other
-        // caller that needs raw usage count or raw limit for a feature.
-        // Returns 0 / null respectively if limits haven't loaded yet.
+        // Convenience accessors used by 402 handlers
         used:  function(feature) { return userLimits.features?.[feature]?.usage  ?? 0;    },
         limit: function(feature) { return userLimits.features?.[feature]?.limit  ?? null; }
     };

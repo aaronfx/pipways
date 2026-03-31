@@ -116,26 +116,39 @@ const PerformancePage = {
     async analyze() {
         const textarea = document.getElementById('tradeJournal');
         const data = textarea.value.trim();
-        
+
         if (!data) {
             UI.showToast('Please paste trade data first', 'warning');
             return;
         }
-        
+
+        // ── Client-side usage gate ────────────────────────────────────────────
+        if (window.PipwaysUsage?.isLoaded) {
+            const check = window.PipwaysUsage.checkUsage('performance_analysis');
+            if (!check.allowed) {
+                UI.showToast(
+                    `You've used your ${check.limit} free performance analysis this month. Upgrade to Pro for unlimited.`,
+                    'warning'
+                );
+                window.PipwaysUsage.showUpgradeModal('performance_analysis');
+                return;
+            }
+        }
+
         try {
             const trades = JSON.parse(data);
-            // Use correct endpoint — API.analyzeJournal may not exist
             let results;
             if (typeof API.analyzeJournal === 'function') {
                 results = await API.analyzeJournal(trades);
             } else {
-                // Fallback to direct request
                 results = await API.request('/ai/performance/analyze-journal', {
                     method: 'POST',
                     body: JSON.stringify({ trades })
                 });
             }
             this.displayAnalysis(results);
+            // Refresh usage badge
+            if (window.PipwaysUsage) window.PipwaysUsage.loadUserLimits();
         } catch (e) {
             const msg = e.message || 'Analysis failed';
             if (typeof UI !== 'undefined') UI.showToast('Error: ' + msg, 'error');

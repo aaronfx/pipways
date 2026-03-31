@@ -371,9 +371,19 @@ async def ask_mentor(
         academy_progress=user_progress
     )
 
+class TrackClickBody(BaseModel):
+    """
+    Body model for POST /track-lesson-click.
+    Fix for Bug 4: the endpoint previously declared lesson_id as a bare int
+    parameter, which FastAPI treats as a query param. The JS client sends a
+    JSON body — this model bridges the gap and eliminates the HTTP 422.
+    """
+    lesson_id: int
+
+
 @router.post("/track-lesson-click")
 async def track_lesson_click(
-    lesson_id: int,
+    body: TrackClickBody,
     current_user = Depends(get_current_user)
 ):
     """Track when user clicks a lesson recommendation"""
@@ -383,7 +393,7 @@ async def track_lesson_click(
             await database.execute(
                 """INSERT INTO user_activity (user_id, activity_type, metadata, created_at)
                    VALUES (:uid, 'lesson_click', :meta, NOW())""",
-                {"uid": user_id, "meta": json.dumps({"lesson_id": lesson_id})}
+                {"uid": user_id, "meta": json.dumps({"lesson_id": body.lesson_id})}
             )
         return {"success": True}
     except Exception as e:

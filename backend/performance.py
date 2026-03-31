@@ -15,6 +15,7 @@ from collections import defaultdict
 
 from .database import database
 from .security import get_current_user
+from .subscriptions import check_limit, log_usage
 from .journal_parser import TradeJournalParser
 
 router = APIRouter(tags=["performance"])
@@ -565,6 +566,19 @@ async def analyze_journal(
     """
     Analyze trading journal with comprehensive analytics and AI coaching.
     """
+    user_id   = current_user.get("id") if current_user else None
+    user_tier = current_user.get("subscription_tier", "free") if current_user else "free"
+
+    if user_id and not await check_limit(user_id, user_tier, "performance_analysis"):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "feature": "performance_analysis",
+                "message": "Monthly performance analysis limit reached. Upgrade to Pro for unlimited.",
+                "upgrade": True,
+            }
+        )
+
     try:
         trades = request.get("trades", [])
 
@@ -584,6 +598,9 @@ async def analyze_journal(
 
         # Overall grade
         grade, score = calculate_overall_grade(stats)
+
+        if user_id:
+            await log_usage(user_id, "performance_analysis")
 
         return {
             "total_trades": stats["total_trades"],
@@ -619,6 +636,19 @@ async def upload_journal(
     """
     Upload and parse trade journal file with full analytics.
     """
+    user_id   = current_user.get("id") if current_user else None
+    user_tier = current_user.get("subscription_tier", "free") if current_user else "free"
+
+    if user_id and not await check_limit(user_id, user_tier, "performance_analysis"):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "feature": "performance_analysis",
+                "message": "Monthly performance analysis limit reached. Upgrade to Pro for unlimited.",
+                "upgrade": True,
+            }
+        )
+
     try:
         content = await file.read()
 
@@ -645,9 +675,10 @@ async def upload_journal(
         # Grade
         grade, score = calculate_overall_grade(stats)
 
+        if user_id:
+            await log_usage(user_id, "performance_analysis", filename=file.filename or "")
+
         return {
-            "success": True,
-            "trades_parsed": len(trades),
             "trades": trades[:50],  # Limit for response size
             "statistics": {
                 "total_trades": stats["total_trades"],

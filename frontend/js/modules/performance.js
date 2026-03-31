@@ -149,7 +149,31 @@ const PerformancePage = {
             // Refresh usage badge immediately after successful analysis
             if (window.PipwaysUsage) window.PipwaysUsage.refreshUsageCounts();
         } catch (e) {
-            const msg = e.message || 'Analysis failed';
+            // Handle 402 limit-reached — show upgrade modal, not a raw error string
+            const status  = e?.status || e?.response?.status;
+            const detail  = e?.detail || e?.body || e;
+            const feature = detail?.feature || 'performance_analysis';
+            const message = detail?.message;
+
+            if (status === 402 || detail?.upgrade === true) {
+                if (window.PipwaysUsage) {
+                    window.PipwaysUsage.showUpgradeModal(feature);
+                    window.PipwaysUsage.refreshUsageCounts();
+                }
+                if (typeof UI !== 'undefined') {
+                    UI.showToast(
+                        message || "Monthly limit reached. Upgrade to Pro for unlimited analyses.",
+                        'warning'
+                    );
+                }
+                return;
+            }
+
+            // Generic error — extract message safely (avoid "[object Object]")
+            const msg = (typeof e === 'string') ? e
+                      : e?.message
+                      || (typeof detail === 'string' ? detail : null)
+                      || 'Analysis failed. Please try again.';
             if (typeof UI !== 'undefined') UI.showToast('Error: ' + msg, 'error');
             else alert('Error: ' + msg);
         }

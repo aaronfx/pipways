@@ -223,8 +223,8 @@ def _validate_trade_logic(result: Dict) -> List[str]:
     if entry is not None and sl is not None and tp is not None:
         risk = abs(entry - sl)
         reward = abs(tp - entry)
-        if risk > 0 and reward / risk < 1.3:
-            errors.append("rr_below_minimum")
+        # Note: R:R quality is scored by the independent Trade Validator tool.
+        # Do not null setups here for R:R — only null for geometric contradictions.
     return errors
 
 
@@ -363,21 +363,26 @@ Minimum stop distance on XAUUSD: 40 points | Forex: 15 pips | Indices: 15 points
 If the natural swing stop gives less than this minimum, use the minimum distance.
 
 STEP 5 — TAKE PROFIT:
-Target = next opposing liquidity level or order block.
-For BUY: target = nearest equal highs, resistance level, or bearish OB above entry.
-For SELL: target = nearest equal lows, support level, or bullish OB below entry.
-Minimum R:R = 1.5. If target cannot achieve 1.5R from the stop, find a further target.
+Target = the NEXT significant liquidity level beyond the immediate BOS level.
+CRITICAL: Do NOT set TP at the BOS level itself — price just broke through it,
+so it is no longer clean resistance. Target the level BEYOND it.
+For BUY: look for equal highs, the next swing high, or bearish OB ABOVE the BOS level.
+For SELL: look for equal lows, the next swing low, or bullish OB BELOW the BOS level.
+Calculate R:R = (TP - entry) / (entry - SL). If R:R < 1.5, move TP to the next level further.
+Keep moving TP to further levels until R:R >= 1.5 or no valid level exists.
+If no target can achieve 1.5 R:R, set entry_confluence_found to false.
 
 STEP 6 — VERIFY THE SETUP:
-Before returning, verify:
-- Is entry BELOW current price for BUY (we want to buy at a discount)?
+Before returning, verify ALL of these:
+- Is entry at the OB/FVG (not at current market price)?
 - Is stop BELOW entry for BUY (or ABOVE for SELL)?
 - Is target ABOVE entry for BUY (or BELOW for SELL)?
-- Is R:R at least 1.5?
-If any check fails, adjust the levels or set entry_confluence_found to false.
+- Is R:R at least 1.5? If not, use the next further target level.
+If any check fails, adjust levels — only set entry_confluence_found to false
+if no valid configuration exists on this chart.
 
 Read ALL prices from the chart Y-axis. Do not invent prices.
-For gold: prices in 4300-4600 range. For forex: typical pair ranges.
+For gold: prices currently in the 4,300-4,700 range. For forex: typical pair ranges.
 
 Return ONLY this JSON:
 {{

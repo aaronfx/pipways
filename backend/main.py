@@ -57,6 +57,10 @@ async def lifespan(app: FastAPI):
     await init_chart_http_client()
     print("✅ Chart analysis HTTP client initialized")
 
+    # Create AI usage log tables (chart_analysis_logs, ai_mentor_logs, etc.)
+    from backend.subscriptions import init_subscription_tables
+    await init_subscription_tables()
+
     yield
 
     # Cleanup on shutdown

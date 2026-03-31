@@ -436,6 +436,39 @@ const ChartAnalysisPage = {
                 symInput.value = analysis.symbol;
             }
 
+            // Fix 2: Detect if this is a LIMIT ORDER (entry not at current price)
+            // A pending limit order means entry is below current price for BUY,
+            // or above current price for SELL — user must WAIT for the pullback.
+            let orderTypeLabel = '';
+            const entryNum = parseFloat(String(setup.entry).replace(',', ''));
+            const approxRange = analysis.chart_annotations?.premium_discount?.range || [];
+            const rangeHigh = parseFloat(approxRange[1]);
+            const rangeLow  = parseFloat(approxRange[0]);
+            const rangeMid  = (rangeHigh + rangeLow) / 2;
+
+            // Heuristic: if entry is meaningfully below current dealing range mid for BUY,
+            // or above for SELL, it's a pending limit order
+            if (!isNaN(entryNum) && !isNaN(rangeMid)) {
+                const isPendingBuy  = dir === 'BUY'  && entryNum < rangeMid * 0.998;
+                const isPendingSell = dir === 'SELL' && entryNum > rangeMid * 1.002;
+                if (isPendingBuy || isPendingSell) {
+                    orderTypeLabel = `
+                    <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);
+                                border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;
+                                display:flex;align-items:center;gap:.5rem;font-size:.8rem;">
+                        <span style="font-size:1rem;">⏳</span>
+                        <div>
+                            <span style="color:#f59e0b;font-weight:700;">LIMIT ORDER</span>
+                            <span style="color:#9ca3af;margin-left:.35rem;">
+                                — Wait for price to pull back to
+                                <strong style="color:white;">${this._esc(String(setup.entry))}</strong>
+                                before entry
+                            </span>
+                        </div>
+                    </div>`;
+                }
+            }
+
             tradeSetupHTML = `
                 <div style="background:linear-gradient(135deg,rgba(124,58,237,.1) 0%,rgba(59,130,246,.1) 100%);
                             border:1px solid var(--primary);border-radius:var(--radius);
@@ -449,6 +482,7 @@ const ChartAnalysisPage = {
                             ${Math.round((setup.probability || .7) * 100)}% Confidence
                         </span>
                     </div>
+                    ${orderTypeLabel}
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem;">
                         <div style="text-align:center;padding:.75rem;background:rgba(0,0,0,.2);border-radius:var(--radius);">
                             <div style="font-size:.75rem;color:var(--gray-500);margin-bottom:.25rem;">Entry</div>
@@ -724,16 +758,22 @@ const ChartAnalysisPage = {
         if (slWrong) warnings.push(`Stop loss must be ${isBuy ? 'BELOW' : 'ABOVE'} entry for a ${direction}.`);
         if (tpWrong) warnings.push(`Take profit must be ${isBuy ? 'ABOVE' : 'BELOW'} entry for a ${direction}.`);
 
-        // ── 1. Risk:Reward (30 pts) ───────────────────────────────────────────
+        // ── 1. Risk:Reward (30 pts) — instrument-aware thresholds ───────────────
+        // Gold/indices/crypto typically achieve 1.5-2.5 R:R on H1.
+        // Forex can hit 3:1+ more easily. Adjusted thresholds per instrument class.
         let rrScore = 0;
-        if      (rr >= 3.0) { rrScore = 30; positives.push(`Excellent R:R of ${rr_text} — strong edge over many trades.`); }
-        else if (rr >= 2.5) { rrScore = 26; positives.push(`Very good R:R of ${rr_text}.`); }
-        else if (rr >= 2.0) { rrScore = 22; positives.push(`Good R:R of ${rr_text}.`); }
-        else if (rr >= 1.5) { rrScore = 16; }
-        else if (rr >= 1.0) { rrScore =  8; warnings.push(`R:R of ${rr_text} is below 1.5 minimum. Reward barely covers risk.`); }
-        else if (rr >= 0.5) { rrScore =  2; warnings.push(`R:R of ${rr_text} — risk outweighs reward. Avoid this setup.`); }
-        else                { rrScore =  0; warnings.push(`R:R of ${rr_text} — this signal should not be traded.`); }
-        breakdown.push({ label: 'Risk:Reward Ratio', score: rrScore, max: 30 });
+        const isHighVolatility = isGold || isIndex || isCrypto;
+        const rrFullMarks  = isHighVolatility ? 2.5 : 3.0;  // full 30pts threshold
+        const rrGoodMarks  = isHighVolatility ? 1.8 : 2.0;  // 24pts threshold
+        const rrAcceptable = isHighVolatility ? 1.4 : 1.5;  // 16pts threshold
+
+        if      (rr >= rrFullMarks)  { rrScore = 30; positives.push(`Excellent R:R of ${rr_text} for this instrument.`); }
+        else if (rr >= rrGoodMarks)  { rrScore = 24; positives.push(`Strong R:R of ${rr_text}.`); }
+        else if (rr >= rrAcceptable) { rrScore = 16; }
+        else if (rr >= 1.0)          { rrScore =  8; warnings.push(`R:R of ${rr_text} is below the ${rrAcceptable} minimum for ${symbol || 'this instrument'}.`); }
+        else if (rr >= 0.5)          { rrScore =  2; warnings.push(`R:R of ${rr_text} — risk outweighs reward. Avoid this setup.`); }
+        else                         { rrScore =  0; warnings.push(`R:R of ${rr_text} — do not trade this signal.`); }
+        breakdown.push({ label: `Risk:Reward Ratio (${rr_text})`, score: rrScore, max: 30 });
 
         // ── 2. Stop Loss Sizing (25 pts) ──────────────────────────────────────
         // Checks if the stop size is appropriate for the instrument.

@@ -13,6 +13,7 @@ from datetime import datetime
 
 from .security import get_current_user
 from .database import database
+from .subscriptions import check_limit, log_usage
 
 router = APIRouter()
 
@@ -289,7 +290,18 @@ async def ask_mentor(
     current_user = Depends(get_current_user)
 ):
     """Main mentor endpoint - always returns lesson recommendations"""
-    user_id = current_user.get("id") if current_user else None
+    user_id   = current_user.get("id") if current_user else None
+    user_tier = (current_user.get("subscription_tier", "free") if current_user else "free")
+
+    if user_id and not await check_limit(user_id, user_tier, "ai_mentor"):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "feature": "ai_mentor",
+                "message": "Daily AI Mentor limit reached. Upgrade to Pro for 200 messages/day.",
+                "upgrade": True,
+            }
+        )
 
     # Fetch academy data in parallel
     academy_structure = await fetch_academy_structure()
@@ -347,6 +359,11 @@ async def ask_mentor(
                         })
                         break
                 break
+
+    if user_id:
+        # Extract topic from first few words of message for analytics
+        topic = " ".join(chat.message.split()[:5]) if chat.message else ""
+        await log_usage(user_id, "ai_mentor", question_topic=topic[:100])
 
     return MentorResponse(
         response=ai_text,

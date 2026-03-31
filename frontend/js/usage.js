@@ -109,7 +109,7 @@ window.PipwaysUsage = (function() {
                     limit: limit,
                     usage: user.usage?.[featureKey] || 0,
                     remaining: limit === null ? 'unlimited' : Math.max(0, limit - (user.usage?.[featureKey] || 0)),
-                    has_access: limit !== 0
+                    has_access: limit === null || (limit - (user.usage?.[featureKey] || 0)) > 0
                 };
             }
 

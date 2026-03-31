@@ -254,8 +254,8 @@ const ChartAnalysisPage = {
             if (analysis.chart_annotations) this.chartAnnotations = analysis.chart_annotations;
             this.displayResults(analysis);
 
-            // Refresh usage counters so badge decrements immediately after this use
-            if (window.PipwaysUsage) window.PipwaysUsage.loadUserLimits();
+            // Refresh usage badge immediately after successful analysis
+            if (window.PipwaysUsage) window.PipwaysUsage.refreshUsageCounts();
 
         } catch (error) {
             // ── 402 limit reached — show upgrade modal instead of raw error ──

@@ -67,19 +67,6 @@ class AIMentor {
         const message = this.inputField?.value.trim();
         if (!message) return;
 
-        // ── Client-side usage gate ────────────────────────────────────────────
-        if (window.PipwaysUsage?.isLoaded) {
-            const check = window.PipwaysUsage.checkUsage('ai_mentor');
-            if (!check.allowed) {
-                this.addMessage(
-                    `You've used all ${check.limit} free AI Mentor messages today. Upgrade to Pro for 200/day.`,
-                    'ai'
-                );
-                window.PipwaysUsage.showUpgradeModal('ai_mentor');
-                return;
-            }
-        }
-
         // Add user message
         this.addMessage(message, 'user');
         this.inputField.value = '';
@@ -119,7 +106,7 @@ class AIMentor {
                 this.updateProgressSidebar(data.academy_progress);
             }
 
-            // Refresh usage badge
+            // Refresh usage counters so badge decrements immediately after this use
             if (window.PipwaysUsage) window.PipwaysUsage.loadUserLimits();
 
         } catch (error) {

@@ -468,6 +468,11 @@ const ChartAnalysisPage = {
                             style="background:linear-gradient(90deg,var(--success) 0%,#059669 100%);">
                         <i class="fas fa-save"></i> Save Signal to Dashboard
                     </button>
+                    ${!this._isAdmin() ? `
+                    <p style="margin-top:8px;font-size:11px;color:#6b7280;text-align:center;">
+                        <i class="fas fa-lock" style="margin-right:4px;"></i>
+                        Signal publishing is admin-only to maintain signal quality.
+                    </p>` : ''}
                 </div>`;
 
             // Auto-fill validator with AI trade setup levels
@@ -589,65 +594,187 @@ const ChartAnalysisPage = {
         const dEl = document.getElementById('validatorDirection');
         if (!eEl || !sEl || !tEl || !dEl) return;
 
-        const entry = parseFloat(eEl.value), sl = parseFloat(sEl.value),
-              tp    = parseFloat(tEl.value), direction = dEl.value;
-        const symbol = this.currentAnalysis?.symbol || 'Unknown';
+        const entry     = parseFloat(eEl.value);
+        const sl        = parseFloat(sEl.value);
+        const tp        = parseFloat(tEl.value);
+        const direction = dEl.value;
+        const symbol    = this.currentAnalysis?.symbol || 'Unknown';
 
-        if (!entry || !sl || !tp) { alert('Please fill in all price levels'); return; }
+        if (!entry || !sl || !tp) {
+            this._toast('Please fill in all price levels', 'error');
+            return;
+        }
 
         const rd = document.getElementById('validatorResults');
         if (!rd) return;
         rd.style.display = 'block';
-        rd.innerHTML = '<div class="loading"><div class="spinner" style="width:24px;height:24px;"></div><small>Validating…</small></div>';
 
-        try {
-            const result = await API.validateTrade({ entry_price:entry, stop_loss:sl, take_profit:tp, direction, symbol });
-            const score  = result.quality_score || 0;
-            const sc     = score>=80?'var(--success)':score>=60?'var(--warning)':'var(--danger)';
-            rd.innerHTML = `
-                <div style="background:var(--gray-900);border-radius:var(--radius);padding:1rem;
-                            border:1px solid var(--gray-700);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                        <span style="color:var(--gray-500);">Quality Score</span>
-                        <span style="font-size:1.5rem;font-weight:700;color:${sc};">${score}/100</span>
-                    </div>
-                    <div style="width:100%;height:6px;background:var(--gray-700);border-radius:3px;
-                                margin-bottom:1rem;overflow:hidden;">
-                        <div style="width:${score}%;height:100%;background:${sc};border-radius:3px;
-                                    transition:width .5s ease;"></div>
-                    </div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:.75rem;font-size:.875rem;">
-                        <div><span style="color:var(--gray-500);">R:R Ratio:</span>
-                             <span style="color:var(--gray-200);font-weight:600;margin-left:.5rem;">
-                                 ${result.risk_reward_text||result.risk_reward_ratio||'N/A'}</span></div>
-                        <div><span style="color:var(--gray-500);">Probability:</span>
-                             <span style="color:var(--gray-200);font-weight:600;margin-left:.5rem;">
-                                 ${Math.round((result.probability_estimate||0)*100)}%</span></div>
-                    </div>
-                    ${result.warnings?.length?`
-                        <div style="margin-top:1rem;padding:.75rem;background:rgba(239,68,68,.1);
-                                    border-radius:var(--radius);border-left:3px solid var(--danger);">
-                            <div style="font-size:.75rem;color:var(--danger);margin-bottom:.25rem;">Warnings:</div>
-                            ${result.warnings.map(w=>`<div style="font-size:.875rem;color:var(--gray-300);">• ${w}</div>`).join('')}
-                        </div>`:''}
-                    ${result.recommendations?.length?`
-                        <div style="margin-top:.75rem;padding:.75rem;background:rgba(16,185,129,.1);
-                                    border-radius:var(--radius);border-left:3px solid var(--success);">
-                            <div style="font-size:.75rem;color:var(--success);margin-bottom:.25rem;">Recommendations:</div>
-                            ${result.recommendations.map(r=>`<div style="font-size:.875rem;color:var(--gray-300);">• ${r}</div>`).join('')}
-                        </div>`:''}
-                </div>`;
-        } catch (error) {
-            rd.innerHTML = `<div class="alert alert-error">Validation failed: ${error.message}</div>`;
+        // Rec 10: validate locally against existing analysis — no second API call
+        const result = this._validateLocally(entry, sl, tp, direction, symbol);
+
+        const sc = result.quality_score >= 80 ? 'var(--success)'
+                 : result.quality_score >= 60 ? 'var(--warning)'
+                 : 'var(--danger)';
+
+        rd.innerHTML = `
+            <div style="background:var(--gray-900);border-radius:var(--radius);padding:1rem;
+                        border:1px solid var(--gray-700);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                    <span style="color:var(--gray-500);">Quality Score</span>
+                    <span style="font-size:1.5rem;font-weight:700;color:${sc};">${result.quality_score}/100</span>
+                </div>
+                <div style="width:100%;height:6px;background:var(--gray-700);border-radius:3px;
+                            margin-bottom:1rem;overflow:hidden;">
+                    <div style="width:${result.quality_score}%;height:100%;background:${sc};border-radius:3px;
+                                transition:width .5s ease;"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:.75rem;font-size:.875rem;">
+                    <div><span style="color:var(--gray-500);">R:R Ratio:</span>
+                         <span style="color:var(--gray-200);font-weight:600;margin-left:.5rem;">
+                             ${result.risk_reward_text}</span></div>
+                    <div><span style="color:var(--gray-500);">Probability:</span>
+                         <span style="color:var(--gray-200);font-weight:600;margin-left:.5rem;">
+                             ${result.probability}%</span></div>
+                </div>
+                ${result.warnings.length ? `
+                    <div style="margin-top:1rem;padding:.75rem;background:rgba(239,68,68,.1);
+                                border-radius:var(--radius);border-left:3px solid var(--danger);">
+                        <div style="font-size:.75rem;color:var(--danger);margin-bottom:.25rem;">Warnings:</div>
+                        ${result.warnings.map(w=>`<div style="font-size:.875rem;color:var(--gray-300);">• ${this._esc(w)}</div>`).join('')}
+                    </div>` : ''}
+                ${result.recommendations.length ? `
+                    <div style="margin-top:.75rem;padding:.75rem;background:rgba(16,185,129,.1);
+                                border-radius:var(--radius);border-left:3px solid var(--success);">
+                        <div style="font-size:.75rem;color:var(--success);margin-bottom:.25rem;">Recommendations:</div>
+                        ${result.recommendations.map(r=>`<div style="font-size:.875rem;color:var(--gray-300);">• ${this._esc(r)}</div>`).join('')}
+                    </div>` : ''}
+            </div>`;
+    },
+
+    // ── Local trade validation — no API call needed ────────────────────────────
+    // Scores the user's entry/SL/TP against the existing chart analysis result.
+    // Returns quality_score (0-100), warnings, and recommendations.
+    _validateLocally(entry, sl, tp, direction, symbol) {
+        const warnings       = [];
+        const recommendations= [];
+        let score            = 50;
+        const analysis       = this.currentAnalysis;
+        const isBuy          = direction === 'BUY';
+
+        // ── Basic geometry checks ─────────────────────────────────────────────
+        const risk   = Math.abs(entry - sl);
+        const reward = Math.abs(tp - entry);
+        const rr     = risk > 0 ? reward / risk : 0;
+
+        // SL on correct side
+        if (isBuy  && sl >= entry) warnings.push('Stop loss must be BELOW entry for a BUY trade.');
+        if (!isBuy && sl <= entry) warnings.push('Stop loss must be ABOVE entry for a SELL trade.');
+
+        // TP on correct side
+        if (isBuy  && tp <= entry) warnings.push('Take profit must be ABOVE entry for a BUY trade.');
+        if (!isBuy && tp >= entry) warnings.push('Take profit must be BELOW entry for a SELL trade.');
+
+        // R:R scoring
+        if (rr >= 3.0)       { score += 20; recommendations.push(`Excellent R:R of 1:${rr.toFixed(1)} — great setup.`); }
+        else if (rr >= 2.0)  { score += 15; }
+        else if (rr >= 1.5)  { score += 10; }
+        else if (rr >= 1.0)  { score +=  0; warnings.push(`R:R of 1:${rr.toFixed(1)} is below the recommended 1.5 minimum.`); }
+        else                 { score -= 15; warnings.push(`R:R of 1:${rr.toFixed(1)} is too low — risk outweighs reward.`); }
+
+        // ── Cross-check against AI analysis ──────────────────────────────────
+        if (analysis) {
+            const bias = (analysis.trading_bias || '').toLowerCase();
+
+            // Direction matches AI bias
+            if ((isBuy && bias === 'bullish') || (!isBuy && bias === 'bearish')) {
+                score += 15;
+                recommendations.push('Direction aligns with AI-detected market bias.');
+            } else if (bias !== 'neutral') {
+                score -= 10;
+                warnings.push(`Direction contradicts AI bias (${bias}). Trading against the structure.`);
+            }
+
+            // Entry near AI suggested entry
+            const aiEntry = parseFloat(analysis.trade_setup?.entry);
+            if (aiEntry && !isNaN(aiEntry)) {
+                const diff = Math.abs(entry - aiEntry) / aiEntry;
+                if (diff < 0.005) {
+                    score += 10;
+                    recommendations.push('Entry is close to the AI-identified OB/FVG zone.');
+                } else if (diff > 0.02) {
+                    warnings.push(`Entry (${entry}) is far from the AI suggested level (${aiEntry}). Consider using the AI entry zone.`);
+                }
+            }
+
+            // SL check against AI stop
+            const aiSL = parseFloat(analysis.trade_setup?.stop_loss);
+            if (aiSL && !isNaN(aiSL)) {
+                const slDiff = Math.abs(sl - aiSL) / aiSL;
+                if (slDiff < 0.005) {
+                    score += 5;
+                } else if (
+                    (isBuy && sl > aiSL) ||   // tighter than AI
+                    (!isBuy && sl < aiSL)
+                ) {
+                    warnings.push('Your stop loss is tighter than the AI structural level — higher risk of early stop out.');
+                }
+            }
+
+            // Confidence bonus
+            const conf = analysis.confidence || 0;
+            if (conf >= 0.80) { score += 10; recommendations.push('High AI confidence (80%+) on this chart structure.'); }
+            else if (conf >= 0.65) { score += 5; }
+            else { warnings.push('Low AI confidence on this chart — structure may be unclear.'); }
+
+            // BOS confirmed
+            if (analysis.bos_confirmed) {
+                score += 5;
+                recommendations.push('Break of Structure confirmed — adds confluence to the setup.');
+            }
+        } else {
+            recommendations.push('Upload and analyze a chart first for AI-assisted validation.');
         }
+
+        score = Math.max(0, Math.min(100, Math.round(score)));
+        const probability = Math.max(30, Math.min(90, Math.round(40 + score * 0.4)));
+
+        return {
+            quality_score:    score,
+            risk_reward_text: rr > 0 ? `1:${rr.toFixed(2)}` : 'N/A',
+            probability,
+            warnings,
+            recommendations,
+        };
+    },
+
+    // ── Admin check — mirrors dashboard._isAdminUser() ───────────────────────
+    _isAdmin() {
+        try {
+            const user = JSON.parse(localStorage.getItem('pipways_user') || '{}');
+            if (!user) return false;
+            if (user.is_admin === true)     return true;
+            if (user.role === 'admin')      return true;
+            if (user.is_superuser === true) return true;
+            const email = (user.email || '').toLowerCase();
+            if (email === 'admin@pipways.com' ||
+                email === 'contact@gopipways.com' ||
+                email.startsWith('admin+')) return true;
+            return false;
+        } catch (_) { return false; }
     },
 
     async saveSignal() {
+        // Admin only — public signals grid must stay clean and professional
+        if (!this._isAdmin()) {
+            this._toast('Only admins can publish signals to the dashboard.', 'error');
+            return;
+        }
         if (!this.currentAnalysis?.trade_setup) {
             this._toast('No trade setup to save', 'error');
             return;
         }
-        const setup = this.currentAnalysis.trade_setup;
+        const setup    = this.currentAnalysis.trade_setup;
+        const analysis = this.currentAnalysis;
         let dir = (setup.direction || 'NEUTRAL').toUpperCase();
         if (dir === 'NEUTRAL') {
             const e = parseFloat(String(setup.entry).replace(',', ''));
@@ -656,30 +783,45 @@ const ChartAnalysisPage = {
         }
 
         try {
-            // Rec 9: post to /api/signals so signal appears on Enhanced Signals grid
             const token = localStorage.getItem('pipways_token');
+            const rationale = (analysis.key_insights || []).join('\n\n') ||
+                `${analysis.trading_bias} bias on ${analysis.symbol}. ` +
+                `${analysis.confluence_reason || ''}`;
+
+            const payload = {
+                symbol:          analysis.symbol || 'Unknown',
+                direction:       dir,
+                entry_price:     parseFloat(setup.entry),
+                stop_loss:       parseFloat(setup.stop_loss),
+                take_profit:     parseFloat(setup.take_profit),
+                confidence:      Math.round((setup.probability || 0.7) * 100),
+                rationale:       rationale,
+                pattern_name:    (analysis.patterns_detected?.[0]?.name) || 'SMC Breakout',
+                structure:       analysis.market_structure || 'breakout',
+                bias_d1:         analysis.trading_bias === 'bullish' ? 'BULL' :
+                                 analysis.trading_bias === 'bearish' ? 'BEAR' : 'NEUTRAL',
+                bias_h4:         analysis.trading_bias === 'bullish' ? 'BULL' :
+                                 analysis.trading_bias === 'bearish' ? 'BEAR' : 'NEUTRAL',
+                bos_m5:          analysis.bos_confirmed ? (dir === 'BUY' ? 'UP' : 'DOWN') : 'NEUTRAL',
+                timeframe:       'H1',
+                source:          'chart_analysis',
+                is_pattern_idea: true,
+            };
+
             const res = await fetch('/api/signals', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type':  'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    symbol:      this.currentAnalysis.symbol || 'Unknown',
-                    direction:   dir,
-                    entry_price: parseFloat(setup.entry),
-                    stop_loss:   parseFloat(setup.stop_loss),
-                    take_profit: parseFloat(setup.take_profit),
-                    confidence:  Math.round((setup.probability || 0.7) * 100),
-                    rationale:   this.currentAnalysis.key_insights?.join('\n') || '',
-                    source:      'chart_analysis',
-                }),
+                body: JSON.stringify(payload),
             });
+
             if (res.ok) {
-                this._toast('Signal saved to Enhanced Signals dashboard!', 'success');
+                this._toast(`✅ ${analysis.symbol} ${dir} signal published to Enhanced Signals!`, 'success');
             } else {
                 const body = await res.json().catch(() => ({}));
-                throw new Error(body.detail || 'Failed to save signal');
+                throw new Error(body.detail || `HTTP ${res.status}`);
             }
         } catch (error) {
             this._toast('Error saving signal: ' + error.message, 'error');

@@ -119,11 +119,14 @@ async def get_usage_state(user_id: int) -> Dict[str, int]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 _LIMIT_MAP = {
-    # feature_key              log_table                free  pro
-    "chart_analysis":        ("chart_analysis_logs",    2,    50),
-    "ai_mentor":             ("ai_mentor_logs",         5,    200),
-    "performance_analysis":  ("journal_uploads",        1,    None),   # monthly
-    "stock_research":        ("stock_analysis_logs",    3,    100),
+    # feature_key              log_table                free  basic  pro
+    #                                                         ↑ matches usage.js FEATURE_CONFIG
+    # pro=None means unlimited. basic tier was missing — free limits were
+    # applied to basic users, giving them 1 perf analysis instead of 10.
+    "chart_analysis":        ("chart_analysis_logs",    2,    50,    None),
+    "ai_mentor":             ("ai_mentor_logs",         5,    200,   None),
+    "performance_analysis":  ("journal_uploads",        1,    10,    None),  # monthly
+    "stock_research":        ("stock_analysis_logs",    3,    100,   None),
 }
 
 _MONTHLY_FEATURES = {"performance_analysis"}
@@ -132,13 +135,20 @@ _MONTHLY_FEATURES = {"performance_analysis"}
 async def check_limit(user_id: int, user_tier: str, feature: str) -> bool:
     """
     Returns True if the user is under their usage limit.
+    Supports free / basic / pro tiers — each maps to its own daily/monthly cap.
     Fails open on DB error so a table hiccup never blocks users.
     """
     if feature not in _LIMIT_MAP:
         return True
 
-    table, free_limit, pro_limit = _LIMIT_MAP[feature]
-    limit = pro_limit if user_tier == "pro" else free_limit
+    table, free_limit, basic_limit, pro_limit = _LIMIT_MAP[feature]
+
+    if user_tier == "pro":
+        limit = pro_limit
+    elif user_tier == "basic":
+        limit = basic_limit
+    else:
+        limit = free_limit
 
     if limit is None:
         return True  # unlimited
@@ -172,7 +182,7 @@ async def log_usage(user_id: int, feature: str, **kwargs):
     if feature not in _LIMIT_MAP:
         return
 
-    table = _LIMIT_MAP[feature][0]
+    table = _LIMIT_MAP[feature][0]  # index 0 = table name (unchanged across 3-tuple → 4-tuple)
 
     _allowed_cols = {
         "chart_analysis_logs":  {"symbol", "timeframe", "analysis_type"},

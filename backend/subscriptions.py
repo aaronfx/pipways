@@ -199,9 +199,16 @@ async def check_limit(user_id: int, user_tier: str, feature: str) -> bool:
             {"uid": user_id, "start": start}
         )
         used = int(row["cnt"]) if row else 0
-        return used < limit
+        allowed = used < limit
+        print(
+            f"[check_limit] {feature} user={user_id} tier={user_tier} "
+            f"used={used} limit={limit} period={'monthly' if is_monthly else 'daily'} "
+            f"→ {'ALLOW' if allowed else 'BLOCK'}",
+            flush=True
+        )
+        return allowed
     except Exception as e:
-        print(f"[check_limit] {feature}: {e}", flush=True)
+        print(f"[check_limit] {feature} user={user_id}: error — {e} (fail open)", flush=True)
         return True  # fail open
 
 

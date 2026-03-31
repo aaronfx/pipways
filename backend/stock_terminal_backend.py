@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field
 
 # Auth + usage — relative imports (stock_terminal_backend lives inside backend/)
 try:
-    from .security import get_current_user
+    from .auth import get_current_user
     from .subscriptions import check_limit, log_usage
     _AUTH_AVAILABLE = True
 except ImportError:

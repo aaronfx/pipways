@@ -67,11 +67,20 @@ def _cache_set(key: str, data: Dict):
     _analysis_cache[key] = {"ts": time.time(), "data": data}
 
 
-# ── Config ────────────────────────────────────────────────────────────────────
-OPENROUTER_API_KEY    = os.getenv("OPENROUTER_API_KEY")
+# ── Provider config ───────────────────────────────────────────────────────────
+# Primary: direct Anthropic API (cheaper, faster, no middleman)
+# Fallback: OpenRouter (used if ANTHROPIC_API_KEY not set)
+ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL    = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1"
+
+OPENROUTER_API_KEY    = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL      = os.getenv("OPENROUTER_VISION_MODEL") or os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
-OPENROUTER_CONFIGURED = bool(OPENROUTER_API_KEY)
 OPENROUTER_BASE_URL   = "https://openrouter.ai/api/v1"
+
+# Use Anthropic direct if key is set, else fall back to OpenRouter
+USE_ANTHROPIC         = bool(ANTHROPIC_API_KEY)
+OPENROUTER_CONFIGURED = bool(OPENROUTER_API_KEY)
 _DEFAULT_CONFIDENCE   = 0.50
 
 # ── Symbol config ─────────────────────────────────────────────────────────────
@@ -322,48 +331,74 @@ Return ONLY this JSON:
 
 Return ONLY valid JSON. No markdown."""
 
-_PASS3_PROMPT = """You are a senior SMC prop firm trader finding the best entry.
+_PASS3_PROMPT = """You are a senior SMC prop firm trader. Find the highest quality entry on this chart.
 
 Chart context: {context}
 Structure: {structure}
 Direction: {direction}
 Zone: {zone}
 
-Find the BEST {direction} entry on this chart using SMC methodology.
+STEP 1 — FIND ORDER BLOCKS:
+An Order Block is the LAST {ob_candle} candle BEFORE a strong {direction} impulse move.
+Look for: the last red candle (for BUY OB) or last green candle (for SELL OB) before price moved sharply.
+The OB zone = the body of that candle (open to close price).
+Price often returns to fill this zone before continuing in the {direction} direction.
 
-ORDER BLOCKS — find the last {ob_candle} candle before a strong {direction} move:
-The OB is the origin of institutional interest. Price often returns to this level.
+STEP 2 — FIND FAIR VALUE GAPS:
+Look for 3 consecutive candles where candle 1's wick and candle 3's wick do NOT overlap.
+The gap between them is an FVG — price tends to return to fill it.
+For BUY: bullish FVG = gap where there's empty space above candle 1 high and below candle 3 low.
 
-FAIR VALUE GAPS — find 3-candle imbalances in the {direction} direction:
-Gap between candle 1 high and candle 3 low (for bullish FVG) where price has not returned.
+STEP 3 — ENTRY PLACEMENT:
+CRITICAL: Entry should be at the OB or FVG level, NOT at current market price.
+If price is already past the OB/FVG, look for the next one or set entry_confluence_found to false.
+Entry = midpoint of the OB body or top of the FVG zone.
 
-LIQUIDITY — was there a sweep of equal lows (BUY) or equal highs (SELL) before the setup?
+STEP 4 — STOP LOSS PLACEMENT:
+Stop loss MUST be placed at the last visible swing {sl_side} on the chart.
+For BUY: stop = below the last significant swing LOW (the lowest wick visible in recent structure).
+For SELL: stop = above the last significant swing HIGH.
+The stop must be beyond the structural level — not an arbitrary small distance.
+Minimum stop distance on XAUUSD: 40 points | Forex: 15 pips | Indices: 15 points
+If the natural swing stop gives less than this minimum, use the minimum distance.
 
-ENTRY RULES:
-- Entry at the OB or FVG level — whichever price has reached or is approaching
-- Stop beyond the nearest swing {sl_side} (invalidation level)
-- Target at next opposing liquidity or OB
-- Minimum R:R 1.5
+STEP 5 — TAKE PROFIT:
+Target = next opposing liquidity level or order block.
+For BUY: target = nearest equal highs, resistance level, or bearish OB above entry.
+For SELL: target = nearest equal lows, support level, or bullish OB below entry.
+Minimum R:R = 1.5. If target cannot achieve 1.5R from the stop, find a further target.
 
-Read prices from the chart Y-axis. For gold prices are 4000-5000 range.
-Do NOT invent prices. If scale is unreadable, set prices to null.
+STEP 6 — VERIFY THE SETUP:
+Before returning, verify:
+- Is entry BELOW current price for BUY (we want to buy at a discount)?
+- Is stop BELOW entry for BUY (or ABOVE for SELL)?
+- Is target ABOVE entry for BUY (or BELOW for SELL)?
+- Is R:R at least 1.5?
+If any check fails, adjust the levels or set entry_confluence_found to false.
+
+Read ALL prices from the chart Y-axis. Do not invent prices.
+For gold: prices in 4300-4600 range. For forex: typical pair ranges.
 
 Return ONLY this JSON:
 {{
   "entry_confluence_found": true or false,
-  "confluence_reason": "specific: which OB or FVG at which exact price level",
-  "order_blocks": [{{"price": "level", "type": "bullish|bearish", "timeframe": "H1|H4|D1"}}],
-  "fair_value_gaps": [{{"start": "price", "end": "price", "type": "bullish|bearish"}}],
+  "confluence_reason": "specific: OB at X price or FVG between X and Y — why this is high probability",
+  "order_blocks": [{{"price": "midpoint of OB body", "type": "bullish|bearish", "timeframe": "H1|H4|D1"}}],
+  "fair_value_gaps": [{{"start": "lower price", "end": "upper price", "type": "bullish|bearish"}}],
   "liquidity_swept": true or false,
   "liquidity_swept_level": "price or null",
-  "suggested_entry": "price or null",
-  "suggested_stop": "price or null",
-  "suggested_target": "price or null",
+  "suggested_entry": "price at OB or FVG level — NOT current market price",
+  "suggested_stop": "price at last swing {sl_side} — structural level",
+  "suggested_target": "price at next opposing liquidity",
   "bos_levels": ["price"],
   "support_levels": ["price1", "price2"],
   "resistance_levels": ["price1", "price2"],
-  "key_insights": ["what you see on this specific chart", "why this entry makes sense", "risk to watch"],
-  "smc_signals": ["specific signal 1", "specific signal 2"]
+  "key_insights": [
+    "describe exactly what structure you see on this chart",
+    "where specifically is the entry zone and why",
+    "what would invalidate this setup"
+  ],
+  "smc_signals": ["specific SMC signal with price level", "second signal with price level"]
 }}
 
 Return ONLY valid JSON. No markdown."""
@@ -376,13 +411,91 @@ async def _call_ai(
     temperature: float = 0.1,
     max_tokens: int = 1000,
 ) -> str:
+    """
+    Call vision AI — uses Anthropic direct API if ANTHROPIC_API_KEY is set,
+    otherwise falls back to OpenRouter. Anthropic is preferred: faster,
+    cheaper (no markup), and one fewer failure point.
+    """
+    if USE_ANTHROPIC:
+        return await _call_anthropic(http, prompt, data_url, temperature, max_tokens)
+    return await _call_openrouter(http, prompt, data_url, temperature, max_tokens)
+
+
+async def _call_anthropic(
+    http: httpx.AsyncClient,
+    prompt: str,
+    data_url: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """Direct Anthropic Messages API with vision."""
+    # Extract base64 and media type from data URL
+    # Format: data:<media_type>;base64,<data>
+    try:
+        header, b64_data = data_url.split(",", 1)
+        media_type = header.split(":")[1].split(";")[0]
+    except Exception:
+        media_type = "image/jpeg"
+        b64_data   = data_url
+
+    response = await http.post(
+        f"{ANTHROPIC_BASE_URL}/messages",
+        headers={
+            "x-api-key":         ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type":      "application/json",
+        },
+        json={
+            "model":      ANTHROPIC_MODEL,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type":       "base64",
+                            "media_type": media_type,
+                            "data":       b64_data,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        },
+    )
+    if response.status_code == 401:
+        raise HTTPException(503, "Anthropic authentication failed. Check ANTHROPIC_API_KEY.")
+    if response.status_code == 429:
+        raise HTTPException(503, "Anthropic rate limited. Try again shortly.")
+    if response.status_code != 200:
+        raise HTTPException(503, f"Anthropic API error: {response.status_code}")
+    data = response.json()
+    if "content" not in data or not data["content"]:
+        raise HTTPException(503, "Empty response from Anthropic")
+    # Anthropic returns content as a list of blocks
+    text_blocks = [b["text"] for b in data["content"] if b.get("type") == "text"]
+    if not text_blocks:
+        raise HTTPException(503, "No text content in Anthropic response")
+    return text_blocks[0]
+
+
+async def _call_openrouter(
+    http: httpx.AsyncClient,
+    prompt: str,
+    data_url: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """OpenRouter fallback — used when ANTHROPIC_API_KEY is not set."""
     response = await http.post(
         f"{OPENROUTER_BASE_URL}/chat/completions",
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "HTTP-Referer": "https://gopipways.com",
-            "X-Title": "Gopipways Trading Platform",
-            "Content-Type": "application/json",
+            "HTTP-Referer":  "https://gopipways.com",
+            "X-Title":       "Gopipways Trading Platform",
+            "Content-Type":  "application/json",
         },
         json={
             "model": OPENROUTER_MODEL,
@@ -393,7 +506,7 @@ async def _call_ai(
                     {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
                 ],
             }],
-            "max_tokens": max_tokens,
+            "max_tokens":  max_tokens,
             "temperature": temperature,
         },
     )
@@ -450,7 +563,7 @@ async def analyze_chart_image(
         print(f"[CHART] Cache hit: {cache_key[:12]}…", flush=True)
         return cached
 
-    if not OPENROUTER_CONFIGURED:
+    if not USE_ANTHROPIC and not OPENROUTER_CONFIGURED:
         demo = _build_demo_response(symbol, content_type, base64_image)
         _cache_set(cache_key, demo)
         return demo

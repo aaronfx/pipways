@@ -264,3 +264,24 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
         **current_user,
         "usage": usage_state,
     }
+
+
+@router.get("/usage")
+async def get_usage_counts(current_user: dict = Depends(get_current_user)):
+    """
+    Lightweight endpoint that returns ONLY feature usage counts for the current user.
+    Called by usage.js after every successful feature use to refresh the badge
+    without the overhead of reloading the full user profile from /auth/me.
+
+    Returns:
+        { chart_analysis: int, ai_mentor: int, performance_analysis: int, stock_research: int }
+    """
+    user_id = current_user["id"]
+    try:
+        from .subscriptions import get_usage_state
+        usage = await get_usage_state(user_id)
+        print(f"[Auth /usage] user={user_id} counts={usage}", flush=True)
+        return {"usage": usage}
+    except Exception as e:
+        print(f"[Auth /usage] error for user={user_id}: {e}", flush=True)
+        return {"usage": None}

@@ -110,7 +110,6 @@ const PerformancePage = {
         } catch (e) {
             console.error('Stats load error:', e);
         }
-        } catch (e) { /* cached load failed */ }
     },
     
     async analyze() {

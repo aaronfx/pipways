@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 
-from .security import get_current_user
+from .auth import get_current_user
 from .database import database
 from .subscriptions import check_limit, log_usage
 

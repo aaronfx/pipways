@@ -436,37 +436,49 @@ const ChartAnalysisPage = {
                 symInput.value = analysis.symbol;
             }
 
-            // Fix 2: Detect if this is a LIMIT ORDER (entry not at current price)
-            // A pending limit order means entry is below current price for BUY,
-            // or above current price for SELL — user must WAIT for the pullback.
+            // Fix 2: Detect LIMIT ORDER vs MARKET ORDER
+            // BUY LIMIT:  entry is below current price — waiting for pullback down to entry
+            // SELL LIMIT: entry is above current price — waiting for pullback up to entry
+            // We detect this by comparing entry against the dealing range high/low
             let orderTypeLabel = '';
             const entryNum = parseFloat(String(setup.entry).replace(',', ''));
             const approxRange = analysis.chart_annotations?.premium_discount?.range || [];
             const rangeHigh = parseFloat(approxRange[1]);
             const rangeLow  = parseFloat(approxRange[0]);
-            const rangeMid  = (rangeHigh + rangeLow) / 2;
+            const rangeMid  = (!isNaN(rangeHigh) && !isNaN(rangeLow)) ? (rangeHigh + rangeLow) / 2 : null;
 
-            // Heuristic: if entry is meaningfully below current dealing range mid for BUY,
-            // or above for SELL, it's a pending limit order
-            if (!isNaN(entryNum) && !isNaN(rangeMid)) {
-                const isPendingBuy  = dir === 'BUY'  && entryNum < rangeMid * 0.998;
-                const isPendingSell = dir === 'SELL' && entryNum > rangeMid * 1.002;
-                if (isPendingBuy || isPendingSell) {
-                    orderTypeLabel = `
-                    <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);
-                                border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;
-                                display:flex;align-items:center;gap:.5rem;font-size:.8rem;">
-                        <span style="font-size:1rem;">⏳</span>
-                        <div>
-                            <span style="color:#f59e0b;font-weight:700;">LIMIT ORDER</span>
-                            <span style="color:#9ca3af;margin-left:.35rem;">
-                                — Wait for price to pull back to
-                                <strong style="color:white;">${this._esc(String(setup.entry))}</strong>
-                                before entry
-                            </span>
-                        </div>
-                    </div>`;
-                }
+            let isPendingOrder = false;
+            let orderTypeText  = '';
+
+            if (!isNaN(entryNum) && rangeMid !== null) {
+                const isPendingBuy  = dir === 'BUY'  && entryNum < rangeMid * 0.999;
+                const isPendingSell = dir === 'SELL' && entryNum > rangeMid * 1.001;
+                if (isPendingBuy)  { isPendingOrder = true; orderTypeText = `BUY LIMIT — wait for price to pull BACK DOWN to ${this._esc(String(setup.entry))}`; }
+                if (isPendingSell) { isPendingOrder = true; orderTypeText = `SELL LIMIT — wait for price to pull BACK UP to ${this._esc(String(setup.entry))}`; }
+            }
+
+            if (isPendingOrder) {
+                orderTypeLabel = `
+                <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);
+                            border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;
+                            display:flex;align-items:center;gap:.5rem;font-size:.8rem;">
+                    <span style="font-size:1rem;">⏳</span>
+                    <div>
+                        <span style="color:#f59e0b;font-weight:700;">PENDING LIMIT ORDER</span>
+                        <span style="color:#9ca3af;margin-left:.35rem;">${orderTypeText}</span>
+                    </div>
+                </div>`;
+            } else {
+                orderTypeLabel = `
+                <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);
+                            border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;
+                            display:flex;align-items:center;gap:.5rem;font-size:.8rem;">
+                    <span style="font-size:1rem;">⚡</span>
+                    <div>
+                        <span style="color:#10b981;font-weight:700;">MARKET ORDER</span>
+                        <span style="color:#9ca3af;margin-left:.35rem;">Entry is at or near current price — can enter now</span>
+                    </div>
+                </div>`;
             }
 
             tradeSetupHTML = `
@@ -747,6 +759,12 @@ const ChartAnalysisPage = {
         const breakdown = [];
         const isBuy     = direction === 'BUY';
 
+        // ── Instrument detection — used across all scoring sections ──────────────
+        const isGold    = symbol.includes('XAU') || symbol.includes('GOLD');
+        const isIndex   = ['US30','US500','NAS100','UK100','DE30'].some(s => symbol.includes(s));
+        const isJPY     = symbol.includes('JPY');
+        const isCrypto  = ['BTC','ETH','XRP','LTC'].some(s => symbol.includes(s));
+
         // ── Basic geometry ────────────────────────────────────────────────────
         const risk      = Math.abs(entry - sl);
         const reward    = Math.abs(tp - entry);
@@ -759,13 +777,11 @@ const ChartAnalysisPage = {
         if (tpWrong) warnings.push(`Take profit must be ${isBuy ? 'ABOVE' : 'BELOW'} entry for a ${direction}.`);
 
         // ── 1. Risk:Reward (30 pts) — instrument-aware thresholds ───────────────
-        // Gold/indices/crypto typically achieve 1.5-2.5 R:R on H1.
-        // Forex can hit 3:1+ more easily. Adjusted thresholds per instrument class.
         let rrScore = 0;
         const isHighVolatility = isGold || isIndex || isCrypto;
-        const rrFullMarks  = isHighVolatility ? 2.5 : 3.0;  // full 30pts threshold
-        const rrGoodMarks  = isHighVolatility ? 1.8 : 2.0;  // 24pts threshold
-        const rrAcceptable = isHighVolatility ? 1.4 : 1.5;  // 16pts threshold
+        const rrFullMarks  = isHighVolatility ? 2.5 : 3.0;
+        const rrGoodMarks  = isHighVolatility ? 1.8 : 2.0;
+        const rrAcceptable = isHighVolatility ? 1.4 : 1.5;
 
         if      (rr >= rrFullMarks)  { rrScore = 30; positives.push(`Excellent R:R of ${rr_text} for this instrument.`); }
         else if (rr >= rrGoodMarks)  { rrScore = 24; positives.push(`Strong R:R of ${rr_text}.`); }
@@ -776,18 +792,10 @@ const ChartAnalysisPage = {
         breakdown.push({ label: `Risk:Reward Ratio (${rr_text})`, score: rrScore, max: 30 });
 
         // ── 2. Stop Loss Sizing (25 pts) ──────────────────────────────────────
-        // Checks if the stop size is appropriate for the instrument.
-        // Too tight = will be stopped out by noise.
-        // Too wide = poor capital efficiency.
         let slScore = 0;
-        const stopPct = (risk / entry) * 100;  // stop as % of price
+        const stopPct = (risk / entry) * 100;
 
         // Instrument-based stop expectations
-        const isGold    = symbol.includes('XAU') || symbol.includes('GOLD');
-        const isIndex   = ['US30','US500','NAS100','UK100','DE30'].some(s => symbol.includes(s));
-        const isJPY     = symbol.includes('JPY');
-        const isCrypto  = ['BTC','ETH','XRP','LTC'].some(s => symbol.includes(s));
-
         let minPct, maxPct, idealLabel;
         if      (isGold)   { minPct = 0.3;  maxPct = 2.0; idealLabel = '0.3–2% (30–200 pts on gold)'; }
         else if (isIndex)  { minPct = 0.15; maxPct = 1.5; idealLabel = '0.15–1.5% of index price'; }

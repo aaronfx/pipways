@@ -9,10 +9,12 @@ from .database import database
 
 async def init_subscription_tables():
     """
-    Create all AI usage log tables idempotently.
-    Called from main.py lifespan AND auto_setup.py (which previously failed
-    because this function didn't exist).
+    Create all AI usage log tables idempotently AND add any missing columns
+    to existing tables. CREATE TABLE IF NOT EXISTS never touches existing tables,
+    so columns added in later deploys would never appear — causing the
+    'column X does not exist' INSERT failures seen in production logs.
     """
+    # ── chart_analysis_logs ───────────────────────────────────────────────────
     await database.execute("""
         CREATE TABLE IF NOT EXISTS chart_analysis_logs (
             id            SERIAL PRIMARY KEY,
@@ -23,10 +25,22 @@ async def init_subscription_tables():
             created_at    TIMESTAMPTZ DEFAULT NOW()
         )
     """)
+    # Ensure columns exist in case table was created by an older deploy
+    for col_def in [
+        "analysis_type VARCHAR(50) DEFAULT 'chart_analysis'",
+        "symbol        VARCHAR(20)",
+        "timeframe     VARCHAR(10)",
+    ]:
+        col_name = col_def.split()[0]
+        await database.execute(
+            f"ALTER TABLE chart_analysis_logs ADD COLUMN IF NOT EXISTS {col_def};"
+        )
     await database.execute(
         "CREATE INDEX IF NOT EXISTS idx_cal_user_date "
         "ON chart_analysis_logs (user_id, created_at DESC)"
     )
+
+    # ── ai_mentor_logs ────────────────────────────────────────────────────────
     await database.execute("""
         CREATE TABLE IF NOT EXISTS ai_mentor_logs (
             id             SERIAL PRIMARY KEY,
@@ -36,9 +50,14 @@ async def init_subscription_tables():
         )
     """)
     await database.execute(
+        "ALTER TABLE ai_mentor_logs ADD COLUMN IF NOT EXISTS question_topic VARCHAR(100);"
+    )
+    await database.execute(
         "CREATE INDEX IF NOT EXISTS idx_aml_user_date "
         "ON ai_mentor_logs (user_id, created_at DESC)"
     )
+
+    # ── journal_uploads ───────────────────────────────────────────────────────
     await database.execute("""
         CREATE TABLE IF NOT EXISTS journal_uploads (
             id         SERIAL PRIMARY KEY,
@@ -48,9 +67,14 @@ async def init_subscription_tables():
         )
     """)
     await database.execute(
+        "ALTER TABLE journal_uploads ADD COLUMN IF NOT EXISTS filename VARCHAR(255);"
+    )
+    await database.execute(
         "CREATE INDEX IF NOT EXISTS idx_ju_user_date "
         "ON journal_uploads (user_id, created_at DESC)"
     )
+
+    # ── stock_analysis_logs ───────────────────────────────────────────────────
     await database.execute("""
         CREATE TABLE IF NOT EXISTS stock_analysis_logs (
             id         SERIAL PRIMARY KEY,
@@ -60,9 +84,13 @@ async def init_subscription_tables():
         )
     """)
     await database.execute(
+        "ALTER TABLE stock_analysis_logs ADD COLUMN IF NOT EXISTS symbol VARCHAR(20);"
+    )
+    await database.execute(
         "CREATE INDEX IF NOT EXISTS idx_sal_user_date "
         "ON stock_analysis_logs (user_id, created_at DESC)"
     )
+
     print("[subscriptions] ✅ All usage log tables ready", flush=True)
 
 
@@ -84,12 +112,6 @@ async def get_usage_state(user_id: int) -> Dict[str, int]:
     month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     async def _count(table: str, sql: str, params: dict) -> int:
-        """
-        Run a COUNT query and return the result.
-        Logs failures explicitly — was previously silently returning 0 on any
-        error (table missing, bad params, connection issue), which caused the
-        usage badge to always show the full free limit regardless of actual use.
-        """
         try:
             row = await database.fetch_one(sql, params)
             count = int(row["cnt"]) if row else 0
@@ -187,10 +209,7 @@ async def log_usage(user_id: int, feature: str, **kwargs):
     """
     Insert one row into the feature's log table after a SUCCESSFUL response.
     Extra kwargs forwarded as columns (symbol, timeframe, question_topic, filename).
-
-    Self-heals: if the table is missing (init_subscription_tables() was never
-    called from main.py lifespan), it creates the tables automatically and
-    retries once — so usage logging works correctly from the very first deploy.
+    Non-fatal on any error.
     """
     if feature not in _LIMIT_MAP:
         return
@@ -211,31 +230,15 @@ async def log_usage(user_id: int, feature: str, **kwargs):
 
     col_names  = ", ".join(cols.keys())
     col_values = ", ".join(f":{k}" for k in cols.keys())
-    sql = (
-        f"INSERT INTO {table} ({col_names}, created_at) "
-        f"VALUES ({col_values}, NOW())"
-    )
 
     try:
-        await database.execute(sql, cols)
-        print(f"[log_usage] ✅ {feature} logged for user={user_id}", flush=True)
+        await database.execute(
+            f"INSERT INTO {table} ({col_names}, created_at) "
+            f"VALUES ({col_values}, NOW())",
+            cols
+        )
     except Exception as e:
-        err = str(e).lower()
-        # Table does not exist — auto-create all tables and retry once
-        if "does not exist" in err or "no such table" in err or "undefined table" in err:
-            print(
-                f"[log_usage] Table '{table}' missing — running init_subscription_tables() "
-                f"and retrying for {feature}",
-                flush=True,
-            )
-            try:
-                await init_subscription_tables()
-                await database.execute(sql, cols)
-                print(f"[log_usage] ✅ {feature} logged after self-heal for user={user_id}", flush=True)
-            except Exception as retry_e:
-                print(f"[log_usage] ❌ Retry failed for {feature} user={user_id}: {retry_e}", flush=True)
-        else:
-            print(f"[log_usage] ❌ {feature} failed for user={user_id}: {e}", flush=True)
+        print(f"[log_usage] {feature}: {e}", flush=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

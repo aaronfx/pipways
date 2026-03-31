@@ -73,7 +73,9 @@ window.PipwaysUsage = (function() {
 
     async function loadUserLimits() {
         try {
-            const token = localStorage.getItem('pipways_token');
+            // Support both key names — 'token' is the canonical key used everywhere else;
+            // 'pipways_token' is the legacy name kept for backward compatibility.
+            const token = localStorage.getItem('token') || localStorage.getItem('pipways_token');
             if (!token) {
                 console.log('PipwaysUsage: No user found, skipping limits load');
                 isLoaded = true;
@@ -109,7 +111,7 @@ window.PipwaysUsage = (function() {
                     limit: limit,
                     usage: user.usage?.[featureKey] || 0,
                     remaining: limit === null ? 'unlimited' : Math.max(0, limit - (user.usage?.[featureKey] || 0)),
-                    has_access: limit === null || (limit - (user.usage?.[featureKey] || 0)) > 0
+                    has_access: limit !== 0
                 };
             }
 
@@ -526,7 +528,13 @@ window.PipwaysUsage = (function() {
 
         // Modal
         showUpgradeModal: showUpgradeModal,
-        hideUpgradeModal: hideUpgradeModal
+        hideUpgradeModal: hideUpgradeModal,
+
+        // Convenience accessors — used by ai_mentor.js 402 handler and any other
+        // caller that needs raw usage count or raw limit for a feature.
+        // Returns 0 / null respectively if limits haven't loaded yet.
+        used:  function(feature) { return userLimits.features?.[feature]?.usage  ?? 0;    },
+        limit: function(feature) { return userLimits.features?.[feature]?.limit  ?? null; }
     };
 
 })();

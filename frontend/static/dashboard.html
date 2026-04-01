@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gopipways — Trading Education & Research</title>
+    <!-- Silence Tailwind CDN development warning (safe in production) -->
     <script>
     (function() {
         const _warn = console.warn.bind(console);
@@ -15,8 +16,10 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Usage manager — loads before page scripts, intercepts 402s globally -->
     <script src="/js/usage.js"></script>
     <script>
+    // ── Pipways Markdown Renderer ─────────────────────────────────────────
     (function() {
         function renderMd(text) {
             if (!text) return '';
@@ -43,10 +46,10 @@
             return output.join('');
         }
         function inlineFormat(text) {
-            text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            text = text.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-            text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g,'<em>$1</em>');
-            text = text.replace(/`([^`]+)`/g,'<code>$1</code>');
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             return text;
         }
         window._renderMd = renderMd;
@@ -120,30 +123,32 @@
         .alert      { padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
         .alert-error{ background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#f87171; }
         .signal-card { background: linear-gradient(135deg, #1a1e24, #0f1419); border: 1px solid #374151; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .signal-card:hover { border-color: #8b5cf6; transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .live-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; background: rgba(34,197,94,0.2); color: #22c55e; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .signal-card:hover { border-color: #8b5cf6; transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); }
+        .live-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; background: rgba(34, 197, 94, 0.2); color: #22c55e; font-size: 10px; font-weight: 600; text-transform: uppercase; }
         .live-badge::before { content: ''; width: 6px; height: 6px; background: #22c55e; border-radius: 50%; animation: pulse-dot 2s infinite; }
-        .pattern-badge { padding: 2px 8px; border-radius: 6px; background: rgba(139,92,246,0.2); color: #a78bfa; font-size: 10px; font-weight: 600; text-transform: uppercase; }
-        .timeframe-badge { padding: 2px 8px; border-radius: 6px; background: rgba(59,130,246,0.2); color: #60a5fa; font-size: 10px; font-weight: 600; }
-        .buy-stop { padding: 4px 12px; border-radius: 6px; background: rgba(34,197,94,0.2); color: #22c55e; font-size: 12px; font-weight: 700; }
-        .sell-stop { padding: 4px 12px; border-radius: 6px; background: rgba(239,68,68,0.2); color: #ef4444; font-size: 12px; font-weight: 700; }
-        .trade-levels { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
-        .level-item { text-align: center; padding: 8px; background: rgba(31,41,55,0.5); border-radius: 8px; }
+        .pattern-badge { padding: 2px 8px; border-radius: 6px; background: rgba(139, 92, 246, 0.2); color: #a78bfa; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .timeframe-badge { padding: 2px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-size: 10px; font-weight: 600; }
+        .buy-stop { padding: 4px 12px; border-radius: 6px; background: rgba(34, 197, 94, 0.2); color: #22c55e; font-size: 12px; font-weight: 700; }
+        .sell-stop { padding: 4px 12px; border-radius: 6px; background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 12px; font-weight: 700; }
+        .trade-levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+        .level-item { text-align: center; padding: 8px; background: rgba(31, 41, 55, 0.5); border-radius: 8px; }
         .level-label { display: block; font-size: 10px; color: #9ca3af; margin-bottom: 4px; }
         .level-value { display: block; font-size: 14px; font-weight: 700; font-family: monospace; }
-        .level-entry { color: #60a5fa; } .level-target { color: #22c55e; } .level-stop { color: #ef4444; }
+        .level-entry { color: #60a5fa; }
+        .level-target { color: #22c55e; }
+        .level-stop { color: #ef4444; }
         .sentiment-bar { height: 6px; background: #374151; border-radius: 3px; overflow: hidden; }
         .sentiment-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-        .sentiment-bullish { background: linear-gradient(90deg,#22c55e,#16a34a); }
-        .sentiment-bearish { background: linear-gradient(90deg,#ef4444,#dc2626); }
+        .sentiment-bullish { background: linear-gradient(90deg, #22c55e, #16a34a); }
+        .sentiment-bearish { background: linear-gradient(90deg, #ef4444, #dc2626); }
         .expiry-time { color: #fbbf24; font-weight: 600; }
         .learn-btn { padding: 6px 12px; border-radius: 6px; background: #7c3aed; color: white; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
         .learn-btn:hover { background: #6d28d9; }
-        .loading { text-align:center; padding:2rem; }
-        .spinner { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
+        .loading    { text-align:center; padding:2rem; }
+        .spinner    { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .text-primary { color:#7c3aed; } .text-success { color:#10b981; } .text-danger { color:#ef4444; }
-        .text-warning { color:#f59e0b; } .text-muted { color:#9ca3af; }
+        .text-warning { color:#f59e0b; } .text-muted   { color:#9ca3af; }
         .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
@@ -160,7 +165,9 @@
         .mentor-prose h3 { color:white; font-weight:700; font-size:.9rem; margin:.75rem 0 .3rem; }
         .mentor-prose hr { border-color:#374151; margin:.6rem 0; }
         .mentor-prose a { color:#a78bfa; text-decoration:underline; }
-        .pw-toast { position:fixed; bottom:5rem; right:1rem; z-index:99999; display:flex; align-items:center; gap:.75rem; padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:300px; box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
+        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
+            padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px;
+            box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
         .pw-toast.success { background:rgba(16,185,129,.92); color:white; border:1px solid rgba(52,211,153,.4); }
         .pw-toast.error   { background:rgba(239,68,68,.92);  color:white; border:1px solid rgba(248,113,113,.4); }
         .pw-toast.info    { background:rgba(59,130,246,.92); color:white; border:1px solid rgba(96,165,250,.4); }
@@ -216,7 +223,8 @@
         .pw-toast { transition:bottom .25s ease; }
         .pw-blog-thumb { height:112px; border-radius:.5rem .5rem 0 0; overflow:hidden; position:relative; }
         .pw-blog-thumb img { width:100%; height:100%; object-fit:cover; }
-        .pw-blog-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(59,130,246,.08)); }
+        .pw-blog-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+            background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(59,130,246,.08)); }
         .sidebar-tap-hint { font-size:.67rem; color:#9ca3af; text-align:center; padding:.3rem 0 0; }
         @media (min-width:768px) { .sidebar-tap-hint { display:none; } }
         .lesson-row-done { background:rgba(16,185,129,.04); }
@@ -230,113 +238,78 @@
             #mentor-rec-grid .text-sm { font-size: .8rem; }
         }
         :focus-visible { outline: 2px solid #a78bfa !important; outline-offset: 2px !important; border-radius: 4px; }
-        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #a78bfa !important; outline-offset: 2px !important; box-shadow: 0 0 0 4px rgba(124,58,237,.25) !important; }
+        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+            outline: 2px solid #a78bfa !important; outline-offset: 2px !important;
+            box-shadow: 0 0 0 4px rgba(124,58,237,.25) !important;
+        }
         .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border-width:0; }
         .focus\:not-sr-only:focus { position:fixed; width:auto; height:auto; padding:inherit; margin:inherit; overflow:visible; clip:auto; white-space:normal; }
 
-        /* ═══════════════════════════════════════════════════════
-           MOBILE BOTTOM NAVIGATION
-        ═══════════════════════════════════════════════════════ */
+        /* ── Mobile Bottom Nav ── */
         #mobile-bottom-nav {
-            display: none;
             position: fixed;
-            bottom: 0; left: 0; right: 0;
-            z-index: 9999;
-            background: #090c12;
-            border-top: 1px solid #1f2937;
-            padding: 0 0 max(6px, env(safe-area-inset-bottom, 6px));
-            box-shadow: 0 -8px 32px rgba(0,0,0,0.8);
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 49;
+            background: #0f172a;
+            border-top: 1px solid #1e293b;
+            display: flex;
+            align-items: stretch;
+            height: 64px;
+            padding-bottom: env(safe-area-inset-bottom);
         }
-        .mobile-nav-btn {
+        @media (min-width: 768px) { #mobile-bottom-nav { display: none; } }
+        .mob-nav-btn {
             flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2px;
-            padding: 8px 2px 4px;
+            gap: 3px;
+            font-size: .6rem;
+            font-weight: 600;
+            color: #6b7280;
             border: none;
             background: transparent;
-            color: #4b5563;
             cursor: pointer;
-            transition: color 0.15s, transform 0.1s;
-            text-decoration: none;
-            -webkit-tap-highlight-color: transparent;
+            transition: color .15s;
+            padding: 0;
             position: relative;
-            min-height: 54px;
-            font-family: 'Inter', sans-serif;
         }
-        .mobile-nav-btn i { font-size: 1.1rem; transition: color 0.15s; }
-        .mobile-nav-btn span { font-size: 0.55rem; font-weight: 600; letter-spacing: 0.03em; line-height: 1; }
-        .mobile-nav-btn.active { color: #a78bfa; }
-        .mobile-nav-btn.active i { color: #a78bfa; }
-        .mobile-nav-btn.active::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 50%;
-            transform: translateX(-50%);
-            width: 24px; height: 2.5px;
-            background: linear-gradient(90deg, #7c3aed, #a78bfa);
-            border-radius: 0 0 3px 3px;
+        .mob-nav-btn i { font-size: .95rem; }
+        .mob-nav-btn.active { color: #a78bfa; }
+        .mob-nav-btn:active { opacity: .7; }
+        /* Centre Analyse button — elevated pill */
+        .mob-nav-centre {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
         }
-        .mobile-nav-btn:active { transform: scale(0.88); }
-        /* Analyse — elevated FAB-style centre button */
-        #mnav-analyse { padding-top: 0; justify-content: flex-end; padding-bottom: 6px; }
-        .mnav-fab-wrap {
-            width: 48px; height: 48px;
+        .mob-nav-centre-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
             background: linear-gradient(135deg, #2563eb, #7c3aed);
-            border-radius: 16px;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 18px rgba(124,58,237,0.55), 0 0 0 3px #090c12;
-            margin-top: -18px;
-            margin-bottom: 4px;
-            transition: transform 0.12s, box-shadow 0.12s;
-            flex-shrink: 0;
+            border: 3px solid #0f172a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(124,58,237,.5);
+            cursor: pointer;
+            transition: transform .15s, box-shadow .15s;
+            position: absolute;
+            bottom: 8px;
+            color: white;
+            font-size: .55rem;
+            font-weight: 700;
+            gap: 2px;
         }
-        #mnav-analyse i { font-size: 1.05rem; color: white !important; }
-        #mnav-analyse.active { color: #c4b5fd; }
-        #mnav-analyse.active .mnav-fab-wrap { box-shadow: 0 4px 22px rgba(124,58,237,0.75), 0 0 0 3px #090c12; }
-        #mnav-analyse.active::after { display: none; }
-        #mnav-analyse:active .mnav-fab-wrap { transform: scale(0.9); }
-
-        /* ═══════════════════════════════════════════════════════
-           MOBILE RESPONSIVE OVERRIDES
-        ═══════════════════════════════════════════════════════ */
-        @media (max-width: 767px) {
-            /* Show bottom nav */
-            #mobile-bottom-nav { display: flex; align-items: flex-end; }
-            /* Push content above bottom nav */
-            main#main-content .p-4 { padding-bottom: 5.5rem !important; }
-            /* Larger tap target for PW hamburger */
-            #mobile-menu-btn { min-height: 44px !important; min-width: 68px !important; padding: 10px 16px !important; }
-            /* Intel cards: 2×2 grid on mobile */
-            #dash-intel-row {
-                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                gap: .5rem !important;
-            }
-            #dash-intel-row .pw-card-hdr { padding: .6rem .7rem !important; }
-            #dash-intel-row .pw-card-body { padding: .6rem .7rem !important; }
-            #dash-intel-row .pw-card-hdr .font-semibold { font-size: .7rem !important; }
-            #dash-intel-row .pw-card-hdr span.text-xs { font-size: .6rem !important; }
-            /* Stat chips: wrap to 2 rows */
-            #dash-stat-row {
-                flex-wrap: wrap !important;
-                overflow-x: visible !important;
-                gap: .35rem !important;
-                padding-bottom: 0 !important;
-            }
-            /* Hide separator dots between chips */
-            #dash-stat-row .text-gray-800 { display: none !important; }
-            /* Session pill full-width on top row */
-            #stat-session-pill {
-                order: -1;
-                flex: 0 0 100% !important;
-                width: 100% !important;
-                justify-content: flex-start;
-            }
-            /* Toast: adjust for bottom nav */
-            .pw-toast { bottom: 5rem !important; }
-        }
+        .mob-nav-centre-btn i { font-size: 1.1rem; }
+        .mob-nav-centre-btn:active { transform: scale(.93); }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
@@ -347,14 +320,14 @@
         Skip to main content
     </a>
 
-    <!-- Mobile Menu Button — enlarged tap target -->
-    <div class="md:hidden fixed top-3 left-3 z-50">
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden fixed top-3.5 left-4 z-50">
         <button id="mobile-menu-btn"
                 aria-label="Open navigation menu"
                 aria-expanded="false"
                 aria-controls="sidebar"
-                class="flex items-center gap-2 px-3 py-2.5 rounded-lg shadow-xl text-white text-sm font-medium transition-all"
-                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);min-height:44px;min-width:64px;">
+                class="flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl text-white text-sm font-medium transition-all"
+                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);min-width:44px;min-height:44px;">
             <i class="fas fa-bars text-xs" aria-hidden="true"></i>
             <span class="text-xs font-semibold tracking-wide" style="letter-spacing:.04em;">PW</span>
         </button>
@@ -363,13 +336,14 @@
     <!-- Sidebar Overlay -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm"></div>
 
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 h-screen bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 overflow-hidden"
-          style="box-shadow: 4px 0 24px rgba(0,0,0,.5);">
-        <div class="p-5 border-b border-gray-800">
+    <!-- FIX 2: Sidebar uses 100dvh so logout is always visible on mobile -->
+    <aside id="sidebar"
+           class="fixed md:static inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 z-50 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 overflow-hidden"
+           style="height:100dvh;box-shadow:4px 0 24px rgba(0,0,0,.5);">
+        <div class="p-5 border-b border-gray-800 flex-shrink-0">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div class="w-9 h-9 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0" aria-hidden="true">
                         <i class="fas fa-graduation-cap text-white"></i>
                     </div>
                     <div>
@@ -381,7 +355,7 @@
                         aria-label="Close navigation menu"
                         class="md:hidden p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-all"
                         onclick="document.getElementById('sidebar').classList.add('-translate-x-full');document.getElementById('sidebar-overlay').classList.add('hidden');">
-                    <i class="fas fa-times text-sm"></i>
+                    <i class="fas fa-times text-sm" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -413,10 +387,12 @@
             </a>
             <div class="nav-section-label">Development</div>
             <a href="#" data-section="journal" class="nav-link">
-                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i><span>Performance Analytics</span>
+                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
+                <span>Performance Analytics</span>
             </a>
             <a href="#" data-section="risk" class="nav-link">
-                <i class="fas fa-calculator nav-icon" style="color:#38bdf8;"></i><span>Risk Calculator</span>
+                <i class="fas fa-calculator nav-icon" style="color:#38bdf8;"></i>
+                <span>Risk Calculator</span>
             </a>
             <div class="nav-section-label">AI Assistant</div>
             <a href="#" data-section="mentor" class="nav-link">
@@ -434,6 +410,7 @@
         </nav>
         <div class="sidebar-tap-hint px-3 pb-1">Tap outside to close</div>
 
+        <!-- Logout always visible — flex-shrink-0 prevents squeeze -->
         <div class="p-4 border-t border-gray-800 flex-shrink-0">
             <div class="flex items-center gap-2.5 mb-3 p-2.5 rounded-xl" style="background:#111827;border:1px solid #1f2937;">
                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
@@ -459,7 +436,8 @@
         </div>
     </aside>
 
-    <main id="main-content" class="flex-1 h-screen overflow-y-auto" tabindex="-1">
+    <!-- FIX 1: pb-24 md:pb-0 clears the fixed bottom nav on mobile -->
+    <main id="main-content" class="flex-1 h-screen overflow-y-auto pb-24 md:pb-0" tabindex="-1">
 
         <!-- Live Market Ticker -->
         <div class="ticker-wrap">
@@ -488,16 +466,16 @@
                             aria-expanded="false"
                             aria-controls="notif-panel"
                             class="relative p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800">
-                        <i class="fas fa-bell text-lg"></i>
-                        <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                        <i class="fas fa-bell text-lg" aria-hidden="true"></i>
+                        <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" aria-label="Unread notifications"></span>
                     </button>
                     <div id="notif-panel"
                          class="hidden absolute right-0 mt-2 w-72 rounded-xl border overflow-hidden z-50"
                          style="background:#111827;border-color:#1f2937;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);">
                         <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color:#1f2937;">
                             <span class="text-sm font-semibold text-white">Notifications</span>
-                            <button onclick="dashboard._toggleNotifPanel()" class="text-gray-600 hover:text-white text-xs">
-                                <i class="fas fa-times"></i>
+                            <button onclick="dashboard._toggleNotifPanel()" aria-label="Close notifications" class="text-gray-600 hover:text-white text-xs transition-colors">
+                                <i class="fas fa-times" aria-hidden="true"></i>
                             </button>
                         </div>
                         <div id="notif-list" class="max-h-64 overflow-y-auto">
@@ -519,10 +497,9 @@
 
         <div class="p-4 md:p-6 max-w-7xl mx-auto">
 
-            <!-- DASHBOARD SECTION -->
+            <!-- DASHBOARD -->
             <section id="section-dashboard" class="section animate-fade-in">
 
-                <!-- Greeting + social proof -->
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div>
                         <h2 id="greeting-text" class="font-bold text-white" style="font-size:1.05rem;"></h2>
@@ -552,7 +529,8 @@
                                               style="background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25);">2 free included</span>
                                     </div>
                                     <p class="text-xs" style="color:#9ca3af;line-height:1.5;">
-                                        Upload any chart screenshot — get entry, stop loss &amp; take profit in seconds. Works on any pair, any timeframe.
+                                        Upload any chart screenshot — get entry, stop loss &amp; take profit in seconds.
+                                        Works on any pair, any timeframe.
                                     </p>
                                     <div id="dash-chart-usage-bar" class="mt-2"></div>
                                 </div>
@@ -571,7 +549,7 @@
                     </div>
                 </div>
 
-                <!-- Stat strip — wraps on mobile -->
+                <!-- Stat strip -->
                 <div id="dash-stat-row" class="flex items-center gap-2 mb-4 overflow-x-auto pb-1"
                      style="scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
                     <div id="stat-session-pill" class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0"
@@ -620,8 +598,8 @@
                     </button>
                 </div>
 
-                <!-- Intel cards — 2-col on mobile, 4-col on xl -->
-                <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4" id="dash-intel-row">
+                <!-- Intel Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4" id="dash-intel-row">
 
                     <!-- Card A: Last Chart Analysis -->
                     <div class="pw-card cursor-pointer" onclick="dashboard.navigate('analysis')"
@@ -778,10 +756,8 @@
                     </div>
                 </div>
 
-                <!-- Zone 3: Market context row -->
+                <!-- Market Context Row -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4" id="dash-market-row">
-
-                    <!-- Session + forex snapshot -->
                     <div class="pw-card">
                         <div class="pw-card-hdr" style="padding:.85rem 1rem;">
                             <div class="flex items-center gap-2">
@@ -803,7 +779,6 @@
                         </div>
                     </div>
 
-                    <!-- NGX Top Movers -->
                     <div class="pw-card">
                         <div class="pw-card-hdr" style="padding:.85rem 1rem;">
                             <div class="flex items-center gap-2">
@@ -816,32 +791,15 @@
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;">
                             <div class="space-y-1.5" id="dash-ngx-movers">
-                                <div class="flex items-center justify-between py-1 border-b" style="border-color:#1f2937;">
-                                    <div><div class="text-xs font-semibold text-white">MTNN</div><div class="text-xs" style="color:#4b5563;">₦220.50</div></div>
-                                    <span class="text-xs font-bold" style="color:#34d399;">+3.2%</span>
-                                </div>
-                                <div class="flex items-center justify-between py-1 border-b" style="border-color:#1f2937;">
-                                    <div><div class="text-xs font-semibold text-white">DANGCEM</div><div class="text-xs" style="color:#4b5563;">₦612.00</div></div>
-                                    <span class="text-xs font-bold" style="color:#34d399;">+1.8%</span>
-                                </div>
-                                <div class="flex items-center justify-between py-1 border-b" style="border-color:#1f2937;">
-                                    <div><div class="text-xs font-semibold text-white">GTCO</div><div class="text-xs" style="color:#4b5563;">₦46.30</div></div>
-                                    <span class="text-xs font-bold" style="color:#f87171;">−0.6%</span>
-                                </div>
-                                <div class="flex items-center justify-between py-1">
-                                    <div><div class="text-xs font-semibold text-white">ZENITH</div><div class="text-xs" style="color:#4b5563;">₦37.80</div></div>
-                                    <span class="text-xs font-bold" style="color:#34d399;">+2.1%</span>
-                                </div>
+                                <div class="flex items-center justify-between py-1 border-b" style="border-color:#1f2937;"><div><div class="text-xs font-semibold text-white">MTNN</div><div class="text-xs" style="color:#4b5563;">₦220.50</div></div><span class="text-xs font-bold" style="color:#34d399;">+3.2%</span></div>
+                                <div class="flex items-center justify-between py-1 border-b" style="border-color:#1f2937;"><div><div class="text-xs font-semibold text-white">DANGCEM</div><div class="text-xs" style="color:#4b5563;">₦612.00</div></div><span class="text-xs font-bold" style="color:#34d399;">+1.8%</span></div>
+                                <div class="flex items-center justify-between py-1 border-b" style="border-color:#1f2937;"><div><div class="text-xs font-semibold text-white">GTCO</div><div class="text-xs" style="color:#4b5563;">₦46.30</div></div><span class="text-xs font-bold" style="color:#f87171;">−0.6%</span></div>
+                                <div class="flex items-center justify-between py-1"><div><div class="text-xs font-semibold text-white">ZENITH</div><div class="text-xs" style="color:#4b5563;">₦37.80</div></div><span class="text-xs font-bold" style="color:#34d399;">+2.1%</span></div>
                             </div>
-                            <button onclick="dashboard.navigate('stocks')"
-                                    class="text-xs font-semibold mt-3 w-full py-1.5 rounded-lg"
-                                    style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.18);color:#34d399;">
-                                Full stock analysis →
-                            </button>
+                            <button onclick="dashboard.navigate('stocks')" class="text-xs font-semibold mt-3 w-full py-1.5 rounded-lg" style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.18);color:#34d399;">Full stock analysis →</button>
                         </div>
                     </div>
 
-                    <!-- Active Signals (blurred for free users) -->
                     <div class="pw-card overflow-hidden" style="position:relative;">
                         <div class="pw-card-hdr" style="padding:.85rem 1rem;">
                             <div class="flex items-center gap-2">
@@ -850,56 +808,25 @@
                                 </div>
                                 <span class="font-semibold text-white text-xs">Active Signals</span>
                             </div>
-                            <span id="dash-signal-count-badge" class="text-xs px-2 py-0.5 rounded-full"
-                                  style="background:rgba(244,114,182,.1);color:#f472b6;border:1px solid rgba(244,114,182,.2);">3 active</span>
+                            <span id="dash-signal-count-badge" class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(244,114,182,.1);color:#f472b6;border:1px solid rgba(244,114,182,.2);">3 active</span>
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;" id="dash-signals-preview-body">
                             <div style="filter:blur(4px);pointer-events:none;user-select:none;" aria-hidden="true">
-                                <div class="rounded-lg p-2.5 mb-2" style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.15);">
-                                    <div class="flex justify-between text-xs mb-1">
-                                        <span class="font-bold" style="color:#34d399;">BUY</span>
-                                        <span style="color:#6b7280;">EUR/USD</span>
-                                    </div>
-                                    <div class="text-xs" style="color:#4b5563;">Entry 1.0850 · TP 1.0950 · expires 4h</div>
-                                </div>
-                                <div class="rounded-lg p-2.5 mb-2" style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);">
-                                    <div class="flex justify-between text-xs mb-1">
-                                        <span class="font-bold" style="color:#f87171;">SELL</span>
-                                        <span style="color:#6b7280;">GBP/JPY</span>
-                                    </div>
-                                    <div class="text-xs" style="color:#4b5563;">Entry 188.50 · TP 187.00</div>
-                                </div>
-                                <div class="rounded-lg p-2.5" style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.15);">
-                                    <div class="flex justify-between text-xs mb-1">
-                                        <span class="font-bold" style="color:#34d399;">BUY</span>
-                                        <span style="color:#6b7280;">DANGCEM</span>
-                                    </div>
-                                    <div class="text-xs" style="color:#4b5563;">Entry ₦608 · TP ₦640</div>
-                                </div>
+                                <div class="rounded-lg p-2.5 mb-2" style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.15);"><div class="flex justify-between text-xs mb-1"><span class="font-bold" style="color:#34d399;">BUY</span><span style="color:#6b7280;">EUR/USD</span></div><div class="text-xs" style="color:#4b5563;">Entry 1.0850 · TP 1.0950 · expires 4h</div></div>
+                                <div class="rounded-lg p-2.5 mb-2" style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);"><div class="flex justify-between text-xs mb-1"><span class="font-bold" style="color:#f87171;">SELL</span><span style="color:#6b7280;">GBP/JPY</span></div><div class="text-xs" style="color:#4b5563;">Entry 188.50 · TP 187.00</div></div>
+                                <div class="rounded-lg p-2.5" style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.15);"><div class="flex justify-between text-xs mb-1"><span class="font-bold" style="color:#34d399;">BUY</span><span style="color:#6b7280;">DANGCEM</span></div><div class="text-xs" style="color:#4b5563;">Entry ₦608 · TP ₦640</div></div>
                             </div>
-                            <!-- Upgrade overlay -->
                             <div id="dash-signals-lock" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,17,23,.82);padding:1rem;gap:.75rem;">
-                                <div class="w-9 h-9 rounded-full flex items-center justify-center" style="background:#1f2937;">
-                                    <i class="fas fa-lock text-xs" style="color:#a78bfa;"></i>
-                                </div>
-                                <div class="text-center">
-                                    <p class="text-xs font-semibold text-white mb-0.5">2 of 3 signals visible</p>
-                                    <p class="text-xs" style="color:#4b5563;">Upgrade to see all active signals</p>
-                                </div>
-                                <a href="/pricing.html"
-                                   class="text-xs font-semibold px-4 py-1.5 rounded-lg text-decoration-none"
-                                   style="background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);color:#a78bfa;">
-                                    Unlock signals · $15/mo →
-                                </a>
+                                <div class="w-9 h-9 rounded-full flex items-center justify-center" style="background:#1f2937;"><i class="fas fa-lock text-xs" style="color:#a78bfa;"></i></div>
+                                <div class="text-center"><p class="text-xs font-semibold text-white mb-0.5">2 of 3 signals visible</p><p class="text-xs" style="color:#4b5563;">Upgrade to see all active signals</p></div>
+                                <a href="/pricing.html" class="text-xs font-semibold px-4 py-1.5 rounded-lg text-decoration-none" style="background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.4);color:#a78bfa;">Unlock signals · $15/mo →</a>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Zone 4: Learning + Blog -->
+                <!-- Learning + AI Insight Row -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4" id="dash-learn-row">
-
-                    <!-- Continue Learning -->
                     <div class="pw-card lg:col-span-2">
                         <div class="pw-card-hdr">
                             <div class="flex items-center gap-2">
@@ -915,25 +842,12 @@
                         </div>
                         <div class="pw-card-body" id="dash-learning-body">
                             <div class="space-y-3 py-1">
-                                <div class="flex gap-3 items-center">
-                                    <div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div>
-                                    <div class="flex-1 space-y-2">
-                                        <div class="shimmer-line w-3/4"></div>
-                                        <div class="shimmer-line-sm w-1/2"></div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3 items-center">
-                                    <div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div>
-                                    <div class="flex-1 space-y-2">
-                                        <div class="shimmer-line w-2/3"></div>
-                                        <div class="shimmer-line-sm w-2/5"></div>
-                                    </div>
-                                </div>
+                                <div class="flex gap-3 items-center"><div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div><div class="flex-1 space-y-2"><div class="shimmer-line w-3/4"></div><div class="shimmer-line-sm w-1/2"></div></div></div>
+                                <div class="flex gap-3 items-center"><div class="w-9 h-9 rounded-lg flex-shrink-0" style="background:#1f2937;"></div><div class="flex-1 space-y-2"><div class="shimmer-line w-2/3"></div><div class="shimmer-line-sm w-2/5"></div></div></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- AI Market Insight -->
                     <div class="pw-card" id="ai-insight-card" style="background:linear-gradient(145deg,#0f0a1f,#1a0a2e);">
                         <div class="pw-card-hdr" style="border-bottom-color:#2d1060;">
                             <div class="flex items-center gap-2">
@@ -963,7 +877,7 @@
                     </div>
                 </div>
 
-                <!-- Blog full width -->
+                <!-- Blog -->
                 <div class="pw-card mb-4" id="dash-blog-row">
                     <div class="pw-card-hdr">
                         <div class="flex items-center gap-2">
@@ -976,30 +890,10 @@
                     </div>
                     <div class="pw-card-body" id="dash-blog-body">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-1">
-                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
-                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
-                                <div class="shimmer-line w-1/3 mb-1"></div>
-                                <div class="shimmer-line w-full mb-1"></div>
-                                <div class="shimmer-line-sm w-2/3"></div>
-                            </div>
-                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
-                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
-                                <div class="shimmer-line w-2/5 mb-1"></div>
-                                <div class="shimmer-line w-3/4 mb-1"></div>
-                                <div class="shimmer-line-sm w-1/2"></div>
-                            </div>
-                            <div class="hidden sm:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
-                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
-                                <div class="shimmer-line w-1/4 mb-1"></div>
-                                <div class="shimmer-line w-full mb-1"></div>
-                                <div class="shimmer-line-sm w-2/5"></div>
-                            </div>
-                            <div class="hidden lg:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;">
-                                <div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div>
-                                <div class="shimmer-line w-1/3 mb-1"></div>
-                                <div class="shimmer-line w-2/3 mb-1"></div>
-                                <div class="shimmer-line-sm w-1/3"></div>
-                            </div>
+                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;"><div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div><div class="shimmer-line w-1/3 mb-1"></div><div class="shimmer-line w-full mb-1"></div><div class="shimmer-line-sm w-2/3"></div></div>
+                            <div style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;"><div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div><div class="shimmer-line w-2/5 mb-1"></div><div class="shimmer-line w-3/4 mb-1"></div><div class="shimmer-line-sm w-1/2"></div></div>
+                            <div class="hidden sm:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;"><div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div><div class="shimmer-line w-1/4 mb-1"></div><div class="shimmer-line w-full mb-1"></div><div class="shimmer-line-sm w-2/5"></div></div>
+                            <div class="hidden lg:block" style="border:1px solid #1f2937;border-radius:.75rem;padding:.85rem;"><div class="h-20 rounded-lg mb-2" style="background:#1f2937;"></div><div class="shimmer-line w-1/3 mb-1"></div><div class="shimmer-line w-2/3 mb-1"></div><div class="shimmer-line-sm w-1/3"></div></div>
                         </div>
                     </div>
                 </div>
@@ -1025,35 +919,17 @@
                     </div>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                        <p class="text-xs text-gray-400 mb-1">Active Signals</p>
-                        <p class="text-2xl font-bold text-white" id="enhanced-stat-active">0</p>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                        <p class="text-xs text-gray-400 mb-1">Avg Confidence</p>
-                        <p class="text-2xl font-bold text-purple-400" id="enhanced-stat-confidence">—</p>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                        <p class="text-xs text-gray-400 mb-1">Win Rate (7d)</p>
-                        <p class="text-2xl font-bold text-green-400" id="enhanced-stat-winrate">—</p>
-                    </div>
-                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                        <p class="text-xs text-gray-400 mb-1">Avg R:R</p>
-                        <p class="text-2xl font-bold text-blue-400" id="enhanced-stat-rr">—</p>
-                    </div>
+                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700"><p class="text-xs text-gray-400 mb-1">Active Signals</p><p class="text-2xl font-bold text-white" id="enhanced-stat-active">0</p></div>
+                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700"><p class="text-xs text-gray-400 mb-1">Avg Confidence</p><p class="text-2xl font-bold text-purple-400" id="enhanced-stat-confidence">—</p></div>
+                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700"><p class="text-xs text-gray-400 mb-1">Win Rate (7d)</p><p class="text-2xl font-bold text-green-400" id="enhanced-stat-winrate">—</p></div>
+                    <div class="bg-gray-800 rounded-xl p-4 border border-gray-700"><p class="text-xs text-gray-400 mb-1">Avg R:R</p><p class="text-2xl font-bold text-blue-400" id="enhanced-stat-rr">—</p></div>
                 </div>
                 <div id="enhanced-signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div class="col-span-full text-center py-12">
-                        <i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i>
-                        <p class="text-gray-400">Loading enhanced signals...</p>
-                    </div>
+                    <div class="col-span-full text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i><p class="text-gray-400">Loading enhanced signals...</p></div>
                 </div>
-                <div class="text-center mt-6">
-                    <button id="loadMoreBtn" class="hidden px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all">Load More Signals</button>
-                </div>
+                <div class="text-center mt-6"><button id="loadMoreBtn" class="hidden px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all">Load More Signals</button></div>
             </section>
 
-            <!-- Signal Detail Modal -->
             <div id="signalModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
                 <div class="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                     <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
@@ -1064,7 +940,7 @@
                 </div>
             </div>
 
-            <!-- TRADING JOURNAL / PERFORMANCE -->
+            <!-- TRADING JOURNAL -->
             <section id="section-journal" class="section hidden">
                 <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 mb-4 md:mb-6">
                     <h4 class="text-base md:text-lg font-bold text-white mb-3 md:mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trade Data</h4>
@@ -1083,11 +959,9 @@
                         <p class="text-sm text-gray-500">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images</p>
                         <p class="text-xs text-purple-400 mt-2" id="selected-format">Select a format above</p>
                     </div>
-                    <div id="upload-status" class="mt-4 hidden"></div>
-                    <div id="journal-upload-loading" class="hidden mt-4 text-center">
-                        <div class="inline-flex items-center gap-2 text-blue-400">
-                            <i class="fas fa-spinner fa-spin"></i><span>Analyzing with AI...</span>
-                        </div>
+                    <div id="upload-status" class="mt-4 hidden" role="status" aria-live="polite"></div>
+                    <div id="journal-upload-loading" class="hidden mt-4 text-center" role="status" aria-live="polite">
+                        <div class="inline-flex items-center gap-2 text-blue-400"><i class="fas fa-spinner fa-spin"></i><span>Analyzing with AI...</span></div>
                     </div>
                 </div>
                 <div id="performance-overview" class="hidden mb-6">
@@ -1103,14 +977,12 @@
                         <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-orange-400" id="stat-max-drawdown">--</div><div class="text-xs text-gray-400">Max DD</div></div>
                         <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-green-400" id="stat-winning-streak">--</div><div class="text-xs text-gray-400">Win Streak</div></div>
                         <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-red-400" id="stat-losing-streak">--</div><div class="text-xs text-gray-400">Loss Streak</div></div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div><div class="text-xs text-gray-400">Net P&amp;L</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div><div class="text-xs text-gray-400">Net P&L</div></div>
                     </div>
                     <div id="strategy-detection" class="hidden bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-3 md:p-4 border border-blue-700/50 mb-4 md:mb-6">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <div><span class="text-sm text-gray-400">Detected Strategy</span><h5 class="text-xl font-bold text-blue-400" id="detected-strategy">--</h5></div>
-                            <div class="text-left md:text-right"><span class="text-sm text-gray-400">Risk Consistency</span>
-                                <div class="flex items-center gap-2"><div class="w-32 bg-gray-700 rounded-full h-2"><div id="risk-consistency-bar" class="bg-green-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div></div><span class="text-lg font-bold text-green-400" id="risk-consistency-score">--%</span></div>
-                            </div>
+                            <div class="text-left md:text-right"><span class="text-sm text-gray-400">Risk Consistency</span><div class="flex items-center gap-2"><div class="w-32 bg-gray-700 rounded-full h-2"><div id="risk-consistency-bar" class="bg-green-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div></div><span class="text-lg font-bold text-green-400" id="risk-consistency-score">--%</span></div></div>
                         </div>
                     </div>
                 </div>
@@ -1137,9 +1009,7 @@
                     <h4 class="font-bold text-white mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Trade History</h4>
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs md:text-sm text-left">
-                            <thead class="text-xs text-gray-500 uppercase bg-gray-900">
-                                <tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Symbol</th><th class="px-4 py-3">Direction</th><th class="px-4 py-3">Entry</th><th class="px-4 py-3">Exit</th><th class="px-4 py-3">P&amp;L</th></tr>
-                            </thead>
+                            <thead class="text-xs text-gray-500 uppercase bg-gray-900"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Symbol</th><th class="px-4 py-3">Direction</th><th class="px-4 py-3">Entry</th><th class="px-4 py-3">Exit</th><th class="px-4 py-3">P&L</th></tr></thead>
                             <tbody id="trades-table-body" class="text-gray-300"></tbody>
                         </table>
                     </div>
@@ -1151,7 +1021,7 @@
                         <div><label class="block text-sm text-gray-400 mb-1">Direction</label><select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"><option value="BUY">Buy</option><option value="SELL">Sell</option></select></div>
                         <div><label class="block text-sm text-gray-400 mb-1">Entry Price</label><input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required></div>
                         <div><label class="block text-sm text-gray-400 mb-1">Exit Price</label><input type="number" id="manual-exit" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"></div>
-                        <div><label class="block text-sm text-gray-400 mb-1">P&amp;L ($)</label><input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required></div>
+                        <div><label class="block text-sm text-gray-400 mb-1">P&L ($)</label><input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required></div>
                         <div><label class="block text-sm text-gray-400 mb-1">Volume</label><input type="number" id="manual-volume" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="0.10"></div>
                         <div class="md:col-span-2 lg:col-span-2 flex items-end"><button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors"><i class="fas fa-plus mr-2"></i>Add Trade</button></div>
                     </form>
@@ -1196,35 +1066,32 @@
                             <div class="bg-gray-800 rounded-xl flex flex-col h-full border border-gray-700 overflow-hidden">
                                 <div class="p-4 border-b border-gray-700 bg-gradient-to-r from-purple-900/50 to-blue-900/50 flex justify-between items-center">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center animate-pulse">
-                                            <i class="fas fa-robot text-white"></i>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-bold text-white">Gopipways AI Copilot</h3>
-                                            <p class="text-xs text-gray-400">Platform Intelligence System</p>
-                                        </div>
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center animate-pulse"><i class="fas fa-robot text-white"></i></div>
+                                        <div><h3 class="font-bold text-white">Gopipways AI Copilot</h3><p class="text-xs text-gray-400">Platform Intelligence System</p></div>
                                     </div>
                                     <div class="flex gap-2">
                                         <button onclick="dashboard.clearMentorChat()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"><i class="fas fa-trash-alt mr-1"></i>Clear</button>
                                         <button onclick="dashboard.toggleMentorHelp()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"><i class="fas fa-question-circle mr-1"></i>Help</button>
                                     </div>
                                 </div>
-                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50">
+                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50" aria-live="polite">
                                     <div class="flex gap-3 animate-fade-in">
                                         <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-xs text-white"></i></div>
                                         <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
-                                            <p class="text-gray-200 text-sm leading-relaxed">👋 Welcome! I'm your <strong>Gopipways AI Copilot</strong>. Ask me anything about trading, your progress, or active signals.</p>
-                                            <p class="mt-2 text-xs text-gray-400">Try typing <code class="bg-gray-800 px-1 rounded">/next</code> or <code class="bg-gray-800 px-1 rounded">/signals</code></p>
+                                            <p class="text-gray-200 text-sm leading-relaxed">👋 Welcome! I'm your <strong>Gopipways AI Copilot</strong>. I have access to your:</p>
+                                            <ul class="mt-2 space-y-1 text-sm text-gray-300">
+                                                <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Performance Analytics</li>
+                                                <li class="flex items-center gap-2"><i class="fas fa-satellite-dish text-green-400 text-xs"></i> Active Signals</li>
+                                                <li class="flex items-center gap-2"><i class="fas fa-graduation-cap text-purple-400 text-xs"></i> Educational Resources</li>
+                                                <li class="flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-xs"></i> Chart Analysis History</li>
+                                            </ul>
+                                            <p class="mt-2 text-xs text-gray-400">Try typing <code class="bg-gray-800 px-1 rounded">/review-trades</code> or <code class="bg-gray-800 px-1 rounded">/signals</code></p>
                                         </div>
                                     </div>
                                 </div>
                                 <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700">
                                     <div class="flex items-center gap-2 text-gray-400 text-sm">
-                                        <div class="flex gap-1">
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0s"></div>
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0.1s"></div>
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
-                                        </div>
+                                        <div class="flex gap-1"><div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0s"></div><div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div><div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div></div>
                                         <span class="text-xs">AI is analyzing your data...</span>
                                     </div>
                                 </div>
@@ -1241,18 +1108,12 @@
                                         <input type="text" id="mentor-input" placeholder="Ask about your trading..."
                                             class="flex-1 min-w-0 px-3 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                                             onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
-                                        <button onclick="dashboard.sendMentorMessage()" class="flex-shrink-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-3 rounded-lg transition-all">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
+                                        <button onclick="dashboard.sendMentorMessage()" class="flex-shrink-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-3 rounded-lg transition-all"><i class="fas fa-paper-plane"></i></button>
                                     </div>
                                 </div>
                             </div>
                             <div id="mentor-recommendations" class="hidden mt-3 rounded-xl" style="border:1px solid rgba(124,58,237,.25);background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(59,130,246,.05));">
-                                <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color:rgba(124,58,237,.2);">
-                                    <i class="fas fa-graduation-cap text-sm" style="color:#a78bfa;"></i>
-                                    <span class="text-sm font-semibold text-white">Recommended Lessons</span>
-                                    <span id="mentor-rec-count" class="ml-auto text-xs px-2 py-0.5 rounded-full font-bold" style="background:rgba(124,58,237,.2);color:#c4b5fd;">0</span>
-                                </div>
+                                <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color:rgba(124,58,237,.2);"><i class="fas fa-graduation-cap text-sm" style="color:#a78bfa;"></i><span class="text-sm font-semibold text-white">Recommended Lessons</span><span id="mentor-rec-count" class="ml-auto text-xs px-2 py-0.5 rounded-full font-bold" style="background:rgba(124,58,237,.2);color:#c4b5fd;">0</span></div>
                                 <div id="mentor-rec-grid" class="p-3 flex flex-col gap-3"></div>
                             </div>
                         </div>
@@ -1262,10 +1123,7 @@
                                 <div id="coach-insights-loading" class="text-center py-4"><div class="inline-flex items-center gap-2 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin"></i> Analyzing...</div></div>
                                 <div id="coach-insights-content" class="hidden space-y-4">
                                     <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-3 border border-purple-700/30"><div class="text-xs text-gray-400 mb-1">Trading Personality</div><div id="trading-personality" class="text-lg font-bold text-purple-400">--</div></div>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div class="bg-gray-900 rounded-lg p-3 text-center"><div id="discipline-score" class="text-2xl font-bold text-blue-400">--</div><div class="text-xs text-gray-500">Discipline</div></div>
-                                        <div class="bg-gray-900 rounded-lg p-3 text-center"><div id="consistency-score" class="text-2xl font-bold text-green-400">--</div><div class="text-xs text-gray-500">Consistency</div></div>
-                                    </div>
+                                    <div class="grid grid-cols-2 gap-3"><div class="bg-gray-900 rounded-lg p-3 text-center"><div id="discipline-score" class="text-2xl font-bold text-blue-400">--</div><div class="text-xs text-gray-500">Discipline</div></div><div class="bg-gray-900 rounded-lg p-3 text-center"><div id="consistency-score" class="text-2xl font-bold text-green-400">--</div><div class="text-xs text-gray-500">Consistency</div></div></div>
                                     <div><div class="text-xs text-gray-400 mb-2 flex items-center gap-1"><i class="fas fa-check-circle text-green-400"></i> Strengths</div><ul id="ai-strengths-list" class="space-y-1"><li class="text-sm text-gray-300 flex items-start gap-2"><span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span><span>Loading...</span></li></ul></div>
                                     <div><div class="text-xs text-gray-400 mb-2 flex items-center gap-1"><i class="fas fa-exclamation-triangle text-yellow-400"></i> Focus Areas</div><ul id="ai-weaknesses-list" class="space-y-1"><li class="text-sm text-gray-300 flex items-start gap-2"><span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span><span>Loading...</span></li></ul></div>
                                     <div class="flex justify-between items-center text-sm border-t border-gray-700 pt-3"><span class="text-gray-400">Risk Profile:</span><span id="risk-profile" class="px-2 py-1 bg-gray-700 rounded text-white text-xs">--</span></div>
@@ -1273,9 +1131,7 @@
                             </div>
                             <div class="bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-xl p-5 border border-blue-700/30">
                                 <h4 class="font-bold text-white mb-3 flex items-center gap-2"><i class="fas fa-tasks text-blue-400"></i> Next Steps</h4>
-                                <ul id="next-steps-list" class="space-y-2 text-sm text-gray-300">
-                                    <li class="flex items-start gap-2"><span class="text-blue-400 mt-0.5">→</span><span>Start a conversation with the AI to get personalized steps</span></li>
-                                </ul>
+                                <ul id="next-steps-list" class="space-y-2 text-sm text-gray-300"><li class="flex items-start gap-2"><span class="text-blue-400 mt-0.5">→</span><span>Start a conversation with the AI to get personalized steps</span></li></ul>
                             </div>
                             <div id="mentor-help-panel" class="hidden bg-gray-800 rounded-xl p-5 border border-gray-700">
                                 <h4 class="font-bold text-white mb-3">Quick Commands</h4>
@@ -1302,6 +1158,53 @@
         </div>
     </main>
 
+    <!-- Mobile Bottom Nav Bar -->
+    <nav id="mobile-bottom-nav" aria-label="Mobile navigation">
+        <button class="mob-nav-btn active" id="mob-btn-home" onclick="_mobNav('dashboard', this)" aria-label="Home">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-btn-signals" onclick="_mobNav('enhanced-signals', this)" aria-label="Signals">
+            <i class="fas fa-satellite-dish"></i>
+            <span>Signals</span>
+        </button>
+        <!-- Centre elevated Analyse button -->
+        <div class="mob-nav-centre">
+            <button class="mob-nav-centre-btn" onclick="dashboard.navigate('analysis')" aria-label="Chart Analysis">
+                <i class="fas fa-chart-bar"></i>
+                <span>Analyse</span>
+            </button>
+        </div>
+        <button class="mob-nav-btn" id="mob-btn-academy" onclick="window.location.href='/academy'" aria-label="Academy">
+            <i class="fas fa-graduation-cap"></i>
+            <span>Academy</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-btn-mentor" onclick="_mobNav('mentor', this)" aria-label="AI Mentor">
+            <i class="fas fa-robot"></i>
+            <span>Mentor</span>
+        </button>
+    </nav>
+
+    <script>
+    // Mobile nav active state helper
+    function _mobNav(section, btn) {
+        document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        dashboard.navigate(section);
+    }
+    // Keep mobile nav in sync with sidebar navigation
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.nav-link[data-section]').forEach(link => {
+            link.addEventListener('click', () => {
+                const sec = link.dataset.section;
+                const map = { dashboard:'mob-btn-home', 'enhanced-signals':'mob-btn-signals', mentor:'mob-btn-mentor' };
+                document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+                if (map[sec]) document.getElementById(map[sec])?.classList.add('active');
+            });
+        });
+    });
+    </script>
+
     <script src="/js/modules/dashboard.js"></script>
     <script src="/js/modules/chart_analysis.js"></script>
     <script src="/js/modules/admin.js"></script>
@@ -1312,74 +1215,6 @@
     <script src="/js/modules/enhanced_signals.js"></script>
     <script src="/js/onboarding.js"></script>
     <script src="/js/modules/risk_calculator.js"></script>
-
-    <!-- ── Mobile Bottom Navigation ── -->
-    <nav id="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
-        <button class="mobile-nav-btn active" id="mnav-home"
-                onclick="dashboard.navigate('dashboard')" aria-label="Home">
-            <i class="fas fa-home"></i>
-            <span>Home</span>
-        </button>
-        <button class="mobile-nav-btn" id="mnav-signals"
-                onclick="dashboard.navigate('enhanced-signals')" aria-label="Signals">
-            <i class="fas fa-satellite-dish"></i>
-            <span>Signals</span>
-        </button>
-        <!-- Analyse — FAB-style centre button -->
-        <button class="mobile-nav-btn" id="mnav-analyse"
-                onclick="dashboard.navigate('analysis')" aria-label="Analyse Chart">
-            <div class="mnav-fab-wrap">
-                <i class="fas fa-chart-bar"></i>
-            </div>
-            <span>Analyse</span>
-        </button>
-        <a class="mobile-nav-btn" id="mnav-academy"
-           href="/academy" aria-label="Trading Academy">
-            <i class="fas fa-graduation-cap"></i>
-            <span>Academy</span>
-        </a>
-        <button class="mobile-nav-btn" id="mnav-mentor"
-                onclick="dashboard.navigate('mentor')" aria-label="AI Mentor">
-            <i class="fas fa-robot"></i>
-            <span>Mentor</span>
-        </button>
-    </nav>
-
-    <script>
-    // ── Mobile bottom nav active state sync ──────────────────────────────
-    // Watches .nav-link.active class via MutationObserver — no dashboard.js patch needed
-    (function() {
-        const MAP = {
-            'dashboard':        'mnav-home',
-            'analysis':         'mnav-analyse',
-            'enhanced-signals': 'mnav-signals',
-            'signals':          'mnav-signals',
-            'mentor':           'mnav-mentor',
-        };
-
-        function syncMobileNav() {
-            const activeLink = document.querySelector('.nav-link.active');
-            const section = activeLink?.dataset?.section;
-            document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
-            const id = MAP[section] || 'mnav-home';
-            document.getElementById(id)?.classList.add('active');
-        }
-
-        function setupObserver() {
-            const links = document.querySelectorAll('.nav-link');
-            if (!links.length) { setTimeout(setupObserver, 150); return; }
-            const obs = new MutationObserver(syncMobileNav);
-            links.forEach(link => obs.observe(link, { attributes: true, attributeFilter: ['class'] }));
-            syncMobileNav();
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', setupObserver);
-        } else {
-            setupObserver();
-        }
-    })();
-    </script>
 
 </body>
 </html>

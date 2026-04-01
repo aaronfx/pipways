@@ -914,27 +914,15 @@ async def reset_password(body: ResetPasswordRequest):
     # Hash the new password
     hashed = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
 
-    # B3 — update password; column verified as hashed_password from auth.py registration INSERT
-    # If your auth.py uses a different column name, update here to match
+    # B3 — column confirmed as password_hash from DB discovery log
     try:
-        result = await database.execute(
-            "UPDATE users SET hashed_password = :pw WHERE id = :uid",
+        await database.execute(
+            "UPDATE users SET password_hash = :pw WHERE id = :uid",
             {"pw": hashed, "uid": row["user_id"]}
         )
     except Exception as e:
-        # Column name mismatch guard — try alternate column names used by some FastAPI templates
-        if "hashed_password" in str(e):
-            try:
-                await database.execute(
-                    "UPDATE users SET password_hash = :pw WHERE id = :uid",
-                    {"pw": hashed, "uid": row["user_id"]}
-                )
-            except Exception as e2:
-                print(f"[EMAIL/RESET] Failed to update password (tried both column names): {e2}", flush=True)
-                raise HTTPException(500, "Failed to update password. Please try again.")
-        else:
-            print(f"[EMAIL/RESET] Failed to update password: {e}", flush=True)
-            raise HTTPException(500, "Failed to update password. Please try again.")
+        print(f"[EMAIL/RESET] Failed to update password: {e}", flush=True)
+        raise HTTPException(500, "Failed to update password. Please try again.")
 
     # Mark token as used
     await database.execute(

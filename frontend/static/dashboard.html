@@ -468,12 +468,8 @@
             <a href="#" data-section="stocks" class="nav-link">
                 <i class="fas fa-chart-pie nav-icon" style="color:#34d399;"></i><span>AI Stock Research</span>
             </a>
-            <a href="#" data-section="signals" class="nav-link">
-                <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
-            </a>
             <a href="#" data-section="enhanced-signals" class="nav-link">
-                <i class="fas fa-chart-bar nav-icon" style="color:#a78bfa;"></i>
-                <span>Enhanced Signals</span>
+                <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
                 <span class="ml-auto bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">New</span>
             </a>
 
@@ -677,7 +673,7 @@
                     </a>
                     <span class="text-gray-800 flex-shrink-0" style="font-size:.6rem;">·</span>
                     <!-- Signals -->
-                    <button onclick="dashboard.navigate('signals')"
+                    <button onclick="dashboard.navigate('enhanced-signals')"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all"
                             style="background:#111827;border:1px solid #1f2937;"
                             onmouseover="this.style.borderColor='#f472b6'" onmouseout="this.style.borderColor='#1f2937'">
@@ -1129,16 +1125,6 @@
                 <div id="dash-tools-row" class="hidden"><div id="dash-courses-body"></div></div>
                 <span id="ai-insight-body-old" class="hidden"></span>
 
-            </section>
-
-            <!-- SIGNALS -->
-            <section id="section-signals" class="section hidden">
-                <!-- Live indicator pill — subtle, no duplicate heading -->
-                <div class="flex items-center gap-2 mb-5">
-                    <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
-                    <span class="text-xs text-gray-400">Live signals — updated in real time</span>
-                </div>
-                <div id="signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
             </section>
 
             <!-- ENHANCED SIGNALS -->

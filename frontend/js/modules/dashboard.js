@@ -354,6 +354,10 @@ const DashboardController = class {
     }
 
     navigate(section) {
+        // Navigation guard: cancel any in-flight dashboard async work
+        // so callbacks don't write into the wrong section after quick nav
+        this._currentSection = section;
+
         // ── Update nav active state ───────────────────────────────────────
         // Reset all nav links
         document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
@@ -427,7 +431,6 @@ const DashboardController = class {
             switch(section) {
                 case 'dashboard': this.loadDashboardStats(); break;
                 case 'signals':   // redirected — fall through to enhanced-signals
-                case 'enhanced-signals':
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
                         // init() on first visit (registers tabs + interval), loadSignals() after that
@@ -528,7 +531,10 @@ const DashboardController = class {
         this._initSessionPill();
         this._initSocialProof();
         this._initUsageBars();
+        const _navAtStart = this._currentSection;
         await this._loadDashboardCards();
+        // If user navigated away while cards were loading, don't write to DOM
+        if (this._currentSection !== _navAtStart) return;
     }
 
     _initSessionPill() {
@@ -593,7 +599,7 @@ const DashboardController = class {
         const n = counts[new Date().getDate() % counts.length];
         el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>'
             + '<span style="color:#9ca3af;font-size:.75rem;">'
-            + '<strong style="color:white;">' + n + '</strong> chart analyses run today by Pipways traders</span>';
+            + '<strong style="color:white;">' + n + '</strong> chart analyses run today by Gopipways traders</span>';
     }
 
     _initUsageBars() {
@@ -717,13 +723,14 @@ const DashboardController = class {
         const activeSignals = signalArr.filter(s => s.status === 'active').length;
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
         // Academy lessons completed count for the stat chip
+        // /learning/progress/:userId → { completed_lessons } (best source)
+        // /learning/resume → { type, overall_percent } — no level_percent or completed_count
         const academyLessonsCount = (() => {
+            if (progress?.completed_lessons != null) return String(progress.completed_lessons);
             if (!academyResume) return '0';
             if (academyResume.type === 'complete') return '28';
-            if (academyResume.completed_count != null) return String(academyResume.completed_count);
-            // lesson_id is the DB id of the NEXT lesson — use level_percent as proxy
-            if (academyResume.level_percent > 0) {
-                const approx = Math.round((academyResume.level_percent / 100) * 12); // beginner has ~12 lessons
+            if (academyResume.overall_percent > 0) {
+                const approx = Math.round((academyResume.overall_percent / 100) * 28);
                 return approx > 0 ? String(approx) : '1';
             }
             return '0';
@@ -766,7 +773,7 @@ const DashboardController = class {
             } else {
                 // In progress — show level progress bars (the CTA is in "Your Next Step" card)
                 const levelName  = academyResume.level || 'Beginner';
-                const levelPct   = academyResume.level_percent || 0;
+                const levelPct   = 0; // level_percent not returned by /learning/resume
                 const totalPct   = academyResume.overall_percent || 0;
                 const lessonTitle = academyResume.title || 'Next Lesson';
                 const moduleName  = academyResume.module || '';
@@ -779,22 +786,20 @@ const DashboardController = class {
                     { name: 'Advanced',     color: '#f59e0b' },
                 ];
                 
-                // Calculate progress for each level based on progress data
+                // Bug 5 fix: use progress.summary array
+                // summary items: { level_name: "Beginner"|"Intermediate"|"Advanced", percent, completed, total }
+                const _summaryMap = {};
+                if (progress?.summary?.length) {
+                    progress.summary.forEach(s => {
+                        _summaryMap[(s.level_name || '').toLowerCase()] = Math.round(s.percent || 0);
+                    });
+                }
+
                 const progBars = levels.map(lv => {
-                    let pct = 0;
-                    
-                    // Try to get level progress from the progress data
-                    if (progress && progress.levels) {
-                        const levelKey = lv.name.toLowerCase();
-                        const levelData = progress.levels[levelKey];
-                        if (levelData) {
-                            pct = Math.round(levelData.percentage || 0);
-                        }
-                    } else if (levelName === lv.name) {
-                        // Fallback to current level percentage
-                        pct = Math.round(levelPct);
-                    }
-                    
+                    const key = lv.name.toLowerCase();
+                    const pct = _summaryMap[key] != null ? _summaryMap[key]
+                                : (levelName === lv.name ? Math.round(levelPct) : 0);
+
                     return '<div style="margin-bottom:.6rem;">'
                         + '<div class="flex items-center justify-between mb-1">'
                         + '<span class="text-xs" style="color:' + lv.color + ';">' + lv.name + '</span>'
@@ -861,7 +866,8 @@ const DashboardController = class {
         }
 
         // ── Card 3: Trading Academy Progress ────────────────────────────────
-        const academyEl = document.getElementById('dash-academy-body');
+        // Bug 4: dash-academy-body not in HTML — skip
+        const academyEl = null;
         if (academyEl && progress) {
             const progressData = progress.levels || {
                 beginner: { percentage: 0, completed: 0, total: 12 },

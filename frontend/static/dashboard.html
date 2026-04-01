@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gopipways — Trading Education & Research</title>
-    <!-- Silence Tailwind CDN development warning (safe in production) -->
     <script>
     (function() {
         const _warn = console.warn.bind(console);
@@ -16,114 +15,65 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Usage manager — loads before page scripts, intercepts 402s globally -->
     <script src="/js/usage.js"></script>
     <script>
-    // ── Pipways Markdown Renderer ─────────────────────────────────────────
-    // Self-contained — no external library dependency
-    // Handles: **bold**, *italic*, `code`, bullet lists, numbered lists, line breaks
     (function() {
         function renderMd(text) {
             if (!text) return '';
-
-            // Process line by line for accurate list and paragraph detection
             var lines = text.split('\n');
             var output = [];
             var inList = false;
             var listType = 'ul';
-
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i];
-
-                // Detect bullet list items: • or - or * at start
                 var bulletMatch = line.match(/^[•\-\*] (.+)$/);
-                // Detect numbered list items: 1. 2. etc
                 var numberedMatch = line.match(/^\d+\.\s+(.+)$/);
-
                 if (bulletMatch || numberedMatch) {
                     var lt = bulletMatch ? 'ul' : 'ol';
-                    if (!inList) {
-                        output.push('<' + lt + '>');
-                        inList = true;
-                        listType = lt;
-                    }
+                    if (!inList) { output.push('<' + lt + '>'); inList = true; listType = lt; }
                     var itemText = bulletMatch ? bulletMatch[1] : numberedMatch[1];
                     output.push('<li>' + inlineFormat(itemText) + '</li>');
                 } else {
-                    if (inList) {
-                        output.push('</' + listType + '>');
-                        inList = false;
-                    }
-                    if (line.trim() === '') {
-                        // Empty line = paragraph break
-                        output.push('<br>');
-                    } else {
-                        output.push('<p>' + inlineFormat(line) + '</p>');
-                    }
+                    if (inList) { output.push('</' + listType + '>'); inList = false; }
+                    if (line.trim() === '') { output.push('<br>'); }
+                    else { output.push('<p>' + inlineFormat(line) + '</p>'); }
                 }
             }
-
             if (inList) output.push('</' + listType + '>');
             return output.join('');
         }
-
         function inlineFormat(text) {
-            // Escape HTML special chars first
-            text = text.replace(/&/g, '&amp;')
-                       .replace(/</g, '&lt;')
-                       .replace(/>/g, '&gt;');
-            // Bold: **text**
-            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-            // Italic: *text* (not preceded/followed by another *)
-            text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
-            // Inline code: `text`
-            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            text = text.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+            text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g,'<em>$1</em>');
+            text = text.replace(/`([^`]+)`/g,'<code>$1</code>');
             return text;
         }
-
         window._renderMd = renderMd;
     })();
     </script>
-    <!-- Quill rich-text editor (blog editor only) -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        /* ── Performance Analytics — mobile overrides ── */
         @media (max-width:767px) {
-            /* Stat tile font sizes */
             #analytics-results .text-xs { font-size:.6rem; }
             .stat-value { font-size:.85rem !important; }
-            /* Equity curve height */
             #equity-curve-chart { max-height:180px; }
             #trade-distribution-chart { max-height:160px; }
             #monthly-performance-chart { max-height:160px; }
-            /* AI coach text */
             #ai-coach-section .text-xs { font-size:.68rem; }
             #ai-coach-section h4 { font-size:.9rem; }
-            /* Format buttons — icon only on tiny screens */
-            @media (max-width:380px) {
-                .format-btn .format-label { display:none; }
-            }
-            /* Improvements list items */
+            @media (max-width:380px) { .format-btn .format-label { display:none; } }
             #ai-coach-section li { font-size:.78rem; }
-            /* Trade table scroll hint */
-            #trade-history .overflow-x-auto::after {
-                content: "";
-            }
         }
-
-        /* Mobile: remove blue tap flash, prevent text selection on cards */
         a, button { -webkit-tap-highlight-color: transparent; }
         .pw-card a, .pw-card button { user-select:none; -webkit-user-select:none; }
-        /* ── Scrollbar ── */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
-
-        /* ── Animations ── */
         @keyframes fadeIn  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         @keyframes ticker  { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
         @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.4;} }
@@ -132,15 +82,10 @@
         @keyframes shimmer { 0%{background-position:-400px 0;} 100%{background-position:400px 0;} }
         .shimmer-line { height:12px; border-radius:6px; background:linear-gradient(90deg,#1f2937 25%,#374151 50%,#1f2937 75%); background-size:800px 100%; animation:shimmer 1.4s ease-in-out infinite; }
         .shimmer-line-sm { height:8px; border-radius:4px; background:linear-gradient(90deg,#1f2937 25%,#374151 50%,#1f2937 75%); background-size:800px 100%; animation:shimmer 1.4s ease-in-out infinite; }
-        /* ── Touch: pause ticker ── */
         .ticker-track { touch-action: none; }
         .animate-fade-in { animation: fadeIn 0.45s ease-out both; }
         .count-animate    { animation: countUp 0.4s ease-out both; }
-
-        /* ── Chart containers ── */
         .chart-container { position:relative; height:300px; width:100%; }
-
-        /* ── Ticker ── */
         .ticker-wrap { overflow:hidden; background:linear-gradient(90deg,#0f172a,#1e1b4b,#0f172a); border-bottom:1px solid #1e293b; padding:0.4rem 0; }
         .ticker-track { display:flex; gap:0; width:max-content; animation: ticker 35s linear infinite; }
         .ticker-track:hover { animation-play-state:paused; }
@@ -149,10 +94,6 @@
         .ticker-price{ color:#94a3b8; font-family:monospace; }
         .ticker-up   { color:#34d399; font-weight:600; }
         .ticker-dn   { color:#f87171; font-weight:600; }
-
-        /* ── Sidebar polish (kept for compatibility) ── */
-
-        /* ── Chart analysis ── */
         .upload-area { border:2px dashed #4b5563; border-radius:.75rem; padding:2rem; text-align:center; cursor:pointer; transition:all .2s; background:#111827; }
         .upload-area:hover { border-color:#7c3aed; background:#1f2937; }
         .card { background:#1f2937; border:1px solid #374151; border-radius:.75rem; padding:1.5rem; }
@@ -178,86 +119,34 @@
         .badge-primary   { background:rgba(124,58,237,.2);  color:#a78bfa; }
         .alert      { padding:1rem; border-radius:.5rem; margin-bottom:1rem; }
         .alert-error{ background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); color:#f87171; }
-
-        /* ── Enhanced Signals Styles ── */
-        .signal-card {
-            background: linear-gradient(135deg, #1a1e24, #0f1419);
-            border: 1px solid #374151;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .signal-card:hover {
-            border-color: #8b5cf6;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        }
-        .live-badge {
-            display: inline-flex; align-items: center; gap: 4px;
-            padding: 2px 8px; border-radius: 9999px;
-            background: rgba(34, 197, 94, 0.2); color: #22c55e;
-            font-size: 10px; font-weight: 600; text-transform: uppercase;
-        }
-        .live-badge::before {
-            content: ''; width: 6px; height: 6px;
-            background: #22c55e; border-radius: 50%;
-            animation: pulse-dot 2s infinite;
-        }
-        .pattern-badge {
-            padding: 2px 8px; border-radius: 6px;
-            background: rgba(139, 92, 246, 0.2); color: #a78bfa;
-            font-size: 10px; font-weight: 600; text-transform: uppercase;
-        }
-        .timeframe-badge {
-            padding: 2px 8px; border-radius: 6px;
-            background: rgba(59, 130, 246, 0.2); color: #60a5fa;
-            font-size: 10px; font-weight: 600;
-        }
-        .buy-stop {
-            padding: 4px 12px; border-radius: 6px;
-            background: rgba(34, 197, 94, 0.2); color: #22c55e;
-            font-size: 12px; font-weight: 700;
-        }
-        .sell-stop {
-            padding: 4px 12px; border-radius: 6px;
-            background: rgba(239, 68, 68, 0.2); color: #ef4444;
-            font-size: 12px; font-weight: 700;
-        }
-        .trade-levels {
-            display: grid; grid-template-columns: repeat(3, 1fr);
-            gap: 8px; margin-bottom: 16px;
-        }
-        .level-item {
-            text-align: center; padding: 8px;
-            background: rgba(31, 41, 55, 0.5); border-radius: 8px;
-        }
+        .signal-card { background: linear-gradient(135deg, #1a1e24, #0f1419); border: 1px solid #374151; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .signal-card:hover { border-color: #8b5cf6; transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .live-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; background: rgba(34,197,94,0.2); color: #22c55e; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .live-badge::before { content: ''; width: 6px; height: 6px; background: #22c55e; border-radius: 50%; animation: pulse-dot 2s infinite; }
+        .pattern-badge { padding: 2px 8px; border-radius: 6px; background: rgba(139,92,246,0.2); color: #a78bfa; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .timeframe-badge { padding: 2px 8px; border-radius: 6px; background: rgba(59,130,246,0.2); color: #60a5fa; font-size: 10px; font-weight: 600; }
+        .buy-stop { padding: 4px 12px; border-radius: 6px; background: rgba(34,197,94,0.2); color: #22c55e; font-size: 12px; font-weight: 700; }
+        .sell-stop { padding: 4px 12px; border-radius: 6px; background: rgba(239,68,68,0.2); color: #ef4444; font-size: 12px; font-weight: 700; }
+        .trade-levels { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+        .level-item { text-align: center; padding: 8px; background: rgba(31,41,55,0.5); border-radius: 8px; }
         .level-label { display: block; font-size: 10px; color: #9ca3af; margin-bottom: 4px; }
         .level-value { display: block; font-size: 14px; font-weight: 700; font-family: monospace; }
-        .level-entry { color: #60a5fa; }
-        .level-target { color: #22c55e; }
-        .level-stop { color: #ef4444; }
-        .sentiment-bar {
-            height: 6px; background: #374151; border-radius: 3px; overflow: hidden;
-        }
+        .level-entry { color: #60a5fa; } .level-target { color: #22c55e; } .level-stop { color: #ef4444; }
+        .sentiment-bar { height: 6px; background: #374151; border-radius: 3px; overflow: hidden; }
         .sentiment-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-        .sentiment-bullish { background: linear-gradient(90deg, #22c55e, #16a34a); }
-        .sentiment-bearish { background: linear-gradient(90deg, #ef4444, #dc2626); }
+        .sentiment-bullish { background: linear-gradient(90deg,#22c55e,#16a34a); }
+        .sentiment-bearish { background: linear-gradient(90deg,#ef4444,#dc2626); }
         .expiry-time { color: #fbbf24; font-weight: 600; }
-        .learn-btn {
-            padding: 6px 12px; border-radius: 6px;
-            background: #7c3aed; color: white;
-            font-size: 12px; font-weight: 600;
-            border: none; cursor: pointer; transition: all 0.2s;
-        }
+        .learn-btn { padding: 6px 12px; border-radius: 6px; background: #7c3aed; color: white; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
         .learn-btn:hover { background: #6d28d9; }
-        .loading    { text-align:center; padding:2rem; }
-        .spinner    { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
+        .loading { text-align:center; padding:2rem; }
+        .spinner { width:40px; height:40px; border:3px solid #374151; border-top-color:#7c3aed; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 1rem; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .text-primary { color:#7c3aed; } .text-success { color:#10b981; } .text-danger { color:#ef4444; }
-        .text-warning { color:#f59e0b; } .text-muted   { color:#9ca3af; }
+        .text-warning { color:#f59e0b; } .text-muted { color:#9ca3af; }
         .mr-2 { margin-right:.5rem; } .mt-1 { margin-top:.25rem; } .mb-0 { margin-bottom:0 !important; }
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
         .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-        /* ── Toast notifications ── */
-        /* ── Mentor message markdown styles ── */
         .mentor-prose { font-size:.875rem; line-height:1.7; color:#d1d5db; }
         .mentor-prose strong { color:#f9fafb; font-weight:600; }
         .mentor-prose em { color:#c4b5fd; font-style:italic; }
@@ -271,143 +160,201 @@
         .mentor-prose h3 { color:white; font-weight:700; font-size:.9rem; margin:.75rem 0 .3rem; }
         .mentor-prose hr { border-color:#374151; margin:.6rem 0; }
         .mentor-prose a { color:#a78bfa; text-decoration:underline; }
-
-        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
-            padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px;
-            box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
+        .pw-toast { position:fixed; bottom:5rem; right:1rem; z-index:99999; display:flex; align-items:center; gap:.75rem; padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:300px; box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
         .pw-toast.success { background:rgba(16,185,129,.92); color:white; border:1px solid rgba(52,211,153,.4); }
         .pw-toast.error   { background:rgba(239,68,68,.92);  color:white; border:1px solid rgba(248,113,113,.4); }
         .pw-toast.info    { background:rgba(59,130,246,.92); color:white; border:1px solid rgba(96,165,250,.4); }
         .pw-toast.warning { background:rgba(245,158,11,.92); color:white; border:1px solid rgba(251,191,36,.4); }
         @keyframes toast-out { to { opacity:0; transform:translateX(110%); } }
-        /* ── Stat chip count-up ── */
         .stat-updated { animation: glowPulse .6s ease-out; }
-
-        /* ── New dashboard cards ── */
         .pw-card { background:#111827; border:1px solid #1f2937; border-radius:1rem; transition:border-color .2s, box-shadow .2s, transform .2s; }
-        /* REC: standardised hover — all cards use translateY(-2px) + shadow */
         .pw-card:hover { border-color:#374151; box-shadow:0 8px 24px -6px rgba(0,0,0,.5); transform:translateY(-1px); }
         .pw-card-hdr { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid #1f2937; }
         .pw-card-body { padding:1.25rem; }
         .pw-section-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#9ca3af; }
-        /* REC: thicker progress bars (10px) are more visible + motivating on a learning platform */
         .pw-progress-bar { height:10px; background:#1f2937; border-radius:5px; overflow:hidden; }
         .pw-progress-fill { height:100%; border-radius:5px; background:linear-gradient(90deg,#7c3aed,#6d28d9); transition:width .6s ease; }
-        /* REC: near-done glow at 80–99% makes progress feel exciting */
         .pw-progress-fill.near-done { background:linear-gradient(90deg,#7c3aed,#a78bfa); box-shadow:0 0 8px rgba(167,139,250,.45); }
         .pw-tool-btn { display:flex; align-items:center; gap:.75rem; padding:.85rem 1rem; background:#111827; border:1px solid #1f2937; border-radius:.75rem; cursor:pointer; transition:all .18s; text-decoration:none; }
         .pw-tool-btn:hover { border-color:var(--tc); background:rgba(var(--tr),.08); transform:translateY(-2px); box-shadow:0 6px 20px -4px rgba(0,0,0,.45); }
         .pw-tool-icon { width:38px; height:38px; border-radius:.6rem; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1rem; }
-        /* REC: stat chip hover standardised */
         .pw-stat-chip { background:#1f2937; border:1px solid #374151; border-radius:.65rem; padding:.75rem 1rem; text-align:center; transition:transform .2s, box-shadow .2s; }
         .pw-stat-chip:hover { transform:translateY(-2px); box-shadow:0 8px 24px -6px rgba(0,0,0,.5); }
         .pw-course-item { display:flex; align-items:flex-start; gap:.85rem; padding:.85rem 0; border-bottom:1px solid #1f2937; }
         .pw-course-item:last-child { border-bottom:none; padding-bottom:0; }
         .pw-blog-item { display:flex; gap:.75rem; padding:.75rem 0; border-bottom:1px solid #1f2937; align-items:flex-start; }
         .pw-blog-item:last-child { border-bottom:none; padding-bottom:0; }
-        /* ── Nav sections — REC: bumped from #374151 to #6b7280 for readability ── */
         .nav-section-label { font-size:.62rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#9ca3af; padding:.6rem .75rem .25rem; margin-top:.5rem; }
-        /* ── Breadcrumb ── */
         .pw-breadcrumb { display:flex; align-items:center; gap:.4rem; font-size:.75rem; color:#6b7280; flex-wrap:wrap; }
         .pw-breadcrumb a { color:#a78bfa; text-decoration:none; transition:color .15s; }
         .pw-breadcrumb a:hover { color:#c4b5fd; }
         .pw-breadcrumb-sep { color:#6b7280; font-size:.65rem; }
-        /* ── Consistent empty state ── */
         .pw-empty { text-align:center; padding:3.5rem 1rem; }
         .pw-empty-icon { width:60px; height:60px; border-radius:50%; border:2px dashed #374151; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; background:#0d1117; }
         .pw-empty-title { font-size:.9rem; font-weight:600; color:#9ca3af; margin-bottom:.35rem; }
         .pw-empty-sub   { font-size:.78rem; color:#9ca3af; }
-
-        /* ── Mobile improvements ── */
         @media (max-width: 767px) {
             .pw-card-body { padding:1rem; }
             .pw-card-hdr  { padding:.75rem 1rem; }
             .pw-tool-btn  { padding:.65rem .85rem; }
             .pw-stat-chip { padding:.65rem .85rem; }
-            /* Mobile dashboard card order: stat > learn > ai > insight > tools > perf > courses > blog */
             #dash-stat-row   { order:1; }
             #dash-learn-row  { order:2; }
             #ai-insight-card { order:3; }
             #dash-perf-row   { order:4; }
             #dash-blog-row   { order:5; }
-            /* Snap the lg:col-span-3 grid to single column cleanly */
             .lg\:col-span-2 { grid-column: span 1; }
             .lg\:col-span-1 { grid-column: span 1; }
         }
-        /* ── Section reveal (always animate on show) ── */
         .section:not(.hidden) { animation: fadeIn .3s ease-out both; }
         .nav-link { position:relative; display:flex; align-items:center; gap:.75rem; padding:.5rem .75rem; border-radius:.6rem; color:#9ca3af; transition:all .15s; font-size:.83rem; font-weight:500; text-decoration:none; }
         .nav-link:hover:not(.active) { background:#111827; color:#e5e7eb; }
         .nav-link.active { background:linear-gradient(90deg,#7c3aed,#6d28d9) !important; color:white; box-shadow:0 4px 14px rgba(124,58,237,.35); }
-        /* REC: force active nav icons white so coloured inline styles don't bleed through */
         .nav-link.active i, .nav-link.active:hover i { color:white !important; }
         .nav-link.active:hover { color:white !important; opacity:.95; }
         .nav-link .nav-icon { width:16px; text-align:center; font-size:.8rem; flex-shrink:0; }
-        /* ── Toast stack offset — REC: consecutive toasts don't overlap ── */
         .pw-toast { transition:bottom .25s ease; }
-        /* ── Blog thumbnail consistency ── */
         .pw-blog-thumb { height:112px; border-radius:.5rem .5rem 0 0; overflow:hidden; position:relative; }
         .pw-blog-thumb img { width:100%; height:100%; object-fit:cover; }
-        .pw-blog-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center;
-            background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(59,130,246,.08)); }
-        /* ── Mobile sidebar tap hint ── */
+        .pw-blog-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,rgba(20,184,166,.12),rgba(59,130,246,.08)); }
         .sidebar-tap-hint { font-size:.67rem; color:#9ca3af; text-align:center; padding:.3rem 0 0; }
         @media (min-width:768px) { .sidebar-tap-hint { display:none; } }
-        /* ── Curriculum lesson row completed state ── */
         .lesson-row-done { background:rgba(16,185,129,.04); }
         .lesson-row-done .lesson-title { text-decoration:line-through; color:#6b7280 !important; }
-        /* ── Stat chip sub-label ── */
         .pw-stat-sub { font-size:.67rem; color:#9ca3af; margin-top:.2rem; min-height:.9rem; }
-
-        /* ── Mobile hero card responsive padding ── */
         @media (max-width: 639px) {
-            /* Hero cards — tighter on mobile */
             #section-dashboard .pw-card > div[class*="grid"] > a,
-            #section-dashboard .pw-card > div[class*="grid"] > button {
-                padding: 1rem !important;
-            }
-            /* Quick action chips — slightly smaller */
+            #section-dashboard .pw-card > div[class*="grid"] > button { padding: 1rem !important; }
             #quick-actions button { font-size: .7rem; padding: .4rem .7rem; }
-            /* Mentor messages max width on mobile */
             #mentor-messages .max-w-\[85\%\] { max-width: 90% !important; }
-            /* Lesson rec cards description */
             #mentor-rec-grid .text-sm { font-size: .8rem; }
         }
-
-        /* ── Accessibility: global focus rings for keyboard navigation ── */
-        :focus-visible {
-            outline: 2px solid #a78bfa !important;
-            outline-offset: 2px !important;
-            border-radius: 4px;
-        }
-        /* Buttons and links get a purple glow on focus */
-        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-            outline: 2px solid #a78bfa !important;
-            outline-offset: 2px !important;
-            box-shadow: 0 0 0 4px rgba(124,58,237,.25) !important;
-        }
-        /* Screen-reader only utility */
+        :focus-visible { outline: 2px solid #a78bfa !important; outline-offset: 2px !important; border-radius: 4px; }
+        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #a78bfa !important; outline-offset: 2px !important; box-shadow: 0 0 0 4px rgba(124,58,237,.25) !important; }
         .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border-width:0; }
         .focus\:not-sr-only:focus { position:fixed; width:auto; height:auto; padding:inherit; margin:inherit; overflow:visible; clip:auto; white-space:normal; }
+
+        /* ═══════════════════════════════════════════════════════
+           MOBILE BOTTOM NAVIGATION
+        ═══════════════════════════════════════════════════════ */
+        #mobile-bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            z-index: 9999;
+            background: #090c12;
+            border-top: 1px solid #1f2937;
+            padding: 0 0 max(6px, env(safe-area-inset-bottom, 6px));
+            box-shadow: 0 -8px 32px rgba(0,0,0,0.8);
+        }
+        .mobile-nav-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            padding: 8px 2px 4px;
+            border: none;
+            background: transparent;
+            color: #4b5563;
+            cursor: pointer;
+            transition: color 0.15s, transform 0.1s;
+            text-decoration: none;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+            min-height: 54px;
+            font-family: 'Inter', sans-serif;
+        }
+        .mobile-nav-btn i { font-size: 1.1rem; transition: color 0.15s; }
+        .mobile-nav-btn span { font-size: 0.55rem; font-weight: 600; letter-spacing: 0.03em; line-height: 1; }
+        .mobile-nav-btn.active { color: #a78bfa; }
+        .mobile-nav-btn.active i { color: #a78bfa; }
+        .mobile-nav-btn.active::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 24px; height: 2.5px;
+            background: linear-gradient(90deg, #7c3aed, #a78bfa);
+            border-radius: 0 0 3px 3px;
+        }
+        .mobile-nav-btn:active { transform: scale(0.88); }
+        /* Analyse — elevated FAB-style centre button */
+        #mnav-analyse { padding-top: 0; justify-content: flex-end; padding-bottom: 6px; }
+        .mnav-fab-wrap {
+            width: 48px; height: 48px;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 18px rgba(124,58,237,0.55), 0 0 0 3px #090c12;
+            margin-top: -18px;
+            margin-bottom: 4px;
+            transition: transform 0.12s, box-shadow 0.12s;
+            flex-shrink: 0;
+        }
+        #mnav-analyse i { font-size: 1.05rem; color: white !important; }
+        #mnav-analyse.active { color: #c4b5fd; }
+        #mnav-analyse.active .mnav-fab-wrap { box-shadow: 0 4px 22px rgba(124,58,237,0.75), 0 0 0 3px #090c12; }
+        #mnav-analyse.active::after { display: none; }
+        #mnav-analyse:active .mnav-fab-wrap { transform: scale(0.9); }
+
+        /* ═══════════════════════════════════════════════════════
+           MOBILE RESPONSIVE OVERRIDES
+        ═══════════════════════════════════════════════════════ */
+        @media (max-width: 767px) {
+            /* Show bottom nav */
+            #mobile-bottom-nav { display: flex; align-items: flex-end; }
+            /* Push content above bottom nav */
+            main#main-content .p-4 { padding-bottom: 5.5rem !important; }
+            /* Larger tap target for PW hamburger */
+            #mobile-menu-btn { min-height: 44px !important; min-width: 68px !important; padding: 10px 16px !important; }
+            /* Intel cards: 2×2 grid on mobile */
+            #dash-intel-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: .5rem !important;
+            }
+            #dash-intel-row .pw-card-hdr { padding: .6rem .7rem !important; }
+            #dash-intel-row .pw-card-body { padding: .6rem .7rem !important; }
+            #dash-intel-row .pw-card-hdr .font-semibold { font-size: .7rem !important; }
+            #dash-intel-row .pw-card-hdr span.text-xs { font-size: .6rem !important; }
+            /* Stat chips: wrap to 2 rows */
+            #dash-stat-row {
+                flex-wrap: wrap !important;
+                overflow-x: visible !important;
+                gap: .35rem !important;
+                padding-bottom: 0 !important;
+            }
+            /* Hide separator dots between chips */
+            #dash-stat-row .text-gray-800 { display: none !important; }
+            /* Session pill full-width on top row */
+            #stat-session-pill {
+                order: -1;
+                flex: 0 0 100% !important;
+                width: 100% !important;
+                justify-content: flex-start;
+            }
+            /* Toast: adjust for bottom nav */
+            .pw-toast { bottom: 5rem !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col md:flex-row">
 
-    <!-- Skip-to-content: visible on focus for keyboard/screen reader users -->
     <a href="#main-content"
        class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[99999] focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold focus:text-white"
        style="background:#7c3aed;outline:3px solid #c4b5fd;">
         Skip to main content
     </a>
 
-    <!-- Mobile Menu Button -->
-    <div class="md:hidden fixed top-3.5 left-4 z-50">
+    <!-- Mobile Menu Button — enlarged tap target -->
+    <div class="md:hidden fixed top-3 left-3 z-50">
         <button id="mobile-menu-btn"
                 aria-label="Open navigation menu"
                 aria-expanded="false"
                 aria-controls="sidebar"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg shadow-xl text-white text-sm font-medium transition-all"
-                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);">
+                class="flex items-center gap-2 px-3 py-2.5 rounded-lg shadow-xl text-white text-sm font-medium transition-all"
+                style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid rgba(167,139,250,.3);min-height:44px;min-width:64px;">
             <i class="fas fa-bars text-xs" aria-hidden="true"></i>
             <span class="text-xs font-semibold tracking-wide" style="letter-spacing:.04em;">PW</span>
         </button>
@@ -422,7 +369,7 @@
         <div class="p-5 border-b border-gray-800">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                    <div class="w-9 h-9 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
                         <i class="fas fa-graduation-cap text-white"></i>
                     </div>
                     <div>
@@ -430,37 +377,29 @@
                         <p class="text-xs text-gray-500">Learn · Research · Grow</p>
                     </div>
                 </div>
-                <!-- Mobile close button -->
                 <button id="sidebar-close-btn"
                         aria-label="Close navigation menu"
                         class="md:hidden p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-all"
                         onclick="document.getElementById('sidebar').classList.add('-translate-x-full');document.getElementById('sidebar-overlay').classList.add('hidden');">
-                    <i class="fas fa-times text-sm" aria-hidden="true"></i>
+                    <i class="fas fa-times text-sm"></i>
                 </button>
             </div>
         </div>
 
         <nav class="flex-1 overflow-y-auto py-3 px-2" style="scrollbar-width:none;">
-
-            <!-- Dashboard -->
             <a href="#" data-section="dashboard" class="nav-link active">
                 <i class="fas fa-home nav-icon"></i><span>Dashboard</span>
             </a>
-
-            <!-- LEARNING -->
             <div class="nav-section-label">Learning</div>
             <a href="/academy" class="nav-link">
                 <i class="fas fa-book-open nav-icon" style="color:#34d399;"></i><span>Trading Academy</span>
             </a>
-
             <a href="#" data-section="webinars" class="nav-link">
                 <i class="fas fa-video nav-icon" style="color:#fbbf24;"></i><span>Webinars</span>
             </a>
             <a href="#" data-section="blog" class="nav-link">
                 <i class="fas fa-newspaper nav-icon" style="color:#2dd4bf;"></i><span>Blog</span>
             </a>
-
-            <!-- RESEARCH -->
             <div class="nav-section-label">Research</div>
             <a href="#" data-section="analysis" class="nav-link">
                 <i class="fas fa-chart-bar nav-icon" style="color:#60a5fa;"></i><span>Chart Analysis</span>
@@ -472,25 +411,17 @@
                 <i class="fas fa-satellite-dish nav-icon" style="color:#f472b6;"></i><span>Market Signals</span>
                 <span class="ml-auto bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">New</span>
             </a>
-
-            <!-- DEVELOPMENT -->
             <div class="nav-section-label">Development</div>
             <a href="#" data-section="journal" class="nav-link">
-                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i>
-                <span>Performance Analytics</span>
+                <i class="fas fa-book-open nav-icon" style="color:#fb923c;"></i><span>Performance Analytics</span>
             </a>
             <a href="#" data-section="risk" class="nav-link">
-                <i class="fas fa-calculator nav-icon" style="color:#38bdf8;"></i>
-                <span>Risk Calculator</span>
+                <i class="fas fa-calculator nav-icon" style="color:#38bdf8;"></i><span>Risk Calculator</span>
             </a>
-
-            <!-- AI ASSISTANT -->
             <div class="nav-section-label">AI Assistant</div>
             <a href="#" data-section="mentor" class="nav-link">
                 <i class="fas fa-robot nav-icon" style="color:#e879f9;"></i><span>AI Mentor</span>
             </a>
-
-            <!-- ADMIN (hidden until admin check) -->
             <div id="admin-menu-container" class="hidden">
                 <div class="nav-section-label" style="color:#7f1d1d;">Admin</div>
                 <a href="#" data-section="admin" class="nav-link" style="border-left:2px solid #dc2626;border-radius:.6rem 0 0 .6rem;">
@@ -504,7 +435,6 @@
         <div class="sidebar-tap-hint px-3 pb-1">Tap outside to close</div>
 
         <div class="p-4 border-t border-gray-800 flex-shrink-0">
-            <!-- User profile -->
             <div class="flex items-center gap-2.5 mb-3 p-2.5 rounded-xl" style="background:#111827;border:1px solid #1f2937;">
                 <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                     <i class="fas fa-user text-xs"></i>
@@ -531,17 +461,14 @@
 
     <main id="main-content" class="flex-1 h-screen overflow-y-auto" tabindex="-1">
 
-        <!-- ── Live Market Ticker ── -->
+        <!-- Live Market Ticker -->
         <div class="ticker-wrap">
-            <div class="ticker-track" id="ticker-track">
-                <!-- populated by JS -->
-            </div>
+            <div class="ticker-track" id="ticker-track"></div>
         </div>
 
         <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-3 flex justify-between items-center">
             <div class="md:hidden" style="width:60px;"></div>
             <div>
-                <!-- Breadcrumb — hidden on dashboard, shown on sub-sections -->
                 <nav id="header-breadcrumb" class="pw-breadcrumb mb-0.5 hidden"></nav>
                 <h2 id="page-title" class="text-xl font-bold text-white leading-tight">Dashboard</h2>
                 <p class="text-xs text-gray-500" id="header-subtitle">Welcome back, <span class="text-purple-400 font-medium">Trader</span></p>
@@ -553,7 +480,6 @@
                     <span class="text-gray-700">|</span>
                     <span id="market-status-text" class="text-green-400 font-medium">Markets Open</span>
                 </div>
-                <!-- Notification bell with dropdown -->
                 <div class="relative" id="notif-wrapper">
                     <button id="notif-btn"
                             onclick="dashboard._toggleNotifPanel()"
@@ -562,16 +488,16 @@
                             aria-expanded="false"
                             aria-controls="notif-panel"
                             class="relative p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800">
-                        <i class="fas fa-bell text-lg" aria-hidden="true"></i>
-                        <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" aria-label="Unread notifications"></span>
+                        <i class="fas fa-bell text-lg"></i>
+                        <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                     </button>
                     <div id="notif-panel"
                          class="hidden absolute right-0 mt-2 w-72 rounded-xl border overflow-hidden z-50"
                          style="background:#111827;border-color:#1f2937;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);">
                         <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color:#1f2937;">
                             <span class="text-sm font-semibold text-white">Notifications</span>
-                            <button onclick="dashboard._toggleNotifPanel()" aria-label="Close notifications" class="text-gray-600 hover:text-white text-xs transition-colors">
-                                <i class="fas fa-times" aria-hidden="true"></i>
+                            <button onclick="dashboard._toggleNotifPanel()" class="text-gray-600 hover:text-white text-xs">
+                                <i class="fas fa-times"></i>
                             </button>
                         </div>
                         <div id="notif-list" class="max-h-64 overflow-y-auto">
@@ -593,21 +519,15 @@
 
         <div class="p-4 md:p-6 max-w-7xl mx-auto">
 
-            <!-- DASHBOARD — Learning & Research Command Center -->
+            <!-- DASHBOARD SECTION -->
             <section id="section-dashboard" class="section animate-fade-in">
 
-                <!-- ══════════════════════════════════════════════════════
-                     ZONE 1 — CHART ANALYSIS HERO
-                     Your #1 feature, above the fold on every login
-                ═══════════════════════════════════════════════════════ -->
-
-                <!-- Greeting + social proof strip -->
+                <!-- Greeting + social proof -->
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div>
                         <h2 id="greeting-text" class="font-bold text-white" style="font-size:1.05rem;"></h2>
                         <p id="greeting-sub" class="text-xs mt-0.5" style="color:#6b7280;"></p>
                     </div>
-                    <!-- Social proof pill — live usage count -->
                     <div id="dash-social-proof" class="flex items-center gap-2 px-3 py-1.5 rounded-full flex-shrink-0"
                          style="background:#111827;border:1px solid #1f2937;font-size:.75rem;">
                         <span class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
@@ -620,7 +540,6 @@
                     <div style="height:3px;background:linear-gradient(90deg,#60a5fa,#7c3aed,rgba(124,58,237,.15));"></div>
                     <div class="pw-card-body" style="padding:1.25rem;">
                         <div class="flex flex-col md:flex-row md:items-center gap-4">
-                            <!-- Left: icon + copy -->
                             <div class="flex items-start gap-3 flex-1 min-w-0">
                                 <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                                      style="background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);">
@@ -633,14 +552,11 @@
                                               style="background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25);">2 free included</span>
                                     </div>
                                     <p class="text-xs" style="color:#9ca3af;line-height:1.5;">
-                                        Upload any chart screenshot — get entry, stop loss &amp; take profit in seconds.
-                                        Works on any pair, any timeframe.
+                                        Upload any chart screenshot — get entry, stop loss &amp; take profit in seconds. Works on any pair, any timeframe.
                                     </p>
-                                    <!-- Usage bar -->
                                     <div id="dash-chart-usage-bar" class="mt-2"></div>
                                 </div>
                             </div>
-                            <!-- Right: upload CTA -->
                             <div class="flex-shrink-0 w-full md:w-auto">
                                 <button onclick="dashboard.navigate('analysis')"
                                         class="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
@@ -655,17 +571,15 @@
                     </div>
                 </div>
 
-                <!-- Stat strip -->
+                <!-- Stat strip — wraps on mobile -->
                 <div id="dash-stat-row" class="flex items-center gap-2 mb-4 overflow-x-auto pb-1"
                      style="scrollbar-width:none;-webkit-overflow-scrolling:touch;-ms-overflow-style:none;">
-                    <!-- Session clock -->
                     <div id="stat-session-pill" class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0"
                          style="background:#111827;border:1px solid #1f2937;font-size:.75rem;">
                         <span id="signals-live-dot" class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
                         <span id="stat-session-label" style="color:#9ca3af;">Loading…</span>
                     </div>
                     <span class="text-gray-800 flex-shrink-0" style="font-size:.6rem;">·</span>
-                    <!-- Academy -->
                     <a href="/academy" class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all text-decoration-none"
                        style="background:#111827;border:1px solid #1f2937;"
                        onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='#1f2937'">
@@ -675,7 +589,6 @@
                         <span id="stat-courses-sub" class="hidden"></span>
                     </a>
                     <span class="text-gray-800 flex-shrink-0" style="font-size:.6rem;">·</span>
-                    <!-- Signals -->
                     <button onclick="dashboard.navigate('enhanced-signals')"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all"
                             style="background:#111827;border:1px solid #1f2937;"
@@ -686,7 +599,6 @@
                         <span id="stat-signals-sub" class="hidden"></span>
                     </button>
                     <span class="text-gray-800 flex-shrink-0" style="font-size:.6rem;">·</span>
-                    <!-- Webinars -->
                     <button onclick="dashboard.navigate('webinars')"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all"
                             style="background:#111827;border:1px solid #1f2937;"
@@ -697,7 +609,6 @@
                         <span id="stat-webinars-sub" class="hidden"></span>
                     </button>
                     <span class="text-gray-800 flex-shrink-0" style="font-size:.6rem;">·</span>
-                    <!-- Blog -->
                     <button onclick="dashboard.navigate('blog')"
                             class="flex items-center gap-2 px-3 py-2 rounded-full flex-shrink-0 transition-all"
                             style="background:#111827;border:1px solid #1f2937;"
@@ -709,11 +620,8 @@
                     </button>
                 </div>
 
-                <!-- ══════════════════════════════════════════════════════
-                     ZONE 2 — PERSONAL INTELLIGENCE
-                     4 cards: last analysis, stock research, MT4 weakness, AI mentor
-                ═══════════════════════════════════════════════════════ -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4" id="dash-intel-row">
+                <!-- Intel cards — 2-col on mobile, 4-col on xl -->
+                <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4" id="dash-intel-row">
 
                     <!-- Card A: Last Chart Analysis -->
                     <div class="pw-card cursor-pointer" onclick="dashboard.navigate('analysis')"
@@ -729,7 +637,6 @@
                             <span id="dash-last-analysis-time" class="text-xs" style="color:#4b5563;"></span>
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;" id="dash-last-analysis-body">
-                            <!-- New user empty state -->
                             <div id="dash-analysis-empty" class="text-center py-3">
                                 <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2"
                                      style="background:rgba(96,165,250,.08);border:1.5px dashed rgba(96,165,250,.25);">
@@ -743,7 +650,6 @@
                                     <i class="fas fa-upload mr-1"></i>Upload Chart →
                                 </button>
                             </div>
-                            <!-- Returning user result — hidden by default, populated by JS -->
                             <div id="dash-analysis-result" class="hidden">
                                 <div class="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
                                      style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.15);">
@@ -762,7 +668,7 @@
                         </div>
                     </div>
 
-                    <!-- Card B: AI Stock Research — FEATURED -->
+                    <!-- Card B: AI Stock Research -->
                     <div class="pw-card cursor-pointer" onclick="dashboard.navigate('stocks')"
                          style="border-color:rgba(52,211,153,.2);background:linear-gradient(145deg,rgba(5,46,22,.4),#111827);"
                          onmouseover="this.style.borderColor='rgba(52,211,153,.5)'"
@@ -778,7 +684,6 @@
                                   style="background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25);">NGX + Global</span>
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;" id="dash-stocks-body">
-                            <!-- Empty state -->
                             <div id="dash-stocks-empty" class="text-center py-3">
                                 <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2"
                                      style="background:rgba(52,211,153,.08);border:1.5px dashed rgba(52,211,153,.25);">
@@ -792,7 +697,6 @@
                                     <i class="fas fa-chart-pie mr-1"></i>Open Stock Research →
                                 </button>
                             </div>
-                            <!-- With data: top movers -->
                             <div id="dash-stocks-data" class="hidden">
                                 <div id="dash-ngx-tickers"></div>
                                 <button onclick="event.stopPropagation();dashboard.navigate('stocks')"
@@ -804,7 +708,7 @@
                         </div>
                     </div>
 
-                    <!-- Card C: Performance / MT4 Weakness — EMOTIONAL CENTREPIECE -->
+                    <!-- Card C: Performance -->
                     <div class="pw-card cursor-pointer" onclick="dashboard.navigate('journal')"
                          id="dash-perf-card"
                          onmouseover="this.style.borderColor='rgba(248,113,113,.35)'"
@@ -819,7 +723,6 @@
                             <span class="text-xs" style="color:#4b5563;">MT4 / MT5</span>
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;" id="dash-perf-body">
-                            <!-- Empty state — convert with emotional copy -->
                             <div id="dash-perf-empty">
                                 <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 mt-1"
                                      style="background:rgba(239,68,68,.08);border:1.5px dashed rgba(239,68,68,.25);">
@@ -834,7 +737,6 @@
                                 </button>
                                 <p class="text-center text-xs mt-1.5" style="color:#374151;">1 free analysis included</p>
                             </div>
-                            <!-- With data — populated by _updateDashPerfCard() -->
                             <div id="dash-perf-result" class="hidden"></div>
                         </div>
                     </div>
@@ -876,25 +778,20 @@
                     </div>
                 </div>
 
-                <!-- ══════════════════════════════════════════════════════
-                     ZONE 3 — LIVE MARKET CONTEXT
-                     Session clock · NGX movers · Signals preview
-                ═══════════════════════════════════════════════════════ -->
+                <!-- Zone 3: Market context row -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4" id="dash-market-row">
 
                     <!-- Session + forex snapshot -->
                     <div class="pw-card">
                         <div class="pw-card-hdr" style="padding:.85rem 1rem;">
                             <div class="flex items-center gap-2">
-                                <span id="dash-market-dot" class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0"
-                                      style="animation:pulse-dot 2s infinite;"></span>
+                                <span id="dash-market-dot" class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
                                 <span id="dash-market-text" class="text-xs font-semibold" style="color:#34d399;">London Open</span>
                             </div>
                             <span id="dash-next-session" class="text-xs" style="color:#4b5563;"></span>
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;">
                             <div class="space-y-1.5" id="dash-forex-tickers">
-                                <!-- Populated by _initTicker() — shimmer until ready -->
                                 <div class="shimmer-line w-full" style="height:18px;border-radius:4px;"></div>
                                 <div class="shimmer-line w-full" style="height:18px;border-radius:4px;"></div>
                                 <div class="shimmer-line w-full" style="height:18px;border-radius:4px;"></div>
@@ -944,7 +841,7 @@
                         </div>
                     </div>
 
-                    <!-- Signals preview — blurred for free users -->
+                    <!-- Active Signals (blurred for free users) -->
                     <div class="pw-card overflow-hidden" style="position:relative;">
                         <div class="pw-card-hdr" style="padding:.85rem 1rem;">
                             <div class="flex items-center gap-2">
@@ -957,7 +854,6 @@
                                   style="background:rgba(244,114,182,.1);color:#f472b6;border:1px solid rgba(244,114,182,.2);">3 active</span>
                         </div>
                         <div class="pw-card-body" style="padding:.85rem 1rem;" id="dash-signals-preview-body">
-                            <!-- Blurred preview — replaced with real data for paid users -->
                             <div style="filter:blur(4px);pointer-events:none;user-select:none;" aria-hidden="true">
                                 <div class="rounded-lg p-2.5 mb-2" style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.15);">
                                     <div class="flex justify-between text-xs mb-1">
@@ -1000,13 +896,10 @@
                     </div>
                 </div>
 
-                <!-- ══════════════════════════════════════════════════════
-                     ZONE 4 — CONTINUE LEARNING + NEXT STEP + BLOG
-                     Academy is the free funnel, not the hero
-                ═══════════════════════════════════════════════════════ -->
+                <!-- Zone 4: Learning + Blog -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4" id="dash-learn-row">
 
-                    <!-- Continue Learning — 2/3 width -->
+                    <!-- Continue Learning -->
                     <div class="pw-card lg:col-span-2">
                         <div class="pw-card-hdr">
                             <div class="flex items-center gap-2">
@@ -1040,7 +933,7 @@
                         </div>
                     </div>
 
-                    <!-- AI Market Insight — 1/3 width -->
+                    <!-- AI Market Insight -->
                     <div class="pw-card" id="ai-insight-card" style="background:linear-gradient(145deg,#0f0a1f,#1a0a2e);">
                         <div class="pw-card-hdr" style="border-bottom-color:#2d1060;">
                             <div class="flex items-center gap-2">
@@ -1111,28 +1004,16 @@
                     </div>
                 </div>
 
-                <!-- Hidden compatibility shims — JS hooks that still reference old IDs -->
-                <!-- next-step IDs kept so _updateNextStepCard doesn't throw errors -->
+                <!-- Hidden compatibility shims -->
                 <span id="next-step-title" class="hidden"></span>
                 <span id="next-step-sub" class="hidden"></span>
                 <a id="next-step-cta" href="/academy" class="hidden"></a>
                 <div id="dash-next-step" class="hidden"></div>
-                <span id="greeting-sub" class="hidden"></span>
-                <span id="dash-market-dot-old" class="hidden"></span>
-                <!-- Tools row still renders via JS into dash-courses-body -->
                 <div id="dash-tools-row" class="hidden"><div id="dash-courses-body"></div></div>
-                <span id="ai-insight-body-old" class="hidden"></span>
-                <span id="greeting-sub" class="hidden"></span>
-                <span id="dash-market-dot-old" class="hidden"></span>
-                <!-- Tools row still renders via JS into dash-courses-body -->
-                <div id="dash-tools-row" class="hidden"><div id="dash-courses-body"></div></div>
-                <span id="ai-insight-body-old" class="hidden"></span>
-
             </section>
 
             <!-- ENHANCED SIGNALS -->
             <section id="section-enhanced-signals" class="section hidden">
-                <!-- Enhanced Signals Header -->
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                     <div class="flex items-center gap-3">
                         <span class="w-2 h-2 rounded-full bg-purple-400 flex-shrink-0" style="animation:pulse-dot 2s infinite;"></span>
@@ -1143,8 +1024,6 @@
                         <button id="patternTab" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-700 text-gray-400 hover:bg-gray-600 transition-all">Pattern Based</button>
                     </div>
                 </div>
-                
-                <!-- Stats Row -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
                         <p class="text-xs text-gray-400 mb-1">Active Signals</p>
@@ -1163,66 +1042,40 @@
                         <p class="text-2xl font-bold text-blue-400" id="enhanced-stat-rr">—</p>
                     </div>
                 </div>
-                
-                <!-- Signals Grid -->
                 <div id="enhanced-signals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div class="col-span-full text-center py-12">
                         <i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i>
                         <p class="text-gray-400">Loading enhanced signals...</p>
                     </div>
                 </div>
-                
-                <!-- Load More Button -->
                 <div class="text-center mt-6">
-                    <button id="loadMoreBtn" class="hidden px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all">
-                        Load More Signals
-                    </button>
+                    <button id="loadMoreBtn" class="hidden px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all">Load More Signals</button>
                 </div>
             </section>
-            
+
             <!-- Signal Detail Modal -->
             <div id="signalModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
                 <div class="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                     <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
                         <h3 id="modalTitle" class="text-lg font-bold text-white">Signal Details</h3>
-                        <button id="closeModal" class="text-gray-400 hover:text-white text-xl">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <button id="closeModal" class="text-gray-400 hover:text-white text-xl"><i class="fas fa-times"></i></button>
                     </div>
-                    <div id="modalContent" class="p-6">
-                        <!-- Modal content loaded dynamically -->
-                    </div>
+                    <div id="modalContent" class="p-6"></div>
                 </div>
             </div>
 
-            <!-- TRADING JOURNAL -->
+            <!-- TRADING JOURNAL / PERFORMANCE -->
             <section id="section-journal" class="section hidden">
-                <!-- AI-Powered badge visible near import section — no duplicate heading -->
-
-                <!-- Import Section -->
                 <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 mb-4 md:mb-6">
                     <h4 class="text-base md:text-lg font-bold text-white mb-3 md:mb-4"><i class="fas fa-file-import text-purple-400 mr-2"></i>Import Trade Data</h4>
                     <div class="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 mb-4 md:mb-6">
-                        <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="mt4">
-                            <i class="fas fa-file-code text-blue-400"></i> MT4
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="mt5">
-                            <i class="fas fa-file-code text-green-400"></i> MT5
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="csv">
-                            <i class="fas fa-file-csv text-yellow-400"></i> CSV
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="excel">
-                            <i class="fas fa-file-excel text-green-500"></i> Excel
-                        </button>
-                        <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="screenshot">
-                            <i class="fas fa-camera text-pink-400"></i> OCR
-                        </button>
-                        <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-xs md:text-sm text-white">
-                            <i class="fas fa-edit"></i> Manual
-                        </button>
+                        <button onclick="dashboard.setJournalFormat('mt4')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="mt4"><i class="fas fa-file-code text-blue-400"></i> MT4</button>
+                        <button onclick="dashboard.setJournalFormat('mt5')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="mt5"><i class="fas fa-file-code text-green-400"></i> MT5</button>
+                        <button onclick="dashboard.setJournalFormat('csv')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="csv"><i class="fas fa-file-csv text-yellow-400"></i> CSV</button>
+                        <button onclick="dashboard.setJournalFormat('excel')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="excel"><i class="fas fa-file-excel text-green-500"></i> Excel</button>
+                        <button onclick="dashboard.setJournalFormat('screenshot')" class="format-btn flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-all text-xs md:text-sm text-white border border-gray-600" data-format="screenshot"><i class="fas fa-camera text-pink-400"></i> OCR</button>
+                        <button onclick="dashboard.showManualEntry()" class="flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-2.5 md:py-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-all text-xs md:text-sm text-white"><i class="fas fa-edit"></i> Manual</button>
                     </div>
-
                     <div id="journal-dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-purple-500 hover:bg-purple-900/10 transition-all cursor-pointer bg-gray-900">
                         <input type="file" id="journal-file-input" class="hidden" accept=".csv,.xlsx,.xls,.pdf,.html,.htm,.png,.jpg,.jpeg">
                         <i class="fas fa-cloud-upload-alt text-4xl text-gray-500 mb-4"></i>
@@ -1230,210 +1083,85 @@
                         <p class="text-sm text-gray-500">Supports CSV, Excel, PDF, MT4/MT5 HTML, Images</p>
                         <p class="text-xs text-purple-400 mt-2" id="selected-format">Select a format above</p>
                     </div>
-
-                    <div id="upload-status" class="mt-4 hidden" role="status" aria-live="polite"></div>
-                    <div id="journal-upload-loading" class="hidden mt-4 text-center" role="status" aria-live="polite" aria-label="Analysing trade data with AI">
+                    <div id="upload-status" class="mt-4 hidden"></div>
+                    <div id="journal-upload-loading" class="hidden mt-4 text-center">
                         <div class="inline-flex items-center gap-2 text-blue-400">
                             <i class="fas fa-spinner fa-spin"></i><span>Analyzing with AI...</span>
                         </div>
                     </div>
                 </div>
-
-                <!-- Performance Overview -->
                 <div id="performance-overview" class="hidden mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <h4 class="text-lg font-bold text-white">Performance Overview</h4>
                         <span id="overall-grade-badge" class="px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold">--</span>
                     </div>
-
                     <div class="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 md:gap-4 mb-4 md:mb-6">
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-white" id="stat-total-trades">--</div>
-                            <div class="text-xs text-gray-400">Trades</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-green-400" id="stat-win-rate">--</div>
-                            <div class="text-xs text-gray-400">Win Rate</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-blue-400" id="stat-profit-factor">--</div>
-                            <div class="text-xs text-gray-400">Profit Factor</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-purple-400" id="stat-expectancy">--</div>
-                            <div class="text-xs text-gray-400">Expectancy</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-orange-400" id="stat-max-drawdown">--</div>
-                            <div class="text-xs text-gray-400">Max DD</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-green-400" id="stat-winning-streak">--</div>
-                            <div class="text-xs text-gray-400">Win Streak</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-red-400" id="stat-losing-streak">--</div>
-                            <div class="text-xs text-gray-400">Loss Streak</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center">
-                            <div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div>
-                            <div class="text-xs text-gray-400">Net P&L</div>
-                        </div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-white" id="stat-total-trades">--</div><div class="text-xs text-gray-400">Trades</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-green-400" id="stat-win-rate">--</div><div class="text-xs text-gray-400">Win Rate</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-blue-400" id="stat-profit-factor">--</div><div class="text-xs text-gray-400">Profit Factor</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-purple-400" id="stat-expectancy">--</div><div class="text-xs text-gray-400">Expectancy</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-orange-400" id="stat-max-drawdown">--</div><div class="text-xs text-gray-400">Max DD</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-green-400" id="stat-winning-streak">--</div><div class="text-xs text-gray-400">Win Streak</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-red-400" id="stat-losing-streak">--</div><div class="text-xs text-gray-400">Loss Streak</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 border border-gray-700 text-center"><div class="text-2xl font-bold text-yellow-400" id="stat-net-pnl">--</div><div class="text-xs text-gray-400">Net P&amp;L</div></div>
                     </div>
-
                     <div id="strategy-detection" class="hidden bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-lg p-3 md:p-4 border border-blue-700/50 mb-4 md:mb-6">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div>
-                                <span class="text-sm text-gray-400">Detected Strategy</span>
-                                <h5 class="text-xl font-bold text-blue-400" id="detected-strategy">--</h5>
-                            </div>
-                            <div class="text-left md:text-right">
-                                <span class="text-sm text-gray-400">Risk Consistency</span>
-                                <div class="flex items-center gap-2">
-                                    <div class="w-32 bg-gray-700 rounded-full h-2">
-                                        <div id="risk-consistency-bar" class="bg-green-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
-                                    </div>
-                                    <span class="text-lg font-bold text-green-400" id="risk-consistency-score">--%</span>
-                                </div>
+                            <div><span class="text-sm text-gray-400">Detected Strategy</span><h5 class="text-xl font-bold text-blue-400" id="detected-strategy">--</h5></div>
+                            <div class="text-left md:text-right"><span class="text-sm text-gray-400">Risk Consistency</span>
+                                <div class="flex items-center gap-2"><div class="w-32 bg-gray-700 rounded-full h-2"><div id="risk-consistency-bar" class="bg-green-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div></div><span class="text-lg font-bold text-green-400" id="risk-consistency-score">--%</span></div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Charts Grid -->
                 <div id="analytics-charts" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 md:mb-6">
-                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700">
-                        <h4 class="font-bold text-white mb-4"><i class="fas fa-chart-line text-blue-400 mr-2"></i>Equity Curve</h4>
-                        <div class="chart-container">
-                            <canvas id="equity-curve-chart" role="img" aria-label="Equity curve chart showing trade-by-trade account balance progression"><p class="sr-only">Equity curve chart — shows how account balance changed across each trade.</p></canvas>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700">
-                        <h4 class="font-bold text-white mb-3 md:mb-4"><i class="fas fa-chart-pie text-green-400 mr-2"></i>Trade Distribution</h4>
-                        <div class="chart-container">
-                            <canvas id="trade-distribution-chart" role="img" aria-label="Trade distribution donut chart showing wins, losses and breakeven trades"><p class="sr-only">Trade distribution chart — shows percentage of winning, losing and breakeven trades.</p></canvas>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 lg:col-span-2">
-                        <h4 class="font-bold text-white mb-4"><i class="fas fa-calendar-alt text-purple-400 mr-2"></i>Monthly Performance</h4>
-                        <div class="chart-container">
-                            <canvas id="monthly-performance-chart" role="img" aria-label="Monthly performance bar chart showing profit and loss by month"><p class="sr-only">Monthly performance chart — shows profit and loss for each month of trading.</p></canvas>
-                        </div>
-                    </div>
+                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700"><h4 class="font-bold text-white mb-4"><i class="fas fa-chart-line text-blue-400 mr-2"></i>Equity Curve</h4><div class="chart-container"><canvas id="equity-curve-chart"></canvas></div></div>
+                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700"><h4 class="font-bold text-white mb-3 md:mb-4"><i class="fas fa-chart-pie text-green-400 mr-2"></i>Trade Distribution</h4><div class="chart-container"><canvas id="trade-distribution-chart"></canvas></div></div>
+                    <div class="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 lg:col-span-2"><h4 class="font-bold text-white mb-4"><i class="fas fa-calendar-alt text-purple-400 mr-2"></i>Monthly Performance</h4><div class="chart-container"><canvas id="monthly-performance-chart"></canvas></div></div>
                 </div>
-
-                <!-- AI Trading Coach -->
                 <div id="ai-coach-section" class="hidden bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 md:p-6 border border-purple-700/50 mb-4 md:mb-6">
                     <h4 class="text-lg font-bold text-white mb-4"><i class="fas fa-robot text-purple-400 mr-2"></i>AI Trading Coach</h4>
-
                     <div class="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700">
-                            <div class="text-3xl font-bold text-blue-400 mb-1" id="ai-discipline-score">--</div>
-                            <div class="text-sm text-gray-400">Discipline Score</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700">
-                            <div class="text-3xl font-bold text-green-400 mb-1" id="ai-risk-score">--</div>
-                            <div class="text-sm text-gray-400">Risk Management</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700">
-                            <div class="text-3xl font-bold text-purple-400 mb-1" id="ai-consistency-score">--</div>
-                            <div class="text-sm text-gray-400">Strategy Consistency</div>
-                        </div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700"><div class="text-3xl font-bold text-blue-400 mb-1" id="ai-discipline-score">--</div><div class="text-sm text-gray-400">Discipline Score</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700"><div class="text-3xl font-bold text-green-400 mb-1" id="ai-risk-score">--</div><div class="text-sm text-gray-400">Risk Management</div></div>
+                        <div class="bg-gray-800 rounded-lg p-2 md:p-4 text-center border border-gray-700"><div class="text-3xl font-bold text-purple-400 mb-1" id="ai-consistency-score">--</div><div class="text-sm text-gray-400">Strategy Consistency</div></div>
                     </div>
-
-                    <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-4">
-                        <h5 class="font-bold text-red-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Main Issue Detected</h5>
-                        <p id="ai-main-mistake" class="text-gray-300">--</p>
-                    </div>
-
-                    <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mb-4">
-                        <h5 class="font-bold text-blue-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>AI Recommendation</h5>
-                        <p id="ai-recommendation" class="text-gray-300">--</p>
-                    </div>
-
+                    <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-4"><h5 class="font-bold text-red-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Main Issue Detected</h5><p id="ai-main-mistake" class="text-gray-300">--</p></div>
+                    <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mb-4"><h5 class="font-bold text-blue-400 mb-2"><i class="fas fa-lightbulb mr-2"></i>AI Recommendation</h5><p id="ai-recommendation" class="text-gray-300">--</p></div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                        <div>
-                            <h5 class="font-bold text-green-400 mb-2"><i class="fas fa-check-circle mr-2"></i>Strengths</h5>
-                            <ul id="ai-strengths" class="space-y-1 text-sm text-gray-300"></ul>
-                        </div>
-                        <div>
-                            <h5 class="font-bold text-yellow-400 mb-2"><i class="fas fa-arrow-up mr-2"></i>Improvements</h5>
-                            <ul id="ai-improvements" class="space-y-1 text-sm text-gray-300"></ul>
-                        </div>
+                        <div><h5 class="font-bold text-green-400 mb-2"><i class="fas fa-check-circle mr-2"></i>Strengths</h5><ul id="ai-strengths" class="space-y-1 text-sm text-gray-300"></ul></div>
+                        <div><h5 class="font-bold text-yellow-400 mb-2"><i class="fas fa-arrow-up mr-2"></i>Improvements</h5><ul id="ai-improvements" class="space-y-1 text-sm text-gray-300"></ul></div>
                     </div>
                 </div>
-
-                <!-- Trade History -->
                 <div id="trade-history" class="hidden bg-gray-800 rounded-xl p-3 md:p-6 border border-gray-700">
                     <h4 class="font-bold text-white mb-4"><i class="fas fa-list text-gray-400 mr-2"></i>Trade History</h4>
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs md:text-sm text-left">
                             <thead class="text-xs text-gray-500 uppercase bg-gray-900">
-                                <tr>
-                                    <th class="px-4 py-3">Date</th>
-                                    <th class="px-4 py-3">Symbol</th>
-                                    <th class="px-4 py-3">Direction</th>
-                                    <th class="px-4 py-3">Entry</th>
-                                    <th class="px-4 py-3">Exit</th>
-                                    <th class="px-4 py-3">P&L</th>
-                                </tr>
+                                <tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Symbol</th><th class="px-4 py-3">Direction</th><th class="px-4 py-3">Entry</th><th class="px-4 py-3">Exit</th><th class="px-4 py-3">P&amp;L</th></tr>
                             </thead>
                             <tbody id="trades-table-body" class="text-gray-300"></tbody>
                         </table>
                     </div>
                 </div>
-
-                <!-- Manual Entry Form -->
                 <div id="manual-entry-form" class="hidden bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 mt-4 md:mt-6">
                     <h4 class="font-bold text-white mb-4"><i class="fas fa-plus-circle text-green-400 mr-2"></i>Add Trade Manually</h4>
                     <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" onsubmit="event.preventDefault(); dashboard.addManualTrade();">
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Symbol</label>
-                            <input type="text" id="manual-symbol" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="EURUSD" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Direction</label>
-                            <select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
-                                <option value="BUY">Buy</option>
-                                <option value="SELL">Sell</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Entry Price</label>
-                            <input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Exit Price</label>
-                            <input type="number" id="manual-exit" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">P&L ($)</label>
-                            <input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-1">Volume</label>
-                            <input type="number" id="manual-volume" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="0.10">
-                        </div>
-                        <div class="md:col-span-2 lg:col-span-2 flex items-end">
-                            <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors">
-                                <i class="fas fa-plus mr-2"></i>Add Trade
-                            </button>
-                        </div>
+                        <div><label class="block text-sm text-gray-400 mb-1">Symbol</label><input type="text" id="manual-symbol" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="EURUSD" required></div>
+                        <div><label class="block text-sm text-gray-400 mb-1">Direction</label><select id="manual-direction" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"><option value="BUY">Buy</option><option value="SELL">Sell</option></select></div>
+                        <div><label class="block text-sm text-gray-400 mb-1">Entry Price</label><input type="number" id="manual-entry" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required></div>
+                        <div><label class="block text-sm text-gray-400 mb-1">Exit Price</label><input type="number" id="manual-exit" step="0.00001" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"></div>
+                        <div><label class="block text-sm text-gray-400 mb-1">P&amp;L ($)</label><input type="number" id="manual-pnl" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" required></div>
+                        <div><label class="block text-sm text-gray-400 mb-1">Volume</label><input type="number" id="manual-volume" step="0.01" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white" placeholder="0.10"></div>
+                        <div class="md:col-span-2 lg:col-span-2 flex items-end"><button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors"><i class="fas fa-plus mr-2"></i>Add Trade</button></div>
                     </form>
                 </div>
             </section>
 
             <!-- AI STOCK RESEARCH -->
             <section id="section-stocks" class="section hidden">
-                <iframe 
-                    src="/static/stock_terminal.html"
-                    class="w-full h-[900px] border-0 rounded-xl">
-                </iframe>
+                <iframe src="/static/stock_terminal.html" class="w-full h-[900px] border-0 rounded-xl"></iframe>
             </section>
-
-
 
             <!-- WEBINARS -->
             <section id="section-webinars" class="section hidden">
@@ -1455,11 +1183,12 @@
                 <div id="cms-container"></div>
             </section>
 
-            <!-- MENTOR -->
             <!-- RISK CALCULATOR -->
             <section id="section-risk" class="section hidden">
                 <div id="risk-calculator-container"></div>
             </section>
+
+            <!-- MENTOR -->
             <section id="section-mentor" class="section hidden">
                 <div class="max-w-7xl mx-auto h-[calc(100vh-140px)]">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
@@ -1476,199 +1205,86 @@
                                         </div>
                                     </div>
                                     <div class="flex gap-2">
-                                        <button onclick="dashboard.clearMentorChat()" aria-label="Clear conversation history" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors" title="Clear History">
-                                            <i class="fas fa-trash-alt mr-1" aria-hidden="true"></i>Clear
-                                        </button>
-                                        <button onclick="dashboard.toggleMentorHelp()" aria-label="Show quick commands" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
-                                            <i class="fas fa-question-circle mr-1" aria-hidden="true"></i>Help
-                                        </button>
+                                        <button onclick="dashboard.clearMentorChat()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"><i class="fas fa-trash-alt mr-1"></i>Clear</button>
+                                        <button onclick="dashboard.toggleMentorHelp()" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"><i class="fas fa-question-circle mr-1"></i>Help</button>
                                     </div>
                                 </div>
-
-                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50" aria-live="polite" aria-label="AI Mentor conversation">
+                                <div id="mentor-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/50">
                                     <div class="flex gap-3 animate-fade-in">
-                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                                            <i class="fas fa-robot text-xs text-white"></i>
-                                        </div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-xs text-white"></i></div>
                                         <div class="bg-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] border border-gray-600">
-                                            <p class="text-gray-200 text-sm leading-relaxed">
-                                                👋 Welcome! I'm your <strong>Gopipways AI Copilot</strong>. I have access to your:
-                                            </p>
-                                            <ul class="mt-2 space-y-1 text-sm text-gray-300">
-                                                <li class="flex items-center gap-2"><i class="fas fa-chart-line text-blue-400 text-xs"></i> Performance Analytics</li>
-                                                <li class="flex items-center gap-2"><i class="fas fa-satellite-dish text-green-400 text-xs"></i> Active Signals</li>
-                                                <li class="flex items-center gap-2"><i class="fas fa-graduation-cap text-purple-400 text-xs"></i> Educational Resources</li>
-                                                <li class="flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-xs"></i> Chart Analysis History</li>
-                                            </ul>
-                                            <p class="mt-2 text-xs text-gray-400">Try typing <code class="bg-gray-800 px-1 rounded">/review-trades</code> or <code class="bg-gray-800 px-1 rounded">/signals</code></p>
+                                            <p class="text-gray-200 text-sm leading-relaxed">👋 Welcome! I'm your <strong>Gopipways AI Copilot</strong>. Ask me anything about trading, your progress, or active signals.</p>
+                                            <p class="mt-2 text-xs text-gray-400">Try typing <code class="bg-gray-800 px-1 rounded">/next</code> or <code class="bg-gray-800 px-1 rounded">/signals</code></p>
                                         </div>
                                     </div>
                                 </div>
-
-                                <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700" role="status" aria-label="AI is thinking">
+                                <div id="mentor-typing" class="hidden px-4 py-2 bg-gray-800/50 border-t border-gray-700">
                                     <div class="flex items-center gap-2 text-gray-400 text-sm">
                                         <div class="flex gap-1">
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0s"></div>
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0s"></div>
+                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0.1s"></div>
+                                            <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
                                         </div>
                                         <span class="text-xs">AI is analyzing your data...</span>
                                     </div>
                                 </div>
-
                                 <div class="p-4 border-t border-gray-700 bg-gray-800">
-                                    <div class="flex gap-2 mb-2 overflow-x-auto pb-2 scrollbar-hide" id="quick-actions">
-                                        <button onclick="dashboard.askMentor('/next')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📚 What's Next
-                                        </button>
-                                        <button onclick="dashboard.askMentor('/review-trades')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📊 Review Trades
-                                        </button>
-                                        <button onclick="dashboard.askMentor('/signals')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📡 Signals
-                                        </button>
-                                        <button onclick="dashboard.askMentor('/strategy')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            🎯 Strategy
-                                        </button>
-                                        <button onclick="dashboard.askMentor('/progress')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            📈 My Progress
-                                        </button>
-                                        <button onclick="dashboard.askMentor('Why am I losing trades?')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">
-                                            🤔 Why am I losing?
-                                        </button>
+                                    <div class="flex gap-2 mb-2 overflow-x-auto pb-2" id="quick-actions">
+                                        <button onclick="dashboard.askMentor('/next')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">📚 What's Next</button>
+                                        <button onclick="dashboard.askMentor('/review-trades')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">📊 Review Trades</button>
+                                        <button onclick="dashboard.askMentor('/signals')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">📡 Signals</button>
+                                        <button onclick="dashboard.askMentor('/strategy')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">🎯 Strategy</button>
+                                        <button onclick="dashboard.askMentor('/progress')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">📈 My Progress</button>
+                                        <button onclick="dashboard.askMentor('Why am I losing trades?')" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-full whitespace-nowrap transition-colors border border-gray-600">🤔 Why am I losing?</button>
                                     </div>
                                     <div class="flex gap-2 w-full min-w-0">
-                                        <label for="mentor-input" class="sr-only">Ask your AI Mentor a question</label>
-                                        <input type="text" id="mentor-input" placeholder="Ask about your trading..." 
+                                        <input type="text" id="mentor-input" placeholder="Ask about your trading..."
                                             class="flex-1 min-w-0 px-3 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
-                                            aria-label="Ask your AI Mentor a question"
                                             onkeypress="if(event.key==='Enter') dashboard.sendMentorMessage()">
-                                        <button onclick="dashboard.sendMentorMessage()" aria-label="Send message" class="flex-shrink-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-3 rounded-lg transition-all">
-                                            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                                        <button onclick="dashboard.sendMentorMessage()" class="flex-shrink-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-3 rounded-lg transition-all">
+                                            <i class="fas fa-paper-plane"></i>
                                         </button>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- ── Lesson Recommendations (injected after AI replies) ── -->
-                            <div id="mentor-recommendations"
-                                 class="hidden mt-3 rounded-xl"
-                                 style="border:1px solid rgba(124,58,237,.25);background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(59,130,246,.05));">
-                                <div class="flex items-center gap-2 px-4 py-3 border-b"
-                                     style="border-color:rgba(124,58,237,.2);">
+                            <div id="mentor-recommendations" class="hidden mt-3 rounded-xl" style="border:1px solid rgba(124,58,237,.25);background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(59,130,246,.05));">
+                                <div class="flex items-center gap-2 px-4 py-3 border-b" style="border-color:rgba(124,58,237,.2);">
                                     <i class="fas fa-graduation-cap text-sm" style="color:#a78bfa;"></i>
                                     <span class="text-sm font-semibold text-white">Recommended Lessons</span>
-                                    <span id="mentor-rec-count"
-                                          class="ml-auto text-xs px-2 py-0.5 rounded-full font-bold"
-                                          style="background:rgba(124,58,237,.2);color:#c4b5fd;">0</span>
+                                    <span id="mentor-rec-count" class="ml-auto text-xs px-2 py-0.5 rounded-full font-bold" style="background:rgba(124,58,237,.2);color:#c4b5fd;">0</span>
                                 </div>
-                                <!-- flex col so ALL cards render at full height, none clipped -->
                                 <div id="mentor-rec-grid" class="p-3 flex flex-col gap-3"></div>
                             </div>
                         </div>
-
                         <div class="lg:col-span-1 space-y-4 overflow-y-auto">
                             <div class="bg-gray-800 rounded-xl p-5 border border-gray-700">
-                                <div class="flex items-center gap-2 mb-4">
-                                    <i class="fas fa-user-graduate text-purple-400"></i>
-                                    <h4 class="font-bold text-white">AI Coach Insights</h4>
-                                </div>
-
-                                <div id="coach-insights-loading" class="text-center py-4">
-                                    <div class="inline-flex items-center gap-2 text-gray-400 text-sm">
-                                        <i class="fas fa-spinner fa-spin"></i> Analyzing...
-                                    </div>
-                                </div>
-
+                                <div class="flex items-center gap-2 mb-4"><i class="fas fa-user-graduate text-purple-400"></i><h4 class="font-bold text-white">AI Coach Insights</h4></div>
+                                <div id="coach-insights-loading" class="text-center py-4"><div class="inline-flex items-center gap-2 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin"></i> Analyzing...</div></div>
                                 <div id="coach-insights-content" class="hidden space-y-4">
-                                    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-3 border border-purple-700/30">
-                                        <div class="text-xs text-gray-400 mb-1">Trading Personality</div>
-                                        <div id="trading-personality" class="text-lg font-bold text-purple-400">--</div>
-                                    </div>
-
+                                    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-3 border border-purple-700/30"><div class="text-xs text-gray-400 mb-1">Trading Personality</div><div id="trading-personality" class="text-lg font-bold text-purple-400">--</div></div>
                                     <div class="grid grid-cols-2 gap-3">
-                                        <div class="bg-gray-900 rounded-lg p-3 text-center">
-                                            <div id="discipline-score" class="text-2xl font-bold text-blue-400">--</div>
-                                            <div class="text-xs text-gray-500">Discipline</div>
-                                        </div>
-                                        <div class="bg-gray-900 rounded-lg p-3 text-center">
-                                            <div id="consistency-score" class="text-2xl font-bold text-green-400">--</div>
-                                            <div class="text-xs text-gray-500">Consistency</div>
-                                        </div>
+                                        <div class="bg-gray-900 rounded-lg p-3 text-center"><div id="discipline-score" class="text-2xl font-bold text-blue-400">--</div><div class="text-xs text-gray-500">Discipline</div></div>
+                                        <div class="bg-gray-900 rounded-lg p-3 text-center"><div id="consistency-score" class="text-2xl font-bold text-green-400">--</div><div class="text-xs text-gray-500">Consistency</div></div>
                                     </div>
-
-                                    <div>
-                                        <div class="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                                            <i class="fas fa-check-circle text-green-400"></i> Strengths
-                                        </div>
-                                        <ul id="ai-strengths-list" class="space-y-1">
-                                            <li class="text-sm text-gray-300 flex items-start gap-2">
-                                                <span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span>
-                                                <span>Loading...</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    <div>
-                                        <div class="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                                            <i class="fas fa-exclamation-triangle text-yellow-400"></i> Focus Areas
-                                        </div>
-                                        <ul id="ai-weaknesses-list" class="space-y-1">
-                                            <li class="text-sm text-gray-300 flex items-start gap-2">
-                                                <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span>
-                                                <span>Loading...</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    <div class="flex justify-between items-center text-sm border-t border-gray-700 pt-3">
-                                        <span class="text-gray-400">Risk Profile:</span>
-                                        <span id="risk-profile" class="px-2 py-1 bg-gray-700 rounded text-white text-xs">--</span>
-                                    </div>
+                                    <div><div class="text-xs text-gray-400 mb-2 flex items-center gap-1"><i class="fas fa-check-circle text-green-400"></i> Strengths</div><ul id="ai-strengths-list" class="space-y-1"><li class="text-sm text-gray-300 flex items-start gap-2"><span class="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 flex-shrink-0"></span><span>Loading...</span></li></ul></div>
+                                    <div><div class="text-xs text-gray-400 mb-2 flex items-center gap-1"><i class="fas fa-exclamation-triangle text-yellow-400"></i> Focus Areas</div><ul id="ai-weaknesses-list" class="space-y-1"><li class="text-sm text-gray-300 flex items-start gap-2"><span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mt-1.5 flex-shrink-0"></span><span>Loading...</span></li></ul></div>
+                                    <div class="flex justify-between items-center text-sm border-t border-gray-700 pt-3"><span class="text-gray-400">Risk Profile:</span><span id="risk-profile" class="px-2 py-1 bg-gray-700 rounded text-white text-xs">--</span></div>
                                 </div>
                             </div>
-
-                            <!-- Sidebar Recommended panel removed — recommendations now appear below chat -->
-
                             <div class="bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-xl p-5 border border-blue-700/30">
-                                <h4 class="font-bold text-white mb-3 flex items-center gap-2">
-                                    <i class="fas fa-tasks text-blue-400"></i> Next Steps
-                                </h4>
+                                <h4 class="font-bold text-white mb-3 flex items-center gap-2"><i class="fas fa-tasks text-blue-400"></i> Next Steps</h4>
                                 <ul id="next-steps-list" class="space-y-2 text-sm text-gray-300">
-                                    <li class="flex items-start gap-2">
-                                        <span class="text-blue-400 mt-0.5">→</span>
-                                        <span>Start a conversation with the AI to get personalized steps</span>
-                                    </li>
+                                    <li class="flex items-start gap-2"><span class="text-blue-400 mt-0.5">→</span><span>Start a conversation with the AI to get personalized steps</span></li>
                                 </ul>
                             </div>
-
                             <div id="mentor-help-panel" class="hidden bg-gray-800 rounded-xl p-5 border border-gray-700">
                                 <h4 class="font-bold text-white mb-3">Quick Commands</h4>
                                 <div class="space-y-2 text-sm">
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/next</code>
-                                        <span class="text-gray-400">What to learn next</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/signals</code>
-                                        <span class="text-gray-400">Analyse active signals</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/review-trades</code>
-                                        <span class="text-gray-400">Review your performance</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/strategy</code>
-                                        <span class="text-gray-400">Strategy readiness check</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/progress</code>
-                                        <span class="text-gray-400">Full progress breakdown</span>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/help</code>
-                                        <span class="text-gray-400">Show all commands</span>
-                                    </div>
+                                    <div class="flex gap-2"><code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/next</code><span class="text-gray-400">What to learn next</span></div>
+                                    <div class="flex gap-2"><code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/signals</code><span class="text-gray-400">Analyse active signals</span></div>
+                                    <div class="flex gap-2"><code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/review-trades</code><span class="text-gray-400">Review your performance</span></div>
+                                    <div class="flex gap-2"><code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/strategy</code><span class="text-gray-400">Strategy readiness check</span></div>
+                                    <div class="flex gap-2"><code class="bg-gray-900 px-2 py-1 rounded text-purple-400">/progress</code><span class="text-gray-400">Full progress breakdown</span></div>
                                 </div>
                             </div>
                         </div>
@@ -1686,14 +1302,7 @@
         </div>
     </main>
 
-    <!-- DashboardController extracted to separate file — fixes HTML parser mangling inline JS -->
     <script src="/js/modules/dashboard.js"></script>
-
-    <!--
-        Module scripts — loaded from frontend/js/modules/
-        Order matters: chart_analysis and admin both depend on window.dashboard
-        and window.API which are set in the inline block above.
-    -->
     <script src="/js/modules/chart_analysis.js"></script>
     <script src="/js/modules/admin.js"></script>
     <script src="/js/modules/cms.js"></script>
@@ -1703,6 +1312,74 @@
     <script src="/js/modules/enhanced_signals.js"></script>
     <script src="/js/onboarding.js"></script>
     <script src="/js/modules/risk_calculator.js"></script>
+
+    <!-- ── Mobile Bottom Navigation ── -->
+    <nav id="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
+        <button class="mobile-nav-btn active" id="mnav-home"
+                onclick="dashboard.navigate('dashboard')" aria-label="Home">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </button>
+        <button class="mobile-nav-btn" id="mnav-signals"
+                onclick="dashboard.navigate('enhanced-signals')" aria-label="Signals">
+            <i class="fas fa-satellite-dish"></i>
+            <span>Signals</span>
+        </button>
+        <!-- Analyse — FAB-style centre button -->
+        <button class="mobile-nav-btn" id="mnav-analyse"
+                onclick="dashboard.navigate('analysis')" aria-label="Analyse Chart">
+            <div class="mnav-fab-wrap">
+                <i class="fas fa-chart-bar"></i>
+            </div>
+            <span>Analyse</span>
+        </button>
+        <a class="mobile-nav-btn" id="mnav-academy"
+           href="/academy" aria-label="Trading Academy">
+            <i class="fas fa-graduation-cap"></i>
+            <span>Academy</span>
+        </a>
+        <button class="mobile-nav-btn" id="mnav-mentor"
+                onclick="dashboard.navigate('mentor')" aria-label="AI Mentor">
+            <i class="fas fa-robot"></i>
+            <span>Mentor</span>
+        </button>
+    </nav>
+
+    <script>
+    // ── Mobile bottom nav active state sync ──────────────────────────────
+    // Watches .nav-link.active class via MutationObserver — no dashboard.js patch needed
+    (function() {
+        const MAP = {
+            'dashboard':        'mnav-home',
+            'analysis':         'mnav-analyse',
+            'enhanced-signals': 'mnav-signals',
+            'signals':          'mnav-signals',
+            'mentor':           'mnav-mentor',
+        };
+
+        function syncMobileNav() {
+            const activeLink = document.querySelector('.nav-link.active');
+            const section = activeLink?.dataset?.section;
+            document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+            const id = MAP[section] || 'mnav-home';
+            document.getElementById(id)?.classList.add('active');
+        }
+
+        function setupObserver() {
+            const links = document.querySelectorAll('.nav-link');
+            if (!links.length) { setTimeout(setupObserver, 150); return; }
+            const obs = new MutationObserver(syncMobileNav);
+            links.forEach(link => obs.observe(link, { attributes: true, attributeFilter: ['class'] }));
+            syncMobileNav();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupObserver);
+        } else {
+            setupObserver();
+        }
+    })();
+    </script>
 
 </body>
 </html>

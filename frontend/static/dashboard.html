@@ -1693,45 +1693,8 @@
         </div>
     </main>
 
-    <script>
-const API_BASE = window.location.origin;
-
-// ── Auth & error helpers — defined here (first script block) so they are
-// available immediately when DashboardController initialises and calls
-// apiRequest during page load, before the chart-analysis block further down.
-
-async function _parseApiError(response) {
-    const text = await response.text().catch(() => '');
-    try {
-        const json = JSON.parse(text);
-        if (json.detail)  return json.detail;
-        if (json.message) return json.message;
-    } catch (_) { /* not JSON */ }
-    return text || `HTTP ${response.status}`;
-}
-
-function _handleAuthError() {
-    localStorage.removeItem('pipways_token');
-    localStorage.removeItem('pipways_user');
-    alert('Your session has expired. Please log in again.');
-    window.location.href = '/';
-}
-
-    </script>
-
-    <!-- DashboardController moved to separate file (fixes inline HTML parser issues) -->
+    <!-- DashboardController extracted to separate file — fixes HTML parser mangling inline JS -->
     <script src="/js/modules/dashboard.js"></script>
-
-    <script>
-    // API shim — dashboard.js sets window.dashboard; modules use window.API
-    // Wait for dashboard.js to execute, then expose API on window
-    window.API = window.API || {
-        request(endpoint, opts = {}) {
-            if (!window.dashboard) console.error('[API] dashboard not initialised');
-            return window.dashboard?.apiRequest(endpoint, opts);
-        }
-    };
-    </script>
 
     <!--
         Module scripts — loaded from frontend/js/modules/

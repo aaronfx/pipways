@@ -1,3 +1,9 @@
+// ── Global API base URL — exposed on window so public_pages.js and all
+// other modules can access it regardless of script load order.
+window.API_BASE = window.location.origin;
+const API_BASE   = window.API_BASE;
+
+
 // ── Auth & error helpers — defined here (first script block) so they are
 // available immediately when DashboardController initialises and calls
 // apiRequest during page load, before the chart-analysis block further down.
@@ -54,9 +60,20 @@ const DashboardController = class {
     }
 
     _showResetModal(token) {
+        // Hide all dashboard content so reset modal shows on a clean dark page
+        document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+        const ticker   = document.querySelector('.ticker-wrap');
+        const header   = document.querySelector('header');
+        const sidebar  = document.getElementById('sidebar');
+        const mobileBtn = document.getElementById('mobile-menu-btn');
+        if (ticker)    ticker.style.display   = 'none';
+        if (header)    header.style.display   = 'none';
+        if (sidebar)   sidebar.style.display  = 'none';
+        if (mobileBtn) mobileBtn.style.display = 'none';
+
         const overlay = document.createElement('div');
         overlay.id = 'reset-modal-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0f172a;display:flex;align-items:center;justify-content:center;padding:20px;';
         overlay.innerHTML = `
             <div style="background:#1f2937;border-radius:14px;padding:32px;width:100%;max-width:440px;border:1px solid #374151;text-align:center;">
                 <div style="font-size:40px;margin-bottom:12px;">🔐</div>
@@ -64,8 +81,9 @@ const DashboardController = class {
                 <p id="reset-modal-p" style="margin:0;color:#9ca3af;font-size:14px;">Please wait a moment.</p>
                 <div id="reset-form-area" style="margin-top:24px;"></div>
             </div>`;
-        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); }, { once: true });
+        // Clicking outside or pressing Escape sends user to login — not the dashboard
+        overlay.addEventListener('click', e => { if (e.target === overlay) window.location.href = '/'; });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') window.location.href = '/'; }, { once: true });
         document.body.appendChild(overlay);
 
         fetch(`/email/verify-reset-token?token=${encodeURIComponent(token)}`)

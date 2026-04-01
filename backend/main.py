@@ -276,6 +276,10 @@ async def get_dashboard_html():
 async def get_academy():
     return await _serve_html(FRONTEND_DIR / "static" / "academy.html", "Academy")
 
+@app.get("/academy.html")
+async def get_academy_html():
+    return await get_academy()
+
 @app.get("/pricing")
 async def get_pricing():
     return await _serve_html(FRONTEND_DIR / "static" / "pricing.html", "Pricing")

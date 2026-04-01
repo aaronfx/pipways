@@ -888,6 +888,11 @@ const DashboardController = class {
                 blogEl.innerHTML = `<div class="pw-empty" style="padding:2rem 1rem;">
                     <div class="pw-empty-icon" style="width:44px;height:44px;"><i class="fas fa-newspaper" style="color:#6b7280;"></i></div>
                     <p class="pw-empty-title">No articles yet</p>
+                    <p class="pw-empty-sub" style="margin-bottom:1.25rem;">Research and market insights are coming soon.</p>
+                    <a href="/academy" class="text-xs font-semibold px-4 py-2 rounded-lg text-decoration-none"
+                       style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;">
+                        <i class="fas fa-graduation-cap mr-1"></i>Browse Academy instead →
+                    </a>
                 </div>`;
             } else {
                 blogEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

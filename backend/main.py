@@ -284,13 +284,25 @@ async def get_academy_html():
 async def get_pricing():
     return await _serve_html(FRONTEND_DIR / "static" / "pricing.html", "Pricing")
 
+@app.get("/pricing.html")
+async def get_pricing_html():
+    return await get_pricing()
+
 @app.get("/risk-calculator")
 async def get_risk_calculator():
     return await _serve_html(FRONTEND_DIR / "static" / "risk_calculator.html", "Risk Calculator")
 
+@app.get("/risk-calculator.html")
+async def get_risk_calculator_html():
+    return await get_risk_calculator()
+
 @app.get("/stock-terminal")
 async def get_stock_terminal():
     return await _serve_html(FRONTEND_DIR / "static" / "stock_terminal.html", "Stock Terminal")
+
+@app.get("/stock-terminal.html")
+async def get_stock_terminal_html():
+    return await get_stock_terminal()
 
 
 @app.get("/health")

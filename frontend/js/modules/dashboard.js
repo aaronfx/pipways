@@ -692,7 +692,7 @@ const DashboardController = class {
             safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
             safe(this.apiRequest('/blog/posts')),
             safe(this.apiRequest('/api/signals/active')),
-            safe(this.apiRequest('/courses/enhanced/progress')),
+            userId ? safe(this.apiRequest(`/learning/progress/${userId}`)) : Promise.resolve(null),
             safe(this.apiRequest('/learning/resume')),
         ]);
 

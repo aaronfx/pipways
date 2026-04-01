@@ -572,11 +572,14 @@ class DashboardController {
                 container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No articles published yet</div>';
                 return;
             }
-            container.innerHTML = posts.map(post => `
+            container.innerHTML = posts.map(post => {
+                // Pre-compute image HTML outside main template — avoids nested backtick evaluation quirk
+                const imgHtml = post.featured_image
+                    ? '<div class="h-48 overflow-hidden"><img src="' + this._safeHtml(post.featured_image) + '" class="w-full h-full object-cover group-hover:scale-105 transition-transform" onerror="this.style.display=\'none\'"></div>'
+                    : '<div class="h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-5xl text-white/20 group-hover:scale-110 transition-transform"></i></div>';
+                return `
                 <article class="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-all cursor-pointer group">
-                    ${post.featured_image
-                        ? `<div class="h-48 overflow-hidden"><img src="${this._safeHtml(post.featured_image)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" onerror="this.parentElement.innerHTML='<div class=h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center><i class=fas fa-newspaper text-5xl text-white/20></i></div>'"></div>`
-                        : `<div class="h-48 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center"><i class="fas fa-newspaper text-5xl text-white/20 group-hover:scale-110 transition-transform"></i></div>`}
+                    ${imgHtml}
                     <div class="p-4">
                         <div class="text-xs text-purple-400 mb-2 uppercase tracking-wide">${this._safeHtml(post.category || 'General')}</div>
                         <h4 class="font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">${this._safeHtml(post.title)}</h4>
@@ -586,7 +589,8 @@ class DashboardController {
                             <span class="text-purple-400">Read more →</span>
                         </div>
                     </div>
-                </article>`).join('');
+                </article>`;
+            }).join('');
         } catch (error) {
             console.error('[Blog Error]', error);
             container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load articles</div>';

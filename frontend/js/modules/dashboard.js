@@ -408,7 +408,8 @@ const DashboardController = class {
         try {
             switch(section) {
                 case 'dashboard': this.loadDashboardStats(); break;
-                case 'signals':   await this.loadSignals();  break;
+                case 'signals':   // redirected — fall through to enhanced-signals
+                case 'enhanced-signals':
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
                         // init() on first visit (registers tabs + interval), loadSignals() after that

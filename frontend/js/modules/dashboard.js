@@ -562,7 +562,6 @@ const DashboardController = class {
             });
 
             const lbl   = document.getElementById('stat-session-label');
-            const dot   = document.querySelector('#stat-session-pill .w-1\\.5');
             const nyEl  = document.getElementById('dash-ny-countdown');
 
             if (lbl) {
@@ -684,15 +683,15 @@ const DashboardController = class {
             return html;
         }
 
-
-
-        // ── Fetch all data in parallel ────────────────────────────────────
+        // ── FIX: correct endpoint with user ID ────────────────────────────
+        // Was: '/courses/enhanced/progress' (non-existent — always returned null)
+        // Now: '/learning/progress/{user_id}' (real endpoint in academy_routes.py)
         const [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
             safe(this.apiRequest('/courses/list')),
             safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
             safe(this.apiRequest('/blog/posts')),
             safe(this.apiRequest('/api/signals/active')),
-            userId ? safe(this.apiRequest(`/learning/progress/${userId}`)) : Promise.resolve(null),
+            safe(this.apiRequest(`/learning/progress/${this.user?.id || 0}`)),
             safe(this.apiRequest('/learning/resume')),
         ]);
 
@@ -779,15 +778,14 @@ const DashboardController = class {
                 const moduleName  = academyResume.module || '';
                 const lessonId    = academyResume.lesson_id;
 
-                // Level palette - fix progress calculation using actual progress data
+                // Level palette - use progress.summary array for real percentages
+                // summary items: { level_name: "Beginner"|"Intermediate"|"Advanced", percent, completed, total }
                 const levels = [
                     { name: 'Beginner',     color: '#34d399' },
                     { name: 'Intermediate', color: '#60a5fa' },
                     { name: 'Advanced',     color: '#f59e0b' },
                 ];
                 
-                // Bug 5 fix: use progress.summary array
-                // summary items: { level_name: "Beginner"|"Intermediate"|"Advanced", percent, completed, total }
                 const _summaryMap = {};
                 if (progress?.summary?.length) {
                     progress.summary.forEach(s => {
@@ -844,7 +842,6 @@ const DashboardController = class {
                     else if (section) dashboard.navigate(section);
                 });
                 // Hover border effect
-                var origBorder = card.style.borderColor;
                 card.addEventListener('mouseenter', function() { this.style.opacity = '0.88'; });
                 card.addEventListener('mouseleave',  function() { this.style.opacity = '1'; });
             });
@@ -863,85 +860,6 @@ const DashboardController = class {
                     setTimeout(_renderToolBadge, 1500);
                 }
             }
-        }
-
-        // ── Card 3: Trading Academy Progress ────────────────────────────────
-        // Bug 4: dash-academy-body not in HTML — skip
-        const academyEl = null;
-        if (academyEl && progress) {
-            const progressData = progress.levels || {
-                beginner: { percentage: 0, completed: 0, total: 12 },
-                intermediate: { percentage: 0, completed: 0, total: 8 },
-                advanced: { percentage: 0, completed: 0, total: 8 }
-            };
-
-            academyEl.innerHTML = `
-                <div class="space-y-3">
-                    <!-- Beginner Level -->
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(52,211,153,.12);">
-                                <i class="fas fa-seedling text-sm" style="color:#34d399;"></i>
-                            </div>
-                            <div>
-                                <div class="text-sm font-medium text-white">Beginner</div>
-                                <div class="text-xs text-gray-400">${progressData.beginner.completed}/${progressData.beginner.total} lessons</div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-bold text-green-400">${Math.round(progressData.beginner.percentage || 0)}%</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Intermediate Level -->
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(96,165,250,.12);">
-                                <i class="fas fa-chart-line text-sm" style="color:#60a5fa;"></i>
-                            </div>
-                            <div>
-                                <div class="text-sm font-medium text-white">Intermediate</div>
-                                <div class="text-xs text-gray-400">${progressData.intermediate.completed}/${progressData.intermediate.total} lessons</div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-bold text-blue-400">${Math.round(progressData.intermediate.percentage || 0)}%</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Advanced Level -->
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(251,191,36,.12);">
-                                <i class="fas fa-crown text-sm" style="color:#fbbf24;"></i>
-                            </div>
-                            <div>
-                                <div class="text-sm font-medium text-white">Advanced</div>
-                                <div class="text-xs text-gray-400">${progressData.advanced.completed}/${progressData.advanced.total} lessons</div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-bold text-yellow-400">${Math.round(progressData.advanced.percentage || 0)}%</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Continue Learning CTA -->
-                    ${academyResume && academyResume.type !== 'complete' ? `
-                    <div class="pt-2 border-t border-gray-700/50">
-                        <a href="/academy" class="flex items-center justify-between p-3 rounded-lg transition-all" 
-                           style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);"
-                           onmouseover="this.style.background='rgba(124,58,237,.12)'"
-                           onmouseout="this.style.background='rgba(124,58,237,.08)'">
-                            <div>
-                                <div class="text-sm font-medium text-purple-300">Continue Learning</div>
-                                <div class="text-xs text-gray-400">${academyResume.lesson_title || 'Pick up where you left off'}</div>
-                            </div>
-                            <i class="fas fa-arrow-right text-purple-400"></i>
-                        </a>
-                    </div>
-                    ` : ''}
-                </div>
-            `;
         }
 
         // ── AI Market Insight: show only for users ≥30% academy progress ──
@@ -1004,17 +922,12 @@ const DashboardController = class {
     }
 
     _updateNextStepCard(progress, courses, academyResume) {
-        /**
-         * Dynamically updates the "Your Next Step" card.
-         * Prioritises Trading Academy data over old courses.
-         */
         const titleEl = document.getElementById('next-step-title');
         const subEl   = document.getElementById('next-step-sub');
         const ctaEl   = document.getElementById('next-step-cta');
         if (!titleEl || !subEl || !ctaEl) return;
 
         if (academyResume && academyResume.type === 'continue' && academyResume.lesson_id) {
-            // Actively in-progress in Academy
             const lessonTitle = academyResume.title  || 'Next Lesson';
             const moduleName  = academyResume.module || '';
             const levelName   = academyResume.level  || '';
@@ -1028,7 +941,6 @@ const DashboardController = class {
             ctaEl.href          = '/academy';
             ctaEl.innerHTML     = '<i class="fas fa-trophy text-xs"></i> View Academy';
         } else {
-            // Not started or no academy data — prompt to begin
             titleEl.textContent = 'Start your Trading Academy';
             subEl.textContent   = '28 lessons · from first pip to institutional strategy';
             ctaEl.href          = '/academy';
@@ -1637,47 +1549,6 @@ const DashboardController = class {
         // Courses section now redirects to Academy
         window.location.href = '/academy';
         return;
-        // Legacy code below kept for reference
-    }
-    async _loadCoursesLegacy() {
-        if (typeof PublicPages !== 'undefined') {
-            await PublicPages.courses('courses-container', this);
-            return;
-        }
-        const container = document.getElementById('courses-container');
-        if (!container) return;
-        if (typeof CoursesPage !== 'undefined') {
-            await CoursesPage.render('courses-container');
-            return;
-        }
-        container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading courses…</div>';
-        try {
-            const data = await this.apiRequest('/courses/list');
-            const courses = Array.isArray(data) ? data : (data.courses || []);
-            if (!courses.length) {
-                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">
-                    <i class="fas fa-graduation-cap text-4xl mb-3 block opacity-30"></i>
-                    <p class="font-medium">No courses available yet</p>
-                </div>`;
-                return;
-            }
-            container.innerHTML = courses.map(c => `
-                <div class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-blue-600/50 transition-colors cursor-pointer"
-                     onclick="CoursesPage ? CoursesPage.openCourse(${c.id}) : null">
-                    <div class="h-40 bg-gradient-to-br from-purple-900 to-blue-900 flex items-center justify-center">
-                        <i class="fas fa-graduation-cap text-5xl text-white/20"></i>
-                    </div>
-                    <div class="p-4">
-                        <span class="text-xs text-purple-400 font-semibold">${c.level || 'Beginner'}</span>
-                        <h4 class="font-bold text-white mt-1 mb-2">${c.title}</h4>
-                        <p class="text-sm text-gray-400 line-clamp-2 mb-2">${c.description || ''}</p>
-                        <div class="text-xs text-gray-500">${c.lesson_count || 0} lessons</div>
-                    </div>
-                </div>
-            `).join('');
-        } catch (error) {
-            container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">Failed to load courses.</div>';
-        }
     }
 
     async loadWebinars() {
@@ -1825,46 +1696,6 @@ const DashboardController = class {
         return;
     }
 
-    _updateRecommendationsList_legacy(resources) {
-        const container = document.getElementById('recommendations-list');
-        const countBadge = document.getElementById('rec-count');
-        if (!container || !countBadge) return;  // panel removed, skip silently
-
-        if (!resources || resources.length === 0) {
-            container.innerHTML = `
-                <div class="text-center text-gray-500 text-sm py-4">
-                    Ask the AI for personalized recommendations
-                </div>
-            `;
-            countBadge.textContent = '0';
-            return;
-        }
-
-        countBadge.textContent = resources.length;
-
-        const icons = {
-            'course': 'fa-graduation-cap text-purple-400',
-            'blog': 'fa-newspaper text-blue-400',
-            'signal': 'fa-satellite-dish text-green-400',
-            'strategy': 'fa-chess text-yellow-400',
-            'warning': 'fa-exclamation-triangle text-red-400'
-        };
-
-        container.innerHTML = resources.map(rec => `
-            <div class="bg-gray-900/50 rounded-lg p-3 border border-gray-700 hover:border-purple-500/50 transition-colors cursor-pointer group">
-                <div class="flex items-start gap-3">
-                    <div class="mt-0.5">
-                        <i class="fas ${icons[rec.type] || 'fa-lightbulb text-gray-400'}"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-white group-hover:text-purple-400 transition-colors truncate">${rec.title}</div>
-                        ${rec.description ? `<div class="text-xs text-gray-400 mt-0.5 line-clamp-2">${rec.description}</div>` : ''}
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
-
     loadMentorHistory() {
         try {
             const history = JSON.parse(localStorage.getItem('mentor_history') || '[]');
@@ -1939,10 +1770,9 @@ const DashboardController = class {
             localStorage.setItem('mentor_history', JSON.stringify(trimmed));
 
             // Also save a compact summary of last 6 exchanges for cross-session context
-            // This gives the AI context even after a refresh without loading full history
             const summary = messages.slice(-6).map(m => ({
                 role: m.role,
-                content: m.content.slice(0, 300) // truncate long responses
+                content: m.content.slice(0, 300)
             }));
             localStorage.setItem('mentor_session_summary', JSON.stringify({
                 saved_at: new Date().toISOString(),
@@ -1965,11 +1795,9 @@ const DashboardController = class {
                 }));
             }
             // No in-session history (fresh page load) — use cross-session summary
-            // This gives the AI context of the last conversation silently
             const summaryRaw = localStorage.getItem('mentor_session_summary');
             if (!summaryRaw) return [];
             const summary = JSON.parse(summaryRaw);
-            // Only use if from last 7 days
             const age = Date.now() - new Date(summary.saved_at).getTime();
             if (age > 7 * 86400000) return [];
             return (summary.messages || []).map(m => ({
@@ -2020,19 +1848,12 @@ const DashboardController = class {
             input.value = '';
             this.appendMentorMessage('/help', 'user');
             this.appendMentorMessage(
-                `**Available commands:**
-` +
-                `• \`/signals\` — Analyse active market signals
-` +
-                `• \`/review-trades\` — Review your performance stats
-` +
-                `• \`/strategy\` — Check your strategy readiness
-` +
-                `• \`/next\` — What to learn next
-` +
-                `• \`/progress\` — Full progress breakdown
-
-` +
+                `**Available commands:**\n` +
+                `• \`/signals\` — Analyse active market signals\n` +
+                `• \`/review-trades\` — Review your performance stats\n` +
+                `• \`/strategy\` — Check your strategy readiness\n` +
+                `• \`/next\` — What to learn next\n` +
+                `• \`/progress\` — Full progress breakdown\n\n` +
                 `Or just ask me anything about trading!`,
                 'assistant'
             );
@@ -2131,22 +1952,17 @@ const DashboardController = class {
             const lessonId = rec.metadata?.lesson_id || rec.id || null;
             const url      = rec.url || null;
             const t        = typeIcons[rec.type] || typeIcons.default;
-            const isStatic = rec.metadata?.static === true;
 
             // Build absolute URL — priority: explicit url with ?lesson= > lesson_id > academy homepage
             const _base = window.location.origin;
             let dest;
             if (url && url.includes('?lesson=')) {
-                // Has specific lesson ID in URL — use it directly (best case)
                 dest = url.startsWith('http') ? url : _base + url;
             } else if (lessonId) {
-                // Has lesson_id in metadata — build specific URL
                 dest = `${_base}/academy.html?lesson=${lessonId}`;
             } else if (url) {
-                // Has URL but no lesson ID (fallback cards) — use URL as-is
                 dest = url.startsWith('http') ? url : _base + url;
             } else {
-                // No URL at all — go to academy homepage
                 dest = `${_base}/academy.html`;
             }
 
@@ -2158,7 +1974,7 @@ const DashboardController = class {
             card.onmouseover = () => { card.style.borderColor = '#7c3aed'; card.style.background = 'rgba(124,58,237,.08)'; };
             card.onmouseout  = () => { card.style.borderColor = '#1f2937'; card.style.background = '#111827'; };
 
-            // Label for CTA button — show "Open Academy" for fallback cards, "Start Lesson" for specific ones
+            // Label for CTA button
             const ctaLabel = (lessonId || (url && url.includes('?lesson=')))
                 ? 'Start Lesson'
                 : 'Open Academy';
@@ -2205,7 +2021,6 @@ const DashboardController = class {
             }).catch(e => console.warn('[Mentor] Lesson click tracking failed:', e));
         }
 
-        // Build absolute URL to guarantee correct navigation across all paths
         const _origin = window.location.origin;
         const destination = url
             ? (url.startsWith('http') ? url : _origin + url)

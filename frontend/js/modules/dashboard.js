@@ -445,6 +445,30 @@ const DashboardController = class {
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
+                case 'risk': {
+                    const rc = document.getElementById('risk-calculator-container');
+                    if (!rc) break;
+                    if (typeof RiskCalculator !== 'undefined') {
+                        if (!rc._rcRendered) { rc._rcRendered = true; await RiskCalculator.render(rc); }
+                    } else {
+                        // Module not loaded — embed standalone page via iframe
+                        rc.innerHTML = `
+                            <div class="max-w-5xl mx-auto">
+                                <div id="rc-loading-note" class="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-4 mb-4 flex items-center gap-3">
+                                    <i class="fas fa-info-circle text-yellow-400"></i>
+                                    <p class="text-sm text-yellow-200">
+                                        Loading calculator…
+                                        <a href="/risk-calculator" target="_blank" class="underline text-yellow-300 ml-2">Open in full page →</a>
+                                    </p>
+                                </div>
+                                <iframe src="/risk-calculator"
+                                    style="width:100%;height:calc(100vh - 220px);border:none;border-radius:12px;background:#111827;"
+                                    onload="document.getElementById('rc-loading-note')?.remove()">
+                                </iframe>
+                            </div>`;
+                    }
+                    break;
+                }
                 case 'admin': {
                     const container = document.getElementById('admin-container');
                     if (!container) break;

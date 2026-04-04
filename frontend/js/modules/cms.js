@@ -1533,7 +1533,9 @@ const CMSPage = {
 
     _webinarForm(d=null){
         const isEdit=d&&d.id; this._editingId=isEdit?d.id:null;
-        d=d||{title:'',description:'',presenter:'',scheduled_at:'',duration_minutes:60,meeting_link:'',recording_url:'',thumbnail:'',max_attendees:100,is_published:false};
+        d=d||{title:'',description:'',presenter:'',speaker_bio:'',scheduled_at:'',duration_minutes:60,
+               meeting_link:'',youtube_url:'',embed_url:'',recording_url:'',
+               thumbnail:'',max_attendees:100,is_published:false};
         const f=document.getElementById('cms-web-form'); if(!f) return;
         f.style.display='block';
         f.innerHTML=`
@@ -1543,13 +1545,21 @@ const CMSPage = {
             <div><label class="cl">Title *</label><input class="ci" id="wf-title" value="${this._e(d.title)}"></div>
             <div><label class="cl">Presenter</label><input class="ci" id="wf-presenter" value="${this._e(d.presenter||'')}"></div>
         </div>
+        <div class="crow"><div><label class="cl">Presenter Bio</label><textarea class="cta" id="wf-bio" style="min-height:55px;">${this._e(d.speaker_bio||'')}</textarea></div></div>
         <div class="crow crow2">
             <div><label class="cl">Date & Time *</label><input type="datetime-local" class="ci" id="wf-date" value="${this._dt(d.scheduled_at)}"></div>
             <div><label class="cl">Duration (min)</label><input type="number" class="ci" id="wf-dur" value="${d.duration_minutes||60}" min="1"></div>
         </div>
         <div class="crow crow2">
-            <div><label class="cl">Meeting Link</label><input class="ci" id="wf-link" value="${this._e(d.meeting_link||'')}" placeholder="https://zoom.us/…"></div>
-            <div><label class="cl">Recording URL</label><input class="ci" id="wf-rec" value="${this._e(d.recording_url||'')}" placeholder="After event"></div>
+            <div><label class="cl">Zoom / Meeting Link</label><input class="ci" id="wf-link" value="${this._e(d.meeting_link||'')}" placeholder="https://zoom.us/…"></div>
+            <div><label class="cl">YouTube Live URL <span style="color:#a78bfa;font-size:.7rem;">(embeds in-app ✓)</span></label>
+                <input class="ci" id="wf-yturl" value="${this._e(d.youtube_url||'')}" placeholder="https://www.youtube.com/watch?v=…"></div>
+        </div>
+        <div class="crow crow2">
+            <div><label class="cl">Custom Embed URL <span style="color:#6b7280;font-size:.7rem;">(fallback)</span></label>
+                <input class="ci" id="wf-embed" value="${this._e(d.embed_url||'')}" placeholder="https://…/embed/…"></div>
+            <div><label class="cl">Recording URL <span style="color:#6b7280;font-size:.7rem;">(after event)</span></label>
+                <input class="ci" id="wf-rec" value="${this._e(d.recording_url||'')}" placeholder="https://www.youtube.com/watch?v=…"></div>
         </div>
         <div class="crow crow2">
             <div><label class="cl">Thumbnail</label>
@@ -1572,12 +1582,24 @@ const CMSPage = {
     },
     _closeWebForm(){ const f=document.getElementById('cms-web-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
     async _saveWebinar(){
-        const title=document.getElementById('wf-title')?.value.trim(),sched=document.getElementById('wf-date')?.value;
+        const title=document.getElementById('wf-title')?.value.trim(),
+              sched=document.getElementById('wf-date')?.value;
         if(!title||!sched){this._toast('Title and date required','error');return;}
-        const p={title,description:document.getElementById('wf-desc')?.value||'',presenter:document.getElementById('wf-presenter')?.value||'',scheduled_at:sched,
-            duration_minutes:parseInt(document.getElementById('wf-dur')?.value)||60,meeting_link:document.getElementById('wf-link')?.value||'',
-            recording_url:document.getElementById('wf-rec')?.value||'',thumbnail:document.getElementById('wf-thumb')?.value||'',
-            max_attendees:parseInt(document.getElementById('wf-max')?.value)||100,is_published:document.getElementById('wf-pub')?.value==='1'};
+        const p={
+            title,
+            description:      document.getElementById('wf-desc')?.value||'',
+            presenter:        document.getElementById('wf-presenter')?.value||'',
+            speaker_bio:      document.getElementById('wf-bio')?.value||'',
+            scheduled_at:     sched,
+            duration_minutes: parseInt(document.getElementById('wf-dur')?.value)||60,
+            meeting_link:     document.getElementById('wf-link')?.value||'',
+            youtube_url:      document.getElementById('wf-yturl')?.value||'',
+            embed_url:        document.getElementById('wf-embed')?.value||'',
+            recording_url:    document.getElementById('wf-rec')?.value||'',
+            thumbnail:        document.getElementById('wf-thumb')?.value||'',
+            max_attendees:    parseInt(document.getElementById('wf-max')?.value)||100,
+            is_published:     document.getElementById('wf-pub')?.value==='1'
+        };
         try{
             if(this._editingId){await API.cms.updateWebinar(this._editingId,p);this._toast('Webinar updated');}
             else{await API.cms.createWebinar(p);this._toast('Webinar created');}

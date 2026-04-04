@@ -264,27 +264,16 @@ const DashboardController = class {
         }
     }
 
-    // Centralised admin check used by renderAdminMenu, loadAdminData, and loadSectionData.
-    // Three tiers:
-    //   1. Explicit flags from the JWT/user object (most reliable)
-    //   2. Email pattern fallback — catches cases where the stored user object
-    //      was created before is_admin was added to the JWT payload
-    //   3. /auth/me refresh — silently re-fetches the user and updates localStorage
-    //      so the next page load has the correct flags without requiring a re-login
     _isAdminUser(user) {
         if (!user) return false;
         if (user.is_admin === true)     return true;
         if (user.role === 'admin')      return true;
         if (user.is_superuser === true) return true;
-        // Fallback: treat known admin email patterns as admin
-        // (handles cases where is_admin is missing from the stored token)
         const email = (user.email || '').toLowerCase();
         if (email === 'admin@pipways.com' || email.startsWith('admin+')) return true;
         return false;
     }
 
-    // Refresh user data from /auth/me and update localStorage + this.user.
-    // Called once on init so stale tokens get corrected silently.
     async _refreshUserFromServer() {
         try {
             const fresh = await this.apiRequest('/auth/me');
@@ -292,7 +281,7 @@ const DashboardController = class {
                 this.user = { ...this.user, ...fresh };
                 localStorage.setItem('pipways_user', JSON.stringify(this.user));
                 this.updateUserDisplay();
-                this.renderAdminMenu();   // re-evaluate with fresh flags
+                this.renderAdminMenu();
             }
         } catch (_) {
             // Non-fatal — stale data is better than crashing
@@ -304,7 +293,6 @@ const DashboardController = class {
             link.addEventListener('click', (e) => {
                 const section = e.currentTarget.dataset.section;
                 const href = e.currentTarget.getAttribute('href');
-                // Allow real href links (not "#") to navigate normally
                 if (!section && href && href !== '#') {
                     return;
                 }
@@ -326,17 +314,16 @@ const DashboardController = class {
             sidebar?.classList.remove('-translate-x-full');
             overlay?.classList.remove('hidden');
             btn?.setAttribute('aria-expanded', 'true');
-            // Focus first interactive element in sidebar
             setTimeout(() => {
                 const firstLink = sidebar?.querySelector('a, button');
                 firstLink?.focus();
-            }, 310); // after transition
+            }, 310);
         };
         const closeSidebar = () => {
             sidebar?.classList.add('-translate-x-full');
             overlay?.classList.add('hidden');
             btn?.setAttribute('aria-expanded', 'false');
-            btn?.focus(); // return focus to trigger
+            btn?.focus();
         };
 
         if (btn) btn.addEventListener('click', () => {
@@ -345,7 +332,6 @@ const DashboardController = class {
 
         overlay?.addEventListener('click', closeSidebar);
 
-        // Escape key closes mobile sidebar
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape' && sidebar && !sidebar.classList.contains('-translate-x-full')) {
                 closeSidebar();
@@ -354,30 +340,22 @@ const DashboardController = class {
     }
 
     navigate(section) {
-        // Navigation guard: cancel any in-flight dashboard async work
-        // so callbacks don't write into the wrong section after quick nav
         this._currentSection = section;
 
-        // ── Update nav active state ───────────────────────────────────────
-        // Reset all nav links
         document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-        // Activate the target link
         const activeLink = document.querySelector(`[data-section="${section}"]`);
         if (activeLink) activeLink.classList.add('active');
 
-        // ── Hide all sections, reveal target with fade ────────────────────
         document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
         const target = document.getElementById(`section-${section}`);
         if (target) {
             target.classList.remove('hidden');
-            // Trigger CSS fade-in on every navigation, not just first load
             target.style.animation = 'none';
-            target.offsetHeight; // reflow
+            target.offsetHeight;
             target.style.animation = 'fadeIn 0.35s ease-out both';
             this.loadSectionData(section);
         }
 
-        // ── Header title + subtitle ───────────────────────────────────────
         const meta = {
             'dashboard': { title: 'Dashboard',          sub: 'Your learning & research command centre' },
             'webinars':  { title: 'Live Webinars',         sub: 'Expert-led sessions, market walkthroughs and Q&A' },
@@ -404,7 +382,6 @@ const DashboardController = class {
             }
         }
 
-        // ── Breadcrumb — REC: show path for sub-sections ─────────────────
         const bc = document.getElementById('header-breadcrumb');
         if (bc) {
             if (section === 'dashboard') {
@@ -418,11 +395,9 @@ const DashboardController = class {
             }
         }
 
-        // ── Close mobile sidebar ──────────────────────────────────────────
         document.getElementById('sidebar')?.classList.add('-translate-x-full');
         document.getElementById('sidebar-overlay')?.classList.add('hidden');
 
-        // ── Scroll content area back to top ───────────────────────────────
         document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -430,10 +405,9 @@ const DashboardController = class {
         try {
             switch(section) {
                 case 'dashboard': this.loadDashboardStats(); break;
-                case 'signals':   // redirected — fall through to enhanced-signals
+                case 'signals':
                 case 'enhanced-signals': 
                     if (typeof window.enhancedSignals !== 'undefined') {
-                        // init() on first visit (registers tabs + interval), loadSignals() after that
                         if (!window.enhancedSignals._initialized) {
                             window.enhancedSignals._initialized = true;
                             window.enhancedSignals.init();
@@ -454,7 +428,6 @@ const DashboardController = class {
                     if (typeof RiskCalculator !== 'undefined') {
                         if (!rc._rcRendered) { rc._rcRendered = true; await RiskCalculator.render(rc); }
                     } else {
-                        // Module not loaded — embed standalone page via iframe
                         rc.innerHTML = `
                             <div class="max-w-5xl mx-auto">
                                 <div id="rc-loading-note" class="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-4 mb-4 flex items-center gap-3">
@@ -493,6 +466,8 @@ const DashboardController = class {
                     if (!container) break;
                     if (typeof CMSPage !== 'undefined') {
                         await CMSPage.render(container);
+                        // Patch Quill editor to accept HTML paste after CMS renders
+                        setTimeout(() => this._patchQuillHtmlPaste(), 600);
                     } else {
                         container.innerHTML = `
                             <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-6 text-center">
@@ -533,20 +508,17 @@ const DashboardController = class {
         this._initUsageBars();
         const _navAtStart = this._currentSection;
         await this._loadDashboardCards();
-        // If user navigated away while cards were loading, don't write to DOM
         if (this._currentSection !== _navAtStart) return;
     }
 
     _initSessionPill() {
-        // Pipways session clock — shows which session is live in WAT (UTC+1)
         const update = () => {
             const now = new Date();
             const utcH = now.getUTCHours();
             const utcM = now.getUTCMinutes();
-            const watH = (utcH + 1) % 24; // WAT = UTC+1
+            const watH = (utcH + 1) % 24;
             const t = watH * 60 + utcM;
 
-            // Session windows in WAT minutes
             const sessions = [
                 { name: 'Sydney',        open: 23*60, close: 24*60+8*60,  color: '#34d399' },
                 { name: 'Tokyo',         open: 1*60,  close: 10*60,       color: '#60a5fa' },
@@ -577,9 +549,8 @@ const DashboardController = class {
                 }
             }
 
-            // NY countdown
             if (nyEl) {
-                const nyOpenWat = 14*60; // 2pm WAT
+                const nyOpenWat = 14*60;
                 const minsToNY = t < nyOpenWat ? nyOpenWat - t : (24*60 - t + nyOpenWat);
                 const hh = Math.floor(minsToNY / 60);
                 const mm = minsToNY % 60;
@@ -591,7 +562,6 @@ const DashboardController = class {
     }
 
     _initSocialProof() {
-        // Simulated real-time platform activity — replaced with real API data when available
         const el = document.getElementById('dash-social-proof');
         if (!el) return;
         const counts = [247, 312, 289, 271, 334, 298, 261];
@@ -602,14 +572,11 @@ const DashboardController = class {
     }
 
     _initUsageBars() {
-        // Wire usage.js badges — wait for PipwaysUsage to finish its /auth/me fetch
-        // before rendering, so counters show real data not stale localStorage
         const _wire = () => {
             const barEl = document.getElementById('dash-chart-usage-bar');
             if (barEl && typeof PipwaysUsage !== 'undefined') {
                 PipwaysUsage.renderBadge('chart_analysis', barEl);
             }
-            // Remove signals lock overlay for paid users
             if (typeof PipwaysUsage !== 'undefined') {
                 const tier = PipwaysUsage.tier;
                 if (tier === 'basic' || tier === 'pro') {
@@ -622,8 +589,6 @@ const DashboardController = class {
         if (typeof PipwaysUsage !== 'undefined' && PipwaysUsage.isLoaded) {
             _wire();
         } else {
-            // PipwaysUsage hasn't finished its refresh yet — wait for it
-            // It fires pipways:usage-updated when done, but also try after 1.5s as fallback
             document.addEventListener('pipways:usage-updated', _wire, { once: true });
             setTimeout(_wire, 1500);
         }
@@ -634,7 +599,6 @@ const DashboardController = class {
         const set  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
         const _e   = s => s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-        // ── Tool card helpers (Card 5) ────────────────────────────────────
         function _premiumFeatureCard(icon, color, bg, border, title, sub, section, href, isPaid, tag) {
             var tagHtml = tag
                 ? '<span style="font-size:.65rem;font-weight:700;padding:.15rem .5rem;border-radius:9999px;background:' + color + '20;color:' + color + ';border:1px solid ' + color + '33;flex-shrink:0;">' + tag + '</span>'
@@ -642,7 +606,6 @@ const DashboardController = class {
             var lockHtml = (!isPaid && !href)
                 ? '<i class="fas fa-lock" style="font-size:.55rem;margin-left:.3rem;opacity:.55;color:#6b7280;"></i>'
                 : '';
-            // Use data attributes to avoid quote nesting in onclick
             var dataNav = href ? 'data-href="' + href + '"' : 'data-section="' + section + '"';
             return '<div class="pw-tool-card" ' + dataNav + ' '
                 + 'style="background:' + bg + ';border:1px solid ' + border + ';border-radius:.75rem;padding:.85rem;cursor:pointer;transition:all .2s;">'
@@ -683,9 +646,6 @@ const DashboardController = class {
             return html;
         }
 
-        // ── FIX: correct endpoint with user ID ────────────────────────────
-        // Was: '/courses/enhanced/progress' (non-existent — always returned null)
-        // Now: '/learning/progress/{user_id}' (real endpoint in academy_routes.py)
         const [courses, webinars, blog, signals, progress, academyResume] = await Promise.all([
             safe(this.apiRequest('/courses/list')),
             safe(this.apiRequest('/webinars/upcoming?upcoming=true')),
@@ -698,7 +658,6 @@ const DashboardController = class {
         const count = d => Array.isArray(d) ? d.length
             : (d?.courses?.length || d?.signals?.length || d?.posts?.length || d?.webinars?.length || 0);
 
-        // ── Stat chips — animate count-in + sub-labels ──────────────────────
         const setChip = (id, val, sub) => {
             const el = document.getElementById(id);
             if (el) {
@@ -710,20 +669,16 @@ const DashboardController = class {
             const subEl = document.getElementById(id + '-sub');
             if (subEl) subEl.textContent = sub || '';
         };
-        // Derive contextual sub-labels
         const courseArr = Array.isArray(courses) ? courses : [];
         const inProgCount = (progress?.in_progress || []).length;
         const completedCount = (progress?.completed || []).length;
-        const coursesSub = ''; // Legacy courses removed — Academy stat chip handles its own label
+        const coursesSub = '';
         const webinarArr = Array.isArray(webinars) ? webinars : (webinars?.webinars || []);
         const webinarsSub = webinarArr.length > 0 ? 'This week' : '';
         const blogArr = Array.isArray(blog) ? blog : (blog?.posts || []);
         const signalArr = Array.isArray(signals) ? signals : (signals?.signals || []);
         const activeSignals = signalArr.filter(s => s.status === 'active').length;
         const signalsSub = activeSignals > 0 ? `${activeSignals} active now` : signalArr.length > 0 ? 'No active signals' : '';
-        // Academy lessons completed count for the stat chip
-        // /learning/progress/:userId → { completed_lessons } (best source)
-        // /learning/resume → { type, overall_percent } — no level_percent or completed_count
         const academyLessonsCount = (() => {
             if (progress?.completed_lessons != null) return String(progress.completed_lessons);
             if (!academyResume) return '0';
@@ -739,13 +694,11 @@ const DashboardController = class {
         setChip('stat-blog',     blog     ? count(blog)     : '—', blogArr.length > 0 ? 'Latest articles' : '');
         setChip('stat-signals',  signals  ? count(signals)  : '—', signalsSub);
 
-        // ── Card 1: Continue Learning (Academy-powered) ──────────────────
         const learningEl = document.getElementById('dash-learning-body');
         if (learningEl) {
             const name = this.user?.full_name?.split(' ')[0] || 'Trader';
 
             if (!academyResume || academyResume.type === 'start') {
-                // New user — show inviting empty state
                 learningEl.innerHTML =
                     '<div class="flex flex-col items-center text-center py-3">'
                     + '<div class="w-14 h-14 rounded-full flex items-center justify-center mb-3" style="background:rgba(52,211,153,.08);border:2px dashed rgba(52,211,153,.2);">'
@@ -770,16 +723,13 @@ const DashboardController = class {
                     + '</div>';
 
             } else {
-                // In progress — show level progress bars (the CTA is in "Your Next Step" card)
                 const levelName  = academyResume.level || 'Beginner';
-                const levelPct   = 0; // level_percent not returned by /learning/resume
+                const levelPct   = 0;
                 const totalPct   = academyResume.overall_percent || 0;
                 const lessonTitle = academyResume.title || 'Next Lesson';
                 const moduleName  = academyResume.module || '';
                 const lessonId    = academyResume.lesson_id;
 
-                // Level palette - use progress.summary array for real percentages
-                // summary items: { level_name: "Beginner"|"Intermediate"|"Advanced", percent, completed, total }
                 const levels = [
                     { name: 'Beginner',     color: '#34d399' },
                     { name: 'Intermediate', color: '#60a5fa' },
@@ -809,7 +759,6 @@ const DashboardController = class {
                         + '</div>';
                 }).join('');
 
-                // Current lesson chip
                 const lessonChip =
                     '<div class="flex items-center gap-2 mt-3 p-2.5 rounded-lg" style="background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.15);">'
                     + '<div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style="background:rgba(124,58,237,.2);">'
@@ -825,7 +774,6 @@ const DashboardController = class {
             }
         }
 
-        // ── Card 5: Platform Tools Hub (replaces old Courses card) ─────────
         const coursesEl = document.getElementById('dash-courses-body');
         if (coursesEl) {
             const tier = (JSON.parse(localStorage.getItem('pipways_user') || '{}').subscription_tier) || 'free';
@@ -833,7 +781,6 @@ const DashboardController = class {
 
             coursesEl.innerHTML = _buildToolsHub(isPaid);
 
-            // Wire tool card clicks via event delegation (avoids any inline onclick quote issues)
             coursesEl.querySelectorAll('.pw-tool-card').forEach(function(card) {
                 card.addEventListener('click', function() {
                     var href    = this.dataset.href;
@@ -841,12 +788,10 @@ const DashboardController = class {
                     if (href)    window.location.href = href;
                     else if (section) dashboard.navigate(section);
                 });
-                // Hover border effect
                 card.addEventListener('mouseenter', function() { this.style.opacity = '0.88'; });
                 card.addEventListener('mouseleave',  function() { this.style.opacity = '1'; });
             });
 
-            // Render chart analysis usage badge — deferred for PipwaysUsage timing
             var badgeEl = document.getElementById('dash-chart-usage');
             if (badgeEl) {
                 var _renderToolBadge = function() {
@@ -862,8 +807,6 @@ const DashboardController = class {
             }
         }
 
-        // ── AI Market Insight: show only for users ≥30% academy progress ──
-        // Prevents confusing beginners with advanced market commentary
         const insightCard = document.getElementById('ai-insight-card');
         if (insightCard) {
             const completionRate = progress?.overall_progress || 0;
@@ -874,12 +817,10 @@ const DashboardController = class {
             }
         }
 
-        // ── Perf card: restore from last journal upload if available ────────
         if (this.lastAnalysisResults) {
             this._updateDashPerfCard(this.lastAnalysisResults);
         }
 
-        // ── Card 6: Latest Blog ───────────────────────────────────────────
         const blogEl = document.getElementById('dash-blog-body');
         if (blogEl) {
             const posts = Array.isArray(blog) ? blog : (blog?.posts || []);
@@ -906,7 +847,6 @@ const DashboardController = class {
                          onclick="dashboard.navigate('blog')"
                          onmouseover="this.style.borderColor='#374151';this.style.transform='translateY(-2px)'"
                          onmouseout="this.style.borderColor='#1f2937';this.style.transform=''">
-                        <!-- Thumbnail — consistent height regardless of image presence -->
                         <div class="pw-blog-thumb">
                             ${p.featured_image
                                 ? `<img src="${p.featured_image}" alt="${_e(p.title)}" onerror="this.parentElement.innerHTML='<div class=pw-blog-thumb-placeholder><i class=\"fas fa-newspaper text-xl\" style=\"color:${col};opacity:.4;\"></i></div>'">`
@@ -967,10 +907,8 @@ const DashboardController = class {
         const name = this.user?.full_name?.split(' ')[0] || 'Trader';
         if (el)  el.textContent  = `${greet}, ${name} ${emoji}`;
         if (sub) sub.textContent = subs;
-        // Remove hidden class so greeting shows in new layout
         if (el)  el.classList.remove('hidden');
         if (sub) sub.classList.remove('hidden');
-        // Set AI insight timestamp
         const tsEl = document.getElementById('insight-timestamp');
         if (tsEl) {
             const d = new Date();
@@ -978,22 +916,18 @@ const DashboardController = class {
         }
     }
 
-
     _initClock() {
         const tick = () => {
             const now    = new Date();
             const clockEl = document.getElementById('live-clock');
             if (clockEl) clockEl.textContent = now.toLocaleTimeString('en-US', { hour12: false });
 
-            // ── Forex market hours: Sun 21:00 UTC – Fri 21:00 UTC ──────────
-            const day   = now.getUTCDay();   // 0=Sun … 6=Sat
+            const day   = now.getUTCDay();
             const hours = now.getUTCHours();
             const mins  = now.getUTCMinutes();
             const timeInMins = hours * 60 + mins;
-            // Open: Sunday 21:00 UTC onward, close: Friday 21:00 UTC
             const isOpen = !(day === 6 || (day === 5 && timeInMins >= 21*60) || (day === 0 && timeInMins < 21*60));
 
-            // Update header pill status text
             const statusEl = document.getElementById('market-status-text');
             const dotEl    = document.getElementById('market-status-dot');
             if (statusEl) {
@@ -1003,12 +937,10 @@ const DashboardController = class {
             if (dotEl) {
                 dotEl.style.background = isOpen ? '#4ade80' : '#f87171';
             }
-            // Update dashboard greeting indicator
             const dashDot  = document.getElementById('dash-market-dot');
             const dashText = document.getElementById('dash-market-text');
             if (dashDot)  dashDot.style.background  = isOpen ? '#4ade80' : '#f87171';
             if (dashText) dashText.textContent = isOpen ? 'Markets Open' : 'Markets Closed';
-            // Sync hero command center market dot
             const heroDot  = document.getElementById('hero-market-dot');
             const heroText = document.getElementById('hero-market-text');
             if (heroDot)  heroDot.style.background  = isOpen ? '#4ade80' : '#f87171';
@@ -1034,7 +966,6 @@ const DashboardController = class {
             { sym: 'US100',   price: '18,240',  chg: '-85',    pct: '-0.46%', up: false },
         ];
 
-        // ── Top scrolling ticker ──────────────────────────────────────────
         const html = pairs.map(p => `
             <div class="ticker-item">
                 <span class="ticker-sym">${p.sym}</span>
@@ -1044,10 +975,8 @@ const DashboardController = class {
         const track = document.getElementById('ticker-track');
         if (track) track.innerHTML = html + html;
 
-        // ── Zone 3 forex snapshot card — populated from same data ─────────
         const fxEl = document.getElementById('dash-forex-tickers');
         if (fxEl) {
-            // Show EUR/USD, GBP/USD, XAU/USD — most relevant for London session
             const featured = ['EUR/USD', 'GBP/USD', 'XAU/USD'];
             fxEl.innerHTML = featured.map((sym, i) => {
                 const p = pairs.find(x => x.sym === sym);
@@ -1062,7 +991,6 @@ const DashboardController = class {
                     <span class="text-xs font-bold" data-base="${parseFloat(p.pct)}" style="color:${color};">${p.pct}</span>
                 </div>`;
             }).join('');
-            // Simulate live micro-drift every 6s so the card looks alive
             setInterval(() => {
                 fxEl.querySelectorAll('[data-base]').forEach(el => {
                     const base = parseFloat(el.dataset.base) || 0;
@@ -1075,7 +1003,6 @@ const DashboardController = class {
         }
     }
 
-
     async apiRequest(endpoint, options = {}) {
         const token = localStorage.getItem('pipways_token');
         const headers = {
@@ -1086,7 +1013,6 @@ const DashboardController = class {
         if (options.body instanceof FormData) delete headers['Content-Type'];
         const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
 
-        // 401 anywhere in the app → session expired, force re-login
         if (res.status === 401) {
             _handleAuthError();
             throw new Error('Session expired. Please log in again.');
@@ -1189,7 +1115,6 @@ const DashboardController = class {
 
             if (result.trades && result.trades.length > 0) {
                 this.lastAnalysisResults = result;
-                // Cache in localStorage + memory so AI Mentor can access it
                 try {
                     const perfCache = {
                         cached_at: Date.now(),
@@ -1235,7 +1160,6 @@ const DashboardController = class {
         const discipline = aiCoach.discipline_score || 0;
 
         el.innerHTML = `
-        <!-- Grade + Net P&L header -->
         <div class="flex items-center justify-between mb-4 pb-3" style="border-bottom:1px solid #1f2937;">
             <div class="flex items-center gap-3">
                 <div class="w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl"
@@ -1254,8 +1178,6 @@ const DashboardController = class {
                 </div>
             </div>
         </div>
-
-        <!-- 4-stat grid -->
         <div class="grid grid-cols-2 gap-2 mb-4">
             <div class="rounded-lg p-2.5 text-center" style="background:#0d1321;border:1px solid #1f2937;">
                 <div class="text-lg font-bold" style="color:${winColor};">${winRate}%</div>
@@ -1274,8 +1196,6 @@ const DashboardController = class {
                 <div class="text-xs text-gray-600 mt-0.5">Profit Factor</div>
             </div>
         </div>
-
-        <!-- Mini discipline bar -->
         ${discipline > 0 ? `
         <div class="mb-3">
             <div class="flex justify-between text-xs mb-1">
@@ -1286,8 +1206,6 @@ const DashboardController = class {
                 <div class="pw-progress-fill" style="width:${discipline}%;"></div>
             </div>
         </div>` : ''}
-
-        <!-- Mini performance chart placeholder -->
         <div class="rounded-lg mb-3 flex items-center justify-center relative overflow-hidden"
              style="height:48px;background:#0d1321;border:1px solid #1f2937;">
             <svg viewBox="0 0 200 40" class="w-full h-full" preserveAspectRatio="none">
@@ -1302,7 +1220,6 @@ const DashboardController = class {
             </svg>
             <span class="absolute bottom-1 right-2 text-gray-700" style="font-size:.6rem;">EQUITY</span>
         </div>
-
         <button onclick="dashboard.navigate('journal')"
             class="w-full py-2 rounded-lg text-xs font-semibold transition-all"
             style="background:rgba(251,146,60,.15);border:1px solid rgba(251,146,60,.3);color:#fb923c;"
@@ -1318,7 +1235,6 @@ const DashboardController = class {
         document.getElementById('trade-history').classList.remove('hidden');
         document.getElementById('strategy-detection').classList.remove('hidden');
 
-        // ── Also refresh the dashboard performance card if it's visible ──
         this._updateDashPerfCard(result);
 
         const stats = result.statistics || {};
@@ -1334,7 +1250,6 @@ const DashboardController = class {
         document.getElementById('stat-net-pnl').className = 'text-2xl font-bold ' + ((stats.net_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400');
 
         document.getElementById('overall-grade-badge').textContent = result.overall_grade || 'N/A';
-
         document.getElementById('detected-strategy').textContent = result.detected_strategy || 'Unknown';
         document.getElementById('risk-consistency-score').textContent = (result.risk_consistency_score || 0) + '%';
         document.getElementById('risk-consistency-bar').style.width = (result.risk_consistency_score || 0) + '%';
@@ -1372,98 +1287,38 @@ const DashboardController = class {
     renderEquityCurve(equityData) {
         const ctx = document.getElementById('equity-curve-chart');
         if (!ctx) return;
-
         if (this.charts.equity) this.charts.equity.destroy();
-
         const labels = equityData.map(d => d.trade_number);
         const data = equityData.map(d => d.equity);
-
         this.charts.equity = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Equity',
-                    data: data,
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af' } },
-                    x: { display: false }
-                }
-            }
+            data: { labels, datasets: [{ label: 'Equity', data, borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4, pointRadius: 0, pointHoverRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af' } }, x: { display: false } } }
         });
     }
 
     renderTradeDistribution(distribution) {
         const ctx = document.getElementById('trade-distribution-chart');
         if (!ctx) return;
-
         if (this.charts.distribution) this.charts.distribution.destroy();
-
         this.charts.distribution = new Chart(ctx, {
             type: 'doughnut',
-            data: {
-                labels: ['Wins', 'Losses', 'Breakeven'],
-                datasets: [{
-                    data: [distribution.wins || 0, distribution.losses || 0, distribution.breakeven || 0],
-                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { color: '#9ca3af', padding: 20 } }
-                }
-            }
+            data: { labels: ['Wins', 'Losses', 'Breakeven'], datasets: [{ data: [distribution.wins || 0, distribution.losses || 0, distribution.breakeven || 0], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', padding: 20 } } } }
         });
     }
 
     renderMonthlyPerformance(monthlyData) {
         const ctx = document.getElementById('monthly-performance-chart');
         if (!ctx) return;
-
         if (this.charts.monthly) this.charts.monthly.destroy();
-
         const labels = monthlyData.map(d => d.month);
         const data = monthlyData.map(d => d.pnl);
         const colors = data.map(v => v >= 0 ? '#10b981' : '#ef4444');
-
         this.charts.monthly = new Chart(ctx, {
             type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'P&L',
-                    data: data,
-                    backgroundColor: colors,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { 
-                        grid: { color: 'rgba(75, 85, 99, 0.3)' }, 
-                        ticks: { color: '#9ca3af', callback: v => '$' + v }
-                    },
-                    x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
-                }
-            }
+            data: { labels, datasets: [{ label: 'P&L', data, backgroundColor: colors, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(75, 85, 99, 0.3)' }, ticks: { color: '#9ca3af', callback: v => '$' + v } }, x: { ticks: { color: '#9ca3af' }, grid: { display: false } } } }
         });
     }
 
@@ -1489,7 +1344,6 @@ const DashboardController = class {
             body: JSON.stringify({ trades: this.manualTrades })
         }).then(result => {
             this.lastAnalysisResults = result;
-            // Cache in localStorage so AI Mentor can access it
             try {
                 localStorage.setItem('pipways_performance', JSON.stringify({
                     cached_at: Date.now(),
@@ -1551,7 +1405,6 @@ const DashboardController = class {
     }
 
     async loadCourses() {
-        // Courses section now redirects to Academy
         window.location.href = '/academy';
         return;
     }
@@ -1560,7 +1413,6 @@ const DashboardController = class {
         const container = document.getElementById('webinars-container');
         if (!container) return;
 
-        // Shimmer loading state
         container.innerHTML = `
             <div class="space-y-4">
                 ${[1,2,3].map(() => `
@@ -1590,14 +1442,12 @@ const DashboardController = class {
                 return;
             }
 
-            // ── Split into buckets ──────────────────────────────────────────
             const live     = webinars.filter(w => w.status === 'live');
             const upcoming = webinars.filter(w => !w.is_completed && w.status !== 'live');
             const past     = webinars.filter(w => w.is_completed && w.recording_url);
 
             let html = '';
 
-            // ── LIVE NOW banner ─────────────────────────────────────────────
             if (live.length) {
                 const w = live[0];
                 const wJson = JSON.stringify(w).replace(/"/g, '&quot;');
@@ -1629,7 +1479,6 @@ const DashboardController = class {
                 </div>`;
             }
 
-            // ── UPCOMING SESSIONS ───────────────────────────────────────────
             if (upcoming.length) {
                 html += `<h3 class="text-white font-bold text-base mb-3 flex items-center gap-2">
                     <i class="fas fa-calendar-alt text-purple-400 text-sm"></i> Upcoming Sessions
@@ -1683,7 +1532,6 @@ const DashboardController = class {
                 });
             }
 
-            // ── PAST RECORDINGS ─────────────────────────────────────────────
             if (past.length) {
                 html += `
                 <div class="mt-6">
@@ -1720,7 +1568,6 @@ const DashboardController = class {
 
             container.innerHTML = html;
 
-            // ── Check registrations for upcoming sessions ───────────────────
             upcoming.forEach(async w => {
                 try {
                     const r = await this.apiRequest(`/webinars/${w.id}/my-registration`);
@@ -1749,14 +1596,12 @@ const DashboardController = class {
         const container = document.getElementById('webinars-container');
         if (!container) return;
 
-        // ── Resolve embed URL ───────────────────────────────────────────────
         let embedUrl = '';
         if (w.youtube_url) {
             const m = w.youtube_url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
             if (m) embedUrl = `https://www.youtube.com/embed/${m[1]}?autoplay=1&rel=0&modestbranding=1`;
         }
         if (!embedUrl && w.embed_url) embedUrl = w.embed_url;
-        // For past recordings fall back to recording_url if YouTube
         if (!embedUrl && w.recording_url) {
             const m = w.recording_url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
             if (m) embedUrl = `https://www.youtube.com/embed/${m[1]}?rel=0&modestbranding=1`;
@@ -1791,23 +1636,13 @@ const DashboardController = class {
 
         container.innerHTML = `
         <div class="animate-fade-in">
-
-            <!-- Back button -->
             <button onclick="dashboard.loadWebinars()"
                     class="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors mb-5">
                 <i class="fas fa-arrow-left"></i> Back to Sessions
             </button>
-
-            <!-- Two-column layout -->
             <div class="flex flex-col lg:flex-row gap-5">
-
-                <!-- ── LEFT: Video + session info ── -->
                 <div class="flex-1 min-w-0">
-
-                    <!-- Video embed -->
                     ${videoBlock}
-
-                    <!-- Session meta below video -->
                     <div class="mt-4 bg-gray-800 rounded-xl p-4 border border-gray-700">
                         <div class="flex items-start justify-between gap-3 flex-wrap">
                             <div>
@@ -1830,13 +1665,8 @@ const DashboardController = class {
                             ${w.duration_minutes ? `<span><i class="fas fa-clock mr-1 text-blue-400"></i>${w.duration_minutes} mins</span>` : ''}
                         </div>
                     </div>
-
                 </div>
-
-                <!-- ── RIGHT: Sidebar ── -->
                 <div class="w-full lg:w-72 xl:w-80 flex-shrink-0 space-y-4">
-
-                    <!-- Presenter card -->
                     ${w.presenter ? `
                     <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
                         <div class="flex items-center gap-3 mb-3">
@@ -1851,8 +1681,6 @@ const DashboardController = class {
                         </div>
                         ${w.speaker_bio ? `<p class="text-gray-400 text-xs leading-relaxed">${w.speaker_bio}</p>` : ''}
                     </div>` : ''}
-
-                    <!-- Feature exposure strip -->
                     <div class="rounded-xl p-4 border"
                          style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(59,130,246,.05));border-color:rgba(124,58,237,.25);">
                         <p class="text-white font-semibold text-sm mb-1 flex items-center gap-2">
@@ -1893,8 +1721,6 @@ const DashboardController = class {
                             </button>
                         </div>
                     </div>
-
-                    <!-- Tags -->
                     ${w.tags ? `
                     <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
                         <p class="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wider">Topics</p>
@@ -1906,7 +1732,6 @@ const DashboardController = class {
                             </span>`).join('')}
                         </div>
                     </div>` : ''}
-
                 </div>
             </div>
         </div>`;
@@ -1986,7 +1811,6 @@ const DashboardController = class {
             document.getElementById('coach-insights-content').classList.remove('hidden');
 
             document.getElementById('trading-personality').textContent = data.trading_personality || 'Developing Trader';
-
             document.getElementById('discipline-score').textContent = (data.discipline_score || 0) + '%';
             document.getElementById('consistency-score').textContent = (data.consistency_score || 0) + '%';
 
@@ -2026,8 +1850,6 @@ const DashboardController = class {
     }
 
     updateRecommendationsList(resources) {
-        // Sidebar panel removed — recommendations now show as cards below chat.
-        // This method is kept as a no-op to avoid errors from existing call sites.
         return;
     }
 
@@ -2038,7 +1860,6 @@ const DashboardController = class {
             if (!container) return;
 
             if (history.length > 0) {
-                // In-session history: restore full chat display
                 container.innerHTML = '';
                 history.forEach(msg => {
                     if (msg.role === 'user') {
@@ -2048,13 +1869,11 @@ const DashboardController = class {
                     }
                 });
             } else {
-                // Fresh load — check if there's a previous session summary
                 const summaryRaw = localStorage.getItem('mentor_session_summary');
                 if (summaryRaw) {
                     const summary = JSON.parse(summaryRaw);
                     const age = Date.now() - new Date(summary.saved_at).getTime();
                     if (age < 7 * 86400000 && summary.messages?.length > 0) {
-                        // Show a subtle "context restored" notice — clean UI but user knows
                         const lastUserMsg = summary.messages.filter(m => m.role === 'user').pop();
                         const notice = document.createElement('div');
                         notice.className = 'flex justify-center mb-3';
@@ -2067,7 +1886,6 @@ const DashboardController = class {
                             </div>`;
                         container.innerHTML = '';
                         container.appendChild(notice);
-                        // Append welcome message after the notice
                         const welcome = document.createElement('div');
                         welcome.className = 'flex gap-3 animate-fade-in';
                         welcome.innerHTML = `
@@ -2100,11 +1918,9 @@ const DashboardController = class {
                 }
             });
 
-            // Keep last 20 messages for display history
             const trimmed = messages.slice(-20);
             localStorage.setItem('mentor_history', JSON.stringify(trimmed));
 
-            // Also save a compact summary of last 6 exchanges for cross-session context
             const summary = messages.slice(-6).map(m => ({
                 role: m.role,
                 content: m.content.slice(0, 300)
@@ -2118,18 +1934,15 @@ const DashboardController = class {
         }
     }
 
-    // ── Get conversation history from localStorage for memory ──────────────
     _getMentorHistory() {
         try {
             const raw = JSON.parse(localStorage.getItem('mentor_history') || '[]');
             if (raw.length > 0) {
-                // In-session history — use last 16 messages
                 return raw.slice(-16).map(m => ({
                     role: m.role === 'user' ? 'user' : 'assistant',
                     content: (m.content || '').slice(0, 800)
                 }));
             }
-            // No in-session history (fresh page load) — use cross-session summary
             const summaryRaw = localStorage.getItem('mentor_session_summary');
             if (!summaryRaw) return [];
             const summary = JSON.parse(summaryRaw);
@@ -2142,25 +1955,21 @@ const DashboardController = class {
         } catch (_) { return []; }
     }
 
-    // ── Get cached performance data to send with mentor request ─────────────
     _getCachedPerformance() {
         try {
-            // Use in-memory cache first (loaded at startup)
             if (this._cachedPerformance) {
                 const age = Date.now() - this._cachedPerformance.cached_at;
-                if (age < 86400000) return this._cachedPerformance; // < 24 hours
+                if (age < 86400000) return this._cachedPerformance;
             }
-            // Fallback: read from localStorage
             const raw = localStorage.getItem('pipways_performance');
             if (!raw) return null;
             const data = JSON.parse(raw);
             if (Date.now() - data.cached_at > 86400000) return null;
-            this._cachedPerformance = data; // store in memory
+            this._cachedPerformance = data;
             return data;
         } catch (_) { return null; }
     }
 
-    // ── Slash command local preview — show what the command does instantly ──
     _getSlashPreview(cmd) {
         const previews = {
             '/signals':       '📡 Fetching active signals and asking mentor to analyse them…',
@@ -2168,7 +1977,7 @@ const DashboardController = class {
             '/strategy':      '🎯 Checking your strategy readiness based on your progress…',
             '/next':          '📚 Finding your recommended next learning step…',
             '/progress':      '📈 Generating your full progress breakdown…',
-            '/help':          null  // handled inline
+            '/help':          null
         };
         return previews[cmd.toLowerCase()] || null;
     }
@@ -2178,7 +1987,6 @@ const DashboardController = class {
         const message = input.value.trim();
         if (!message) return;
 
-        // ── Slash command: /help handled entirely client-side ──────────────
         if (message.toLowerCase() === '/help') {
             input.value = '';
             this.appendMentorMessage('/help', 'user');
@@ -2198,7 +2006,6 @@ const DashboardController = class {
         this.appendMentorMessage(message, 'user');
         input.value = '';
 
-        // Show slash command preview while waiting
         const preview = this._getSlashPreview(message);
         if (preview) {
             const previewEl = document.getElementById('mentor-typing');
@@ -2209,11 +2016,9 @@ const DashboardController = class {
         document.getElementById('mentor-typing').classList.remove('hidden');
         this._hideMentorRecommendations();
 
-        // Get conversation history for memory
         const history = this._getMentorHistory();
 
         try {
-            // Attach cached performance data directly — no backend fetch needed
             const cachedPerf = this._getCachedPerformance();
 
             const response = await this.apiRequest('/ai/mentor/ask', {
@@ -2223,13 +2028,12 @@ const DashboardController = class {
                     question: message,
                     skill_level: 'intermediate',
                     include_platform_context: true,
-                    conversation_history: history,       // ← memory
-                    cached_performance: cachedPerf       // ← performance data from localStorage
+                    conversation_history: history,
+                    cached_performance: cachedPerf
                 })
             });
 
             document.getElementById('mentor-typing').classList.add('hidden');
-            // Restore default typing text
             const span = document.getElementById('mentor-typing')?.querySelector('span');
             if (span) span.textContent = 'AI is analyzing your data...';
 
@@ -2256,13 +2060,11 @@ const DashboardController = class {
         }
     }
 
-    // ── Hides the lesson recommendations panel ──────────────────────────────
     _hideMentorRecommendations() {
         const panel = document.getElementById('mentor-recommendations');
         if (panel) panel.classList.add('hidden');
     }
 
-    // ── Renders lesson cards inside the chat column ─────────────────────────
     _renderMentorLessonCards(recommendations) {
         const panel = document.getElementById('mentor-recommendations');
         const grid  = document.getElementById('mentor-rec-grid');
@@ -2288,7 +2090,6 @@ const DashboardController = class {
             const url      = rec.url || null;
             const t        = typeIcons[rec.type] || typeIcons.default;
 
-            // Build absolute URL — priority: explicit url with ?lesson= > lesson_id > academy homepage
             const _base = window.location.origin;
             let dest;
             if (url && url.includes('?lesson=')) {
@@ -2309,13 +2110,8 @@ const DashboardController = class {
             card.onmouseover = () => { card.style.borderColor = '#7c3aed'; card.style.background = 'rgba(124,58,237,.08)'; };
             card.onmouseout  = () => { card.style.borderColor = '#1f2937'; card.style.background = '#111827'; };
 
-            // Label for CTA button
-            const ctaLabel = (lessonId || (url && url.includes('?lesson=')))
-                ? 'Start Lesson'
-                : 'Open Academy';
-            const ctaIcon = lessonId || (url && url.includes('?lesson='))
-                ? 'fa-play-circle'
-                : 'fa-graduation-cap';
+            const ctaLabel = (lessonId || (url && url.includes('?lesson='))) ? 'Start Lesson' : 'Open Academy';
+            const ctaIcon  = (lessonId || (url && url.includes('?lesson='))) ? 'fa-play-circle' : 'fa-graduation-cap';
 
             card.innerHTML = `
                 <div class="flex items-start gap-3">
@@ -2341,14 +2137,11 @@ const DashboardController = class {
 
         panel.classList.remove('hidden');
 
-        // Scroll chat to show the new cards
         const msgs = document.getElementById('mentor-messages');
         if (msgs) setTimeout(() => msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' }), 100);
     }
 
-    // ── Tracks lesson click and navigates to the specific lesson ───────────
     async _handleMentorLessonClick(lessonId, url) {
-        // Track click (fire-and-forget — don't block navigation)
         if (lessonId) {
             this.apiRequest('/ai/mentor/track-lesson-click', {
                 method: 'POST',
@@ -2365,7 +2158,6 @@ const DashboardController = class {
         window.location.href = destination;
     }
 
-    // ── Safe HTML escape for card content ───────────────────────────────────
     _escapeHtml(str) {
         const d = document.createElement('div');
         d.textContent = str || '';
@@ -2431,7 +2223,6 @@ const DashboardController = class {
         wrapper.dataset.role = 'assistant';
         wrapper.dataset.content = text;
 
-        // Start with a typing indicator inside the bubble
         wrapper.innerHTML = `
             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1">
                 <i class="fas fa-robot text-xs text-white"></i>
@@ -2446,22 +2237,18 @@ const DashboardController = class {
 
         const contentEl = wrapper.querySelector('.typing-content');
 
-        // Stream word by word as plain text first (fast — 20ms/word)
         const words = text.split(' ');
         let currentText = '';
         for (let i = 0; i < words.length; i++) {
             currentText += (i > 0 ? ' ' : '') + words[i];
             contentEl.textContent = currentText;
             container.scrollTop = container.scrollHeight;
-            // Speed: fast for short messages, skip animation for long ones
             if (words.length < 80) {
                 await new Promise(r => setTimeout(r, 18));
             }
         }
 
-        // Render final markdown after typing completes
         contentEl.innerHTML = window._renderMd ? window._renderMd(text) : text;
-
         container.scrollTop = container.scrollHeight;
         wrapper.dataset.content = text;
     }
@@ -2488,12 +2275,10 @@ const DashboardController = class {
                     </div>
                 `;
             }
-            // Also hide lesson recommendation cards
             this._hideMentorRecommendations();
         }
     }
 
-    // ── Micro-UX helpers — REC: stacked toasts with vertical offset ────────
     _toast(message, type = 'success', duration = 3200) {
         const icons = { success:'fa-check-circle', error:'fa-exclamation-circle', info:'fa-info-circle', warning:'fa-exclamation-triangle' };
         const t = document.createElement('div');
@@ -2502,17 +2287,15 @@ const DashboardController = class {
         t.setAttribute('aria-live', 'assertive');
         t.setAttribute('aria-atomic', 'true');
         t.innerHTML = `<i class="fas ${icons[type]||icons.info} text-sm flex-shrink-0"></i><span>${message}</span>`;
-        // Offset above any existing toasts so they stack cleanly
         const existing = document.querySelectorAll('.pw-toast');
-        const BASE = 24;   // 1.5rem in px
-        const HEIGHT = 56; // approximate toast height + gap
+        const BASE = 24;
+        const HEIGHT = 56;
         t.style.bottom = `${BASE + existing.length * HEIGHT}px`;
         document.body.appendChild(t);
         setTimeout(() => {
             t.style.animation = 'toast-out .3s ease-in both';
             setTimeout(() => {
                 t.remove();
-                // Re-stack remaining toasts
                 document.querySelectorAll('.pw-toast').forEach((el, i) => {
                     el.style.bottom = `${BASE + i * HEIGHT}px`;
                 });
@@ -2526,12 +2309,9 @@ const DashboardController = class {
         if (!panel) return;
         const isHidden = panel.classList.contains('hidden');
         panel.classList.toggle('hidden');
-        // Dismiss red dot once opened
         if (isHidden && dot) dot.style.display = 'none';
-        // Update aria-expanded on the trigger button
         const notifTrigger = document.getElementById('notif-btn');
         if (notifTrigger) notifTrigger.setAttribute('aria-expanded', String(isHidden));
-        // Close on click outside
         if (isHidden) {
             const close = (e) => {
                 if (!document.getElementById('notif-wrapper')?.contains(e.target)) {
@@ -2543,6 +2323,67 @@ const DashboardController = class {
         }
     }
 
+    // ── Quill HTML paste patch ────────────────────────────────────────────────
+    // Quill strips HTML tags by default when pasting from clipboard.
+    // This patch intercepts the paste event on the .ql-editor element and
+    // injects the clipboard HTML directly via dangerouslyPasteHTML so that
+    // <h2>, <h3>, <a href>, <ul>, <strong> etc. all render correctly.
+    _patchQuillHtmlPaste() {
+        // Find the Quill editor element inside the CMS container
+        const editorEl = document.querySelector('#cms-container .ql-editor');
+        if (!editorEl) {
+            console.warn('[CMS] Quill editor not found — HTML paste patch skipped');
+            return;
+        }
+
+        // Prevent double-patching on repeated CMS visits
+        if (editorEl._htmlPatchApplied) return;
+        editorEl._htmlPatchApplied = true;
+
+        editorEl.addEventListener('paste', (e) => {
+            const clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
+            const html = clipboardData.getData('text/html');
+            const text = clipboardData.getData('text/plain');
+
+            // Only intercept if the pasted content contains HTML tags
+            // Plain text paste falls through to Quill's default handler
+            if (!html && !/<[a-z][\s\S]*>/i.test(text)) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const content = html || text;
+
+            // Find the Quill instance — check common global names
+            const quill = window.quill
+                || window._quillInstance
+                || (typeof Quill !== 'undefined' && Quill.find(editorEl));
+
+            if (quill && typeof quill.clipboard?.dangerouslyPasteHTML === 'function') {
+                const range = quill.getSelection(true);
+                const index = range ? range.index : quill.getLength();
+                quill.clipboard.dangerouslyPasteHTML(index, content, 'user');
+                this._toast('HTML pasted and rendered', 'success', 2000);
+            } else {
+                // Fallback: inject directly into the editor element
+                const selection = window.getSelection();
+                if (selection.rangeCount) {
+                    selection.deleteFromDocument();
+                    const range = selection.getRangeAt(0);
+                    const fragment = range.createContextualFragment(content);
+                    range.insertNode(fragment);
+                    selection.collapseToEnd();
+                } else {
+                    editorEl.innerHTML += content;
+                }
+                this._toast('HTML pasted', 'success', 2000);
+            }
+        }, true); // capture phase — fires before Quill's own paste handler
+
+        console.log('[CMS] Quill HTML paste patch applied ✓');
+    }
 
     logout() {
         localStorage.removeItem('pipways_token');

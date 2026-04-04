@@ -616,11 +616,37 @@ def start_webinar_reminder_scheduler():
 
 async def send_webinar_confirmation_task(user_id: int, email: str, full_name: str,
                                           session_title: str, presenter: str,
-                                          scheduled_at, duration_minutes: int = 60):
+                                          scheduled_at, duration_minutes: int = 60,
+                                          webinar_id: Optional[int] = None):
     """
     Send registration confirmation immediately after user registers.
     Called from webinars.py register endpoint.
+
+    If scheduled_at arrives as None (caller didn't pass it), we fetch the full
+    webinar row from the DB using webinar_id so the email always has a real date.
     """
+    _missing = scheduled_at is None or str(scheduled_at).strip().lower() in ("none", "", "null")
+
+    if _missing and webinar_id:
+        try:
+            row = await database.fetch_one(
+                "SELECT scheduled_at, duration_minutes, presenter, title "
+                "FROM webinars WHERE id = :id",
+                {"id": webinar_id}
+            )
+            if row:
+                scheduled_at   = row["scheduled_at"]
+                duration_minutes = row["duration_minutes"] or duration_minutes
+                if not presenter or presenter in ("", "TBA"):
+                    presenter = row["presenter"] or ""
+                if not session_title:
+                    session_title = row["title"] or session_title
+                print(f"[WEBINAR EMAIL] Fetched scheduled_at={scheduled_at} for webinar_id={webinar_id}", flush=True)
+        except Exception as e:
+            print(f"[WEBINAR EMAIL] ⚠️  Could not fetch webinar row: {e}", flush=True)
+    elif _missing:
+        print(f"[WEBINAR EMAIL] ⚠️  scheduled_at is None and no webinar_id provided — date will show as 'Date to be confirmed'", flush=True)
+
     subject, html = webinar_confirmation_email(
         full_name        = full_name,
         session_title    = session_title,

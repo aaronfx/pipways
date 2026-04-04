@@ -1121,12 +1121,12 @@ const CMSPage = {
                     <td class="text-gray-300">${this._d(w.scheduled_at)}</td>
                     <td class="text-gray-400">${w.duration_minutes||60}m</td>
                     <td>${this._pub(w.is_published)}</td>
-                    <td><button class="cb cb-g" style="font-size:.72rem;padding:.25rem .65rem;" onclick="CMSPage._webinarRegistrants(${w.id},'${this._e(w.title).replace(/'/g,"\\'")}')">
+                    <td><button class="cb cb-g" style="font-size:.72rem;padding:.25rem .65rem;" onclick="CMSPage._webinarRegistrants(${w.id},this.dataset.title)" data-title="${this._e(w.title)}">
                         <i class="fas fa-users mr-1"></i>${regCounts[w.id]||0}
                     </button></td>
                     <td class="text-gray-400">${w.max_attendees||100}</td>
                     <td class="text-right"><div style="display:flex;gap:.3rem;justify-content:flex-end;">
-                        <button class="cb cb-g" onclick='CMSPage._webinarForm(${JSON.stringify(w).replace(/"/g,"&quot;")})'>
+                        <button class="cb cb-g" onclick="CMSPage._webinarForm(${JSON.stringify(w).replace(/"/g,'&quot;')})">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="cb ${w.is_published?'cb-g':'cb-gr'}" onclick="CMSPage._toggleWebinar(${w.id})">${w.is_published?'Unpublish':'Publish'}</button>

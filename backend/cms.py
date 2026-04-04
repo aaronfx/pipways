@@ -125,7 +125,7 @@ async def cms_upload_media(
     folder: str = Form("general"),
     _=Depends(get_admin_user)
 ):
-    """Upload a file; returns the public URL."""
+    """Upload a file; stores in PostgreSQL so files persist across Railway deploys."""
     if file.content_type not in ALLOWED_MIME:
         raise HTTPException(400, f"File type '{file.content_type}' not allowed")
 
@@ -136,27 +136,56 @@ async def cms_upload_media(
     ext       = mimetypes.guess_extension(file.content_type) or os.path.splitext(file.filename or "")[1] or ".bin"
     ext       = ext.lstrip(".")
     safe_name = f"{folder}/{uuid.uuid4().hex}.{ext}"
-    dest_dir  = os.path.join(UPLOAD_DIR, folder)
-    os.makedirs(dest_dir, exist_ok=True)
-    dest_path = os.path.join(UPLOAD_DIR, safe_name.replace("/", os.sep))
 
-    with open(dest_path, "wb") as f:
-        f.write(contents)
+    # ── Primary storage: PostgreSQL (survives Railway deploys) ────────────
+    import base64
+    b64_data  = base64.b64encode(contents).decode()
+    media_url = f"/cms/media/serve/{safe_name}"
 
-    # Persist to media_library table if it exists
+    # Store in media_files table (used by media.py /cms/media/serve/ endpoint)
+    try:
+        await _exec(
+            "CREATE TABLE IF NOT EXISTS media_files ("
+            "  id SERIAL PRIMARY KEY, filename VARCHAR(512) UNIQUE NOT NULL,"
+            "  original VARCHAR(255) NOT NULL, mime_type VARCHAR(100) NOT NULL,"
+            "  folder VARCHAR(50) NOT NULL DEFAULT 'general',"
+            "  size_bytes INTEGER NOT NULL DEFAULT 0, url TEXT NOT NULL,"
+            "  data TEXT, uploaded_by INTEGER, created_at TIMESTAMPTZ DEFAULT NOW())"
+        )
+        await _exec(
+            "INSERT INTO media_files (filename, original, mime_type, folder, size_bytes, url, data) "
+            "VALUES (:fn, :orig, :mime, :folder, :size, :url, :data) "
+            "ON CONFLICT (filename) DO UPDATE SET data=EXCLUDED.data, size_bytes=EXCLUDED.size_bytes, url=EXCLUDED.url",
+            {"fn": safe_name, "orig": file.filename, "mime": file.content_type,
+             "folder": folder, "size": len(contents), "url": media_url, "data": b64_data}
+        )
+    except Exception as e:
+        print(f"[CMS UPLOAD] media_files insert error: {e}", flush=True)
+
+    # Also persist to legacy media_library table
     try:
         await _exec(
             "INSERT INTO media_library (filename, original_name, url, mime_type, size_bytes, folder, created_at) "
             "VALUES (:fn,:orig,:url,:mime,:size,:folder,:now)",
-            {"fn": safe_name, "orig": file.filename, "url": f"{UPLOAD_URL}/{safe_name}",
+            {"fn": safe_name, "orig": file.filename, "url": media_url,
              "mime": file.content_type, "size": len(contents),
              "folder": folder, "now": datetime.utcnow()}
         )
     except Exception:
-        pass  # table may not exist yet, URL is still valid
+        pass
+
+    # ── Secondary: filesystem cache (fast serving until next deploy) ──────
+    try:
+        dest_dir  = os.path.join(UPLOAD_DIR, folder)
+        os.makedirs(dest_dir, exist_ok=True)
+        dest_path = os.path.join(UPLOAD_DIR, safe_name.replace("/", os.sep))
+        with open(dest_path, "wb") as f:
+            f.write(contents)
+    except Exception:
+        pass  # non-fatal — DB is the primary store
 
     return {
-        "url":           f"{UPLOAD_URL}/{safe_name}",
+        "url":           media_url,
         "filename":      safe_name,
         "original_name": file.filename,
         "mime_type":     file.content_type,

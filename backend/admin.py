@@ -73,11 +73,12 @@ def _fmt(value) -> str:
 
 # ── Main stats endpoint (keeps backward-compatible path /admin/users) ─────────
 
+@router.get("/stats")
 @router.get("/users")
 async def get_admin_stats(_admin=Depends(get_admin_user)):
     """
     Full admin dashboard statistics.
-    Path: GET /admin/users  (kept for backward compatibility with existing clients)
+    Paths: GET /admin/stats (primary), GET /admin/users (backward compatible)
     """
     today = date.today().isoformat()
     week_ago = (date.today() - timedelta(days=7)).isoformat()

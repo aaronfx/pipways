@@ -651,6 +651,55 @@ _UNIQUE_INDEX_MIGRATIONS = [
     ),
 ]
 
+async def run_enhanced_signals_migration():
+    """
+    Enhanced Signals schema migration — indexes, defaults, data backfill.
+    Moved from main.py. Idempotent — safe to call on every deploy.
+    Column additions are already handled by _COLUMN_MIGRATIONS above;
+    this function adds composite indexes and backfills NULL defaults.
+    """
+    try:
+        print("[ENHANCED SIGNALS] Running migration…", flush=True)
+
+        # ── Indexes ──────────────────────────────────────────────────────────
+        indexes = [
+            'CREATE INDEX IF NOT EXISTS idx_signals_pattern ON signals(pattern)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_asset_type ON signals(asset_type)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_confidence ON signals(confidence)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_expires_at ON signals(expires_at)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_country ON signals(country)',
+            'CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status)',
+            """CREATE INDEX IF NOT EXISTS idx_signals_enhanced
+               ON signals (status, is_published, expires_at, created_at DESC)
+               WHERE status = 'active' AND is_published = TRUE""",
+        ]
+        for index_sql in indexes:
+            try:
+                await database.execute(index_sql)
+            except Exception as e:
+                print(f"[ENHANCED SIGNALS] ⚠️  Index warn: {e}", flush=True)
+
+        # ── Backfill NULLs with sensible defaults ────────────────────────────
+        backfills = [
+            "UPDATE signals SET asset_type = 'forex' WHERE asset_type IS NULL",
+            "UPDATE signals SET country = 'all' WHERE country IS NULL",
+            "UPDATE signals SET sentiment_bearish = 50 WHERE sentiment_bearish IS NULL",
+            "UPDATE signals SET sentiment_bullish = 50 WHERE sentiment_bullish IS NULL",
+            "UPDATE signals SET ai_confidence = confidence WHERE ai_confidence IS NULL AND confidence IS NOT NULL",
+        ]
+        for query in backfills:
+            try:
+                await database.execute(query)
+            except Exception as e:
+                print(f"[ENHANCED SIGNALS] ⚠️  Backfill warn: {e}", flush=True)
+
+        print("[ENHANCED SIGNALS] ✅ Migration complete", flush=True)
+        return True
+    except Exception as e:
+        print(f"[ENHANCED SIGNALS] ❌ Migration error: {e}", flush=True)
+        return False
+
+
 async def run_unique_index_migrations():
     """
     Add missing UNIQUE indexes that ON CONFLICT clauses depend on.

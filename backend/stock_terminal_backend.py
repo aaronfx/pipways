@@ -34,6 +34,7 @@ from anthropic import AsyncAnthropic
 from fastapi import APIRouter, FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from starlette.requests import Request as StarletteRequest
 
 # Auth + usage — relative imports (stock_terminal_backend lives inside backend/)
 try:
@@ -42,6 +43,12 @@ try:
     _AUTH_AVAILABLE = True
 except ImportError:
     _AUTH_AVAILABLE = False
+
+try:
+    from .rate_limit import limiter
+    _LIMITER_AVAILABLE = True
+except ImportError:
+    _LIMITER_AVAILABLE = False
     get_current_user = None  # type: ignore
 
 # ── Environment ───────────────────────────────────────────────────────────────

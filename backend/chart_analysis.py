@@ -28,6 +28,8 @@ import json
 import re
 
 from PIL import Image
+from starlette.requests import Request as StarletteRequest
+from .rate_limit import limiter
 from .auth import get_current_user
 from .subscriptions import check_limit, log_usage
 
@@ -534,7 +536,9 @@ def _parse_json(content: str) -> Dict:
 
 
 @router.post("/analyze")
+@limiter.limit("10/minute")
 async def analyze_chart_image(
+    request: StarletteRequest,
     file: UploadFile = File(...),
     symbol: Optional[str] = Form(None),
     timeframe: Optional[str] = Form(None),

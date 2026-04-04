@@ -26,7 +26,8 @@ from backend.payments import router as payments_router
 from backend.email_service import router as email_router
 from backend.academy_routes import router as learning_router
 from backend.risk_calculator import router as risk_router
-from backend.database import database, init_database, run_migrations, run_unique_index_migrations
+from backend.database import database, init_database, run_migrations, run_unique_index_migrations, run_enhanced_signals_migration
+from backend.rate_limit import install_rate_limiter
 
 BASE_DIR = Path(__file__).parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
@@ -66,99 +67,6 @@ async def lifespan(app: FastAPI):
     print("🔄 Application shutting down")
 
 
-async def run_enhanced_signals_migration():
-    try:
-        print("[ENHANCED SIGNALS] Checking migration status...")
-        existing_query = """
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'signals' AND table_schema = 'public'
-        """
-        existing_rows = await database.fetch_all(existing_query)
-        existing_columns = [row["column_name"] for row in existing_rows]
-        new_columns = [
-            ('pattern', 'VARCHAR(50)'),
-            ('full_name', 'TEXT'),
-            ('asset_type', "VARCHAR(50) DEFAULT 'forex'"),
-            ('country', "VARCHAR(10) DEFAULT 'all'"),
-            ('sentiment_bearish', 'INTEGER DEFAULT 50'),
-            ('sentiment_bullish', 'INTEGER DEFAULT 50'),
-            ('current_price', 'VARCHAR(20)'),
-            ('price_change', 'VARCHAR(20)'),
-            ('price_change_percent', 'VARCHAR(20)'),
-            ('chart_data', 'TEXT'),
-            ('expires_at', 'TIMESTAMPTZ'),
-            ('ai_confidence', 'FLOAT DEFAULT 0.5'),
-            ('confidence', 'INTEGER DEFAULT 75'),
-            ('entry', 'VARCHAR(50)'),
-            ('target', 'VARCHAR(50)'),
-            ('stop', 'VARCHAR(50)'),
-            ('pattern_points', "JSONB DEFAULT '[]'"),
-            ('pattern_lines',  "JSONB DEFAULT '[]'"),
-            ('is_pattern_idea', 'BOOLEAN DEFAULT FALSE'),
-            ('is_published', 'BOOLEAN DEFAULT TRUE'),
-            ('technical_summary', 'TEXT'),
-            ('volatility_index', 'FLOAT'),
-            ('pattern_name',   'TEXT'),
-            ('structure',      'TEXT'),
-            ('bias_d1',        'TEXT'),
-            ('bias_h4',        'TEXT'),
-            ('bos_m5',         'TEXT'),
-            ('breakout_point', 'JSONB'),
-            ('candles',        "JSONB DEFAULT '[]'"),
-            ('timeframe',      "TEXT DEFAULT 'M5'"),
-            ('rationale',      'TEXT'),
-            ('entry_price',    'NUMERIC(20, 8)'),
-            ('take_profit',    'NUMERIC(20, 8)'),
-            ('stop_loss',      'NUMERIC(20, 8)'),
-            ('updated_at',     'TIMESTAMPTZ'),
-        ]
-        columns_added = 0
-        for column_name, column_type in new_columns:
-            if column_name not in existing_columns:
-                try:
-                    await database.execute(
-                        f"ALTER TABLE signals ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
-                    )
-                    print(f"[ENHANCED SIGNALS] ✅ Added column: {column_name}")
-                    columns_added += 1
-                except Exception as e:
-                    print(f"[ENHANCED SIGNALS] ⚠️  Error adding column {column_name}: {e}")
-        indexes = [
-            'CREATE INDEX IF NOT EXISTS idx_signals_pattern ON signals(pattern)',
-            'CREATE INDEX IF NOT EXISTS idx_signals_asset_type ON signals(asset_type)',
-            'CREATE INDEX IF NOT EXISTS idx_signals_confidence ON signals(confidence)',
-            'CREATE INDEX IF NOT EXISTS idx_signals_expires_at ON signals(expires_at)',
-            'CREATE INDEX IF NOT EXISTS idx_signals_country ON signals(country)',
-            'CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status)',
-            """CREATE INDEX IF NOT EXISTS idx_signals_enhanced
-               ON signals (status, is_published, expires_at, created_at DESC)
-               WHERE status = 'active' AND is_published = TRUE""",
-        ]
-        for index_sql in indexes:
-            try:
-                await database.execute(index_sql)
-            except Exception as e:
-                print(f"[ENHANCED SIGNALS] ⚠️  Error adding index: {e}")
-        update_queries = [
-            "UPDATE signals SET asset_type = 'forex' WHERE asset_type IS NULL",
-            "UPDATE signals SET country = 'all' WHERE country IS NULL",
-            "UPDATE signals SET sentiment_bearish = 50 WHERE sentiment_bearish IS NULL",
-            "UPDATE signals SET sentiment_bullish = 50 WHERE sentiment_bullish IS NULL",
-            "UPDATE signals SET ai_confidence = confidence WHERE ai_confidence IS NULL AND confidence IS NOT NULL"
-        ]
-        for query in update_queries:
-            try:
-                await database.execute(query)
-            except Exception as e:
-                print(f"[ENHANCED SIGNALS] ⚠️  Error updating data: {e}")
-        print(f"[ENHANCED SIGNALS] 🎉 Migration completed: {columns_added} columns added")
-        print("[ENHANCED SIGNALS] ℹ️  No seed data injected — bot is the only signal source")
-        return True
-    except Exception as e:
-        print(f"[ENHANCED SIGNALS] ❌ Migration error: {e}")
-        return False
-
-
 app = FastAPI(
     title="Gopipways API",
     description="Gopipways — Nigeria's Trading Education & AI Platform",
@@ -180,6 +88,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Rate Limiting ────────────────────────────────────────────────────────────
+install_rate_limiter(app)
 
 app.include_router(auth_router,             prefix="/auth",           tags=["Authentication"])
 app.include_router(signals_router)

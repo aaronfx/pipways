@@ -6,9 +6,11 @@ Added: get_current_user dependency for other routers to import
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
+from starlette.requests import Request as StarletteRequest
 from typing import Optional
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
+from .rate_limit import limiter
 
 from .database import database, users, get_available_columns
 from .security import (
@@ -176,7 +178,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/register", response_model=Token)
-async def register(user_data: UserRegister):
+@limiter.limit("5/minute")
+async def register(request: StarletteRequest, user_data: UserRegister):
     print(f"[Auth] Registration: {user_data.email}", flush=True)
     if await get_user_by_email(user_data.email):
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -205,7 +208,8 @@ async def register(user_data: UserRegister):
 
 
 @router.post("/token", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("10/minute")
+async def login(request: StarletteRequest, form_data: OAuth2PasswordRequestForm = Depends()):
     print(f"[Auth] Login: {form_data.username}", flush=True)
     user = await get_user_by_email(form_data.username)
     if not user:

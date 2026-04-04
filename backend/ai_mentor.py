@@ -14,6 +14,8 @@ from datetime import datetime
 from .auth import get_current_user
 from .database import database
 from .subscriptions import check_limit, log_usage
+from starlette.requests import Request as StarletteRequest
+from .rate_limit import limiter
 
 router = APIRouter()
 
@@ -285,7 +287,9 @@ async def generate_ai_response(message: str, context: Dict) -> str:
         return "Great question! Learn the complete answer in the lesson below. 👇"
 
 @router.post("/ask", response_model=MentorResponse)
+@limiter.limit("15/minute")
 async def ask_mentor(
+    request: StarletteRequest,
     chat: ChatMessage,
     current_user = Depends(get_current_user)
 ):

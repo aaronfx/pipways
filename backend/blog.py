@@ -76,6 +76,7 @@ async def get_posts(
     category: Optional[str] = None,
     current_user=Depends(get_current_user),
 ):
+    """Retrieve paginated published blog posts with optional category filtering."""
     cat_sql = "AND category = :cat" if category else ""
     params: dict = {"lim": limit, "off": offset}
     if category:
@@ -132,6 +133,7 @@ async def get_posts(
 
 @router.get("/posts/{slug}")
 async def get_post(slug: str, current_user=Depends(get_current_user)):
+    """Retrieve a single blog post by slug."""
     # Try with is_published
     row = await _fetch_one(
         "SELECT * FROM blog_posts WHERE slug = :slug AND (LOWER(status) = 'published' OR is_published = TRUE)",

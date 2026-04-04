@@ -1,0 +1,38 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "globals": {
+    "API": "readonly",
+    "Store": "readonly",
+    "UI": "readonly",
+    "PipwaysUsage": "readonly",
+    "PaymentsPage": "readonly",
+    "PublicPages": "readonly",
+    "AdminPage": "readonly",
+    "CMSPage": "readonly",
+    "CoursesPage": "readonly",
+    "DashboardHomePatch": "readonly",
+    "Onboarding": "readonly",
+    "QuizPage": "readonly",
+    "dashboard": "readonly",
+    "Chart": "readonly",
+    "Quill": "readonly",
+    "marked": "readonly",
+    "DOMPurify": "readonly",
+    "hljs": "readonly"
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "script"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-undef": "warn",
+    "no-console": "off",
+    "semi": ["warn", "always"],
+    "quotes": ["warn", "single"],
+    "eqeqeq": "warn"
+  }
+}

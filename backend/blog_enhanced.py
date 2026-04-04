@@ -16,13 +16,7 @@ async def enhanced_posts(
     tag: Optional[str] = None,
     search: Optional[str] = None,
 ):
-    """
-    Get posts with enhanced metadata including:
-    - SEO fields (meta description, keywords)
-    - Comment counts
-    - Tags
-    - Read time estimates
-    """
+    """Retrieve posts with enhanced metadata, SEO fields, comment counts, and tag filtering."""
     try:
         if tag:
             query = """

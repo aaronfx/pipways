@@ -228,6 +228,7 @@ class BlogPostIn(BaseModel):
 
 @router.get("/blog")
 async def cms_list_posts(_=Depends(get_admin_user)):
+    """List all blog posts for CMS admin (admin access required)."""
     rows = await _rows(
         "SELECT id, title, slug, excerpt, category, tags, featured_image, "
         "is_published, views, seo_title, seo_description, focus_keyword, "
@@ -241,6 +242,7 @@ async def cms_list_posts(_=Depends(get_admin_user)):
 
 @router.get("/blog/{post_id}")
 async def cms_get_post(post_id: int, _=Depends(get_admin_user)):
+    """Retrieve a specific blog post by ID for editing."""
     r = await _row("SELECT * FROM blog_posts WHERE id = :id", {"id": post_id})
     if not r: raise HTTPException(404, "Post not found")
     r["tags"] = _tags_list(r.get("tags"))
@@ -248,6 +250,7 @@ async def cms_get_post(post_id: int, _=Depends(get_admin_user)):
 
 @router.post("/blog", status_code=201)
 async def cms_create_post(data: BlogPostIn, _=Depends(get_admin_user)):
+    """Create a new blog post."""
     if await _row("SELECT id FROM blog_posts WHERE slug=:s", {"s": data.slug}):
         raise HTTPException(400, f"Slug '{data.slug}' already exists")
     now = datetime.utcnow()
@@ -282,6 +285,7 @@ async def cms_create_post(data: BlogPostIn, _=Depends(get_admin_user)):
 
 @router.put("/blog/{post_id}")
 async def cms_update_post(post_id: int, data: BlogPostIn, _=Depends(get_admin_user)):
+    """Update an existing blog post."""
     if not await _row("SELECT id FROM blog_posts WHERE id=:id", {"id": post_id}):
         raise HTTPException(404, "Post not found")
     sql = ("UPDATE blog_posts SET title=:title,slug=:slug,excerpt=:excerpt,content=:content,"
@@ -303,11 +307,13 @@ async def cms_update_post(post_id: int, data: BlogPostIn, _=Depends(get_admin_us
 
 @router.delete("/blog/{post_id}")
 async def cms_delete_post(post_id: int, _=Depends(get_admin_user)):
+    """Delete a blog post."""
     await _exec("DELETE FROM blog_posts WHERE id=:id", {"id": post_id})
     return {"message": "Post deleted"}
 
 @router.post("/blog/{post_id}/toggle-publish")
 async def cms_toggle_post(post_id: int, _=Depends(get_admin_user)):
+    """Toggle the published status of a blog post."""
     r = await _row("SELECT id,is_published FROM blog_posts WHERE id=:id", {"id": post_id})
     if not r: raise HTTPException(404, "Post not found")
     ns = not bool(r["is_published"])
@@ -491,6 +497,7 @@ class QuestionIn(BaseModel):
 
 @router.get("/courses")
 async def cms_list_courses(_=Depends(get_admin_user)):
+    """List all courses with lesson counts."""
     # ── ROOT-CAUSE FIX ────────────────────────────────────────────────────────
     # Previously this code used _rows() inside the try block.  _rows() catches
     # ALL exceptions and returns [] silently, so the except-fallback was DEAD
@@ -545,6 +552,7 @@ async def cms_list_courses(_=Depends(get_admin_user)):
 
 @router.post("/courses", status_code=201)
 async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
+    """Create a new course."""
     print(f"[CMS] CREATE COURSE title={data.title!r}", flush=True)
 
     # Step 1 — guaranteed-safe INSERT using only original schema columns
@@ -590,6 +598,7 @@ async def cms_create_course(data: CourseIn, _=Depends(get_admin_user)):
 
 @router.put("/courses/{cid}")
 async def cms_update_course(cid: int, data: CourseIn, _=Depends(get_admin_user)):
+    """Update an existing course."""
     if not await _row("SELECT id FROM courses WHERE id=:id", {"id": cid}):
         raise HTTPException(404, "Course not found")
 
@@ -620,6 +629,7 @@ async def cms_update_course(cid: int, data: CourseIn, _=Depends(get_admin_user))
 
 @router.delete("/courses/{cid}")
 async def cms_delete_course(cid: int, _=Depends(get_admin_user)):
+    """Delete a course."""
     # Delete child records first (cascade-safe order)
     for sql, params in [
         ("DELETE FROM quiz_questions WHERE quiz_id IN "
@@ -640,6 +650,7 @@ async def cms_delete_course(cid: int, _=Depends(get_admin_user)):
 
 @router.post("/courses/{cid}/toggle-publish")
 async def cms_toggle_course(cid: int, _=Depends(get_admin_user)):
+    """Toggle the published status of a course."""
     r = await _row("SELECT id, is_published FROM courses WHERE id=:id", {"id": cid})
     if not r:
         raise HTTPException(404, "Course not found")
@@ -659,6 +670,7 @@ async def cms_toggle_course(cid: int, _=Depends(get_admin_user)):
 
 @router.get("/courses/{cid}/modules")
 async def cms_list_modules(cid: int, _=Depends(get_admin_user)):
+    """List all modules in a course."""
     try:
         mods = await _rows(
             "SELECT m.id, m.title, m.description, m.order_index,"
@@ -685,6 +697,7 @@ async def cms_list_modules(cid: int, _=Depends(get_admin_user)):
 
 @router.post("/modules", status_code=201)
 async def cms_create_module(data: ModuleIn, _=Depends(get_admin_user)):
+    """Create a new module in a course."""
     mid = await _exec(
         "INSERT INTO course_modules (course_id, title, description, order_index)"
         " VALUES (:cid, :title, :desc, :ord) RETURNING id",
@@ -696,6 +709,7 @@ async def cms_create_module(data: ModuleIn, _=Depends(get_admin_user)):
 
 @router.put("/modules/{mid}")
 async def cms_update_module(mid: int, data: ModuleIn, _=Depends(get_admin_user)):
+    """Update a course module."""
     await _exec(
         "UPDATE course_modules SET title=:title, description=:desc, order_index=:ord"
         " WHERE id=:id",
@@ -707,6 +721,7 @@ async def cms_update_module(mid: int, data: ModuleIn, _=Depends(get_admin_user))
 
 @router.delete("/modules/{mid}")
 async def cms_delete_module(mid: int, _=Depends(get_admin_user)):
+    """Delete a module and all its associated lessons and quizzes."""
     await _exec("DELETE FROM quiz_questions WHERE quiz_id IN"
                 " (SELECT id FROM quizzes WHERE module_id=:id)", {"id": mid})
     await _exec("DELETE FROM quizzes WHERE module_id=:id", {"id": mid})
@@ -719,6 +734,7 @@ async def cms_delete_module(mid: int, _=Depends(get_admin_user)):
 
 @router.get("/modules/{mid}/lessons")
 async def cms_list_lessons(mid: int, _=Depends(get_admin_user)):
+    """List all lessons in a module."""
     rows = await _rows(
         "SELECT * FROM lessons WHERE module_id=:mid ORDER BY order_index, id",
         {"mid": mid}
@@ -730,6 +746,7 @@ async def cms_list_lessons(mid: int, _=Depends(get_admin_user)):
 
 @router.post("/lessons", status_code=201)
 async def cms_create_lesson(data: LessonIn, _=Depends(get_admin_user)):
+    """Create a new lesson in a module."""
     lid = await _exec(
         "INSERT INTO lessons"
         " (module_id, course_id, title, content, video_url, attachment_url,"
@@ -750,6 +767,7 @@ async def cms_create_lesson(data: LessonIn, _=Depends(get_admin_user)):
 
 @router.put("/lessons/{lid}")
 async def cms_update_lesson(lid: int, data: LessonIn, _=Depends(get_admin_user)):
+    """Update a lesson in a module."""
     await _exec(
         "UPDATE lessons SET title=:title, content=:content, video_url=:video,"
         " attachment_url=:attach, duration_minutes=:dur, order_index=:ord,"
@@ -764,6 +782,7 @@ async def cms_update_lesson(lid: int, data: LessonIn, _=Depends(get_admin_user))
 
 @router.delete("/lessons/{lid}")
 async def cms_delete_lesson(lid: int, _=Depends(get_admin_user)):
+    """Delete a lesson from a module."""
     # FIX 10: fetch course_id BEFORE deleting so we can sync lesson_count
     row = await _row("SELECT course_id FROM lessons WHERE id=:id", {"id": lid})
     await _exec("DELETE FROM lessons WHERE id=:id", {"id": lid})
@@ -776,6 +795,7 @@ async def cms_delete_lesson(lid: int, _=Depends(get_admin_user)):
 
 @router.get("/modules/{mid}/quiz")
 async def cms_get_quiz(mid: int, _=Depends(get_admin_user)):
+    """Retrieve the quiz for a module."""
     quiz = await _row("SELECT * FROM quizzes WHERE module_id=:mid", {"mid": mid})
     if not quiz:
         return None
@@ -789,6 +809,7 @@ async def cms_get_quiz(mid: int, _=Depends(get_admin_user)):
 
 @router.post("/quizzes", status_code=201)
 async def cms_create_quiz(data: QuizIn, _=Depends(get_admin_user)):
+    """Create a new quiz for a module."""
     qid = await _exec(
         "INSERT INTO quizzes (module_id, title, pass_percentage, max_attempts, created_at)"
         " VALUES (:mid, :title, :pass, :attempts, :now) RETURNING id",
@@ -802,6 +823,7 @@ async def cms_create_quiz(data: QuizIn, _=Depends(get_admin_user)):
 
 @router.put("/quizzes/{qid}")
 async def cms_update_quiz(qid: int, data: QuizIn, _=Depends(get_admin_user)):
+    """Update a quiz."""
     await _exec(
         "UPDATE quizzes SET title=:title, pass_percentage=:pass,"
         " max_attempts=:attempts WHERE id=:id",
@@ -813,6 +835,7 @@ async def cms_update_quiz(qid: int, data: QuizIn, _=Depends(get_admin_user)):
 
 @router.delete("/quizzes/{qid}")
 async def cms_delete_quiz(qid: int, _=Depends(get_admin_user)):
+    """Delete a quiz and all its questions."""
     await _exec("DELETE FROM quiz_questions WHERE quiz_id=:id", {"id": qid})
     await _exec("DELETE FROM quizzes WHERE id=:id", {"id": qid})
     return {"message": "Quiz deleted"}
@@ -820,6 +843,7 @@ async def cms_delete_quiz(qid: int, _=Depends(get_admin_user)):
 
 @router.post("/quiz-questions", status_code=201)
 async def cms_create_question(data: QuestionIn, _=Depends(get_admin_user)):
+    """Create a new question in a quiz."""
     qid = await _exec(
         "INSERT INTO quiz_questions"
         " (quiz_id, question, option_a, option_b, option_c, option_d,"
@@ -836,6 +860,7 @@ async def cms_create_question(data: QuestionIn, _=Depends(get_admin_user)):
 
 @router.put("/quiz-questions/{qid}")
 async def cms_update_question(qid: int, data: QuestionIn, _=Depends(get_admin_user)):
+    """Update a quiz question."""
     await _exec(
         "UPDATE quiz_questions SET question=:q, option_a=:a, option_b=:b,"
         " option_c=:c, option_d=:d, correct_option=:correct,"
@@ -850,6 +875,7 @@ async def cms_update_question(qid: int, data: QuestionIn, _=Depends(get_admin_us
 
 @router.delete("/quiz-questions/{qid}")
 async def cms_delete_question(qid: int, _=Depends(get_admin_user)):
+    """Delete a quiz question."""
     await _exec("DELETE FROM quiz_questions WHERE id=:id", {"id": qid})
     return {"message": "Question deleted"}
 
@@ -872,6 +898,7 @@ class SignalIn(BaseModel):
 
 @router.get("/signals")
 async def cms_list_signals(_=Depends(get_admin_user)):
+    """List all trading signals."""
     rows = await _rows(
         "SELECT id,symbol,direction,entry_price,stop_loss,take_profit,"
         "timeframe,analysis,ai_confidence,status,is_published,outcome,created_at "
@@ -882,6 +909,7 @@ async def cms_list_signals(_=Depends(get_admin_user)):
 
 @router.post("/signals", status_code=201)
 async def cms_create_signal(data: SignalIn, _=Depends(get_admin_user)):
+    """Create a new trading signal."""
     sid = await _exec(
         "INSERT INTO signals (symbol,direction,entry_price,stop_loss,take_profit,"
         "timeframe,analysis,ai_confidence,status,created_at) "
@@ -900,6 +928,7 @@ async def cms_create_signal(data: SignalIn, _=Depends(get_admin_user)):
 
 @router.put("/signals/{sid}")
 async def cms_update_signal(sid: int, data: SignalIn, _=Depends(get_admin_user)):
+    """Update a trading signal."""
     if not await _row("SELECT id FROM signals WHERE id=:id", {"id": sid}):
         raise HTTPException(404, "Signal not found")
     await _exec(
@@ -915,11 +944,13 @@ async def cms_update_signal(sid: int, data: SignalIn, _=Depends(get_admin_user))
 
 @router.delete("/signals/{sid}")
 async def cms_delete_signal(sid: int, _=Depends(get_admin_user)):
+    """Delete a trading signal."""
     await _exec("DELETE FROM signals WHERE id=:id", {"id": sid})
     return {"message": "Signal deleted"}
 
 @router.post("/signals/{sid}/close")
 async def cms_close_signal(sid: int, outcome: Optional[str] = "closed", _=Depends(get_admin_user)):
+    """Close a trading signal with a specified outcome."""
     await _exec("UPDATE signals SET status='closed',outcome=:outcome WHERE id=:id",
                 {"outcome": outcome, "id": sid})
     return {"message": f"Signal closed ({outcome})"}
@@ -943,6 +974,7 @@ class WebinarIn(BaseModel):
 
 @router.get("/webinars")
 async def cms_list_webinars(_=Depends(get_admin_user)):
+    """List all webinars."""
     rows = await _rows(
         "SELECT id,title,description,presenter,scheduled_at,duration_minutes,"
         "meeting_link,recording_url,thumbnail,max_attendees,is_published,status,created_at "
@@ -955,6 +987,7 @@ async def cms_list_webinars(_=Depends(get_admin_user)):
 
 @router.post("/webinars", status_code=201)
 async def cms_create_webinar(data: WebinarIn, _=Depends(get_admin_user)):
+    """Create a new webinar session."""
     try: sched = datetime.fromisoformat(data.scheduled_at.replace("Z", "+00:00"))
     except: raise HTTPException(400, "Invalid scheduled_at format")
     wid = await _exec(
@@ -971,6 +1004,7 @@ async def cms_create_webinar(data: WebinarIn, _=Depends(get_admin_user)):
 
 @router.put("/webinars/{wid}")
 async def cms_update_webinar(wid: int, data: WebinarIn, _=Depends(get_admin_user)):
+    """Update a webinar."""
     if not await _row("SELECT id FROM webinars WHERE id=:id", {"id": wid}):
         raise HTTPException(404, "Webinar not found")
     try: sched = datetime.fromisoformat(data.scheduled_at.replace("Z", "+00:00"))
@@ -989,11 +1023,13 @@ async def cms_update_webinar(wid: int, data: WebinarIn, _=Depends(get_admin_user
 
 @router.delete("/webinars/{wid}")
 async def cms_delete_webinar(wid: int, _=Depends(get_admin_user)):
+    """Delete a webinar."""
     await _exec("DELETE FROM webinars WHERE id=:id", {"id": wid})
     return {"message": "Webinar deleted"}
 
 @router.post("/webinars/{wid}/toggle-publish")
 async def cms_toggle_webinar(wid: int, _=Depends(get_admin_user)):
+    """Toggle the published status of a webinar."""
     r = await _row("SELECT id,is_published FROM webinars WHERE id=:id", {"id": wid})
     if not r: raise HTTPException(404, "Webinar not found")
     ns = not bool(r["is_published"])
@@ -1025,6 +1061,7 @@ async def cms_list_users(
     tier: Optional[str] = None,
     _=Depends(get_admin_user)
 ):
+    """List all users with pagination."""
     where = []
     v = {}
     if search:
@@ -1060,6 +1097,7 @@ async def cms_list_users(
 
 @router.post("/users/{uid}/role")
 async def cms_set_user_role(uid: int, data: UserRoleIn, _=Depends(get_admin_user)):
+    """Set a user's role (admin, moderator, or user)."""
     valid = {"admin", "moderator", "user"}
     if data.role not in valid:
         raise HTTPException(400, f"Role must be one of: {', '.join(valid)}")
@@ -1072,6 +1110,7 @@ async def cms_set_user_role(uid: int, data: UserRoleIn, _=Depends(get_admin_user
 
 @router.post("/users/{uid}/subscription")
 async def cms_set_subscription(uid: int, data: UserSubIn, _=Depends(get_admin_user)):
+    """Set a user's subscription tier (free, pro, or enterprise)."""
     valid = {"free", "pro", "enterprise"}
     if data.subscription_tier not in valid:
         raise HTTPException(400, f"Tier must be one of: {', '.join(valid)}")
@@ -1083,6 +1122,7 @@ async def cms_set_subscription(uid: int, data: UserSubIn, _=Depends(get_admin_us
 
 @router.post("/users/{uid}/toggle-active")
 async def cms_toggle_user(uid: int, _=Depends(get_admin_user)):
+    """Toggle a user's active status (ban/unban)."""
     r = await _row("SELECT id,is_active FROM users WHERE id=:id", {"id": uid})
     if not r: raise HTTPException(404, "User not found")
     ns = not bool(r["is_active"])
@@ -1121,6 +1161,7 @@ class AnnouncementIn(BaseModel):
 
 @router.get("/announcements")
 async def cms_list_announcements(_=Depends(get_admin_user)):
+    """List all announcements."""
     rows = await _rows("SELECT * FROM announcements ORDER BY created_at DESC")
     for r in rows:
         r["created_at"] = _fmt(r.get("created_at"))
@@ -1129,6 +1170,7 @@ async def cms_list_announcements(_=Depends(get_admin_user)):
 
 @router.post("/announcements", status_code=201)
 async def cms_create_announcement(data: AnnouncementIn, _=Depends(get_admin_user)):
+    """Create a new announcement or banner."""
     exp = None
     if data.expires_at:
         try: exp = datetime.fromisoformat(data.expires_at.replace("Z", "+00:00"))
@@ -1143,11 +1185,13 @@ async def cms_create_announcement(data: AnnouncementIn, _=Depends(get_admin_user
 
 @router.delete("/announcements/{aid}")
 async def cms_delete_announcement(aid: int, _=Depends(get_admin_user)):
+    """Delete an announcement."""
     await _exec("DELETE FROM announcements WHERE id=:id", {"id": aid})
     return {"message": "Announcement deleted"}
 
 @router.post("/announcements/{aid}/toggle")
 async def cms_toggle_announcement(aid: int, _=Depends(get_admin_user)):
+    """Toggle an announcement's active status."""
     r = await _row("SELECT id,is_active FROM announcements WHERE id=:id", {"id": aid})
     if not r: raise HTTPException(404, "Announcement not found")
     ns = not bool(r["is_active"])
@@ -1169,6 +1213,7 @@ class CouponIn(BaseModel):
 
 @router.get("/coupons")
 async def cms_list_coupons(_=Depends(get_admin_user)):
+    """List all discount coupons."""
     rows = await _rows("SELECT * FROM coupons ORDER BY created_at DESC")
     for r in rows:
         r["created_at"] = _fmt(r.get("created_at"))
@@ -1177,6 +1222,7 @@ async def cms_list_coupons(_=Depends(get_admin_user)):
 
 @router.post("/coupons", status_code=201)
 async def cms_create_coupon(data: CouponIn, _=Depends(get_admin_user)):
+    """Create a new discount coupon."""
     if await _row("SELECT id FROM coupons WHERE code=:code", {"code": data.code.upper()}):
         raise HTTPException(400, "Coupon code already exists")
     exp = None
@@ -1193,11 +1239,13 @@ async def cms_create_coupon(data: CouponIn, _=Depends(get_admin_user)):
 
 @router.delete("/coupons/{cid}")
 async def cms_delete_coupon(cid: int, _=Depends(get_admin_user)):
+    """Delete a coupon."""
     await _exec("DELETE FROM coupons WHERE id=:id", {"id": cid})
     return {"message": "Coupon deleted"}
 
 @router.post("/coupons/{cid}/toggle")
 async def cms_toggle_coupon(cid: int, _=Depends(get_admin_user)):
+    """Toggle a coupon's active status."""
     r = await _row("SELECT id,is_active FROM coupons WHERE id=:id", {"id": cid})
     if not r: raise HTTPException(404, "Coupon not found")
     ns = not bool(r["is_active"])
@@ -1240,12 +1288,14 @@ async def _ensure_settings_table():
 
 @router.get("/settings")
 async def cms_get_settings(_=Depends(get_admin_user)):
+    """Retrieve all site settings."""
     await _ensure_settings_table()
     rows = await _rows("SELECT key,value FROM site_settings ORDER BY key")
     return {r["key"]: r["value"] for r in rows}
 
 @router.put("/settings")
 async def cms_update_settings(updates: dict, _=Depends(get_admin_user)):
+    """Update site settings."""
     await _ensure_settings_table()
     now = datetime.utcnow()
     for k, v in updates.items():

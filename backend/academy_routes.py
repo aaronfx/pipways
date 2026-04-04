@@ -1256,6 +1256,7 @@ async def academy_clean_url_redirect():
 
 @router.get("/levels")
 async def get_levels(current_user=Depends(get_current_user)):
+    """Retrieve all learning levels."""
     try:
         rows = await database.fetch_all(
             "SELECT id, name, description, order_index FROM learning_levels ORDER BY order_index"
@@ -1267,6 +1268,7 @@ async def get_levels(current_user=Depends(get_current_user)):
 
 @router.get("/modules/{level_id}")
 async def get_modules(level_id: int, current_user=Depends(get_current_user)):
+    """Retrieve all modules in a learning level."""
     try:
         level = await database.fetch_one(
             "SELECT id FROM learning_levels WHERE id=:lid", {"lid": level_id}
@@ -1311,6 +1313,7 @@ async def get_modules(level_id: int, current_user=Depends(get_current_user)):
 
 @router.get("/lessons/{module_id}")
 async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
+    """Retrieve all lessons in a module."""
     try:
         module = await database.fetch_one(
             "SELECT id FROM learning_modules WHERE id=:mid", {"mid": module_id}
@@ -1358,6 +1361,7 @@ async def get_lessons(module_id: int, current_user=Depends(get_current_user)):
 
 @router.get("/lesson/{lesson_id}")
 async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
+    """Retrieve a specific lesson by ID."""
     try:
         lesson = await database.fetch_one(
             """SELECT l.id, l.title, l.content, l.order_index, l.module_id,
@@ -1400,6 +1404,7 @@ async def get_lesson(lesson_id: int, current_user=Depends(get_current_user)):
 
 @router.get("/quiz/{lesson_id}")
 async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
+    """Retrieve the quiz for a lesson."""
     try:
         lesson = await database.fetch_one(
             "SELECT id FROM learning_lessons WHERE id=:lid", {"lid": lesson_id}
@@ -1431,6 +1436,7 @@ async def get_quiz(lesson_id: int, current_user=Depends(get_current_user)):
 
 @router.get("/progress/{user_id}")
 async def get_progress(user_id: int, current_user=Depends(get_current_user)):
+    """Retrieve learning progress for a user."""
     try:
         caller   = _user_get(current_user, "id", 0)
         is_admin = _user_get(current_user, "is_admin", False)
@@ -1496,6 +1502,7 @@ async def get_progress(user_id: int, current_user=Depends(get_current_user)):
 
 @router.get("/badges/{user_id}")
 async def get_badges(user_id: int, current_user=Depends(get_current_user)):
+    """Retrieve all badges earned by a user."""
     try:
         caller   = _user_get(current_user, "id", 0)
         is_admin = _user_get(current_user, "is_admin", False)
@@ -1524,6 +1531,7 @@ async def get_badges(user_id: int, current_user=Depends(get_current_user)):
 
 @router.get("/mentor/guide/{user_id}")
 async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
+    """Retrieve personalized mentoring guide for a user."""
     try:
         caller   = _user_get(current_user, "id", 0)
         is_admin = _user_get(current_user, "is_admin", False)
@@ -1577,6 +1585,7 @@ async def mentor_guide(user_id: int, current_user=Depends(get_current_user)):
 
 @router.post("/badges/check")
 async def check_badges(current_user=Depends(get_current_user)):
+    """Check for and award newly earned badges."""
     try:
         user_id = _user_get(current_user, "id", 0)
         if not user_id:
@@ -1589,6 +1598,7 @@ async def check_badges(current_user=Depends(get_current_user)):
 
 @router.post("/quiz/submit")
 async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_user)):
+    """Submit quiz answers and record completion."""
     try:
         user_id = _user_get(current_user, "id", 0)
         if not user_id:
@@ -1682,6 +1692,7 @@ async def submit_quiz(payload: QuizSubmission, current_user=Depends(get_current_
 
 @router.post("/lesson/complete")
 async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(get_current_user)):
+    """Mark a lesson as complete and check for new badges."""
     try:
         user_id = _user_get(current_user, "id", 0)
         if not user_id:
@@ -1724,6 +1735,7 @@ async def complete_lesson(payload: LessonCompleteRequest, current_user=Depends(g
 
 @router.post("/profile/first-visit-complete")
 async def mark_first_visit_complete(current_user=Depends(get_current_user)):
+    """Mark the user's first visit to the academy as complete."""
     try:
         user_id = _user_get(current_user, "id", 0)
         if not user_id:
@@ -1752,6 +1764,7 @@ async def mark_first_visit_complete(current_user=Depends(get_current_user)):
 
 @router.post("/mentor/teach")
 async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    """Get AI-generated teaching explanation for a lesson."""
     try:
         lesson = await database.fetch_one(
             """SELECT l.title, l.content, lv.name AS level_name
@@ -1784,6 +1797,7 @@ async def mentor_teach(lesson_id: int = Query(...), current_user=Depends(get_cur
 
 @router.post("/mentor/practice")
 async def mentor_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    """Generate AI practice exercises for a lesson."""
     try:
         lesson = await database.fetch_one(
             """SELECT l.title, lv.name AS level_name
@@ -1823,6 +1837,7 @@ async def mentor_practice(lesson_id: int = Query(...), current_user=Depends(get_
 
 @router.post("/mentor/chart-practice")
 async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depends(get_current_user)):
+    """Generate AI-guided chart analysis practice exercises."""
     try:
         lesson = await database.fetch_one(
             """SELECT l.title, lv.name AS level_name
@@ -1897,6 +1912,7 @@ async def mentor_chart_practice(lesson_id: int = Query(...), current_user=Depend
 
 @router.get("/resume")
 async def resume_learning(current_user=Depends(get_current_user)):
+    """Get the next lesson to resume learning for a user."""
     """
     Returns the lesson the user should resume/start next.
     type: "continue" | "start" | "complete"
@@ -1974,6 +1990,7 @@ async def resume_learning(current_user=Depends(get_current_user)):
 
 @router.get("/lesson/{lesson_id}/diagram")
 async def get_lesson_diagram(lesson_id: int, current_user=Depends(get_current_user)):
+    """Retrieve the AI-generated diagram for a lesson."""
     """
     Returns an SVG diagram for a lesson.
     - Lesson already has SVG → return it immediately (cached in DB).
@@ -2032,6 +2049,7 @@ async def get_lesson_diagram(lesson_id: int, current_user=Depends(get_current_us
 
 @router.post("/lesson/{lesson_id}/diagram/regenerate")
 async def regenerate_lesson_diagram(lesson_id: int, current_user=Depends(get_current_user)):
+    """Regenerate the AI diagram for a lesson."""
     """Admin only: force-regenerate the AI diagram for a lesson."""
     is_admin = _user_get(current_user, "is_admin", False)
     if not is_admin:

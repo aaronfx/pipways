@@ -544,6 +544,7 @@ async def analyze_chart_image(
     timeframe: Optional[str] = Form(None),
     current_user = Depends(get_current_user)
 ):
+    """Analyze a chart image and provide trading insights."""
     """Three-pass SMC chart analysis with full validation."""
     user_id   = current_user.get("id")
     user_tier = current_user.get("subscription_tier", "free")
@@ -837,6 +838,7 @@ def _build_demo_response(symbol: Optional[str], content_type: str, base64_image:
 
 @router.get("/pattern-library")
 async def get_pattern_library():
+    """Return a library of chart patterns with descriptions and success rates."""
     return {
         "reversal": [
             {"name": "Head and Shoulders",  "type": "reversal",     "reliability": "high",   "description": "Three peaks pattern signaling trend reversal",       "success_rate": "65%"},

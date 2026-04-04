@@ -25,6 +25,9 @@ email-validator==2.1.0.post1
 slowapi==0.1.9
 redis==5.0.1
 
+# Error Monitoring
+sentry-sdk[fastapi]==1.50.1
+
 # Data Processing
 numpy==2.0.2
 pandas==2.2.3

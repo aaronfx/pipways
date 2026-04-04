@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 from pathlib import Path
+from backend.error_monitoring import init_sentry
 from backend.auth import router as auth_router
 from backend.routes.signals import router as signals_router
 from backend.courses import router as courses_router
@@ -73,6 +74,9 @@ app = FastAPI(
     version=APP_VERSION,
     lifespan=lifespan
 )
+
+# Initialize Sentry error monitoring
+init_sentry(app, release=APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
@@ -293,18 +297,22 @@ async def not_found_handler(request: Request, exc: HTTPException):
     )
 
 
-@app.exception_handler(500)
+@app.exception_handler(Exception)
 async def internal_error_handler(request: Request, exc: Exception):
     print(f"Internal server error: {exc}")
     from fastapi.responses import JSONResponse
+    import sentry_sdk
+    # Capture to Sentry with additional context
+    sentry_sdk.capture_exception(exc, tags={"endpoint": request.url.path})
     if any(request.url.path.startswith(p) for p in ("/api", "/auth")):
-        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        return JSONResponse(status_code=500, content={"detail": "Internal server error", "error_id": sentry_sdk.last_event_id()})
     return HTMLResponse(
-        content="""<!DOCTYPE html><html>
+        content=f"""<!DOCTYPE html><html>
         <head><title>Server Error — Gopipways</title></head>
         <body style="font-family:Arial,sans-serif;text-align:center;padding:80px;background:#0f172a;color:#e2e8f0;">
           <h1 style="color:#ef4444;">Something went wrong</h1>
           <p style="color:#94a3b8;">We're working to fix this. Please try again later.</p>
+          {f'<p style="font-size:12px;color:#64748b;">Error ID: {sentry_sdk.last_event_id()}</p>' if sentry_sdk.last_event_id() else ''}
           <a href="/" style="display:inline-block;margin-top:20px;background:#7c3aed;color:white;
              padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
             Back to Home

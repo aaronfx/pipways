@@ -153,6 +153,58 @@ async def get_usage_state(user_id: int) -> Dict[str, int]:
 # GENERIC LIMIT CHECK & LOG  (used by all 4 service endpoints)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ── CMS key mapping ──────────────────────────────────────────────────────────
+# Maps feature keys to (log_table, free_cms_key, pro_cms_key, default_free, default_pro)
+_FEATURE_CONFIG = {
+    "chart_analysis":       ("chart_analysis_logs",  "chart_free_daily",    "chart_pro_daily",    2,   50),
+    "ai_mentor":            ("ai_mentor_logs",       "mentor_free_daily",   "mentor_pro_daily",   5,   200),
+    "performance_analysis": ("journal_uploads",      "journal_free_imports","journal_pro_imports", 1,   10),
+    "stock_research":       ("stock_analysis_logs",  "stock_free_daily",    "stock_pro_daily",    3,   100),
+}
+
+# Cache for CMS limits — refreshed periodically
+_cms_limits_cache = {}
+_cms_cache_ts = 0
+_CMS_CACHE_TTL = 300  # 5 minutes
+
+
+async def _load_cms_limits():
+    """Load feature limits from site_settings table. Returns dict of key→value."""
+    global _cms_limits_cache, _cms_cache_ts
+    import time
+    now = time.monotonic()
+    if _cms_limits_cache and (now - _cms_cache_ts) < _CMS_CACHE_TTL:
+        return _cms_limits_cache
+
+    try:
+        rows = await database.fetch_all(
+            "SELECT key, value FROM site_settings WHERE key LIKE :pattern",
+            {"pattern": "%_daily"}
+        )
+        rows2 = await database.fetch_all(
+            "SELECT key, value FROM site_settings WHERE key LIKE :pattern",
+            {"pattern": "%_imports"}
+        )
+        result = {}
+        for row in list(rows) + list(rows2):
+            k = row["key"] if isinstance(row, dict) else getattr(row, "key", None)
+            v = row["value"] if isinstance(row, dict) else getattr(row, "value", None)
+            if k and v:
+                try:
+                    result[k] = int(v)
+                except (ValueError, TypeError):
+                    pass
+        _cms_limits_cache = result
+        _cms_cache_ts = now
+        return result
+    except Exception as e:
+        print(f"[subscriptions] CMS limits load error: {e}", flush=True)
+        return _cms_limits_cache  # return stale cache on error
+
+
+_MONTHLY_FEATURES = {"performance_analysis"}
+
+# Legacy hardcoded limits (kept for reference; check_limit() now reads from CMS site_settings)
 _LIMIT_MAP = {
     # feature_key              log_table                free  basic  pro
     "chart_analysis":        ("chart_analysis_logs",    2,    50,    None),
@@ -161,28 +213,34 @@ _LIMIT_MAP = {
     "stock_research":        ("stock_analysis_logs",    3,    100,   None),
 }
 
-_MONTHLY_FEATURES = {"performance_analysis"}
-
 
 async def check_limit(user_id: int, user_tier: str, feature: str) -> bool:
     """
     Returns True if the user is under their usage limit.
-    Supports free / basic / pro tiers.
+    Reads limits from CMS site_settings with hardcoded fallbacks.
     Fails open on DB error so a hiccup never blocks users.
     """
-    if feature not in _LIMIT_MAP:
+    if feature not in _FEATURE_CONFIG:
         return True
 
-    table, free_limit, basic_limit, pro_limit = _LIMIT_MAP[feature]
+    table, free_key, pro_key, default_free, default_pro = _FEATURE_CONFIG[feature]
 
-    if user_tier == "pro":
-        limit = pro_limit
+    # Pro tier = unlimited by default
+    if user_tier in ("pro", "pro_plus"):
+        # Check if CMS set a pro limit
+        cms = await _load_cms_limits()
+        pro_val = cms.get(pro_key)
+        if pro_val is None or pro_val == 0:
+            return True  # unlimited
+        limit = pro_val
     elif user_tier == "basic":
-        limit = basic_limit
+        cms = await _load_cms_limits()
+        limit = cms.get(pro_key, default_pro)  # basic gets pro limits
     else:
-        limit = free_limit
+        cms = await _load_cms_limits()
+        limit = cms.get(free_key, default_free)
 
-    if limit is None:
+    if limit is None or limit == 0:
         return True  # unlimited
 
     is_monthly = feature in _MONTHLY_FEATURES
@@ -202,7 +260,8 @@ async def check_limit(user_id: int, user_tier: str, feature: str) -> bool:
         allowed = used < limit
         print(
             f"[check_limit] {feature} user={user_id} tier={user_tier} "
-            f"used={used} limit={limit} period={'monthly' if is_monthly else 'daily'} "
+            f"used={used} limit={limit} (cms={free_key if user_tier=='free' else pro_key}) "
+            f"period={'monthly' if is_monthly else 'daily'} "
             f"→ {'ALLOW' if allowed else 'BLOCK'}",
             flush=True
         )
@@ -218,10 +277,10 @@ async def log_usage(user_id: int, feature: str, **kwargs):
     Extra kwargs forwarded as columns (symbol, timeframe, question_topic, filename).
     Non-fatal on any error.
     """
-    if feature not in _LIMIT_MAP:
+    if feature not in _FEATURE_CONFIG:
         return
 
-    table = _LIMIT_MAP[feature][0]
+    table = _FEATURE_CONFIG[feature][0]
 
     _allowed_cols = {
         "chart_analysis_logs":  {"symbol", "timeframe", "analysis_type"},

@@ -255,24 +255,8 @@ const PaymentsPage = {
 
 window.PaymentsPage = PaymentsPage;
 
-// ── Global 402 handler — intercept all API calls ──────────────────────────
-// Monkey-patch API.request to auto-show upgrade modal on 402
-const _originalRequest = API.request.bind(API);
-API.request = async function(endpoint, options = {}) {
-    try {
-        return await _originalRequest(endpoint, options);
-    } catch (err) {
-        if (err.message && err.message.includes('402')) {
-            const featureMap = {
-                '/ai/mentor': 'AI Mentor',
-                '/ai/chart':  'Chart Analysis',
-                '/ai/performance': 'Performance Analytics',
-                '/api/stock': 'Stock Terminal',
-            };
-            const feature = Object.entries(featureMap).find(([k]) => endpoint.includes(k))?.[1] || 'this feature';
-            PaymentsPage.showUpgradeModal(feature);
-            throw err;
-        }
-        throw err;
-    }
-};
+// ── REMOVED: 402 handler monkey-patch ────────────────────────────────────────
+// This monkey-patch of API.request has been removed to avoid conflicts with the
+// canonical 402 handler in /js/api.js. The API.request method now handles all
+// 402 responses directly and calls PaymentsPage.showUpgradeModal when needed.
+// See: /js/api.js lines ~50-66 for the primary 402 handler

@@ -253,14 +253,17 @@ async def paystack_webhook(request: Request):
     signature = request.headers.get("x-paystack-signature", "")
     body_bytes = await request.body()
 
-    if PAYSTACK_SECRET_KEY:
-        expected = hmac.new(
-            PAYSTACK_SECRET_KEY.encode("utf-8"),
-            body_bytes,
-            hashlib.sha512,
-        ).hexdigest()
-        if not hmac.compare_digest(signature, expected):
-            raise HTTPException(400, "Invalid webhook signature")
+    if not PAYSTACK_SECRET_KEY:
+        print("[PAYMENTS] ⚠️ PAYSTACK_SECRET_KEY not set — rejecting webhook", flush=True)
+        raise HTTPException(503, "Payment system not configured")
+
+    expected = hmac.new(
+        PAYSTACK_SECRET_KEY.encode("utf-8"),
+        body_bytes,
+        hashlib.sha512,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(400, "Invalid webhook signature")
 
     payload = json.loads(body_bytes)
 

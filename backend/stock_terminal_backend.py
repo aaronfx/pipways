@@ -43,13 +43,13 @@ try:
     _AUTH_AVAILABLE = True
 except ImportError:
     _AUTH_AVAILABLE = False
+    get_current_user = None  # type: ignore
 
 try:
     from .rate_limit import limiter
     _LIMITER_AVAILABLE = True
 except ImportError:
     _LIMITER_AVAILABLE = False
-    get_current_user = None  # type: ignore
 
 # ── Environment ───────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")

@@ -18,11 +18,13 @@ import os
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Depends
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 
 from backend.database import database
+from backend.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,9 @@ logger = logging.getLogger(__name__)
 # Set BOT_SECRET env var on Railway + PIPWAYS_BOT_SECRET on the bot VPS.
 # Empty string = auth disabled (safe for dev; always set in production).
 _BOT_SECRET = os.environ.get("BOT_SECRET", "")
+
+# OAuth2 scheme for optional user authentication on signal list endpoints
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 # ── Router ────────────────────────────────────────────────────────────────────
 # No prefix on the router — every path is declared in full on the decorator.
@@ -281,21 +286,46 @@ async def get_enhanced_signals(
     asset_type: Optional[str] = None,
     direction: Optional[str] = None,
     is_pattern_idea: Optional[bool] = None,   # #8: tab filtering server-side
+    token: Optional[str] = Depends(oauth2_scheme),
 ):
     """
     Primary endpoint for the Enhanced Signals dashboard panel.
     Returns active, published, non-expired signals newest-first.
     Candles are intentionally excluded — fetch GET /api/signals/{id} for the full row.
     Supports ?asset_type=, ?direction=, ?is_pattern_idea= query filters.
+
+    Authentication:
+      - Unauthenticated: limited to 3 most recent signals (no full data)
+      - Free tier: 3 signals with full fields
+      - Pro tier: all signals with full data
     """
     db = get_db()
     try:
+        # Get user tier from token if available
+        user_tier = "free"
+        if token:
+            try:
+                current_user = await get_current_user(token)
+                user_tier = current_user.get("subscription_tier", "free")
+            except Exception:
+                user_tier = "free"
+        else:
+            user_tier = "unauthenticated"
+
+        # Apply tier-based limits
+        tier_limit = limit
+        if user_tier == "unauthenticated":
+            tier_limit = min(limit, 3)
+        elif user_tier == "free":
+            tier_limit = min(limit, 3)
+        # Pro tier: no limit imposed, use requested limit
+
         where_clauses = [
             "status = 'active'",
             "(expires_at IS NULL OR expires_at > NOW())",
             "is_published = TRUE",
         ]
-        params: dict = {"limit": limit}
+        params: dict = {"limit": tier_limit}
 
         if asset_type:
             where_clauses.append("asset_type = :asset_type")
@@ -323,7 +353,18 @@ async def get_enhanced_signals(
         rows = await db.fetch_all(query, params)
         signals = [_hydrate(dict(row)) for row in rows]
 
-        logger.info(f"[signals] GET /enhanced — {len(signals)} signals")
+        # For unauthenticated users, strip sensitive fields
+        if user_tier == "unauthenticated":
+            for signal in signals:
+                # Remove entry/stop/target for unauthenticated users
+                signal.pop("entry", None)
+                signal.pop("stop", None)
+                signal.pop("target", None)
+                signal.pop("entry_price", None)
+                signal.pop("stop_loss", None)
+                signal.pop("take_profit", None)
+
+        logger.info(f"[signals] GET /enhanced — {len(signals)} signals (tier={user_tier})")
         return signals
 
     except HTTPException:
@@ -334,11 +375,27 @@ async def get_enhanced_signals(
 
 
 @router.get("/api/signals/winrate")
-async def get_signal_winrate(days: int = 7):
+async def get_signal_winrate(
+    days: int = 7,
+    token: Optional[str] = Depends(oauth2_scheme),
+):
     """
     #4: 7-day win rate from closed signals.
     Counts status='closed_tp' as wins, 'closed_sl' as losses.
+
+    Authentication:
+      - Unauthenticated: 404 (win rate hidden)
+      - Free/Pro tier: full win rate data
     """
+    # Win rate is protected — only authenticated users see it
+    if not token:
+        raise HTTPException(status_code=404, detail="Win rate requires authentication")
+
+    try:
+        current_user = await get_current_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
     db = get_db()
     try:
         since = datetime.utcnow() - timedelta(days=days)
@@ -486,18 +543,43 @@ async def get_active_signals(
     country: str = "all",
     asset_type: str = "all",
     limit: int = 50,
+    token: Optional[str] = Depends(oauth2_scheme),
 ):
     """
     Dashboard summary panel endpoint.
     Supports ?country= and ?asset_type= query filters.
+
+    Authentication:
+      - Unauthenticated: limited to 3 most recent signals
+      - Free tier: 3 signals with full fields
+      - Pro tier: all signals with full data
     """
     db = get_db()
     try:
+        # Get user tier from token if available
+        user_tier = "free"
+        if token:
+            try:
+                current_user = await get_current_user(token)
+                user_tier = current_user.get("subscription_tier", "free")
+            except Exception:
+                user_tier = "free"
+        else:
+            user_tier = "unauthenticated"
+
+        # Apply tier-based limits
+        tier_limit = limit
+        if user_tier == "unauthenticated":
+            tier_limit = min(limit, 3)
+        elif user_tier == "free":
+            tier_limit = min(limit, 3)
+        # Pro tier: no limit imposed, use requested limit
+
         where_clauses = [
             "status = 'active'",
             "(expires_at IS NULL OR expires_at > NOW())",
         ]
-        params: dict = {"limit": limit}
+        params: dict = {"limit": tier_limit}
 
         if country and country != "all":
             where_clauses.append("country = :country")
@@ -517,7 +599,19 @@ async def get_active_signals(
 
         rows = await db.fetch_all(query, params)
         signals = [_hydrate(dict(row)) for row in rows]
-        logger.info(f"[signals] GET /active — {len(signals)} signals")
+
+        # For unauthenticated users, strip sensitive fields
+        if user_tier == "unauthenticated":
+            for signal in signals:
+                # Remove entry/stop/target for unauthenticated users
+                signal.pop("entry", None)
+                signal.pop("stop", None)
+                signal.pop("target", None)
+                signal.pop("entry_price", None)
+                signal.pop("stop_loss", None)
+                signal.pop("take_profit", None)
+
+        logger.info(f"[signals] GET /active — {len(signals)} signals (tier={user_tier})")
         return signals
 
     except HTTPException:

@@ -49,6 +49,8 @@ async def lifespan(app: FastAPI):
     print("✅ Chart analysis HTTP client initialized")
     from backend.subscriptions import init_subscription_tables
     await init_subscription_tables()
+    from backend.payments import init_payment_tables
+    await init_payment_tables()
     from backend.email_service import ensure_email_tables, start_webinar_reminder_scheduler
     await ensure_email_tables()
     start_webinar_reminder_scheduler()
@@ -56,7 +58,7 @@ async def lifespan(app: FastAPI):
     if admin_email:
         try:
             await database.execute(
-                "UPDATE users SET is_admin = TRUE WHERE LOWER(email) = :email",
+                "UPDATE users SET is_admin = TRUE WHERE LOWER(email) = :email AND is_admin = FALSE",
                 {"email": admin_email}
             )
             print(f"[ADMIN] Auto-promoted {admin_email}", flush=True)
@@ -305,14 +307,13 @@ async def internal_error_handler(request: Request, exc: Exception):
     # Capture to Sentry with additional context
     sentry_sdk.capture_exception(exc, tags={"endpoint": request.url.path})
     if any(request.url.path.startswith(p) for p in ("/api", "/auth")):
-        return JSONResponse(status_code=500, content={"detail": "Internal server error", "error_id": sentry_sdk.last_event_id()})
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
     return HTMLResponse(
         content=f"""<!DOCTYPE html><html>
         <head><title>Server Error — Gopipways</title></head>
         <body style="font-family:Arial,sans-serif;text-align:center;padding:80px;background:#0f172a;color:#e2e8f0;">
           <h1 style="color:#ef4444;">Something went wrong</h1>
           <p style="color:#94a3b8;">We're working to fix this. Please try again later.</p>
-          {f'<p style="font-size:12px;color:#64748b;">Error ID: {sentry_sdk.last_event_id()}</p>' if sentry_sdk.last_event_id() else ''}
           <a href="/" style="display:inline-block;margin-top:20px;background:#7c3aed;color:white;
              padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
             Back to Home

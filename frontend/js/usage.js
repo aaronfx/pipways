@@ -63,7 +63,7 @@ window.PipwaysUsage = (function() {
         console.log('PipwaysUsage: Initializing usage tracking system');
 
         setupUpgradeModal();
-        setupFetchInterceptor();
+        // setupFetchInterceptor();  // Removed — 402 handling now in api.js
         loadUserLimits();
     }
 
@@ -176,51 +176,12 @@ window.PipwaysUsage = (function() {
             console.warn('PipwaysUsage: refreshUsageCounts error (non-fatal):', err);
         }
     }
-    // FETCH INTERCEPTOR (402 HANDLING)
-    // ══════════════════════════════════════════════════════════════════════════
 
-    function setupFetchInterceptor() {
-        const originalFetch = window.fetch;
-
-        window.fetch = async function(...args) {
-            try {
-                const response = await originalFetch.apply(this, args);
-
-                if (response.status === 402) {
-                    console.log('PipwaysUsage: 402 Payment Required intercepted');
-
-                    let errorData = {};
-                    try {
-                        errorData = await response.clone().json();
-                    } catch (e) {
-                        console.error('PipwaysUsage: Error parsing 402 body:', e);
-                    }
-
-                    const feature = extractFeatureFromError(errorData, args[0]);
-                    showUpgradeModal(feature, errorData);
-
-                    // Attach parsed data to the response so calling code can read it
-                    // without calling .json() again (body can only be read once).
-                    // Also throw a proper Error so catch blocks get a real message
-                    // instead of "[object Object]".
-                    const limitMsg = errorData?.message
-                        || errorData?.detail
-                        || 'Usage limit reached. Upgrade to Pro to continue.';
-
-                    const limitError = new Error(limitMsg);
-                    limitError.status  = 402;
-                    limitError.feature = feature;
-                    limitError.detail  = errorData;
-                    limitError.upgrade = true;
-                    throw limitError;
-                }
-
-                return response;
-            } catch (error) {
-                throw error;
-            }
-        };
-    }
+    // ── 402 HANDLING NOW MOVED TO api.js ────────────────────────────────────
+    // The fetch interceptor for 402 responses has been removed from here to avoid
+    // conflicts with the canonical handler in /js/api.js. All 402 handling is now
+    // centralized in API.request() to ensure single point of responsibility.
+    // See: /js/api.js lines ~50-66 for the primary 402 handler
 
     function extractFeatureFromError(errorData, url) {
         if (errorData && errorData.feature) return errorData.feature;

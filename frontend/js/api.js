@@ -48,6 +48,19 @@ const API = {
                 throw new Error('Session expired. Please log in again.');
             }
 
+            // ── 402: subscription limit reached → show upgrade modal ────
+            if (res.status === 402) {
+                const err = await res.json().catch(() => ({ detail: 'Upgrade required' }));
+                const upgradeError = new Error(err.detail || 'Feature limit reached. Please upgrade your plan.');
+                upgradeError.status = 402;
+                upgradeError.upgrade = true;
+                // Trigger upgrade modal if PaymentsPage is available
+                if (window.PaymentsPage && typeof window.PaymentsPage.showUpgradeModal === 'function') {
+                    try { window.PaymentsPage.showUpgradeModal(err.feature || ''); } catch(e) {}
+                }
+                throw upgradeError;
+            }
+
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
                 throw new Error(err.detail || `Request failed: ${res.status}`);

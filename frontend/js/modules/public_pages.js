@@ -31,6 +31,12 @@ const PublicPages = (() => {
         return res.json();
     }
 
+    // ── HTML escape helper ───────────────────────────────────────────────────
+    function _esc(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
     // ── containers ──────────────────────────────────────────────────────────
     function el(id) {
         return document.getElementById(id)
@@ -122,7 +128,7 @@ const PublicPages = (() => {
                         </div>` : ''}
                         ${s.analysis ? `
                         <p class="text-xs text-gray-500 border-t border-gray-700/50 pt-2.5 mt-1 leading-relaxed line-clamp-2">
-                            ${s.analysis}
+                            ${_esc(s.analysis)}
                         </p>` : ''}
                     </div>
                     <!-- footer -->
@@ -209,7 +215,7 @@ const PublicPages = (() => {
                         +     '<i class="fas fa-calendar-alt" style="color:#a78bfa;font-size:.9rem;"></i></div>'
                         +   '<div>'
                         +     '<div style="font-size:.7rem;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;">Next Session</div>'
-                        +     '<div style="font-weight:700;color:white;font-size:.9rem;">' + (nextW.title || '') + '</div>'
+                        +     '<div style="font-weight:700;color:white;font-size:.9rem;">' + _esc(nextW.title || '') + '</div>'
                         +   '</div>'
                         + '</div>'
                         + '<div id="pw-webinar-countdown" style="display:flex;align-items:center;gap:.4rem;font-size:1.1rem;font-weight:800;color:#a78bfa;font-variant-numeric:tabular-nums;">'
@@ -369,11 +375,11 @@ const PublicPages = (() => {
                      + dateBlock
                      + '<div style="flex:1;padding:1.1rem 1.25rem;">'
                      +   '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.4rem;">'
-                     +     '<h4 style="font-weight:700;color:' + (isCompleted ? '#9ca3af' : 'white') + ';font-size:.95rem;line-height:1.3;margin:0;">' + (w.title||'') + '</h4>'
+                     +     '<h4 style="font-weight:700;color:' + (isCompleted ? '#9ca3af' : 'white') + ';font-size:.95rem;line-height:1.3;margin:0;">' + _esc(w.title||'') + '</h4>'
                      +     statusHtml
                      +   '</div>'
                      +   tagsHtml
-                     +   (w.description ? '<p style="font-size:.8rem;color:#9ca3af;margin:0 0 .6rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + w.description + '</p>' : '')
+                     +   (w.description ? '<p style="font-size:.8rem;color:#9ca3af;margin:0 0 .6rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + _esc(w.description) + '</p>' : '')
                      +   (metaChips ? '<div style="display:flex;flex-wrap:wrap;gap:.6rem;font-size:.73rem;color:#6b7280;margin-bottom:.7rem;">' + metaChips + '</div>' : '')
                      +   speakerHtml
                      +   '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin-top:.75rem;">'
@@ -501,8 +507,8 @@ const PublicPages = (() => {
                             +     '<span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:rgba(96,165,250,.12);color:' + col + ';border:1px solid ' + col + '33;padding:.2rem .7rem;border-radius:9999px;">' + cat + '</span>'
                             +     featBadge
                             +   '</div>'
-                            +   '<h3 class="text-xl lg:text-2xl font-bold text-white leading-snug mb-3 group-hover:text-blue-300 transition-colors">' + (p.title || '') + '</h3>'
-                            +   '<p class="text-gray-400 text-sm leading-relaxed mb-5 line-clamp-3">' + (p.excerpt || '') + '</p>'
+                            +   '<h3 class="text-xl lg:text-2xl font-bold text-white leading-snug mb-3 group-hover:text-blue-300 transition-colors">' + _esc(p.title || '') + '</h3>'
+                            +   '<p class="text-gray-400 text-sm leading-relaxed mb-5 line-clamp-3">' + _esc(p.excerpt || '') + '</p>'
                             +   '<div class="flex items-center justify-between text-xs text-gray-500">'
                             +     '<div class="flex items-center gap-3">' + dateParts + '</div>'
                             +     '<span class="text-blue-400 font-semibold group-hover:text-blue-300">Read &#8594;</span>'
@@ -515,8 +521,8 @@ const PublicPages = (() => {
                         + imgSmall
                         + '<div class="p-5">'
                         +   '<div class="flex items-center gap-1.5 mb-2"><span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:' + col + ';">' + cat + '</span></div>'
-                        +   '<h4 class="font-bold text-white mb-2 leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">' + (p.title || '') + '</h4>'
-                        +   '<p class="text-sm text-gray-400 line-clamp-2 mb-4">' + (p.excerpt || '') + '</p>'
+                        +   '<h4 class="font-bold text-white mb-2 leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">' + _esc(p.title || '') + '</h4>'
+                        +   '<p class="text-sm text-gray-400 line-clamp-2 mb-4">' + _esc(p.excerpt || '') + '</p>'
                         +   '<div class="flex justify-between items-center text-xs text-gray-600">'
                         +     '<div class="flex items-center gap-2">'
                         +       (date ? '<span>' + date + '</span>' : '')
@@ -626,8 +632,8 @@ const PublicPages = (() => {
                             <span class="text-xs font-semibold text-purple-400 uppercase tracking-wide">${course.level || 'Beginner'}</span>
                             ${course.instructor ? `<span class="text-xs text-gray-500">${course.instructor}</span>` : ''}
                         </div>
-                        <h4 class="font-bold text-white mb-2 group-hover:text-purple-300 transition-colors line-clamp-2">${course.title}</h4>
-                        <p class="text-sm text-gray-400 line-clamp-2 mb-4">${course.description || ''}</p>
+                        <h4 class="font-bold text-white mb-2 group-hover:text-purple-300 transition-colors line-clamp-2">${_esc(course.title)}</h4>
+                        <p class="text-sm text-gray-400 line-clamp-2 mb-4">${_esc(course.description || '')}</p>
                         <div class="flex justify-between items-center text-xs text-gray-500 mb-3">
                             <span><i class="fas fa-book-open mr-1.5"></i>${course.lesson_count || 0} lessons</span>
                             ${pct > 0 ? `<span class="text-green-400 font-semibold">${pct}% done</span>` : ''}

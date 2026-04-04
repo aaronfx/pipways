@@ -585,6 +585,10 @@ async def analyze_journal(
         if not trades:
             raise HTTPException(400, "No trades provided")
 
+        # Validate trade count limit
+        if isinstance(trades, list) and len(trades) > 500:
+            raise HTTPException(400, "Maximum 500 trades per analysis. Please split your journal.")
+
         # Calculate all metrics
         stats = calculate_performance_metrics(trades)
         equity_curve = calculate_equity_curve(trades)

@@ -227,6 +227,7 @@ const DashboardController = class {
             'enhanced-signals': { title: 'Enhanced Signals', sub: 'AI-powered professional trading insights' },
             'journal':   { title: 'Performance Analytics', sub: 'AI-powered coaching from your real trade data' },
             'mentor':    { title: 'AI Mentor',             sub: '24/7 personal trading coach' },
+            'subscription': { title: 'Subscription & Plans', sub: 'Upgrade your account to unlock all features' },
             'admin':     { title: 'Admin Panel',        sub: 'Platform administration' },
             'cms':       { title: 'Content Management', sub: 'Manage courses, blog, signals and users' }
         };
@@ -283,6 +284,13 @@ const DashboardController = class {
                 case 'blog':      await this.loadBlog();     break;
                 case 'journal':   this.setupJournalUpload(); break;
                 case 'mentor':    await this.loadMentor();   break;
+                case 'subscription': {
+                    const container = document.getElementById('subscription-content');
+                    if (window.PaymentsPage) {
+                        PaymentsPage.render(container);
+                    }
+                    break;
+                }
                 case 'risk': {
                     const rc = document.getElementById('risk-calculator-container');
                     if (!rc) break;

@@ -8,7 +8,7 @@ import json
 import httpx
 from typing import List, Dict, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 from .auth import get_current_user
@@ -25,7 +25,7 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 class ChatMessage(BaseModel):
-    message: str
+    message: str = Field(..., max_length=5000, description="User question (max 5000 chars)")
     context: Optional[Dict[str, Any]] = None
 
 class LessonRecommendation(BaseModel):

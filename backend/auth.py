@@ -69,7 +69,9 @@ _available_columns_cache = None
 def get_columns():
     global _available_columns_cache
     if _available_columns_cache is None:
+        print("[AUTH] Loading column schema (one-time sync call)…", flush=True)
         _available_columns_cache = get_available_columns()
+        print(f"[AUTH] Columns loaded: {len(_available_columns_cache)} columns", flush=True)
     return _available_columns_cache
 
 
@@ -219,8 +221,10 @@ async def login(request: StarletteRequest, form_data: OAuth2PasswordRequestForm 
     try:
         is_valid = verify_password(form_data.password, _extract(user, "password_hash"))
     except Exception as e:
-        print(f"[Error] Password verification: {e}", flush=True)
-        is_valid = False
+        print(f"[CRITICAL] Password verification failure: {e}", flush=True)
+        import sentry_sdk
+        sentry_sdk.capture_exception(e)
+        raise HTTPException(status_code=500, detail="Authentication service error")
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Incorrect email or password",

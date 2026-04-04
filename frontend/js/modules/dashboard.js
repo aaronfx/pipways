@@ -836,32 +836,73 @@ const DashboardController = class {
                     </a>
                 </div>`;
             } else {
-                blogEl.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                ${list.map(p => {
+                // ── FIX: use DOM API instead of nested template literals ──
+                // Nested backtick + onerror + col variable caused SyntaxError
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3';
+
+                list.forEach(p => {
                     const catColors = {'Market Analysis':'#60a5fa','Strategy':'#a78bfa','Education':'#34d399','General':'#9ca3af'};
-                    const col = catColors[p.category] || '#9ca3af';
+                    const col  = catColors[p.category] || '#9ca3af';
                     const date = p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
-                    return `
-                    <div class="rounded-xl cursor-pointer transition-all duration-200 overflow-hidden"
-                         style="border:1px solid #1f2937;background:#0d1321;"
-                         onclick="dashboard.navigate('blog')"
-                         onmouseover="this.style.borderColor='#374151';this.style.transform='translateY(-2px)'"
-                         onmouseout="this.style.borderColor='#1f2937';this.style.transform=''">
-                        <div class="pw-blog-thumb">
-                            ${p.featured_image
-                                ? `<img src="${p.featured_image}" alt="${_e(p.title)}" onerror="this.parentElement.innerHTML='<div class=pw-blog-thumb-placeholder><i class=\"fas fa-newspaper text-xl\" style=\"color:${col};opacity:.4;\"></i></div>'">`
-                                : `<div class="pw-blog-thumb-placeholder"><i class="fas fa-newspaper text-xl" style="color:${col};opacity:.4;"></i></div>`}
-                            <div class="absolute bottom-0 left-0 right-0 px-3 py-1" style="background:linear-gradient(transparent,rgba(0,0,0,.6));">
-                                <span class="text-xs font-bold" style="color:${col};">${_e(p.category||'General').toUpperCase()}</span>
-                            </div>
-                        </div>
-                        <div class="p-3">
-                            <div class="text-sm font-medium text-white line-clamp-2 mb-2 leading-snug">${_e(p.title)}</div>
-                            <div class="text-xs text-gray-600">${date}</div>
-                        </div>
-                    </div>`;
-                }).join('')}
-                </div>`;
+
+                    const card = document.createElement('div');
+                    card.className = 'rounded-xl cursor-pointer transition-all duration-200 overflow-hidden';
+                    card.style.cssText = 'border:1px solid #1f2937;background:#0d1321;';
+                    card.addEventListener('click', () => dashboard.navigate('blog'));
+                    card.addEventListener('mouseover', function() { this.style.borderColor = '#374151'; this.style.transform = 'translateY(-2px)'; });
+                    card.addEventListener('mouseout',  function() { this.style.borderColor = '#1f2937';  this.style.transform = ''; });
+
+                    // Thumb — build image/placeholder safely without inline onerror string injection
+                    const thumb = document.createElement('div');
+                    thumb.className = 'pw-blog-thumb';
+
+                    if (p.featured_image) {
+                        const img = document.createElement('img');
+                        img.src = p.featured_image;
+                        img.alt = '';
+                        img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'pw-blog-thumb-placeholder';
+                        placeholder.style.display = 'none';
+                        placeholder.innerHTML = '<i class="fas fa-newspaper text-xl" style="color:' + col + ';opacity:.4;"></i>';
+                        img.addEventListener('error', function() {
+                            this.style.display = 'none';
+                            placeholder.style.display = 'flex';
+                        });
+                        thumb.appendChild(img);
+                        thumb.appendChild(placeholder);
+                    } else {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'pw-blog-thumb-placeholder';
+                        placeholder.innerHTML = '<i class="fas fa-newspaper text-xl" style="color:' + col + ';opacity:.4;"></i>';
+                        thumb.appendChild(placeholder);
+                    }
+
+                    // Category label overlay
+                    const overlay = document.createElement('div');
+                    overlay.className = 'absolute bottom-0 left-0 right-0 px-3 py-1';
+                    overlay.style.background = 'linear-gradient(transparent,rgba(0,0,0,.6))';
+                    const catSpan = document.createElement('span');
+                    catSpan.className = 'text-xs font-bold';
+                    catSpan.style.color = col;
+                    catSpan.textContent = (p.category || 'General').toUpperCase();
+                    overlay.appendChild(catSpan);
+                    thumb.appendChild(overlay);
+
+                    // Body
+                    const body = document.createElement('div');
+                    body.className = 'p-3';
+                    body.innerHTML = '<div class="text-sm font-medium text-white line-clamp-2 mb-2 leading-snug">' + _e(p.title) + '</div>'
+                        + '<div class="text-xs text-gray-600">' + date + '</div>';
+
+                    card.appendChild(thumb);
+                    card.appendChild(body);
+                    grid.appendChild(card);
+                });
+
+                blogEl.innerHTML = '';
+                blogEl.appendChild(grid);
             }
         }
     }
@@ -2356,10 +2397,13 @@ const DashboardController = class {
 
             const content = html || text;
 
-            // Find the Quill instance — check common global names
-            const quill = window.quill
-                || window._quillInstance
-                || (typeof Quill !== 'undefined' && Quill.find(editorEl));
+            // Find the Quill instance — check common global names, then DOM lookup
+            let quill = window.quill || window._quillInstance;
+            if (!quill && typeof Quill !== 'undefined') {
+                quill = Quill.find(editorEl);
+                // Expose it globally so the console command also works
+                if (quill) window.quill = quill;
+            }
 
             if (quill && typeof quill.clipboard?.dangerouslyPasteHTML === 'function') {
                 const range = quill.getSelection(true);

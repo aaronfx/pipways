@@ -1,26 +1,40 @@
 """
-Webinars API — Complete Rebuild
-Endpoints:
-  GET /webinars/upcoming?upcoming=true|false
-
-Design decisions:
-- status field uses LOWER() comparisons — no case sensitivity issues
-- is_published checked as OR condition — CMS toggle always works
-- No hard date cutoff for published webinars — show them regardless of date
-- Returns all fields the frontend and CMS js expect
+Webinars API — v2 Session Hub Upgrade
+New columns : youtube_url, embed_url
+New endpoints:
+  POST /webinars/{id}/register     — user self-registration
+  GET  /webinars/{id}/registrants  — admin only, attendee list
+  GET  /webinars/{id}/my-registration — check if current user is registered
 """
 from typing import Optional
-# New webinar columns — added automatically if missing
+
+# ── Auto-migration: new columns added if missing (idempotent) ────────────────
 _WEBINAR_NEW_COLS = [
     "ALTER TABLE webinars ADD COLUMN IF NOT EXISTS speaker_bio TEXT DEFAULT ''",
     "ALTER TABLE webinars ADD COLUMN IF NOT EXISTS tags VARCHAR(500) DEFAULT ''",
+    # v2 Session Hub
+    "ALTER TABLE webinars ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT ''",
+    "ALTER TABLE webinars ADD COLUMN IF NOT EXISTS embed_url VARCHAR(500) DEFAULT ''",
 ]
+
+_REGISTRATION_TABLE = """
+CREATE TABLE IF NOT EXISTS webinar_registrations (
+    id            SERIAL PRIMARY KEY,
+    webinar_id    INTEGER NOT NULL,
+    user_id       INTEGER NOT NULL,
+    registered_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(webinar_id, user_id)
+)
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from .database import database
 from .security import get_current_user
 
 router = APIRouter()
 
+
+# ── Internal helpers ─────────────────────────────────────────────────────────
 
 async def _fetch(sql: str, params: dict = None) -> list:
     try:
@@ -36,8 +50,7 @@ def _fmt(row: dict, upcoming: bool) -> dict:
     status = (row.get("status") or "scheduled").lower()
     now    = __import__("datetime").datetime.utcnow()
 
-    # Auto-detect completed: past webinars that were scheduled/live
-    is_past = sat and sat < now
+    is_past      = sat and sat < now
     is_completed = is_past and status in ("scheduled", "live", "published", "completed")
     if is_completed:
         status = "completed"
@@ -54,6 +67,8 @@ def _fmt(row: dict, upcoming: bool) -> dict:
         "duration_minutes": row.get("duration_minutes") or 60,
         "meeting_link":     (row.get("meeting_link") or "") if not is_completed else "",
         "recording_url":    row.get("recording_url") or "",
+        "youtube_url":      row.get("youtube_url") or "",
+        "embed_url":        row.get("embed_url") or "",
         "is_published":     bool(row.get("is_published", False)),
         "max_attendees":    row.get("max_attendees") or 100,
         "thumbnail":        row.get("thumbnail") or "",
@@ -64,11 +79,16 @@ def _fmt(row: dict, upcoming: bool) -> dict:
 async def _run_webinar_migrations():
     for sql in _WEBINAR_NEW_COLS:
         try:
-            from .database import database as _db
-            await _db.execute(sql)
+            await database.execute(sql)
         except Exception:
             pass
+    try:
+        await database.execute(_REGISTRATION_TABLE)
+    except Exception as e:
+        print(f"[WEBINARS] registration table migration error: {e}", flush=True)
 
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/upcoming")
 async def get_webinars(
@@ -76,18 +96,13 @@ async def get_webinars(
     current_user=Depends(get_current_user),
 ):
     """
-    Fetch webinars for the public page.
-    - upcoming=true  → published or scheduled/live
+    Fetch webinars for the session hub.
+    - upcoming=true  → published or scheduled/live (+ completed for past recordings tab)
     - upcoming=false → recorded only
-
-    Two-stage query: rich columns first, plain fallback if columns missing.
     """
-    # Ensure new columns exist (idempotent)
     await _run_webinar_migrations()
 
     if upcoming:
-        # Stage 1: try with all new columns
-        # Returns both upcoming AND past (completed) webinars — frontend separates them
         rows = await _fetch(
             """
             SELECT id, title, description,
@@ -98,6 +113,8 @@ async def get_webinars(
                    COALESCE(duration_minutes, 60)   AS duration_minutes,
                    COALESCE(meeting_link, '')        AS meeting_link,
                    COALESCE(recording_url, '')       AS recording_url,
+                   COALESCE(youtube_url, '')         AS youtube_url,
+                   COALESCE(embed_url, '')           AS embed_url,
                    COALESCE(max_attendees, 100)      AS max_attendees,
                    COALESCE(is_published, FALSE)     AS is_published,
                    COALESCE(thumbnail, '')           AS thumbnail,
@@ -108,8 +125,6 @@ async def get_webinars(
             ORDER BY scheduled_at ASC NULLS LAST
             """
         )
-
-        # Stage 2: simple fallback if new columns don't exist
         if not rows:
             rows = await _fetch(
                 """
@@ -130,6 +145,8 @@ async def get_webinars(
                    COALESCE(status, 'recorded')   AS status,
                    COALESCE(duration_minutes, 60) AS duration_minutes,
                    COALESCE(recording_url, '')     AS recording_url,
+                   COALESCE(youtube_url, '')       AS youtube_url,
+                   COALESCE(embed_url, '')         AS embed_url,
                    COALESCE(is_published, FALSE)   AS is_published
             FROM webinars
             WHERE LOWER(COALESCE(status, '')) = 'recorded'
@@ -146,3 +163,94 @@ async def get_webinars(
     result = [_fmt(r, upcoming) for r in rows]
     print(f"[WEBINARS] /upcoming?upcoming={upcoming} → {len(result)} records", flush=True)
     return result
+
+
+@router.post("/{webinar_id}/register")
+async def register_for_webinar(
+    webinar_id: int,
+    current_user=Depends(get_current_user),
+):
+    """
+    Register the authenticated user for a webinar.
+    Idempotent — re-registering returns success without error.
+    """
+    await _run_webinar_migrations()
+
+    # Confirm the webinar exists and is published/scheduled
+    webinar = await _fetch(
+        "SELECT id, title, max_attendees FROM webinars WHERE id = :id",
+        {"id": webinar_id}
+    )
+    if not webinar:
+        raise HTTPException(status_code=404, detail="Webinar not found")
+
+    # Check capacity
+    w = webinar[0]
+    count_rows = await _fetch(
+        "SELECT COUNT(*) AS cnt FROM webinar_registrations WHERE webinar_id = :wid",
+        {"wid": webinar_id}
+    )
+    current_count = count_rows[0]["cnt"] if count_rows else 0
+    max_att = w.get("max_attendees") or 100
+
+    if current_count >= max_att:
+        raise HTTPException(status_code=400, detail="This session is fully booked")
+
+    # Insert — ignore duplicate (ON CONFLICT DO NOTHING)
+    try:
+        await database.execute(
+            """
+            INSERT INTO webinar_registrations (webinar_id, user_id)
+            VALUES (:wid, :uid)
+            ON CONFLICT (webinar_id, user_id) DO NOTHING
+            """,
+            {"wid": webinar_id, "uid": current_user["id"]}
+        )
+    except Exception as e:
+        print(f"[WEBINARS] registration insert error: {e}", flush=True)
+        raise HTTPException(status_code=500, detail="Registration failed")
+
+    print(f"[WEBINARS] user {current_user['id']} registered for webinar {webinar_id}", flush=True)
+    return {
+        "success": True,
+        "message": f"You're registered for \"{w['title']}\". We'll remind you before it starts.",
+        "webinar_id": webinar_id,
+    }
+
+
+@router.get("/{webinar_id}/my-registration")
+async def my_registration(
+    webinar_id: int,
+    current_user=Depends(get_current_user),
+):
+    """Check whether the current user is already registered."""
+    await _run_webinar_migrations()
+    rows = await _fetch(
+        "SELECT id FROM webinar_registrations WHERE webinar_id = :wid AND user_id = :uid",
+        {"wid": webinar_id, "uid": current_user["id"]}
+    )
+    return {"registered": bool(rows)}
+
+
+@router.get("/{webinar_id}/registrants")
+async def get_registrants(
+    webinar_id: int,
+    current_user=Depends(get_current_user),
+):
+    """Admin only — list all registrants for a webinar."""
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    await _run_webinar_migrations()
+    rows = await _fetch(
+        """
+        SELECT wr.id, wr.registered_at,
+               u.email, u.full_name
+        FROM webinar_registrations wr
+        JOIN users u ON u.id = wr.user_id
+        WHERE wr.webinar_id = :wid
+        ORDER BY wr.registered_at ASC
+        """,
+        {"wid": webinar_id}
+    )
+    return {"webinar_id": webinar_id, "count": len(rows), "registrants": rows}

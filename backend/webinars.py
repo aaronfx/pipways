@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS webinar_registrations (
 from fastapi import APIRouter, Depends, HTTPException
 from .database import database
 from .security import get_current_user
+from .email_service import send_webinar_confirmation_task
 
 router = APIRouter()
 
@@ -211,9 +212,30 @@ async def register_for_webinar(
         raise HTTPException(status_code=500, detail="Registration failed")
 
     print(f"[WEBINARS] user {current_user['id']} registered for webinar {webinar_id}", flush=True)
+
+    # ── Send confirmation email (fire-and-forget, non-blocking) ─────────────
+    try:
+        user_row = await database.fetch_one(
+            "SELECT email, full_name FROM users WHERE id = :uid",
+            {"uid": current_user["id"]}
+        )
+        if user_row:
+            import asyncio
+            asyncio.create_task(send_webinar_confirmation_task(
+                user_id         = current_user["id"],
+                email           = user_row["email"],
+                full_name       = user_row["full_name"] or "Trader",
+                session_title   = w["title"],
+                presenter       = w.get("presenter", "") or "",
+                scheduled_at    = w.get("scheduled_at"),
+                duration_minutes= w.get("duration_minutes") or 60,
+            ))
+    except Exception as e:
+        print(f"[WEBINARS] Confirmation email error (non-blocking): {e}", flush=True)
+
     return {
         "success": True,
-        "message": f"You're registered for \"{w['title']}\". We'll remind you before it starts.",
+        "message": f"You're registered for \"{w['title']}\". Check your email for confirmation.",
         "webinar_id": webinar_id,
     }
 

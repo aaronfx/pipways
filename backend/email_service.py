@@ -1100,7 +1100,7 @@ def subscription_email(full_name: str, plan: str, amount: str,
                        billing_cycle: str = "monthly") -> tuple:
     first = (full_name or "Trader").split()[0]
     plan_label = plan.upper()
-    features = {{
+    features = {
         "pro": [
             ("🎓 Live Mentorship Sessions", "Direct access to experienced traders — live sessions where you can ask questions, review your trades, and get real-time guidance. This alone is worth the subscription."),
             ("📊 Unlimited Live Signals", "High-quality, well-reasoned trade setups delivered daily. Entry, stop loss, take profit, and the full rationale behind every call."),
@@ -1116,7 +1116,7 @@ def subscription_email(full_name: str, plan: str, amount: str,
             ("📚 Full Academy Access", "All lessons and modules. Build structure into your trading from day one."),
             ("🤖 AI Mentor", "Ask anything, any time. Trading questions answered with the depth of a professional coach."),
         ],
-    }}
+    }
     feature_list  = features.get(plan.lower(), features["pro"])
     features_html = "".join(f"""
 <tr style="border-bottom:1px solid #f3f4f6;">

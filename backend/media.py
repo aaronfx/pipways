@@ -1,372 +1,173 @@
 """
-Media file uploads and management.
+media_service.py — Cloudinary-backed media storage for Gopipways CMS
+Replaces local filesystem uploads which are wiped on every Railway deployment.
 
-Endpoints (all mounted under /cms by main.py):
-  POST   /cms/media/upload          — upload a file (admin only)
-  GET    /cms/media                 — list uploaded files (admin only)
-  GET    /cms/media?folder=blog     — list by folder
-  DELETE /cms/media?filename=...    — delete a file (admin only)
-  GET    /cms/media/serve/{filename} — serve a file publicly (no auth)
-
-Storage: files are written to MEDIA_ROOT (default: /app/uploads).
-  On Railway the filesystem is ephemeral — files survive restarts but
-  NOT new deployments. For persistence, set MEDIA_STORAGE=db to store
-  files as base64 in the database, or point MEDIA_ROOT at a mounted volume.
-
-Environment variables:
-  MEDIA_ROOT      — absolute path to store files (default: /app/uploads)
-  MEDIA_BASE_URL  — public URL prefix served to clients
-                    (default: https://www.gopipways.com/cms/media/serve)
-  MEDIA_MAX_MB    — max upload size in MB (default: 10)
-  MEDIA_STORAGE   — "disk" (default) | "db"
+Setup:
+    1. pip install cloudinary
+    2. Add to Railway env vars:
+         CLOUDINARY_CLOUD_NAME=your_cloud_name
+         CLOUDINARY_API_KEY=your_api_key
+         CLOUDINARY_API_SECRET=your_api_secret
+    3. Free tier: 25GB storage, 25GB bandwidth/month — plenty for CMS media
 """
 
 import os
-import re
 import uuid
-import base64
-import mimetypes
-from pathlib import Path
-from datetime import datetime
-from typing import Optional
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+from fastapi import UploadFile, HTTPException
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from fastapi.responses import Response
+# ── Configure Cloudinary from env vars ───────────────────────────────────────
+cloudinary.config(
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key    = os.getenv("CLOUDINARY_API_KEY"),
+    api_secret = os.getenv("CLOUDINARY_API_SECRET"),
+    secure     = True
+)
 
-from .database import database
-from .security import get_current_user, is_admin_user, get_user_id
-
-router = APIRouter()
-
-# ── Config ─────────────────────────────────────────────────────────────────────
-
-MEDIA_ROOT     = Path(os.getenv("MEDIA_ROOT", "/app/uploads"))
-MEDIA_BASE_URL = os.getenv("MEDIA_BASE_URL", "https://www.gopipways.com/cms/media/serve")
-MEDIA_MAX_MB   = int(os.getenv("MEDIA_MAX_MB", "10"))
-MEDIA_STORAGE  = os.getenv("MEDIA_STORAGE", "disk").lower()  # "disk" | "db"
-
-# Allowed MIME types → sub-folder mapping
-ALLOWED_TYPES: dict[str, str] = {
-    # Images
-    "image/jpeg":   "images",
-    "image/png":    "images",
-    "image/gif":    "images",
-    "image/webp":   "images",
-    "image/svg+xml":"images",
-    # Documents
-    "application/pdf": "docs",
-    # Video (for lesson attachments — large files should use YouTube instead)
-    "video/mp4":    "video",
-    "video/webm":   "video",
+# Allowed MIME types → Cloudinary resource type mapping
+ALLOWED_TYPES = {
+    "image/jpeg":      "image",
+    "image/png":       "image",
+    "image/webp":      "image",
+    "image/gif":       "image",
+    "image/svg+xml":   "image",
+    "video/mp4":       "video",
+    "video/webm":      "video",
+    "application/pdf": "raw",
 }
 
-MAX_BYTES = MEDIA_MAX_MB * 1024 * 1024
+MAX_FILE_SIZE_MB = 20
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
-# ── DB table (created once on first use) ───────────────────────────────────────
-
-_TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS media_files (
-    id          SERIAL PRIMARY KEY,
-    filename    VARCHAR(255) UNIQUE NOT NULL,
-    original    VARCHAR(255) NOT NULL,
-    mime_type   VARCHAR(100) NOT NULL,
-    folder      VARCHAR(50)  NOT NULL DEFAULT 'general',
-    size_bytes  INTEGER      NOT NULL DEFAULT 0,
-    url         TEXT         NOT NULL,
-    data        TEXT,                          -- base64 payload (db mode only)
-    uploaded_by INTEGER,
-    created_at  TIMESTAMPTZ  DEFAULT NOW()
-)
-"""
-
-_TABLE_READY = False
-
-async def _ensure_table():
-    global _TABLE_READY
-    if _TABLE_READY:
-        return
-    try:
-        await database.execute(_TABLE_SQL)
-        _TABLE_READY = True
-    except Exception as e:
-        print(f"[MEDIA] Table init warning: {e}", flush=True)
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _safe_filename(original: str, folder: str) -> str:
-    """Generate a unique, filesystem-safe filename preserving the extension."""
-    ext  = Path(original).suffix.lower()
-    stem = re.sub(r"[^a-z0-9_-]", "_", Path(original).stem.lower())[:40]
-    uid  = uuid.uuid4().hex[:8]
-    return f"{folder}/{stem}_{uid}{ext}"
-
-
-def _public_url(filename: str) -> str:
-    return f"{MEDIA_BASE_URL.rstrip('/')}/{filename}"
-
-
-async def _save_disk(filename: str, data: bytes) -> None:
-    """Write bytes to MEDIA_ROOT / filename, creating directories as needed."""
-    dest = MEDIA_ROOT / filename
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
-
-
-async def _save_db(filename: str, mime: str, data: bytes, folder: str, original: str,
-                   size: int, url: str, user_id: int) -> None:
-    """Store file content as base64 in media_files table."""
-    b64 = base64.b64encode(data).decode()
-    await database.execute(
-        """
-        INSERT INTO media_files (filename, original, mime_type, folder, size_bytes, url, data, uploaded_by)
-        VALUES (:fn, :orig, :mime, :folder, :size, :url, :data, :uid)
-        ON CONFLICT (filename) DO UPDATE
-            SET data=EXCLUDED.data, size_bytes=EXCLUDED.size_bytes, url=EXCLUDED.url
-        """,
-        {"fn": filename, "orig": original, "mime": mime, "folder": folder,
-         "size": size, "url": url, "data": b64, "uid": user_id}
-    )
-
-
-# ── POST /cms/media/upload ─────────────────────────────────────────────────────
-
-@router.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    current_user=Depends(get_current_user),
-):
-    """Upload a media file. Admin only."""
-    if not is_admin_user(current_user):
-        raise HTTPException(403, "Admin access required")
-
-    await _ensure_table()
-
-    # ── 1. Validate MIME type ──────────────────────────────────────────────
-    content_type = (file.content_type or "").split(";")[0].strip().lower()
-    # Fall back to guessing from extension if browser sends octet-stream
-    if content_type == "application/octet-stream" or not content_type:
-        guessed, _ = mimetypes.guess_type(file.filename or "")
-        content_type = guessed or "application/octet-stream"
-
-    if content_type not in ALLOWED_TYPES:
+async def upload_media(file: UploadFile, folder: str = "general") -> dict:
+    """
+    Upload a file to Cloudinary under gopipways/{folder}/.
+    Returns a dict with: url, filename, original_name, folder, resource_type, size
+    """
+    # Validate MIME type
+    content_type = file.content_type or ""
+    resource_type = ALLOWED_TYPES.get(content_type)
+    if not resource_type:
         raise HTTPException(
-            400,
-            f"File type '{content_type}' is not allowed. "
-            f"Allowed: {', '.join(ALLOWED_TYPES)}"
+            status_code=400,
+            detail=f"Unsupported file type: {content_type}. Allowed: images, videos, PDFs."
         )
 
-    folder = ALLOWED_TYPES[content_type]
+    # Read file content
+    content = await file.read()
 
-    # ── 2. Read and validate size ──────────────────────────────────────────
-    data = await file.read()
-    size = len(data)
-
-    if size == 0:
-        raise HTTPException(400, "Uploaded file is empty")
-    if size > MAX_BYTES:
+    # Validate size
+    if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
-            400,
-            f"File too large ({size // 1024 // 1024} MB). "
-            f"Maximum allowed: {MEDIA_MAX_MB} MB"
+            status_code=400,
+            detail=f"File too large ({len(content)//1024//1024}MB). Maximum: {MAX_FILE_SIZE_MB}MB."
         )
 
-    # ── 3. Generate safe filename and public URL ───────────────────────────
-    original = file.filename or "upload"
-    filename = _safe_filename(original, folder)
-    url      = _public_url(filename)
-    user_id  = get_user_id(current_user)
+    # Build a stable public_id so the URL is predictable
+    # Format: gopipways/{folder}/{original_stem}_{short_uuid}
+    original_name = file.filename or "upload"
+    stem = os.path.splitext(original_name)[0][:50]  # cap stem length
+    short_id = uuid.uuid4().hex[:8]
+    public_id = f"gopipways/{folder}/{stem}_{short_id}"
 
-    # ── 4. Store ───────────────────────────────────────────────────────────
+    # Upload to Cloudinary
     try:
-        if MEDIA_STORAGE == "db":
-            await _save_db(filename, content_type, data, folder, original,
-                           size, url, user_id)
-        else:
-            await _save_disk(filename, data)
-            # Also log in DB (without the blob) for listing/management
-            try:
-                await database.execute(
-                    """
-                    INSERT INTO media_files
-                        (filename, original, mime_type, folder, size_bytes, url, uploaded_by)
-                    VALUES (:fn, :orig, :mime, :folder, :size, :url, :uid)
-                    ON CONFLICT (filename) DO UPDATE
-                        SET size_bytes=EXCLUDED.size_bytes, url=EXCLUDED.url
-                    """,
-                    {"fn": filename, "orig": original, "mime": content_type,
-                     "folder": folder, "size": size, "url": url, "uid": user_id}
-                )
-            except Exception as db_err:
-                print(f"[MEDIA] DB log warning (non-fatal): {db_err}", flush=True)
-
+        result = cloudinary.uploader.upload(
+            content,
+            public_id=public_id,
+            resource_type=resource_type,
+            overwrite=False,
+            # For PDFs: return the raw URL, not a preview
+            format=None if resource_type != "raw" else None,
+        )
     except Exception as e:
-        print(f"[MEDIA] Storage error: {e}", flush=True)
-        raise HTTPException(500, f"Failed to store file: {e}")
-
-    print(f"[MEDIA] ✅ Uploaded {original} → {filename} ({size} bytes, {content_type})", flush=True)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
     return {
-        "success":   True,
-        "filename":  filename,
-        "original":  original,
-        "url":       url,
-        "mime_type": content_type,
-        "folder":    folder,
-        "size":      size,
+        "url":           result["secure_url"],
+        "filename":      result["public_id"],          # used as the delete key
+        "original_name": original_name,
+        "folder":        folder,
+        "resource_type": resource_type,
+        "size":          result.get("bytes", len(content)),
+        "width":         result.get("width"),
+        "height":        result.get("height"),
     }
 
 
-# ── GET /cms/media ─────────────────────────────────────────────────────────────
-
-@router.get("")
-async def list_media(
-    folder: Optional[str] = Query(None),
-    current_user=Depends(get_current_user),
-):
-    """List uploaded media files. Admin only."""
-    if not is_admin_user(current_user):
-        raise HTTPException(403, "Admin access required")
-
-    await _ensure_table()
-
-    if MEDIA_STORAGE == "disk":
-        # Build list from filesystem + DB records merged
-        items = []
-        try:
-            sql = "SELECT filename, original, mime_type, folder, size_bytes, url, created_at FROM media_files"
-            params: dict = {}
-            if folder and folder != "all":
-                sql += " WHERE folder = :folder"
-                params["folder"] = folder
-            sql += " ORDER BY created_at DESC LIMIT 200"
-            rows = await database.fetch_all(sql, params)
-            items = [dict(r) for r in rows]
-        except Exception as e:
-            print(f"[MEDIA] List DB error: {e}", flush=True)
-
-        # Also scan disk in case DB log is behind
-        scan_root = MEDIA_ROOT / (folder if folder and folder != "all" else "")
-        if scan_root.exists():
-            db_names = {i["filename"] for i in items}
-            for p in scan_root.rglob("*"):
-                if p.is_file():
-                    rel = str(p.relative_to(MEDIA_ROOT))
-                    if rel not in db_names:
-                        mime, _ = mimetypes.guess_type(str(p))
-                        items.append({
-                            "filename":   rel,
-                            "original":   p.name,
-                            "mime_type":  mime or "application/octet-stream",
-                            "folder":     p.parent.name,
-                            "size_bytes": p.stat().st_size,
-                            "url":        _public_url(rel),
-                            "created_at": None,
-                        })
-
-    else:
-        # DB mode — all data in media_files
-        try:
-            sql = "SELECT filename, original, mime_type, folder, size_bytes, url, created_at FROM media_files"
-            params = {}
-            if folder and folder != "all":
-                sql += " WHERE folder = :folder"
-                params["folder"] = folder
-            sql += " ORDER BY created_at DESC LIMIT 200"
-            rows = await database.fetch_all(sql, params)
-            items = [dict(r) for r in rows]
-        except Exception as e:
-            print(f"[MEDIA] List error: {e}", flush=True)
-            items = []
-
-    return {"files": items, "count": len(items), "folder": folder or "all"}
-
-
-# ── DELETE /cms/media ──────────────────────────────────────────────────────────
-
-@router.delete("")
-async def delete_media(
-    filename: str = Query(..., description="Relative filename, e.g. images/photo_abc123.jpg"),
-    current_user=Depends(get_current_user),
-):
-    """Delete a media file. Admin only."""
-    if not is_admin_user(current_user):
-        raise HTTPException(403, "Admin access required")
-
-    await _ensure_table()
-
-    # Sanitise — prevent path traversal
-    filename = filename.lstrip("/")
-    if ".." in filename or filename.startswith("/"):
-        raise HTTPException(400, "Invalid filename")
-
-    deleted_disk = False
-    deleted_db   = False
-
-    # Remove from disk
-    if MEDIA_STORAGE != "db":
-        target = MEDIA_ROOT / filename
-        if target.exists() and target.is_file():
-            target.unlink()
-            deleted_disk = True
-            print(f"[MEDIA] Deleted from disk: {filename}", flush=True)
-
-    # Remove from DB
-    try:
-        result = await database.execute(
-            "DELETE FROM media_files WHERE filename = :fn",
-            {"fn": filename}
-        )
-        deleted_db = True
-    except Exception as e:
-        print(f"[MEDIA] DB delete warning: {e}", flush=True)
-
-    if not deleted_disk and not deleted_db:
-        raise HTTPException(404, f"File not found: {filename}")
-
-    return {"success": True, "deleted": filename}
-
-
-# ── GET /cms/media/serve/{filename:path} ───────────────────────────────────────
-
-@router.get("/serve/{filename:path}")
-async def serve_media(filename: str):
+async def list_media(folder: str = None) -> list:
     """
-    Serve an uploaded file publicly (no auth required).
-    Used when MEDIA_STORAGE=db. In disk mode, Railway should serve
-    MEDIA_ROOT via a CDN or nginx — this endpoint is the fallback.
+    List all media files in gopipways/ or a specific subfolder.
+    Returns a list of dicts compatible with the CMS media grid.
     """
-    # Sanitise
-    filename = filename.lstrip("/")
-    if ".." in filename:
-        raise HTTPException(400, "Invalid path")
+    prefix = f"gopipways/{folder}" if folder else "gopipways"
+    results = []
 
-    # Try disk first
-    disk_path = MEDIA_ROOT / filename
-    if disk_path.exists() and disk_path.is_file():
-        mime, _ = mimetypes.guess_type(str(disk_path))
-        return Response(
-            content=disk_path.read_bytes(),
-            media_type=mime or "application/octet-stream",
-            headers={"Cache-Control": "public, max-age=31536000"},
-        )
-
-    # Try DB (db mode or disk file missing)
-    await _ensure_table()
     try:
-        row = await database.fetch_one(
-            "SELECT data, mime_type FROM media_files WHERE filename = :fn",
-            {"fn": filename}
+        # Fetch images
+        img_res = cloudinary.api.resources(
+            type="upload",
+            prefix=prefix,
+            max_results=200,
+            resource_type="image"
         )
-        if row and row["data"]:
-            content = base64.b64decode(row["data"])
-            return Response(
-                content=content,
-                media_type=row["mime_type"] or "application/octet-stream",
-                headers={"Cache-Control": "public, max-age=86400"},
-            )
-    except Exception as e:
-        print(f"[MEDIA] Serve DB error: {e}", flush=True)
+        results.extend(img_res.get("resources", []))
 
-    raise HTTPException(404, "File not found")
+        # Fetch videos
+        vid_res = cloudinary.api.resources(
+            type="upload",
+            prefix=prefix,
+            max_results=200,
+            resource_type="video"
+        )
+        results.extend(vid_res.get("resources", []))
+
+        # Fetch raw (PDFs)
+        raw_res = cloudinary.api.resources(
+            type="upload",
+            prefix=prefix,
+            max_results=200,
+            resource_type="raw"
+        )
+        results.extend(raw_res.get("resources", []))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list media: {str(e)}")
+
+    # Normalise to the shape the CMS frontend expects
+    return [
+        {
+            "url":           r["secure_url"],
+            "filename":      r["public_id"],
+            "original_name": r["public_id"].split("/")[-1],
+            "folder":        folder or "general",
+            "resource_type": r.get("resource_type", "image"),
+            "size":          r.get("bytes", 0),
+            "created_at":    r.get("created_at"),
+        }
+        for r in results
+    ]
+
+
+async def delete_media(public_id: str) -> dict:
+    """
+    Delete a file from Cloudinary by its public_id (the 'filename' field from upload/list).
+    Tries all resource types since we don't know which type the file is.
+    """
+    deleted = False
+    for resource_type in ("image", "video", "raw"):
+        try:
+            result = cloudinary.uploader.destroy(public_id, resource_type=resource_type)
+            if result.get("result") == "ok":
+                deleted = True
+                break
+        except Exception:
+            continue
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="File not found or already deleted.")
+
+    return {"deleted": True, "filename": public_id}

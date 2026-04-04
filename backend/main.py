@@ -47,8 +47,10 @@ async def lifespan(app: FastAPI):
     from backend.subscriptions import init_subscription_tables
     await init_subscription_tables()
     # M1 — ensure email tables exist (password_reset_tokens, email_logs, preferences)
-    from backend.email_service import ensure_email_tables
+    from backend.email_service import ensure_email_tables, start_webinar_reminder_scheduler
     await ensure_email_tables()
+    # Webinar reminder scheduler — fires every hour, sends 24h and 1h reminders
+    start_webinar_reminder_scheduler()
     # M3 — auto-promote admin via ADMIN_EMAIL env var
     admin_email = os.getenv("ADMIN_EMAIL", "").lower().strip()
     if admin_email:

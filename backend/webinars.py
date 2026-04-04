@@ -268,7 +268,7 @@ async def get_registrants(
     current_user=Depends(get_current_user),
 ):
     """Admin only — list all registrants for a webinar."""
-    if not current_user.get("is_admin"):
+    if not dict(current_user).get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     await _run_webinar_migrations()

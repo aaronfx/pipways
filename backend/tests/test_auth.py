@@ -73,20 +73,13 @@ async def test_login_success(client, mock_database):
     """Valid credentials return access token."""
     hashed = get_password_hash("CorrectPassword1!")
 
-    # Return a mock user row
-    fake_user = MagicMock()
-    fake_user.__getitem__ = lambda self, k: {
+    # Return a user dict that works with _extract() in auth.py
+    user_dict = {
         "id": 1, "email": "user@pipways.com", "full_name": "Test",
         "is_active": True, "is_admin": False, "password_hash": hashed,
         "subscription_tier": "free", "role": "user",
-    }[k]
-    fake_user.__contains__ = lambda self, k: True
-    for attr, val in {"id": 1, "email": "user@pipways.com", "full_name": "Test",
-                      "is_active": True, "is_admin": False, "password_hash": hashed,
-                      "subscription_tier": "free", "role": "user"}.items():
-        setattr(fake_user, attr, val)
-
-    mock_database.fetch_one = AsyncMock(return_value=fake_user)
+    }
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
 
     res = await client.post("/auth/token", data={
         "username": "user@pipways.com",
@@ -147,17 +140,12 @@ async def test_me_unauthenticated(client):
 @pytest.mark.asyncio
 async def test_me_authenticated(client, mock_database, auth_headers):
     """Authenticated request to /auth/me returns user profile."""
-    fake_user = MagicMock()
-    fake_user._mapping = {
+    user_dict = {
         "id": 1, "email": "test@pipways.com", "full_name": "Test User",
         "is_active": True, "is_admin": False, "password_hash": "xxx",
         "subscription_tier": "free", "role": "user",
     }
-    fake_user._mapping.get = fake_user._mapping.get
-    for attr, val in fake_user._mapping.items():
-        setattr(fake_user, attr, val)
-
-    mock_database.fetch_one = AsyncMock(return_value=fake_user)
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
 
     res = await client.get("/auth/me", headers=auth_headers)
 

@@ -219,8 +219,7 @@ async def test_calculate_risk_missing_required_fields(client):
 async def test_calculate_risk_authenticated_saves_history(client, mock_database, auth_headers):
     """POST /risk/calculate with auth token saves calculation to history."""
     # Mock authenticated user
-    fake_user = MagicMock()
-    fake_user._mapping = {
+    user_dict = {
         "id": 1,
         "email": "test@pipways.com",
         "full_name": "Test User",
@@ -230,10 +229,7 @@ async def test_calculate_risk_authenticated_saves_history(client, mock_database,
         "subscription_tier": "free",
         "role": "user",
     }
-    for attr, val in fake_user._mapping.items():
-        setattr(fake_user, attr, val)
-
-    mock_database.fetch_one = AsyncMock(return_value=fake_user)
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
     mock_database.execute = AsyncMock(return_value=None)
 
     res = await client.post(
@@ -271,6 +267,11 @@ async def test_get_risk_history_unauthenticated(client):
 @pytest.mark.asyncio
 async def test_get_risk_history_empty(client, mock_database, auth_headers):
     """GET /risk/history with no history returns empty list."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
     mock_database.fetch_all = AsyncMock(return_value=[])
 
     res = await client.get("/risk/history", headers=auth_headers)
@@ -283,6 +284,12 @@ async def test_get_risk_history_empty(client, mock_database, auth_headers):
 @pytest.mark.asyncio
 async def test_get_risk_history_with_data(client, mock_database, auth_headers):
     """GET /risk/history returns user's calculation history."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+
     now = datetime.utcnow()
     fake_calculations = [
         {
@@ -304,10 +311,8 @@ async def test_get_risk_history_with_data(client, mock_database, auth_headers):
             "account_balance": 10000,
         },
     ]
-    fake_rows = [
-        MagicMock(spec=dict, **calc) for calc in fake_calculations
-    ]
-    mock_database.fetch_all = AsyncMock(return_value=fake_rows)
+    # Return actual dicts, not MagicMocks
+    mock_database.fetch_all = AsyncMock(return_value=fake_calculations)
 
     res = await client.get("/risk/history", headers=auth_headers)
 
@@ -322,6 +327,12 @@ async def test_get_risk_history_with_data(client, mock_database, auth_headers):
 @pytest.mark.asyncio
 async def test_get_risk_history_limit_parameter(client, mock_database, auth_headers):
     """GET /risk/history respects limit parameter."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+
     fake_rows = [
         MagicMock(spec=dict, **{
             "position_size": 0.1 * i,
@@ -346,6 +357,11 @@ async def test_get_risk_history_limit_parameter(client, mock_database, auth_head
 @pytest.mark.asyncio
 async def test_get_risk_history_db_error(client, mock_database, auth_headers):
     """GET /risk/history handles database errors gracefully."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
     mock_database.fetch_all = AsyncMock(side_effect=Exception("DB Error"))
 
     res = await client.get("/risk/history", headers=auth_headers)
@@ -357,8 +373,15 @@ async def test_get_risk_history_db_error(client, mock_database, auth_headers):
 
 
 @pytest.mark.asyncio
-async def test_get_risk_history_invalid_limit(client, auth_headers):
+async def test_get_risk_history_invalid_limit(client, mock_database, auth_headers):
     """GET /risk/history with invalid limit parameter."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+    mock_database.fetch_all = AsyncMock(return_value=[])
+
     res = await client.get("/risk/history?limit=-5", headers=auth_headers)
 
     # May return 422 for invalid param or return default

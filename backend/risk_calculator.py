@@ -190,6 +190,7 @@ async def calculate_risk(
             "take_profit":       take_profit,
             "price_risk":        round(price_risk, 5),
             "instrument_type":   instrument_type,
+            "symbol":            request.symbol or 'EURUSD',
             "recommendation":    recommendation,
             "warnings":          warnings,
             # FIXED: was `len(warnings) == 0 or recommendation == "valid"` (or → True whenever rec is valid

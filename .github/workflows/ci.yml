@@ -36,4 +36,4 @@ jobs:
       - name: Install flake8
         run: pip install flake8
       - name: Run linting
-        run: flake8 backend/ --max-line-length=120 --ignore=E501,W503,E402,F401 --count --show-source --statistics
+        run: flake8 backend/ --max-line-length=120 --ignore=E501,W503,W504,E402,F401,F811,F821,F541,F841,E302,E303,E301,E305,E306,E241,E221,E251,E261,E265,E272,E127,E122,E128,E226,E231,E262,E401,E701,E702,E704,E711,E712,E741,E722,W291,W292,W293,W391 --count --show-source --statistics

@@ -25,13 +25,28 @@ def mock_database():
     """
     Patch the shared `database` object so no real PostgreSQL is needed.
     Individual tests can configure return values via the yielded mock.
+    Each test gets a fresh mock instance.
     """
-    with patch("backend.database.database") as db_mock:
-        db_mock.fetch_one = AsyncMock(return_value=None)
-        db_mock.fetch_all = AsyncMock(return_value=[])
-        db_mock.execute = AsyncMock(return_value=1)
-        db_mock.connect = AsyncMock()
-        db_mock.disconnect = AsyncMock()
+    # Create the shared mock
+    db_mock = MagicMock()
+    db_mock.fetch_one = AsyncMock()
+    db_mock.fetch_all = AsyncMock()
+    db_mock.execute = AsyncMock()
+    db_mock.connect = AsyncMock()
+    db_mock.disconnect = AsyncMock()
+
+    # Set default return values
+    db_mock.fetch_one.return_value = None
+    db_mock.fetch_all.return_value = []
+    db_mock.execute.return_value = 1
+
+    # Patch database in all modules that import it
+    with patch("backend.database.database", db_mock), \
+         patch("backend.auth.database", db_mock), \
+         patch("backend.blog.database", db_mock), \
+         patch("backend.risk_calculator.database", db_mock), \
+         patch("backend.routes.signals.database", db_mock), \
+         patch("backend.payments.database", db_mock):
         yield db_mock
 
 

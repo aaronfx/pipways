@@ -22,6 +22,11 @@ async def test_get_posts_unauthenticated(client):
 @pytest.mark.asyncio
 async def test_get_posts_authenticated_empty(client, mock_database, auth_headers):
     """GET /blog/posts returns empty list when no posts exist."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
     mock_database.fetch_all = AsyncMock(return_value=[])
 
     res = await client.get("/blog/posts", headers=auth_headers)
@@ -34,6 +39,12 @@ async def test_get_posts_authenticated_empty(client, mock_database, auth_headers
 @pytest.mark.asyncio
 async def test_get_posts_authenticated_with_data(client, mock_database, auth_headers):
     """GET /blog/posts returns paginated published posts."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+
     now = datetime.utcnow()
     fake_post = {
         "id": 1,
@@ -52,8 +63,8 @@ async def test_get_posts_authenticated_with_data(client, mock_database, auth_hea
         "created_at": now,
         "updated_at": now,
     }
-    fake_row = MagicMock(spec=dict, **fake_post)
-    mock_database.fetch_all = AsyncMock(return_value=[fake_row])
+    # Return actual dict, not MagicMock
+    mock_database.fetch_all = AsyncMock(return_value=[fake_post])
 
     res = await client.get("/blog/posts?limit=10&offset=0", headers=auth_headers)
 
@@ -68,6 +79,11 @@ async def test_get_posts_authenticated_with_data(client, mock_database, auth_hea
 @pytest.mark.asyncio
 async def test_get_posts_with_category_filter(client, mock_database, auth_headers):
     """GET /blog/posts filters by category."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
     mock_database.fetch_all = AsyncMock(return_value=[])
 
     res = await client.get("/blog/posts?category=Trading", headers=auth_headers)
@@ -81,6 +97,12 @@ async def test_get_posts_with_category_filter(client, mock_database, auth_header
 @pytest.mark.asyncio
 async def test_get_posts_pagination(client, mock_database, auth_headers):
     """GET /blog/posts respects limit and offset parameters."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+
     posts = [
         {
             "id": i,
@@ -101,8 +123,8 @@ async def test_get_posts_pagination(client, mock_database, auth_headers):
         }
         for i in range(1, 6)
     ]
-    fake_rows = [MagicMock(spec=dict, **post) for post in posts]
-    mock_database.fetch_all = AsyncMock(return_value=fake_rows)
+    # Return actual dicts, not MagicMocks, so they can be properly serialized
+    mock_database.fetch_all = AsyncMock(return_value=posts)
 
     res = await client.get("/blog/posts?limit=5&offset=0", headers=auth_headers)
 
@@ -112,16 +134,28 @@ async def test_get_posts_pagination(client, mock_database, auth_headers):
 
 
 @pytest.mark.asyncio
-async def test_get_posts_invalid_limit(client, auth_headers):
+async def test_get_posts_invalid_limit(client, mock_database, auth_headers):
     """GET /blog/posts with limit > 100 returns 422."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+
     res = await client.get("/blog/posts?limit=150", headers=auth_headers)
 
     assert res.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_get_posts_negative_offset(client, auth_headers):
+async def test_get_posts_negative_offset(client, mock_database, auth_headers):
     """GET /blog/posts with negative offset returns 422."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
+
     res = await client.get("/blog/posts?offset=-1", headers=auth_headers)
 
     assert res.status_code == 422
@@ -130,6 +164,11 @@ async def test_get_posts_negative_offset(client, auth_headers):
 @pytest.mark.asyncio
 async def test_get_posts_db_error(client, mock_database, auth_headers):
     """GET /blog/posts handles database errors gracefully."""
+    # Mock auth user lookup
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+    mock_database.fetch_one = AsyncMock(return_value=user_dict)
     mock_database.fetch_all = AsyncMock(side_effect=Exception("DB Error"))
 
     res = await client.get("/blog/posts", headers=auth_headers)
@@ -156,6 +195,12 @@ async def test_get_post_by_slug_unauthenticated(client):
 async def test_get_post_by_slug_found(client, mock_database, auth_headers):
     """GET /blog/posts/{slug} returns full post content."""
     now = datetime.utcnow()
+
+    # Mock auth user lookup first call
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+
     fake_post = {
         "id": 1,
         "title": "Advanced Chart Patterns",
@@ -173,8 +218,17 @@ async def test_get_post_by_slug_found(client, mock_database, auth_headers):
         "created_at": now,
         "updated_at": now,
     }
-    fake_row = MagicMock(spec=dict, **fake_post)
-    mock_database.fetch_one = AsyncMock(return_value=fake_row)
+
+    # Create a callable to handle multiple calls
+    call_count = [0]
+    async def fetch_one_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return user_dict
+        else:
+            return fake_post
+
+    mock_database.fetch_one = AsyncMock(side_effect=fetch_one_side_effect)
 
     res = await client.get("/blog/posts/advanced-chart-patterns", headers=auth_headers)
 
@@ -189,7 +243,20 @@ async def test_get_post_by_slug_found(client, mock_database, auth_headers):
 @pytest.mark.asyncio
 async def test_get_post_by_slug_not_found(client, mock_database, auth_headers):
     """GET /blog/posts/{slug} returns 404 if post doesn't exist."""
-    mock_database.fetch_one = AsyncMock(return_value=None)
+    # Mock auth user lookup first, then return None for post
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+
+    call_count = [0]
+    async def fetch_one_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return user_dict
+        else:
+            return None
+
+    mock_database.fetch_one = AsyncMock(side_effect=fetch_one_side_effect)
 
     res = await client.get("/blog/posts/nonexistent-slug", headers=auth_headers)
 
@@ -199,25 +266,20 @@ async def test_get_post_by_slug_not_found(client, mock_database, auth_headers):
 @pytest.mark.asyncio
 async def test_get_post_by_slug_unpublished(client, mock_database, auth_headers):
     """GET /blog/posts/{slug} for unpublished post returns 404."""
-    fake_post = {
-        "id": 99,
-        "title": "Draft Post",
-        "slug": "draft-post",
-        "excerpt": "This is a draft",
-        "content": "Draft content",
-        "category": "Drafts",
-        "featured_image": None,
-        "views": 0,
-        "tags": [],
-        "featured": False,
-        "read_time": "3 min",
-        "is_published": False,  # Not published
-        "status": "draft",
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-    }
-    # Mock returns None because the query filters on published status
-    mock_database.fetch_one = AsyncMock(return_value=None)
+    # Mock auth user lookup first, then return None for post (unpublished filtered out)
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+
+    call_count = [0]
+    async def fetch_one_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return user_dict
+        else:
+            return None
+
+    mock_database.fetch_one = AsyncMock(side_effect=fetch_one_side_effect)
 
     res = await client.get("/blog/posts/draft-post", headers=auth_headers)
 
@@ -227,7 +289,20 @@ async def test_get_post_by_slug_unpublished(client, mock_database, auth_headers)
 @pytest.mark.asyncio
 async def test_get_post_by_slug_db_error(client, mock_database, auth_headers):
     """GET /blog/posts/{slug} handles database errors gracefully."""
-    mock_database.fetch_one = AsyncMock(side_effect=Exception("DB Error"))
+    # Mock auth user lookup first, then raise error for post query
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+
+    call_count = [0]
+    async def fetch_one_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return user_dict
+        else:
+            raise Exception("DB Error")
+
+    mock_database.fetch_one = AsyncMock(side_effect=fetch_one_side_effect)
 
     res = await client.get("/blog/posts/some-slug", headers=auth_headers)
 
@@ -238,6 +313,11 @@ async def test_get_post_by_slug_db_error(client, mock_database, auth_headers):
 @pytest.mark.asyncio
 async def test_get_post_slug_format(client, mock_database, auth_headers):
     """GET /blog/posts with various slug formats."""
+    # Mock auth user lookup first
+    user_dict = {"id": 1, "email": "test@pipways.com", "full_name": "Test User",
+                 "is_active": True, "is_admin": False, "password_hash": "xxx",
+                 "subscription_tier": "free", "role": "user"}
+
     fake_post = {
         "id": 1,
         "title": "Post with Dashes and Numbers",
@@ -255,8 +335,16 @@ async def test_get_post_slug_format(client, mock_database, auth_headers):
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
     }
-    fake_row = MagicMock(spec=dict, **fake_post)
-    mock_database.fetch_one = AsyncMock(return_value=fake_row)
+
+    call_count = [0]
+    async def fetch_one_side_effect(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return user_dict
+        else:
+            return fake_post
+
+    mock_database.fetch_one = AsyncMock(side_effect=fetch_one_side_effect)
 
     res = await client.get("/blog/posts/post-with-dashes-and-numbers-123", headers=auth_headers)
 

@@ -54,3 +54,4 @@ pytesseract==0.3.10
 
 # AI
 anthropic>=0.21.0
+apscheduler==3.10.4

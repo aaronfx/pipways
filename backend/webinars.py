@@ -177,9 +177,15 @@ async def register_for_webinar(
     """
     await _run_webinar_migrations()
 
-    # Confirm the webinar exists and is published/scheduled
+    # Fetch the full webinar row — include all fields needed for the confirmation email
     webinar = await _fetch(
-        "SELECT id, title, max_attendees FROM webinars WHERE id = :id",
+        """
+        SELECT id, title, max_attendees,
+               scheduled_at,
+               COALESCE(presenter, '')        AS presenter,
+               COALESCE(duration_minutes, 60) AS duration_minutes
+        FROM webinars WHERE id = :id
+        """,
         {"id": webinar_id}
     )
     if not webinar:
@@ -211,7 +217,8 @@ async def register_for_webinar(
         print(f"[WEBINARS] registration insert error: {e}", flush=True)
         raise HTTPException(status_code=500, detail="Registration failed")
 
-    print(f"[WEBINARS] user {current_user['id']} registered for webinar {webinar_id}", flush=True)
+    print(f"[WEBINARS] user {current_user['id']} registered for webinar {webinar_id} "
+          f"(scheduled_at={w.get('scheduled_at')})", flush=True)
 
     # ── Send confirmation email (fire-and-forget, non-blocking) ─────────────
     try:
@@ -222,13 +229,14 @@ async def register_for_webinar(
         if user_row:
             import asyncio
             asyncio.create_task(send_webinar_confirmation_task(
-                user_id         = current_user["id"],
-                email           = user_row["email"],
-                full_name       = user_row["full_name"] or "Trader",
-                session_title   = w["title"],
-                presenter       = w.get("presenter", "") or "",
-                scheduled_at    = w.get("scheduled_at"),
-                duration_minutes= w.get("duration_minutes") or 60,
+                user_id          = current_user["id"],
+                email            = user_row["email"],
+                full_name        = user_row["full_name"] or "Trader",
+                session_title    = w["title"],
+                presenter        = w.get("presenter") or "",
+                scheduled_at     = w.get("scheduled_at"),   # now always populated
+                duration_minutes = w.get("duration_minutes") or 60,
+                webinar_id       = webinar_id,               # fallback for email_service
             ))
     except Exception as e:
         print(f"[WEBINARS] Confirmation email error (non-blocking): {e}", flush=True)

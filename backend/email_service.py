@@ -266,10 +266,13 @@ def _base(content: str, preview: str = "") -> str:
 </table></td></tr></table></body></html>"""
 
 
-# ── Webinar email templates ────────────────────────────────────────────────────
+# ── Webinar date/calendar helpers ──────────────────────────────────────────────
 
 def _fmt_session_date(scheduled_at) -> str:
-    """Format a datetime object into a readable WAT string."""
+    """Format a datetime object into a readable WAT string.
+    Returns 'Date to be confirmed' gracefully for None/null values."""
+    if scheduled_at is None or str(scheduled_at).strip().lower() in ("none", "", "null"):
+        return "Date to be confirmed"
     try:
         if isinstance(scheduled_at, str):
             scheduled_at = datetime.fromisoformat(scheduled_at.replace("Z", "+00:00"))
@@ -277,8 +280,40 @@ def _fmt_session_date(scheduled_at) -> str:
         wat = scheduled_at + timedelta(hours=1) if scheduled_at.tzinfo else scheduled_at
         return wat.strftime("%A, %d %B %Y at %I:%M %p WAT")
     except Exception:
-        return str(scheduled_at)
+        return "Date to be confirmed"
 
+
+def _google_calendar_link(session_title: str, scheduled_at, duration_minutes: int = 60) -> str:
+    """Build a Google Calendar 'Add to Calendar' URL from the session datetime.
+    Returns an empty string if scheduled_at is missing or unparseable."""
+    if scheduled_at is None or str(scheduled_at).strip().lower() in ("none", "", "null"):
+        return ""
+    try:
+        if isinstance(scheduled_at, str):
+            scheduled_at = datetime.fromisoformat(scheduled_at.replace("Z", "+00:00"))
+        # Work in UTC for the calendar link
+        if hasattr(scheduled_at, "tzinfo") and scheduled_at.tzinfo:
+            start_utc = scheduled_at.replace(tzinfo=None)
+        else:
+            start_utc = scheduled_at
+        end_utc = start_utc + timedelta(minutes=duration_minutes)
+        fmt = "%Y%m%dT%H%M%SZ"
+        from urllib.parse import quote
+        title_enc   = quote(session_title)
+        details_enc = quote(f"Join on Gopipways: {DASHBOARD_URL}")
+        location_enc = quote(DASHBOARD_URL)
+        return (
+            f"https://calendar.google.com/calendar/render?action=TEMPLATE"
+            f"&text={title_enc}"
+            f"&dates={start_utc.strftime(fmt)}/{end_utc.strftime(fmt)}"
+            f"&details={details_enc}"
+            f"&location={location_enc}"
+        )
+    except Exception:
+        return ""
+
+
+# ── Webinar email templates ────────────────────────────────────────────────────
 
 def webinar_confirmation_email(full_name: str, session_title: str,
                                 presenter: str, scheduled_at,
@@ -286,6 +321,19 @@ def webinar_confirmation_email(full_name: str, session_title: str,
     first      = (full_name or "Trader").split()[0]
     date_str   = _fmt_session_date(scheduled_at)
     pres_line  = f"Host: {presenter}" if presenter and presenter != "TBA" else ""
+    cal_url    = _google_calendar_link(session_title, scheduled_at, duration_minutes)
+
+    cal_block = f"""
+<div style="text-align:center;margin-bottom:20px;">
+    <a href="{cal_url}"
+       target="_blank"
+       style="display:inline-block;color:#667eea;font-size:13px;font-weight:600;
+              text-decoration:none;border:1px solid rgba(102,126,234,.3);
+              padding:9px 22px;border-radius:7px;
+              background:rgba(102,126,234,.07);">
+        📅 Add to Google Calendar →
+    </a>
+</div>""" if cal_url else ""
 
     content = f"""
 <h2 style="margin:0 0 8px;font-size:22px;color:#111827;">You're registered, {first}. ✅</h2>
@@ -313,7 +361,7 @@ def webinar_confirmation_email(full_name: str, session_title: str,
     </p>
 </div>
 
-<div style="text-align:center;margin-bottom:24px;">
+<div style="text-align:center;margin-bottom:20px;">
     <a href="{DASHBOARD_URL}"
        style="display:inline-block;background:linear-gradient(135deg,#667eea,#764ba2);
               color:white;text-decoration:none;padding:14px 32px;border-radius:8px;
@@ -321,6 +369,14 @@ def webinar_confirmation_email(full_name: str, session_title: str,
         Go to Dashboard →
     </a>
 </div>
+
+{cal_block}
+
+<p style="margin:0 0 16px;font-size:13px;color:#9ca3af;line-height:1.6;
+          text-align:center;font-style:italic;">
+    Check your email for confirmation.
+    Return here on session day to watch live.
+</p>
 
 <p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;">
     You will receive a reminder 24 hours before and again 1 hour before
@@ -1283,8 +1339,6 @@ def password_reset_email(full_name: str, reset_url: str) -> tuple:
         f"Reset your Gopipways password — link expires in 1 hour",
         _base(content, f"Your reset link is inside. It expires in 1 hour — click now.")
     )
-
-
 
 
 # ── Log helper ─────────────────────────────────────────────────────────────────

@@ -73,6 +73,7 @@ API.cms = {
     updateWebinar:   (id,d)      => _cmsReq(`/cms/webinars/${id}`,{method:'PUT',body:JSON.stringify(d)}),
     deleteWebinar:   (id)        => _cmsReq(`/cms/webinars/${id}`,{method:'DELETE'}),
     toggleWebinar:   (id)        => _cmsReq(`/cms/webinars/${id}/toggle-publish`,{method:'POST'}),
+    getRegistrants:  (id)        => _cmsReq(`/webinars/${id}/registrants`),
     // Users
     listUsers:       (p,s,r,t)   => _cmsReq(`/cms/users?page=${p||1}&per_page=25${s?`&search=${encodeURIComponent(s)}`:''}`),
     setUserRole:     (id,role)   => _cmsReq(`/cms/users/${id}/role`,{method:'POST',body:JSON.stringify({role})}),
@@ -1503,6 +1504,14 @@ const CMSPage = {
     async _webinars(){
         const pane=document.getElementById('cms-pane-webinars'); if(!pane) return;
         let ws=[]; try{ws=await API.cms.listWebinars();}catch(e){console.error('[CMS] listWebinars failed:',e); this._toast('Failed to load webinars: '+e.message,'error');}
+
+        // Fetch registrant counts for all webinars in parallel
+        const regCounts={};
+        await Promise.all(ws.map(async w=>{
+            try{const r=await API.cms.getRegistrants(w.id); regCounts[w.id]=r.count||0;}
+            catch(_){regCounts[w.id]=0;}
+        }));
+
         pane.innerHTML=`
         <div class="chdr">
             <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-video text-pink-400"></i> Webinars <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">${ws.length}</span></h3>
@@ -1511,101 +1520,87 @@ const CMSPage = {
         <div id="cms-web-form" style="display:none;" class="ccard mb-4"></div>
         <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
             <div class="overflow-x-auto"><table class="cms-tbl">
-                <thead><tr><th>Title</th><th>Presenter</th><th>Date</th><th>Duration</th><th>Status</th><th>Capacity</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>ID</th><th>Title</th><th>Presenter</th><th>Date</th><th>Duration</th><th>Status</th><th>Registered</th><th>Capacity</th><th class="text-right">Actions</th></tr></thead>
                 <tbody>${ws.length?ws.map(w=>`<tr>
+                    <td><span style="background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3);padding:.15rem .5rem;border-radius:.35rem;font-size:.7rem;font-weight:700;font-family:monospace;">#${w.id}</span></td>
                     <td><div class="text-white font-medium text-sm">${this._e(w.title)}</div>
-                        ${w.meeting_link?`<a href="${this._e(w.meeting_link)}" target="_blank" class="text-purple-400 text-xs hover:underline">🔗 Join</a>`:''}</td>
-                    <td class="text-gray-400">${this._e(w.presenter||'—')}</td>
+                        ${w.meeting_link?`<a href="${this._e(w.meeting_link)}" target="_blank" class="text-purple-400 text-xs hover:underline">&#x1F517; Join</a>`:''}</td>
+                    <td class="text-gray-400">${this._e(w.presenter||'&#x2014;')}</td>
                     <td class="text-gray-300">${this._d(w.scheduled_at)}</td>
                     <td class="text-gray-400">${w.duration_minutes||60}m</td>
                     <td>${this._pub(w.is_published)}</td>
+                    <td><button class="cb cb-g" style="font-size:.72rem;padding:.25rem .65rem;" onclick="CMSPage._webinarRegistrants(${w.id},this.dataset.title)" data-title="${this._e(w.title)}">
+                        <i class="fas fa-users mr-1"></i>${regCounts[w.id]||0}
+                    </button></td>
                     <td class="text-gray-400">${w.max_attendees||100}</td>
                     <td class="text-right"><div style="display:flex;gap:.3rem;justify-content:flex-end;">
                         <button class="cb cb-g" onclick="CMSPage._webinarForm(${JSON.stringify(w).replace(/"/g,'&quot;')})"><i class="fas fa-edit"></i></button>
                         <button class="cb ${w.is_published?'cb-g':'cb-gr'}" onclick="CMSPage._toggleWebinar(${w.id})">${w.is_published?'Unpublish':'Publish'}</button>
                         <button class="cb cb-r" onclick="CMSPage._deleteWebinar(${w.id})"><i class="fas fa-trash"></i></button>
                     </div></td>
-                </tr>`).join(''):`<tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm">No webinars yet</td></tr>`}
+                </tr>`).join(''):`<tr><td colspan="9" class="text-center py-8 text-gray-500 text-sm">No webinars yet</td></tr>`}
                 </tbody>
             </table></div>
         </div>`;
     },
 
-    _webinarForm(d=null){
-        const isEdit=d&&d.id; this._editingId=isEdit?d.id:null;
-        d=d||{title:'',description:'',presenter:'',speaker_bio:'',scheduled_at:'',duration_minutes:60,
-               meeting_link:'',youtube_url:'',embed_url:'',recording_url:'',
-               thumbnail:'',max_attendees:100,is_published:false};
-        const f=document.getElementById('cms-web-form'); if(!f) return;
-        f.style.display='block';
-        f.innerHTML=`
-        <div class="chdr"><h4 class="text-white font-semibold">${isEdit?'Edit Webinar':'New Webinar'}</h4>
-            <button class="cb cb-g" onclick="CMSPage._closeWebForm()"><i class="fas fa-times"></i></button></div>
-        <div class="crow crow2">
-            <div><label class="cl">Title *</label><input class="ci" id="wf-title" value="${this._e(d.title)}"></div>
-            <div><label class="cl">Presenter</label><input class="ci" id="wf-presenter" value="${this._e(d.presenter||'')}"></div>
-        </div>
-        <div class="crow"><div><label class="cl">Presenter Bio</label><textarea class="cta" id="wf-bio" style="min-height:55px;">${this._e(d.speaker_bio||'')}</textarea></div></div>
-        <div class="crow crow2">
-            <div><label class="cl">Date & Time *</label><input type="datetime-local" class="ci" id="wf-date" value="${this._dt(d.scheduled_at)}"></div>
-            <div><label class="cl">Duration (min)</label><input type="number" class="ci" id="wf-dur" value="${d.duration_minutes||60}" min="1"></div>
-        </div>
-        <div class="crow crow2">
-            <div><label class="cl">Zoom / Meeting Link</label><input class="ci" id="wf-link" value="${this._e(d.meeting_link||'')}" placeholder="https://zoom.us/…"></div>
-            <div><label class="cl">YouTube Live URL <span style="color:#a78bfa;font-size:.7rem;">(embeds in-app ✓)</span></label>
-                <input class="ci" id="wf-yturl" value="${this._e(d.youtube_url||'')}" placeholder="https://www.youtube.com/watch?v=…"></div>
-        </div>
-        <div class="crow crow2">
-            <div><label class="cl">Custom Embed URL <span style="color:#6b7280;font-size:.7rem;">(fallback)</span></label>
-                <input class="ci" id="wf-embed" value="${this._e(d.embed_url||'')}" placeholder="https://…/embed/…"></div>
-            <div><label class="cl">Recording URL <span style="color:#6b7280;font-size:.7rem;">(after event)</span></label>
-                <input class="ci" id="wf-rec" value="${this._e(d.recording_url||'')}" placeholder="https://www.youtube.com/watch?v=…"></div>
-        </div>
-        <div class="crow crow2">
-            <div><label class="cl">Thumbnail</label>
-                <div style="display:flex;gap:.4rem;">
-                    <input class="ci" id="wf-thumb" value="${this._e(d.thumbnail||'')}">
-                    <button class="cb cb-g" onclick="CMSPage._pickMedia('wf-thumb')"><i class="fas fa-images"></i></button>
+    async _webinarRegistrants(id, title){
+        const existing=document.getElementById('cms-reg-modal'); if(existing) existing.remove();
+        const modal=document.createElement('div');
+        modal.id='cms-reg-modal';
+        modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;';
+        modal.innerHTML=`
+        <div style="background:#1f2937;border:1px solid #374151;border-radius:.75rem;width:min(640px,96vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
+            <div class="chdr" style="padding:1rem 1.25rem;flex-shrink:0;">
+                <div>
+                    <h4 class="text-white font-semibold flex items-center gap-2">
+                        <i class="fas fa-users text-purple-400"></i> Registrants
+                    </h4>
+                    <p class="text-xs text-gray-500 mt-0.5">${CMSPage._e(title||'')}</p>
                 </div>
+                <button class="cb cb-g" onclick="CMSPage._closeRegModal()"><i class="fas fa-times"></i></button>
             </div>
-            <div><label class="cl">Max Attendees</label><input type="number" class="ci" id="wf-max" value="${d.max_attendees||100}" min="1"></div>
-        </div>
-        <div class="crow"><div><label class="cl">Description</label><textarea class="cta" id="wf-desc" style="min-height:70px;">${this._e(d.description||'')}</textarea></div></div>
-        <div style="display:flex;gap:1.5rem;align-items:center;margin-top:.5rem;flex-wrap:wrap;">
-            <label class="ctog" onclick="CMSPage._togCheck('wf-pub')">
-                <div class="ttrack${d.is_published?' on':''}"><div class="tthumb"></div></div>
-                <span class="text-sm text-gray-300">Published</span>
-                <input type="hidden" id="wf-pub" value="${d.is_published?'1':'0'}">
-            </label>
-            <button class="cb cb-p" onclick="CMSPage._saveWebinar()"><i class="fas fa-save"></i> ${isEdit?'Update':'Create'} Webinar</button>
+            <div id="cms-reg-body" style="overflow-y:auto;padding:1rem 1.25rem;flex:1;">
+                <div class="text-gray-400 text-sm text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading registrants&#x2026;</div>
+            </div>
         </div>`;
-    },
-    _closeWebForm(){ const f=document.getElementById('cms-web-form'); if(f){f.style.display='none';f.innerHTML='';} this._editingId=null; },
-    async _saveWebinar(){
-        const title=document.getElementById('wf-title')?.value.trim(),
-              sched=document.getElementById('wf-date')?.value;
-        if(!title||!sched){this._toast('Title and date required','error');return;}
-        const p={
-            title,
-            description:      document.getElementById('wf-desc')?.value||'',
-            presenter:        document.getElementById('wf-presenter')?.value||'',
-            speaker_bio:      document.getElementById('wf-bio')?.value||'',
-            scheduled_at:     sched,
-            duration_minutes: parseInt(document.getElementById('wf-dur')?.value)||60,
-            meeting_link:     document.getElementById('wf-link')?.value||'',
-            youtube_url:      document.getElementById('wf-yturl')?.value||'',
-            embed_url:        document.getElementById('wf-embed')?.value||'',
-            recording_url:    document.getElementById('wf-rec')?.value||'',
-            thumbnail:        document.getElementById('wf-thumb')?.value||'',
-            max_attendees:    parseInt(document.getElementById('wf-max')?.value)||100,
-            is_published:     document.getElementById('wf-pub')?.value==='1'
-        };
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e=>{ if(e.target===modal) CMSPage._closeRegModal(); });
+
         try{
-            if(this._editingId){await API.cms.updateWebinar(this._editingId,p);this._toast('Webinar updated');}
-            else{await API.cms.createWebinar(p);this._toast('Webinar created');}
-            this._closeWebForm(); await this._webinars();
-        }catch(e){this._toast(e.message,'error');}
+            const r=await API.cms.getRegistrants(id);
+            const body=document.getElementById('cms-reg-body');
+            if(!body) return;
+            if(!r.count){
+                body.innerHTML=`<div class="text-center py-10 text-gray-500"><i class="fas fa-user-slash text-2xl block mb-2 opacity-30"></i>No registrants yet</div>`;
+                return;
+            }
+            body.innerHTML=`
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-semibold text-white">${r.count} registrant${r.count!==1?'s':''}</span>
+                <span style="background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3);padding:.2rem .65rem;border-radius:9999px;font-size:.72rem;font-weight:700;">
+                    Webinar ID #${id}
+                </span>
+            </div>
+            <div class="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
+                <table class="cms-tbl">
+                    <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Registered At</th></tr></thead>
+                    <tbody>${r.registrants.map((reg,i)=>`<tr>
+                        <td class="text-gray-600 text-xs">${i+1}</td>
+                        <td class="text-white text-sm">${CMSPage._e(reg.full_name||'&#x2014;')}</td>
+                        <td class="text-gray-400 text-xs font-mono">${CMSPage._e(reg.email)}</td>
+                        <td class="text-gray-500 text-xs">${CMSPage._d(reg.registered_at)}</td>
+                    </tr>`).join('')}</tbody>
+                </table>
+            </div>`;
+        }catch(e){
+            const body=document.getElementById('cms-reg-body');
+            if(body) body.innerHTML=`<div class="text-red-400 text-sm text-center py-8"><i class="fas fa-exclamation-triangle mr-2"></i>${CMSPage._e(e.message)}</div>`;
+        }
     },
+
+    _closeRegModal(){ const m=document.getElementById('cms-reg-modal'); if(m) m.remove(); },
+
     async _toggleWebinar(id){ try{const r=await API.cms.toggleWebinar(id);this._toast(r.message);await this._webinars();}catch(e){this._toast(e.message,'error');} },
     async _deleteWebinar(id){ if(!confirm('Delete webinar?'))return; try{await API.cms.deleteWebinar(id);this._toast('Deleted');await this._webinars();}catch(e){this._toast(e.message,'error');} },
 

@@ -21,18 +21,19 @@ from backend.ai_mentor import router as ai_mentor_router
 from backend.ai_insights import router as ai_insights_router
 from backend.stock_terminal_backend import router as stock_router
 from backend.cms import router as cms_router
+from backend.media import router as media_router
 from backend.payments import router as payments_router
 from backend.email_service import router as email_router
 from backend.academy_routes import router as learning_router
 from backend.risk_calculator import router as risk_router
 from backend.database import database, init_database, run_migrations, run_unique_index_migrations
+
 BASE_DIR = Path(__file__).parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 print(f"[PATH DEBUG] __file__ = {__file__}", flush=True)
 print(f"[PATH DEBUG] BASE_DIR = {BASE_DIR}", flush=True)
 print(f"[PATH DEBUG] FRONTEND_DIR = {FRONTEND_DIR}", flush=True)
 
-# M7 — single version constant, referenced everywhere
 APP_VERSION = "2.5.0"
 
 @asynccontextmanager
@@ -46,12 +47,9 @@ async def lifespan(app: FastAPI):
     print("✅ Chart analysis HTTP client initialized")
     from backend.subscriptions import init_subscription_tables
     await init_subscription_tables()
-    # M1 — ensure email tables exist (password_reset_tokens, email_logs, preferences)
     from backend.email_service import ensure_email_tables, start_webinar_reminder_scheduler
     await ensure_email_tables()
-    # Webinar reminder scheduler — fires every hour, sends 24h and 1h reminders
     start_webinar_reminder_scheduler()
-    # M3 — auto-promote admin via ADMIN_EMAIL env var
     admin_email = os.getenv("ADMIN_EMAIL", "").lower().strip()
     if admin_email:
         try:
@@ -161,7 +159,6 @@ async def run_enhanced_signals_migration():
         return False
 
 
-# M4 — rebranded title/description; M7 — use APP_VERSION
 app = FastAPI(
     title="Gopipways API",
     description="Gopipways — Nigeria's Trading Education & AI Platform",
@@ -175,7 +172,7 @@ app.add_middleware(
         "https://gopipways.com",
         "https://www.gopipways.com",
         "http://localhost:8000",
-        "http://localhost:3000",   # M5 — local frontend dev server
+        "http://localhost:3000",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
     ],
@@ -199,6 +196,11 @@ app.include_router(ai_mentor_router,        prefix="/ai/mentor",      tags=["AI 
 app.include_router(ai_insights_router,      prefix="/ai/insights",    tags=["AI Insights"])
 app.include_router(stock_router,            prefix="/api/stock",      tags=["Stock Research"])
 app.include_router(cms_router,              prefix="/cms",            tags=["Content Management"])
+# ── Media library — mounted BEFORE cms_router catches /cms/* ─────────────────
+# Cloudinary-backed: files persist across Railway deployments.
+# Required env vars: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+# Fallback: set MEDIA_STORAGE=db to store files as base64 in PostgreSQL instead.
+app.include_router(media_router,            prefix="/cms/media",      tags=["CMS Media"])
 app.include_router(payments_router,         prefix="/payments",       tags=["Payments"])
 app.include_router(email_router,            prefix="/email",          tags=["Email Services"])
 app.include_router(learning_router,         prefix="/learning",       tags=["Learning Management"])
@@ -311,8 +313,8 @@ async def get_stock_terminal_html():
 async def health_check():
     return {
         "status": "healthy",
-        "version": APP_VERSION,   # M7
-        "platform": "Gopipways",  # M4
+        "version": APP_VERSION,
+        "platform": "Gopipways",
         "features": [
             "Trading Academy", "AI Chart Analysis", "AI Mentor",
             "Performance Analytics", "Enhanced Market Signals",
@@ -327,8 +329,8 @@ async def health_check():
 @app.get("/api/info")
 async def api_info():
     return {
-        "name": "Gopipways API",   # M4
-        "version": APP_VERSION,    # M7
+        "name": "Gopipways API",
+        "version": APP_VERSION,
         "description": "Gopipways — Nigeria's Trading Education & AI Platform",
         "signal_system": {"source": "trading_bot", "fake_data": False, "endpoint": "/api/signals/enhanced"},
         "features": {
@@ -338,8 +340,8 @@ async def api_info():
             "ai_services": "/ai", "chart_analysis": "/ai/chart",
             "performance": "/ai/performance", "ai_mentor": "/ai/mentor",
             "stock_research": "/api/stock", "cms": "/cms",
-            "payments": "/payments", "email": "/email",
-            "learning": "/learning", "risk_calculator": "/risk"
+            "media": "/cms/media", "payments": "/payments",
+            "email": "/email", "learning": "/learning", "risk_calculator": "/risk"
         },
         "documentation": "/docs"
     }
@@ -357,7 +359,6 @@ async def get_favicon():
 async def not_found_handler(request: Request, exc: HTTPException):
     from fastapi.responses import JSONResponse
     path = request.url.path
-    # M2 — removed trailing slashes from all prefix checks
     api_prefixes = (
         "/api", "/auth", "/signals", "/courses", "/webinars",
         "/blog", "/admin", "/ai", "/cms", "/payments",
@@ -365,7 +366,6 @@ async def not_found_handler(request: Request, exc: HTTPException):
     )
     if any(path.startswith(p) for p in api_prefixes):
         return JSONResponse(status_code=404, content={"detail": "Endpoint not found"})
-    # M6 — return a proper 404 page instead of redirect loop
     return HTMLResponse(
         content="""<!DOCTYPE html><html>
         <head><title>Page Not Found — Gopipways</title></head>
@@ -375,7 +375,7 @@ async def not_found_handler(request: Request, exc: HTTPException):
           <p style="color:#94a3b8;">The page you're looking for doesn't exist.</p>
           <a href="/" style="display:inline-block;margin-top:20px;background:#7c3aed;color:white;
              padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
-            ← Back to Gopipways
+            Back to Gopipways
           </a>
         </body></html>""",
         status_code=404
@@ -396,7 +396,7 @@ async def internal_error_handler(request: Request, exc: Exception):
           <p style="color:#94a3b8;">We're working to fix this. Please try again later.</p>
           <a href="/" style="display:inline-block;margin-top:20px;background:#7c3aed;color:white;
              padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">
-            ← Back to Home
+            Back to Home
           </a>
         </body></html>""",
         status_code=500

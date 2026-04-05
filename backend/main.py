@@ -96,13 +96,13 @@ app.add_middleware(
 )
 
 
-# ── WWW → non-WWW redirect ─────────────────────────────────────────────────
+# ── Non-WWW → WWW redirect ─────────────────────────────────────────────────
 @app.middleware("http")
-async def redirect_www(request: Request, call_next):
+async def redirect_to_www(request: Request, call_next):
     host = request.headers.get("host", "")
-    if host.startswith("www."):
-        non_www = host[4:]  # strip "www."
-        url = str(request.url).replace(f"://{host}", f"://{non_www}", 1)
+    # Redirect bare domain to www (skip localhost / Railway internal hosts)
+    if host in ("gopipways.com", "gopipways.com:443", "gopipways.com:8080"):
+        url = str(request.url).replace(f"://{host}", f"://www.{host.split(':')[0]}", 1)
         return RedirectResponse(url, status_code=301)
     return await call_next(request)
 

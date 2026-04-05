@@ -13,3 +13,4 @@ const API = {
         return dashboard.apiRequest(endpoint, opts);
     }
 };
+window.API = API;

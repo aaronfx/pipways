@@ -385,6 +385,18 @@ const DashboardController = class {
             throw new Error('Session expired. Please log in again.');
         }
 
+        if (res.status === 402) {
+            let detail = '';
+            try { detail = (await res.json()).detail || ''; } catch (_) {}
+            if (window.PaymentsPage) {
+                PaymentsPage.showUpgradeModal(detail || 'this feature');
+            }
+            const err = new Error(detail || 'Upgrade required');
+            err.status = 402;
+            err.upgrade = true;
+            throw err;
+        }
+
         if (!res.ok) {
             let msg = `HTTP ${res.status}`;
             try {

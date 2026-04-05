@@ -1228,6 +1228,9 @@
     });
     </script>
 
+    <!-- Paystack Inline JS (must load before payments.js) -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+
     <!-- Dashboard Core & Module Imports (loaded in order) -->
     <script src="/js/modules/dashboard_core.js"></script>
     <script src="/js/modules/dashboard_password_reset.js"></script>
@@ -1238,6 +1241,7 @@
     <script src="/js/modules/dashboard_blog.js"></script>
     <script src="/js/modules/dashboard_mentor.js"></script>
     <script src="/js/modules/dashboard_init.js"></script>
+    <script src="/js/payments.js"></script>
 
     <script src="/js/modules/chart_analysis.js"></script>
     <script src="/js/modules/admin.js"></script>

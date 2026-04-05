@@ -11,7 +11,7 @@ New in v2:
 
 All endpoints require admin authentication via get_admin_user().
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form, Query
 from pydantic import BaseModel
 from typing import Optional, List, Any
 from datetime import datetime
@@ -341,16 +341,62 @@ async def cms_delete_post(post_id: int, _=Depends(get_admin_user)):
     return {"message": "Post deleted"}
 
 @router.post("/blog/{post_id}/toggle-publish")
-async def cms_toggle_post(post_id: int, _=Depends(get_admin_user)):
+async def cms_toggle_post(post_id: int, bg: BackgroundTasks, _=Depends(get_admin_user)):
     """Toggle the published status of a blog post."""
-    r = await _row("SELECT id,is_published FROM blog_posts WHERE id=:id", {"id": post_id})
+    r = await _row("SELECT id,is_published,title,excerpt,slug,category FROM blog_posts WHERE id=:id", {"id": post_id})
     if not r: raise HTTPException(404, "Post not found")
     ns = not bool(r["is_published"])
     # Sync both is_published and legacy status column
     await _exec("UPDATE blog_posts SET is_published=:pub,status=:status,updated_at=:now WHERE id=:id",
                 {"pub": ns, "status": "published" if ns else "draft",
                  "now": datetime.utcnow(), "id": post_id})
+
+    # Send email notifications when publishing (not unpublishing)
+    if ns:
+        bg.add_background_task(_notify_blog_subscribers, r)
+
     return {"is_published": ns, "message": "Published" if ns else "Unpublished"}
+
+
+async def _notify_blog_subscribers(post: dict):
+    """Background task: email all subscribers about a new blog post."""
+    try:
+        from .email_service import send_blog_published_task
+
+        # Gather subscribers: registered users + newsletter subscribers
+        users = await _rows(
+            "SELECT id AS user_id, email, full_name FROM users WHERE is_active = TRUE"
+        )
+        subs = await _rows(
+            "SELECT 0 AS user_id, email, name AS full_name FROM email_subscribers"
+        )
+
+        # Deduplicate by email (registered users take priority)
+        seen = set()
+        recipients = []
+        for u in (users + subs):
+            email = u.get("email", "").lower().strip()
+            if email and email not in seen:
+                seen.add(email)
+                recipients.append({
+                    "user_id": u.get("user_id", 0),
+                    "email": email,
+                    "full_name": u.get("full_name") or "Trader",
+                })
+
+        if recipients:
+            await send_blog_published_task(
+                subscribers=recipients,
+                post_title=post.get("title", "New Post"),
+                post_excerpt=post.get("excerpt", ""),
+                post_slug=post.get("slug", ""),
+                category=post.get("category", "Trading"),
+            )
+            print(f"[BLOG EMAIL] Queued {len(recipients)} notifications for '{post.get('title')}'", flush=True)
+        else:
+            print("[BLOG EMAIL] No subscribers found — skipping", flush=True)
+    except Exception as e:
+        print(f"[BLOG EMAIL] Error sending notifications: {e}", flush=True)
 
 class SEORequest(BaseModel):
     title: str

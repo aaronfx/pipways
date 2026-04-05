@@ -95,6 +95,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── WWW → non-WWW redirect ─────────────────────────────────────────────────
+@app.middleware("http")
+async def redirect_www(request: Request, call_next):
+    host = request.headers.get("host", "")
+    if host.startswith("www."):
+        non_www = host[4:]  # strip "www."
+        url = str(request.url).replace(f"://{host}", f"://{non_www}", 1)
+        return RedirectResponse(url, status_code=301)
+    return await call_next(request)
+
+
 # ── Rate Limiting ────────────────────────────────────────────────────────────
 install_rate_limiter(app)
 

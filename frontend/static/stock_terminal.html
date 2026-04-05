@@ -40,8 +40,14 @@
             background: rgba(124,58,237,.15) !important;
             color: #e5e7eb !important;
         }
-        /* ── Mobile: collapse sidebar to icon-only strip ── */
+        /* ── Mobile: hide sidebar & header (dashboard provides nav & title) ── */
         @media (max-width: 767px) {
+            aside { display: none !important; }
+            main { padding: 1rem !important; }
+            header { display: none !important; }
+        }
+        /* ── Tablet: collapse sidebar to icon-only strip ── */
+        @media (min-width: 768px) and (max-width: 1023px) {
             aside { width: 52px !important; min-width: 52px !important; padding: .75rem .35rem !important; }
             aside nav button span { display: none; }
             aside nav button { justify-content: center; padding: .65rem !important; }
@@ -87,6 +93,26 @@
             </div>
         </div>
     </header>
+
+    <!-- Mobile horizontal tab bar (visible only on mobile, replaces hidden sidebar) -->
+    <div class="md:hidden flex gap-1 px-3 py-2 overflow-x-auto bg-gray-900 border-b border-gray-800" style="scrollbar-width:none;-ms-overflow-style:none;">
+        <button onclick="switchTab('analyzer')" id="mob-tab-analyzer" class="mob-stock-tab active"
+            style="display:flex;align-items:center;gap:.4rem;padding:.45rem .75rem;border-radius:99px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;white-space:nowrap;background:linear-gradient(90deg,#7c3aed,#6d28d9);color:white;">
+            <i class="fas fa-search" style="font-size:.65rem;"></i> Analyze
+        </button>
+        <button onclick="switchTab('portfolio')" id="mob-tab-portfolio" class="mob-stock-tab"
+            style="display:flex;align-items:center;gap:.4rem;padding:.45rem .75rem;border-radius:99px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;white-space:nowrap;background:#1f2937;color:#9ca3af;">
+            <i class="fas fa-briefcase" style="font-size:.65rem;"></i> Portfolio
+        </button>
+        <button onclick="switchTab('compare')" id="mob-tab-compare" class="mob-stock-tab"
+            style="display:flex;align-items:center;gap:.4rem;padding:.45rem .75rem;border-radius:99px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;white-space:nowrap;background:#1f2937;color:#9ca3af;">
+            <i class="fas fa-code-compare" style="font-size:.65rem;"></i> Compare
+        </button>
+        <button onclick="switchTab('ngx')" id="mob-tab-ngx" class="mob-stock-tab"
+            style="display:flex;align-items:center;gap:.4rem;padding:.45rem .75rem;border-radius:99px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;white-space:nowrap;background:#1f2937;color:#9ca3af;">
+            <i class="fas fa-chart-line" style="font-size:.65rem;"></i> NGX
+        </button>
+    </div>
 
     <!-- Body: vertical sidebar + content -->
     <div class="flex min-h-screen">
@@ -740,21 +766,26 @@
 
         function switchTab(tab) {
             const tabs = ['analyzer', 'portfolio', 'compare', 'ngx'];
-            const icons = { analyzer:'#a78bfa', portfolio:'#60a5fa', compare:'#34d399', ngx:'#4ade80' };
             tabs.forEach(t => {
                 document.getElementById('view-' + t).classList.add('hidden');
+                // Sidebar buttons
                 const btn = document.getElementById('tab-' + t);
-                // Inactive style
                 btn.style.background = 'transparent';
                 btn.style.color = '#9ca3af';
                 btn.style.boxShadow = 'none';
+                // Mobile tab buttons
+                const mobBtn = document.getElementById('mob-tab-' + t);
+                if (mobBtn) { mobBtn.style.background = '#1f2937'; mobBtn.style.color = '#9ca3af'; }
             });
             document.getElementById('view-' + tab).classList.remove('hidden');
+            // Sidebar active
             const activeBtn = document.getElementById('tab-' + tab);
-            // Active style — purple gradient matching dashboard
             activeBtn.style.background = 'linear-gradient(90deg,#7c3aed,#6d28d9)';
             activeBtn.style.color = 'white';
             activeBtn.style.boxShadow = '0 4px 14px rgba(124,58,237,.35)';
+            // Mobile active
+            const mobActive = document.getElementById('mob-tab-' + tab);
+            if (mobActive) { mobActive.style.background = 'linear-gradient(90deg,#7c3aed,#6d28d9)'; mobActive.style.color = 'white'; }
         }
 
         async function analyzeStock() {

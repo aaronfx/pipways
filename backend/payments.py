@@ -43,8 +43,8 @@ PLANS = {
     "pro_monthly": {
         "name":        "Pro Monthly",
         "tier":        "pro",
-        "amount_ngn":  5000,
-        "amount_kobo": 5000 * 100,
+        "amount_ngn":  20000,
+        "amount_kobo": 20000 * 100,
         "interval":    "monthly",
         "description": "Unlimited AI Mentor, Chart Analysis, Performance Analytics, Signals + Telegram",
         "features": [
@@ -58,21 +58,21 @@ PLANS = {
     "pro_yearly": {
         "name":        "Pro Yearly",
         "tier":        "pro",
-        "amount_ngn":  45000,
-        "amount_kobo": 45000 * 100,
+        "amount_ngn":  200000,
+        "amount_kobo": 200000 * 100,
         "interval":    "annually",
-        "description": "Everything in Pro, billed yearly. Save N15,000.",
+        "description": "Everything in Pro, billed yearly. Save \u20a640,000.",
         "features": [
             "Everything in Pro Monthly",
-            "Save N15,000 vs monthly billing",
+            "Save \u20a640,000 vs monthly billing",
             "Priority AI response speed",
         ],
     },
     "power_monthly": {
         "name":        "Power Trader",
         "tier":        "pro_plus",
-        "amount_ngn":  12000,
-        "amount_kobo": 12000 * 100,
+        "amount_ngn":  35000,
+        "amount_kobo": 35000 * 100,
         "interval":    "monthly",
         "description": "Everything Pro + unlimited Chart Analysis + AI Stock Terminal",
         "features": [

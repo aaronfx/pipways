@@ -44,8 +44,13 @@ const PaymentsPage = {
                 </div>
             </div>
         `;
-        await this._loadConfig();
-        this._renderPlanCards(document.getElementById('plans-grid'));
+        try {
+            await this._loadConfig();
+        } catch (e) {
+            console.error('[Payments] render failed:', e);
+        }
+        const grid = document.getElementById('plans-grid');
+        if (grid) this._renderPlanCards(grid);
     },
 
     _renderPlanCards(container) {
@@ -57,9 +62,9 @@ const PaymentsPage = {
         const user = Store.getUser();
         const currentTier = user?.subscription_tier || 'free';
 
-        const planOrder = ['pro_monthly', 'pro_annual', 'enterprise_monthly'];
+        const planOrder = ['pro_monthly', 'pro_yearly', 'power_monthly'];
         const badges = {
-            'pro_annual': { text: 'Best Value', color: '#10b981' },
+            'pro_yearly': { text: 'Best Value', color: '#10b981' },
             'pro_monthly': { text: 'Most Popular', color: '#3b82f6' },
         };
 
@@ -70,10 +75,10 @@ const PaymentsPage = {
             const badge = badges[key];
 
             return `
-            <div style="background:white;border-radius:1rem;padding:2rem;border:2px solid ${isActive ? '#3b82f6' : '#e5e7eb'};
-                        position:relative;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:box-shadow .2s;"
-                 onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.12)'"
-                 onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'">
+            <div style="background:#111827;border-radius:1rem;padding:2rem;border:2px solid ${isActive ? '#3b82f6' : '#1f2937'};
+                        position:relative;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:box-shadow .2s, border-color .2s;"
+                 onmouseover="this.style.boxShadow='0 10px 25px rgba(0,0,0,.4)';this.style.borderColor='#374151'"
+                 onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.3)';this.style.borderColor='${isActive ? '#3b82f6' : '#1f2937'}'">
 
                 ${badge ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);
                     background:${badge.color};color:white;font-size:.75rem;font-weight:700;
@@ -81,15 +86,15 @@ const PaymentsPage = {
 
                 ${isActive ? `<div style="position:absolute;top:-12px;right:1rem;
                     background:#10b981;color:white;font-size:.75rem;font-weight:700;
-                    padding:.25rem .75rem;border-radius:99px;">✓ Current Plan</div>` : ''}
+                    padding:.25rem .75rem;border-radius:99px;">Current Plan</div>` : ''}
 
-                <h3 style="font-size:1.25rem;font-weight:700;color:#111827;margin-bottom:.5rem;">
+                <h3 style="font-size:1.25rem;font-weight:700;color:#f9fafb;margin-bottom:.5rem;">
                     ${plan.name}
                 </h3>
-                <p style="color:#6b7280;font-size:.875rem;margin-bottom:1.5rem;">${plan.description}</p>
+                <p style="color:#9ca3af;font-size:.875rem;margin-bottom:1.5rem;">${plan.description}</p>
 
                 <div style="margin-bottom:1.5rem;">
-                    <span style="font-size:2.25rem;font-weight:800;color:#111827;">
+                    <span style="font-size:2.25rem;font-weight:800;color:#f9fafb;">
                         ₦${plan.amount_ngn.toLocaleString()}
                     </span>
                     <span style="color:#9ca3af;font-size:.875rem;">
@@ -100,7 +105,7 @@ const PaymentsPage = {
                 <ul style="list-style:none;padding:0;margin-bottom:1.5rem;">
                     ${(plan.features || []).map(f => `
                         <li style="display:flex;align-items:center;gap:.5rem;padding:.375rem 0;
-                                   font-size:.875rem;color:#374151;border-bottom:1px solid #f3f4f6;">
+                                   font-size:.875rem;color:#d1d5db;border-bottom:1px solid #1f2937;">
                             <i class="fas fa-check" style="color:#10b981;flex-shrink:0;"></i>
                             ${f}
                         </li>
@@ -109,7 +114,7 @@ const PaymentsPage = {
 
                 ${isActive
                     ? `<button disabled style="width:100%;padding:.75rem;border-radius:.5rem;
-                          background:#f3f4f6;color:#9ca3af;border:none;font-weight:600;cursor:default;">
+                          background:#1f2937;color:#9ca3af;border:none;font-weight:600;cursor:default;">
                           Active Plan
                        </button>`
                     : `<button onclick="PaymentsPage.startPayment('${key}')"
@@ -133,7 +138,7 @@ const PaymentsPage = {
         const currentTier = user?.subscription_tier || 'free';
 
         // Suggest pro_monthly as default upgrade
-        const suggestedKey = currentTier === 'pro' ? 'enterprise_monthly' : 'pro_monthly';
+        const suggestedKey = currentTier === 'pro' ? 'power_monthly' : 'pro_monthly';
         const plan = this._plans?.[suggestedKey];
 
         UI.showModal(`
@@ -206,7 +211,7 @@ const PaymentsPage = {
         // Get a reference from backend (backend stores metadata)
         let reference;
         try {
-            const init = await API.request('/payments/initialize', {
+            const init = await API.request('/payments/initiate', {
                 method: 'POST',
                 body: JSON.stringify({ plan_key: planKey }),
             });

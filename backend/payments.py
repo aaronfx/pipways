@@ -123,27 +123,31 @@ async def _paystack_get(path: str) -> dict:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@router.get("/config")
+async def get_config():
+    """Return Paystack public key for frontend Inline JS."""
+    if not PAYSTACK_PUBLIC_KEY:
+        raise HTTPException(503, "Payment system not configured")
+    return {"public_key": PAYSTACK_PUBLIC_KEY}
+
+
 @router.get("/plans")
 async def get_plans():
     """
-    Return all available plans with Naira pricing.
-    Public — no auth required (used on pricing page).
+    Return all available plans with Naira pricing keyed by plan key.
+    Public — no auth required (used on pricing page & subscription section).
     """
     return {
-        "currency": "NGN",
-        "note": "Trading Academy is FREE for all users. These plans unlock AI tools.",
-        "plans": [
-            {
-                "key":         key,
-                "name":        plan["name"],
-                "tier":        plan["tier"],
-                "amount_ngn":  plan["amount_ngn"],
-                "interval":    plan["interval"],
-                "description": plan["description"],
-                "features":    plan["features"],
-            }
-            for key, plan in PLANS.items()
-        ],
+        key: {
+            "name":        plan["name"],
+            "tier":        plan["tier"],
+            "amount_ngn":  plan["amount_ngn"],
+            "amount":      plan["amount_kobo"],
+            "interval":    plan["interval"],
+            "description": plan["description"],
+            "features":    plan["features"],
+        }
+        for key, plan in PLANS.items()
     }
 
 

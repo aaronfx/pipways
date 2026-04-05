@@ -259,7 +259,8 @@ const ChartAnalysisPage = {
 
         } catch (error) {
             // ── 402 limit reached — show upgrade modal instead of raw error ──
-            if (error.message && (error.message.includes('limit_reached') || error.message.includes('402'))) {
+            const errMsg = error?.message || error?.detail || String(error || '');
+            if (errMsg && (errMsg.includes('limit_reached') || errMsg.includes('402') || error?.status === 402 || error?.upgrade)) {
                 // Show upgrade UI
                 if (results) results.innerHTML = `
                     <div style="text-align:center;padding:3rem;background:#111827;border-radius:12px;border:1px solid #374151;">
@@ -336,11 +337,13 @@ const ChartAnalysisPage = {
             if (exhausted) {
                 userMsg = 'The server is taking too long to wake up. Please wait 30 seconds and try again.';
             } else {
+                // Extract a readable message from various error shapes
+                const msg = error?.message || error?.detail || '';
                 try {
-                    const parsed = JSON.parse(error.message);
-                    userMsg = parsed.detail || parsed.error || error.message;
+                    const parsed = JSON.parse(msg);
+                    userMsg = parsed.detail || parsed.error || msg;
                 } catch (_) {
-                    userMsg = error.message;
+                    userMsg = msg || (typeof error === 'string' ? error : 'Analysis failed. Please try again.');
                 }
             }
             results.innerHTML = `

@@ -17,16 +17,57 @@ const PaymentsPage = {
     _plans: null,
     _publicKey: null,
 
-    // ── Load config from backend ────────────────────────────────────────────
+    // ── Hardcoded fallback plans (shown if backend is unreachable) ────────
+    _fallbackPlans: {
+        pro_monthly: {
+            name: 'Pro Monthly', tier: 'pro', amount_ngn: 5000, amount: 500000,
+            interval: 'monthly', description: 'Unlimited AI Mentor, Chart Analysis, Performance Analytics, Signals + Telegram',
+            features: ['Unlimited AI Mentor sessions', '20 Chart Analyses per month', 'Unlimited Performance Analytics', 'Full trading signals + Telegram alerts', 'Webinar recordings access']
+        },
+        pro_yearly: {
+            name: 'Pro Yearly', tier: 'pro', amount_ngn: 45000, amount: 4500000,
+            interval: 'annually', description: 'Everything in Pro, billed yearly. Save N15,000.',
+            features: ['Everything in Pro Monthly', 'Save N15,000 vs monthly billing', 'Priority AI response speed']
+        },
+        power_monthly: {
+            name: 'Power Trader', tier: 'pro_plus', amount_ngn: 12000, amount: 1200000,
+            interval: 'monthly', description: 'Everything Pro + unlimited Chart Analysis + AI Stock Terminal',
+            features: ['Everything in Pro', 'Unlimited Chart Analyses', 'AI Stock Research Terminal', 'Earliest access to new features']
+        }
+    },
+
+    // ── Load config from backend (with timeout) ────────────────────────────
     async _loadConfig() {
         if (this._plans && this._publicKey) return;
+
+        const timeout = (ms) => new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), ms));
+
         try {
-            const config = await API.request('/payments/config');
+            const config = await Promise.race([
+                API.request('/payments/config'),
+                timeout(8000)
+            ]);
             this._publicKey = config.public_key;
-            const full = await API.request('/payments/plans');
-            this._plans = full;
         } catch (e) {
-            console.error('[Payments] Failed to load config:', e);
+            console.warn('[Payments] Config unavailable:', e.message || e);
+        }
+
+        try {
+            const full = await Promise.race([
+                API.request('/payments/plans'),
+                timeout(8000)
+            ]);
+            if (full && typeof full === 'object' && Object.keys(full).length > 0) {
+                this._plans = full;
+            }
+        } catch (e) {
+            console.warn('[Payments] Plans unavailable, using fallback:', e.message || e);
+        }
+
+        // Always fall back to hardcoded plans if backend didn't return any
+        if (!this._plans) {
+            this._plans = this._fallbackPlans;
         }
     },
 

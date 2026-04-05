@@ -1,6 +1,6 @@
 /**
  * cms.js v2 — Core CMS Module (shell)
- * Tabs: Blog · LMS · Signals · Webinars · Users · Media · Limits · Settings
+ * Tabs: Blog · LMS · Signals · Webinars · Users · Media · Pricing · Limits · Settings
  *
  * Feature-specific methods are in separate modules:
  *   - cms_blog.js
@@ -200,6 +200,7 @@ const CMSPage = {
             {id:'webinars',icon:'fa-video',         label:'Webinars'},
             {id:'users',   icon:'fa-users',         label:'Users'},
             {id:'media',   icon:'fa-photo-video',   label:'Media'},
+            {id:'pricing', icon:'fa-tags',            label:'Pricing'},
             {id:'limits',  icon:'fa-sliders-h',     label:'Feature Limits'},
             {id:'settings',icon:'fa-cog',           label:'Settings'},
         ];
@@ -209,7 +210,7 @@ const CMSPage = {
                 <h2 class="text-2xl font-bold text-white flex items-center gap-2">
                     <i class="fas fa-layer-group text-purple-400"></i> Content Management
                 </h2>
-                <p class="text-sm text-gray-500 mt-0.5">Blog · LMS · Signals · Webinars · Users · Media · Limits · Settings</p>
+                <p class="text-sm text-gray-500 mt-0.5">Blog · LMS · Signals · Webinars · Users · Media · Pricing · Limits · Settings</p>
             </div>
         </div>
         <div class="flex gap-1 mb-5 p-1 rounded-xl bg-gray-800/60 border border-gray-700 flex-wrap">
@@ -236,7 +237,7 @@ const CMSPage = {
     async _loadTab(tab){
         const map={blog:()=>this._blog(),lms:()=>this._lms(),signals:()=>this._signals(),
                    webinars:()=>this._webinars(),users:()=>this._users(),
-                   media:()=>this._media(),limits:()=>this._limits(),settings:()=>this._settings()};
+                   media:()=>this._media(),pricing:()=>this._pricing(),limits:()=>this._limits(),settings:()=>this._settings()};
         if(map[tab]) await map[tab]();
     },
 };

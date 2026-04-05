@@ -104,7 +104,91 @@ async _saveSettings(){
     document.querySelectorAll('[id^="s-"]').forEach(el=>{ updates[el.id.slice(2)]=el.value; });
     try{await API.cms.saveSettings(updates);this._toast('Settings saved');}
     catch(e){this._toast(e.message,'error');}
-},_togCheck(id, onVal='1', offVal='0'){
+},
+
+// ── Pricing Plans CMS ─────────────────────────────────────────────────────
+async _pricing(){
+    const pane=document.getElementById('cms-pane-pricing'); if(!pane) return;
+    pane.innerHTML=`<div class="text-gray-400 text-sm text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading plans…</div>`;
+    let s={}; try{s=await API.cms.getSettings();}catch(_){}
+    const g=(k,fb='')=>this._e(s[k]!=null?s[k]:fb);
+
+    const plans=[
+        {key:'pro_monthly', label:'Pro Monthly', color:'#7c3aed', icon:'fa-bolt',
+         defaults:{name:'Pro Monthly',amount:'20000',interval:'monthly',
+                   description:'Unlimited AI Mentor, Chart Analysis, Performance Analytics, Signals + Telegram',
+                   features:'Unlimited AI Mentor sessions\n20 Chart Analyses per month\nUnlimited Performance Analytics\nFull trading signals + Telegram alerts\nWebinar recordings access'}},
+        {key:'pro_yearly', label:'Pro Yearly', color:'#3b82f6', icon:'fa-calendar-alt',
+         defaults:{name:'Pro Yearly',amount:'200000',interval:'annually',
+                   description:'Everything in Pro, billed yearly. Save ₦40,000.',
+                   features:'Everything in Pro Monthly\nSave ₦40,000 vs monthly billing\nPriority AI response speed'}},
+        {key:'power_monthly', label:'Power Trader', color:'#f59e0b', icon:'fa-crown',
+         defaults:{name:'Power Trader',amount:'35000',interval:'monthly',
+                   description:'Everything Pro + unlimited Chart Analysis + AI Stock Terminal',
+                   features:'Everything in Pro\nUnlimited Chart Analyses\nAI Stock Research Terminal\nEarliest access to new features'}},
+    ];
+
+    pane.innerHTML=`
+    <div class="chdr">
+        <h3 class="text-white font-semibold flex items-center gap-2"><i class="fas fa-tags text-green-400"></i> Subscription Plans</h3>
+        <button class="cb cb-p" onclick="CMSPage._savePricing()"><i class="fas fa-save"></i> Save All Plans</button>
+    </div>
+    <p class="text-gray-400 text-sm mb-4">Edit plan names, prices, descriptions and features. Changes take effect immediately after saving.</p>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        ${plans.map(p=>{
+            const pfx='plan_'+p.key+'_';
+            return `
+        <div class="ccard" style="border-color:${p.color}33;">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;">
+                <div style="width:38px;height:38px;border-radius:.5rem;background:${p.color}20;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas ${p.icon}" style="color:${p.color};font-size:.95rem;"></i>
+                </div>
+                <div><div class="text-white font-semibold text-sm">${p.label}</div><div class="text-gray-500 text-xs">${g(pfx+'interval',p.defaults.interval)}</div></div>
+            </div>
+            <div style="margin-bottom:.6rem;">
+                <label class="text-xs text-gray-400">Plan Name</label>
+                <input class="ci" id="p-${pfx}name" value="${g(pfx+'name',p.defaults.name)}" style="margin-top:.25rem;">
+            </div>
+            <div style="margin-bottom:.6rem;">
+                <label class="text-xs text-gray-400">Price (₦)</label>
+                <input type="number" class="ci" id="p-${pfx}amount" value="${g(pfx+'amount',p.defaults.amount)}" style="margin-top:.25rem;" min="0">
+            </div>
+            <div style="margin-bottom:.6rem;">
+                <label class="text-xs text-gray-400">Billing Interval</label>
+                <select class="cs" id="p-${pfx}interval" style="margin-top:.25rem;">
+                    ${['monthly','annually'].map(iv=>`<option value="${iv}"${(g(pfx+'interval',p.defaults.interval))===iv?' selected':''}>${iv.charAt(0).toUpperCase()+iv.slice(1)}</option>`).join('')}
+                </select>
+            </div>
+            <div style="margin-bottom:.6rem;">
+                <label class="text-xs text-gray-400">Short Description</label>
+                <input class="ci" id="p-${pfx}description" value="${g(pfx+'description',p.defaults.description)}" style="margin-top:.25rem;">
+            </div>
+            <div style="margin-bottom:.6rem;">
+                <label class="text-xs text-gray-400">Features (one per line)</label>
+                <textarea class="ci" id="p-${pfx}features" rows="5" style="margin-top:.25rem;resize:vertical;">${g(pfx+'features',p.defaults.features)}</textarea>
+            </div>
+            <div style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid #374151;display:flex;align-items:center;gap:.5rem;">
+                <label class="ctog" onclick="CMSPage._togCheck('p-${pfx}enabled')">
+                    <div class="ttrack${(g(pfx+'enabled','1'))==='0'?'':' on'}"><div class="tthumb"></div></div>
+                    <input type="hidden" id="p-${pfx}enabled" value="${g(pfx+'enabled','1')}">
+                </label>
+                <span class="text-xs text-gray-500">Plan visible to users</span>
+            </div>
+        </div>`;
+        }).join('')}
+    </div>`;
+},
+async _savePricing(){
+    const updates={};
+    document.querySelectorAll('[id^="p-plan_"]').forEach(el=>{
+        const key=el.id.slice(2); // strip 'p-'
+        updates[key]=el.value;
+    });
+    try{await API.cms.saveSettings(updates);this._toast('Plans saved — prices updated live');}
+    catch(e){this._toast(e.message,'error');}
+},
+
+_togCheck(id, onVal='1', offVal='0'){
     const el=document.getElementById(id); if(!el) return;
     const isOn=el.value===onVal;
     el.value=isOn?offVal:onVal;

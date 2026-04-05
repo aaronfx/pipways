@@ -85,6 +85,45 @@ PLANS = {
 }
 
 
+async def _get_live_plans() -> dict:
+    """
+    Return plans dict, merging hardcoded PLANS with any overrides from
+    site_settings (keys like plan_pro_monthly_amount, plan_pro_monthly_name, etc.).
+    """
+    import copy
+    plans = copy.deepcopy(PLANS)
+    try:
+        rows = await database.fetch_all("SELECT key, value FROM site_settings WHERE key LIKE 'plan_%'")
+        overrides = {r["key"]: r["value"] for r in rows}
+    except Exception:
+        return plans
+
+    for plan_key in list(plans.keys()):
+        pfx = f"plan_{plan_key}_"
+        # Check if plan is disabled
+        if overrides.get(pfx + "enabled") == "0":
+            del plans[plan_key]
+            continue
+        if pfx + "name" in overrides:
+            plans[plan_key]["name"] = overrides[pfx + "name"]
+        if pfx + "amount" in overrides:
+            try:
+                amt = int(overrides[pfx + "amount"])
+                plans[plan_key]["amount_ngn"] = amt
+                plans[plan_key]["amount_kobo"] = amt * 100
+            except ValueError:
+                pass
+        if pfx + "interval" in overrides:
+            plans[plan_key]["interval"] = overrides[pfx + "interval"]
+        if pfx + "description" in overrides:
+            plans[plan_key]["description"] = overrides[pfx + "description"]
+        if pfx + "features" in overrides:
+            plans[plan_key]["features"] = [
+                f.strip() for f in overrides[pfx + "features"].split("\n") if f.strip()
+            ]
+    return plans
+
+
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class InitiatePaymentRequest(BaseModel):
@@ -136,7 +175,9 @@ async def get_plans():
     """
     Return all available plans with Naira pricing keyed by plan key.
     Public — no auth required (used on pricing page & subscription section).
+    Reads overrides from site_settings so admins can change pricing via CMS.
     """
+    plans = await _get_live_plans()
     return {
         key: {
             "name":        plan["name"],
@@ -147,7 +188,7 @@ async def get_plans():
             "description": plan["description"],
             "features":    plan["features"],
         }
-        for key, plan in PLANS.items()
+        for key, plan in plans.items()
     }
 
 
@@ -166,9 +207,10 @@ async def initiate_payment(
       3. Paystack redirects to APP_URL/payments/callback?reference=...
       4. POST /payments/verify/{reference}  → tier upgraded
     """
-    plan = PLANS.get(body.plan_key)
+    live_plans = await _get_live_plans()
+    plan = live_plans.get(body.plan_key)
     if not plan:
-        raise HTTPException(400, f"Unknown plan: {body.plan_key}. Valid: {list(PLANS.keys())}")
+        raise HTTPException(400, f"Unknown plan: {body.plan_key}. Valid: {list(live_plans.keys())}")
 
     user_id = get_user_id(current_user)
     email = (

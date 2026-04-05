@@ -131,6 +131,7 @@
         .buy-stop { padding: 4px 12px; border-radius: 6px; background: rgba(34, 197, 94, 0.2); color: #22c55e; font-size: 12px; font-weight: 700; }
         .sell-stop { padding: 4px 12px; border-radius: 6px; background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 12px; font-weight: 700; }
         .trade-levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+        @media (max-width:479px) { .trade-levels { grid-template-columns: 1fr 1fr; } }
         .level-item { text-align: center; padding: 8px; background: rgba(31, 41, 55, 0.5); border-radius: 8px; }
         .level-label { display: block; font-size: 10px; color: #9ca3af; margin-bottom: 4px; }
         .level-value { display: block; font-size: 14px; font-weight: 700; font-family: monospace; }
@@ -165,9 +166,11 @@
         .mentor-prose h3 { color:white; font-weight:700; font-size:.9rem; margin:.75rem 0 .3rem; }
         .mentor-prose hr { border-color:#374151; margin:.6rem 0; }
         .mentor-prose a { color:#a78bfa; text-decoration:underline; }
-        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
+        .pw-toast { position:fixed; bottom:1.5rem; right:1.5rem; left:1.5rem; z-index:99999; display:flex; align-items:center; gap:.75rem;
             padding:.75rem 1.1rem; border-radius:.75rem; font-size:.83rem; font-weight:600; max-width:340px;
             box-shadow:0 12px 40px rgba(0,0,0,.55); animation:fadeIn .3s ease-out both; pointer-events:none; }
+        @media (min-width:768px) { .pw-toast { left:auto; } }
+        @media (max-width:767px) { .pw-toast { max-width:none; bottom:5rem; } }
         .pw-toast.success { background:rgba(16,185,129,.92); color:white; border:1px solid rgba(52,211,153,.4); }
         .pw-toast.error   { background:rgba(239,68,68,.92);  color:white; border:1px solid rgba(248,113,113,.4); }
         .pw-toast.info    { background:rgba(59,130,246,.92); color:white; border:1px solid rgba(96,165,250,.4); }
@@ -191,7 +194,7 @@
         .pw-course-item:last-child { border-bottom:none; padding-bottom:0; }
         .pw-blog-item { display:flex; gap:.75rem; padding:.75rem 0; border-bottom:1px solid #1f2937; align-items:flex-start; }
         .pw-blog-item:last-child { border-bottom:none; padding-bottom:0; }
-        .nav-section-label { font-size:.62rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#9ca3af; padding:.6rem .75rem .25rem; margin-top:.5rem; }
+        .nav-section-label { font-size:.65rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#9ca3af; padding:.6rem .75rem .25rem; margin-top:.5rem; }
         .pw-breadcrumb { display:flex; align-items:center; gap:.4rem; font-size:.75rem; color:#6b7280; flex-wrap:wrap; }
         .pw-breadcrumb a { color:#a78bfa; text-decoration:none; transition:color .15s; }
         .pw-breadcrumb a:hover { color:#c4b5fd; }
@@ -234,8 +237,12 @@
             #section-dashboard .pw-card > div[class*="grid"] > a,
             #section-dashboard .pw-card > div[class*="grid"] > button { padding: 1rem !important; }
             #quick-actions button { font-size: .7rem; padding: .4rem .7rem; }
-            #mentor-messages .max-w-\[85\%\] { max-width: 90% !important; }
+            #mentor-messages .max-w-\[85\%\] { max-width: 92% !important; }
             #mentor-rec-grid .text-sm { font-size: .8rem; }
+            body { scrollbar-width: none; -ms-overflow-style: none; }
+            body::-webkit-scrollbar { display: none; }
+            .pw-section-label { font-size:.72rem; }
+            .pw-stat-sub { font-size:.7rem; }
         }
         :focus-visible { outline: 2px solid #a78bfa !important; outline-offset: 2px !important; border-radius: 4px; }
         button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
@@ -267,17 +274,19 @@
             align-items: center;
             justify-content: center;
             gap: 3px;
-            font-size: .6rem;
+            font-size: .65rem;
             font-weight: 600;
             color: #6b7280;
             border: none;
             background: transparent;
             cursor: pointer;
             transition: color .15s;
-            padding: 0;
+            padding: 6px 0;
             position: relative;
+            min-width: 44px;
+            min-height: 44px;
         }
-        .mob-nav-btn i { font-size: .95rem; }
+        .mob-nav-btn i { font-size: 1.05rem; }
         .mob-nav-btn.active { color: #a78bfa; }
         .mob-nav-btn:active { opacity: .7; }
         /* Centre Analyse button — elevated pill */
@@ -304,11 +313,11 @@
             position: absolute;
             bottom: 8px;
             color: white;
-            font-size: .55rem;
+            font-size: .6rem;
             font-weight: 700;
             gap: 2px;
         }
-        .mob-nav-centre-btn i { font-size: 1.1rem; }
+        .mob-nav-centre-btn i { font-size: 1.15rem; }
         .mob-nav-centre-btn:active { transform: scale(.93); }
     </style>
 </head>
@@ -448,7 +457,7 @@
             <div class="ticker-track" id="ticker-track"></div>
         </div>
 
-        <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-6 py-3 flex justify-between items-center">
+        <header class="bg-gray-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-800 px-3 md:px-6 py-3 flex justify-between items-center">
             <div class="md:hidden" style="width:60px;"></div>
             <div>
                 <nav id="header-breadcrumb" class="pw-breadcrumb mb-0.5 hidden"></nav>
@@ -474,7 +483,7 @@
                         <span id="notif-dot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" aria-label="Unread notifications"></span>
                     </button>
                     <div id="notif-panel"
-                         class="hidden absolute right-0 mt-2 w-72 rounded-xl border overflow-hidden z-50"
+                         class="hidden absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border overflow-hidden z-50"
                          style="background:#111827;border-color:#1f2937;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);">
                         <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color:#1f2937;">
                             <span class="text-sm font-semibold text-white">Notifications</span>

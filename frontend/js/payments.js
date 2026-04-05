@@ -12,6 +12,50 @@
  *   PaymentsPage.render(container)           — full pricing page
  */
 
+// ── Inline helpers (avoid dependency on ui.js / store.js) ──────────────────
+const _pw = {
+    _toastBox: null,
+    _ensureToastBox() {
+        if (this._toastBox) return this._toastBox;
+        let box = document.getElementById('pw-toast-container');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'pw-toast-container';
+            box.style.cssText = 'position:fixed;bottom:2rem;right:2rem;z-index:9999;display:flex;flex-direction:column;gap:.75rem;';
+            document.body.appendChild(box);
+        }
+        this._toastBox = box;
+        return box;
+    },
+    toast(msg, type = 'info') {
+        const colors = { success:'#10b981', error:'#ef4444', warning:'#f59e0b', info:'#3b82f6' };
+        const t = document.createElement('div');
+        t.style.cssText = `background:#1f2937;color:#f3f4f6;border-left:4px solid ${colors[type]||colors.info};padding:.75rem 1.25rem;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:260px;max-width:400px;display:flex;justify-content:space-between;align-items:center;`;
+        t.innerHTML = `<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#9ca3af;margin-left:.75rem;">&times;</button>`;
+        this._ensureToastBox().appendChild(t);
+        setTimeout(() => { if (t.parentElement) t.remove(); }, 5000);
+    },
+    modal(content) {
+        const m = document.createElement('div');
+        m.className = 'pw-modal-overlay';
+        m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;';
+        m.innerHTML = `<div style="background:#1f2937;color:#f3f4f6;border-radius:1rem;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,.4);position:relative;">
+            <button onclick="this.closest('.pw-modal-overlay').remove()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.5rem;cursor:pointer;color:#9ca3af;">&times;</button>
+            <div style="padding:2rem;">${content}</div></div>`;
+        m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+        document.body.appendChild(m);
+    },
+    closeModal() { document.querySelectorAll('.pw-modal-overlay').forEach(m => m.remove()); }
+};
+
+// Provide global UI/Router shims if they don't already exist
+if (typeof UI === 'undefined') {
+    window.UI = { showToast: (m,t) => _pw.toast(m,t), showModal: c => _pw.modal(c), closeModal: () => _pw.closeModal() };
+}
+if (typeof Router === 'undefined') {
+    window.Router = { navigate(path) { window.location.href = path; } };
+}
+
 const PaymentsPage = {
 
     _plans: null,
@@ -100,7 +144,7 @@ const PaymentsPage = {
             return;
         }
 
-        const user = Store.getUser();
+        const user = JSON.parse(localStorage.getItem('pipways_user') || 'null');
         const currentTier = user?.subscription_tier || 'free';
 
         const planOrder = ['pro_monthly', 'pro_yearly', 'power_monthly'];
@@ -175,7 +219,7 @@ const PaymentsPage = {
     async showUpgradeModal(featureName = 'this feature') {
         await this._loadConfig();
 
-        const user = Store.getUser();
+        const user = JSON.parse(localStorage.getItem('pipways_user') || 'null');
         const currentTier = user?.subscription_tier || 'free';
 
         // Suggest pro_monthly as default upgrade
@@ -232,7 +276,7 @@ const PaymentsPage = {
     async startPayment(planKey) {
         await this._loadConfig();
 
-        const user = Store.getUser();
+        const user = JSON.parse(localStorage.getItem('pipways_user') || 'null');
         if (!user) {
             UI.showToast('Please log in to upgrade', 'warning');
             return;
@@ -285,7 +329,6 @@ const PaymentsPage = {
                     // Update local user object with new tier
                     const updated = { ...user, subscription_tier: result.tier };
                     localStorage.setItem('pipways_user', JSON.stringify(updated));
-                    Store.state.user = updated;
 
                     // Redirect to dashboard
                     setTimeout(() => Router.navigate('/dashboard'), 1500);
